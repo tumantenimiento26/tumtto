@@ -1,0 +1,86 @@
+{
+  "project": "Tumantenimiento",
+  "description": "Plataforma mexicana de servicios de mantenimiento — indice navegable de prototipos.",
+  "version": "1.0",
+  "generated": "2026-05-22",
+  "totals": { "files": 40, "screens": 136, "components": 35, "audiences": 3 },
+  "tokens": {
+    "primaryBlue": "#0A6BCF",
+    "deepNavy": "#0E2C56",
+    "accentCyan": "#18C1FF",
+    "successGreen": "#18A66A",
+    "warningAmber": "#F59E0B",
+    "errorRed": "#DC2626",
+    "fonts": { "ui": "Inter", "display": "Manrope", "mono": "JetBrains Mono" }
+  },
+  "sections": [
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "subtitle": "Sistema de diseno y libreria de componentes — la base tecnica.",
+      "items": [
+        { "file": "Design System.html", "title": "Design System", "description": "Marca, paleta, tipografia y los componentes base del sistema visual.", "icon": "palette", "badge": "Design System" },
+        { "file": "UILibraryPrimitives.html", "title": "UI · Primitives", "description": "Atomos del sistema: botones, inputs, badges, avatares y rating.", "icon": "box", "components": 7 },
+        { "file": "UILibraryContainers.html", "title": "UI · Containers", "description": "Tarjetas, list items, estados vacios, loaders y alertas.", "icon": "layout-grid", "components": 5 },
+        { "file": "UILibraryNavigation.html", "title": "UI · Navigation", "description": "Tab bars, app bars, sidebar, breadcrumbs y tabs.", "icon": "navigation", "components": 5 },
+        { "file": "UILibraryForms.html", "title": "UI · Forms", "description": "Selects, date y time pickers, toggles, checkboxes y carga de fotos.", "icon": "clipboard-list", "components": 6 },
+        { "file": "UILibraryDataDisplay.html", "title": "UI · Data Display", "description": "Tablas, KPI cards, lineas de tiempo y filas de estadisticas.", "icon": "bar-chart-3", "components": 4 },
+        { "file": "UILibraryDomain.html", "title": "UI · Domain", "description": "Componentes de negocio: tecnico, servicio, precios, chat y KYC.", "icon": "package", "components": 8 }
+      ]
+    },
+    {
+      "id": "cliente",
+      "title": "Cliente · Mobile",
+      "subtitle": "El viaje del cliente, de la primera apertura a su cuenta.",
+      "items": [
+        { "file": "Onboarding.html", "title": "Onboarding", "description": "Splash, carrusel de valor, seleccion de rol y registro con codigo OTP.", "icon": "sparkles", "screens": 7, "platform": "mobile" },
+        { "file": "B2.html", "title": "Onboarding · Datos", "description": "Continuacion tras el OTP: datos personales, direccion y permisos.", "icon": "user-plus", "screens": 4, "platform": "mobile" },
+        { "file": "Home.html", "title": "Home", "description": "Pantalla de inicio con categorias y tecnicos destacados cerca del cliente.", "icon": "home", "screens": 1, "platform": "mobile" },
+        { "file": "Discovery.html", "title": "Descubrimiento", "description": "Busqueda de tecnicos en vista de lista, mapa y filtros avanzados.", "icon": "search", "screens": 4, "platform": "mobile" },
+        { "file": "Profile.html", "title": "Perfil del Tecnico", "description": "Perfil publico del tecnico — la pantalla decisiva para contratar.", "icon": "badge-check", "screens": 1, "platform": "mobile" },
+        { "file": "Wizard.html", "title": "Solicitud de Servicio", "description": "Wizard de cinco pasos: problema, direccion, fecha, resumen y envio.", "icon": "list-checks", "screens": 5, "platform": "mobile" },
+        { "file": "Tracking.html", "title": "Seguimiento", "description": "Seguimiento del servicio en vivo a traves de seis estados clave.", "icon": "route", "screens": 7, "platform": "mobile" },
+        { "file": "Inbox.html", "title": "Mensajes", "description": "Bandeja de mensajes del cliente con busqueda, filtros y estados vacios.", "icon": "inbox", "screens": 6, "platform": "mobile" },
+        { "file": "Chat.html", "title": "Chat", "description": "Conversacion entre cliente y tecnico con adjuntos y moderacion.", "icon": "message-circle", "screens": 3, "platform": "mobile" },
+        { "file": "Pago.html", "title": "Pago", "description": "Flujo de pago con tarjeta, OXXO, efectivo y confirmacion anti-fraude.", "icon": "credit-card", "screens": 8, "platform": "mobile" },
+        { "file": "Calificacion.html", "title": "Calificacion", "description": "Calificacion del servicio con flujo positivo y manejo de casos negativos.", "icon": "star", "screens": 5, "platform": "mobile" },
+        { "file": "MisServicios.html", "title": "Mis Servicios", "description": "Historico del cliente: servicios activos, completados y cancelados.", "icon": "history", "screens": 4, "platform": "mobile" },
+        { "file": "PerfilCliente.html", "title": "Perfil del Cliente", "description": "Mi cuenta: perfil, direcciones, metodos de pago y baja de cuenta.", "icon": "user", "screens": 7, "platform": "mobile" }
+      ]
+    },
+    {
+      "id": "tecnico",
+      "title": "Tecnico · PRO",
+      "subtitle": "El viaje del tecnico, del alta a la ejecucion del servicio.",
+      "items": [
+        { "file": "TecnicoOnboarding.html", "title": "Onboarding PRO", "description": "Alta del tecnico: bienvenida, celular, datos, zona de cobertura e INE.", "icon": "hard-hat", "screens": 6, "platform": "mobile", "pro": true },
+        { "file": "TecnicoPerfilTarifas.html", "title": "Perfil + Tarifas", "description": "Pasos finales del alta: perfil profesional, categorias y tarifas base.", "icon": "tag", "screens": 2, "platform": "mobile", "pro": true },
+        { "file": "TecnicoHome.html", "title": "Home PRO", "description": "Inbox de solicitudes del tecnico en tres estados de actividad.", "icon": "bell", "screens": 3, "platform": "mobile", "pro": true },
+        { "file": "TecnicoDetalleSolicitud.html", "title": "Detalle de Solicitud", "description": "Evaluacion de una solicitud entrante: detalle, rechazo y aceptacion.", "icon": "file-text", "screens": 3, "platform": "mobile", "pro": true },
+        { "file": "TecnicoEjecucion.html", "title": "Ejecucion del Servicio", "description": "De aceptado a cobro: en camino, diagnostico, extras y evidencia.", "icon": "wrench", "screens": 10, "platform": "mobile", "pro": true },
+        { "file": "TecnicoAgenda.html", "title": "Agenda", "description": "Agenda del tecnico en tres tabs y configuracion de disponibilidad.", "icon": "calendar", "screens": 5, "platform": "mobile", "pro": true },
+        { "file": "TecnicoPerfil.html", "title": "Perfil PRO", "description": "Cuenta del tecnico: perfil, vista publica, bio, KYC y pausa de cuenta.", "icon": "settings", "screens": 5, "platform": "mobile", "pro": true }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Admin",
+      "subtitle": "Herramientas de operacion, en movil y en web.",
+      "items": [
+        { "file": "AdminMobile.html", "title": "Admin Mobile", "description": "Acceso movil del admin: login, MFA y dashboard de operacion en vivo.", "icon": "smartphone", "screens": 3, "platform": "mobile" },
+        { "file": "AdminKycDisputas.html", "title": "KYC y Disputas", "description": "Aprobacion de KYC y gestion de disputas desde el movil.", "icon": "shield-check", "screens": 5, "platform": "mobile" },
+        { "file": "Login.html", "title": "Login del Panel", "description": "Acceso al panel web: login, error, verificacion MFA y recuperacion.", "icon": "lock", "screens": 5, "platform": "web" },
+        { "file": "Dashboard.html", "title": "Dashboard", "description": "Dashboard operativo del administrador en dos densidades de informacion.", "icon": "layout-dashboard", "screens": 2, "platform": "web" },
+        { "file": "Clientes.html", "title": "Clientes", "description": "Gestion de clientes: listado y detalle con resumen de actividad.", "icon": "users", "screens": 2, "platform": "web" },
+        { "file": "Tecnicos.html", "title": "Tecnicos", "description": "Gestion de tecnicos: listado, detalle de KYC y modal de rechazo.", "icon": "hard-hat", "screens": 3, "platform": "web" },
+        { "file": "Servicios.html", "title": "Servicios", "description": "Gestion de servicios: listado, linea de tiempo y casos con disputa.", "icon": "clipboard-list", "screens": 3, "platform": "web" },
+        { "file": "Catalogo.html", "title": "Catalogo", "description": "Catalogo de servicios con edicion completa y estado vacio.", "icon": "book-open", "screens": 2, "platform": "web" },
+        { "file": "Soporte.html", "title": "Soporte", "description": "Soporte y disputas: bandeja de tickets, disputa activa y estado al dia.", "icon": "life-buoy", "screens": 2, "platform": "web" },
+        { "file": "Finanzas.html", "title": "Finanzas", "description": "Finanzas: resumen, conciliacion con Mercado Pago y retiros a tecnicos.", "icon": "banknote", "screens": 4, "platform": "web" },
+        { "file": "Reportes.html", "title": "Reportes", "description": "Reportes y analytics: overview, desempeno de tecnicos y vista geografica.", "icon": "trending-up", "screens": 3, "platform": "web" },
+        { "file": "Regiones.html", "title": "Regiones", "description": "Regiones y cobertura: mapa con poligonos y tabla de colonias.", "icon": "map", "screens": 3, "platform": "web" },
+        { "file": "Config.html", "title": "Configuracion", "description": "Configuracion del sistema: comisiones, cancelaciones y MFA.", "icon": "sliders-horizontal", "screens": 3, "platform": "web" }
+      ]
+    }
+  ]
+}

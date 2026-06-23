@@ -1,0 +1,1236 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tumantenimiento — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://unpkg.com/lucide@0.378.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root{
+    /* Brand */
+    --primary-blue:#0A6BCF;
+    --secondary-blue:#0894EA;
+    --deep-navy:#0E2C56;
+    --accent-cyan:#18C1FF;
+
+    /* Surfaces */
+    --bg:#F8FBFF;
+    --surface:#EEF3F8;
+    --white:#FFFFFF;
+
+    /* Text */
+    --text:#0E2C56;
+    --text-gray:#6B7280;
+    --text-soft:#9CA3AF;
+    --hairline:#E1E8F0;
+
+    /* Status (reserved) */
+    --success:#18A66A;
+    --success-soft:#E5F7EE;
+    --warning:#F59E0B;
+    --warning-soft:#FEF3DC;
+    --error:#DC2626;
+    --error-soft:#FCE9E9;
+    --info:#18C1FF;
+    --info-soft:#E0F6FF;
+
+    /* Radius */
+    --r-sm:8px;
+    --r-md:10px;
+    --r-lg:12px;
+    --r-xl:16px;
+    --r-2xl:20px;
+    --r-pill:999px;
+
+    /* Shadow */
+    --shadow-xs:0 1px 2px rgba(14,44,86,.04);
+    --shadow-sm:0 1px 3px rgba(14,44,86,.06), 0 1px 2px rgba(14,44,86,.04);
+    --shadow-md:0 6px 16px rgba(14,44,86,.08), 0 2px 4px rgba(14,44,86,.04);
+    --shadow-lg:0 18px 40px rgba(14,44,86,.10), 0 4px 10px rgba(14,44,86,.05);
+
+    /* Spacing (4px scale) */
+    --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px;
+    --s-6:24px; --s-8:32px; --s-12:48px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ---------- Page chrome ---------- */
+  .page{max-width:1240px;margin:0 auto;padding:48px 32px 96px}
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding-bottom:24px;border-bottom:1px solid var(--hairline);margin-bottom:48px;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand img{width:40px;height:40px;object-fit:contain}
+  .brand .wordmark{
+    font-family:'Manrope',sans-serif;font-weight:800;font-size:22px;letter-spacing:-.01em;
+    color:var(--primary-blue);
+  }
+  .brand .wordmark span{color:var(--deep-navy)}
+  .topbar .meta{
+    display:flex;gap:24px;font-size:13px;color:var(--text-gray);
+  }
+  .topbar .meta b{color:var(--deep-navy);font-weight:600}
+
+  /* Section structure */
+  section{margin-bottom:64px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:24px}
+  .sec-head h2{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:-.01em;
+    color:var(--deep-navy);margin:0;
+  }
+  .sec-head .sec-tag{
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;
+  }
+  .sec-head p{color:var(--text-gray);font-size:14px;margin:0 0 0 auto;max-width:520px;text-align:right}
+
+  .panel{
+    background:var(--white);border:1px solid var(--hairline);
+    border-radius:var(--r-xl);padding:32px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    display:grid;grid-template-columns:1.1fr .9fr;gap:32px;
+    margin-bottom:64px;
+  }
+  .hero-card{
+    background:linear-gradient(135deg,#0E2C56 0%,#0A6BCF 60%,#0894EA 100%);
+    border-radius:var(--r-2xl);padding:48px;color:var(--white);
+    position:relative;overflow:hidden;min-height:340px;
+    display:flex;flex-direction:column;justify-content:space-between;
+  }
+  .hero-card::after{
+    content:"";position:absolute;right:-80px;top:-80px;width:340px;height:340px;
+    background:radial-gradient(circle,rgba(24,193,255,.45),transparent 65%);
+  }
+  .hero-eyebrow{
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;opacity:.7;
+  }
+  .hero-title{
+    font-family:'Manrope',sans-serif;font-weight:700;font-size:44px;line-height:1.05;
+    letter-spacing:-.02em;margin:16px 0 12px;max-width:14ch;
+  }
+  .hero-sub{font-size:15px;line-height:1.55;opacity:.85;max-width:42ch;margin:0}
+  .hero-meta{
+    display:flex;gap:32px;position:relative;z-index:1;
+    font-size:13px;
+  }
+  .hero-meta div span{display:block;opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+  .hero-meta div b{font-family:'Manrope',sans-serif;font-weight:700;font-size:18px}
+
+  .essence{
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .essence-row{
+    background:var(--white);border:1px solid var(--hairline);
+    border-radius:var(--r-lg);padding:20px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .essence-icon{
+    width:44px;height:44px;border-radius:var(--r-md);
+    background:rgba(10,107,207,.08);color:var(--primary-blue);
+    display:grid;place-items:center;flex-shrink:0;
+  }
+  .essence-row h4{margin:0 0 2px;font-size:15px;color:var(--deep-navy);font-weight:600}
+  .essence-row p{margin:0;font-size:13px;color:var(--text-gray)}
+
+  /* ---------- Logo card ---------- */
+  .logo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .logo-tile{
+    border-radius:var(--r-lg);height:180px;
+    display:grid;place-items:center;border:1px solid var(--hairline);
+    position:relative;
+  }
+  .logo-tile img{max-width:62%;max-height:62%;object-fit:contain}
+  .logo-tile .tag{
+    position:absolute;left:12px;top:12px;
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;
+  }
+  .logo-tile.t-light{background:var(--white)}
+  .logo-tile.t-soft{background:var(--surface)}
+  .logo-tile.t-dark{background:var(--deep-navy)}
+  .logo-tile.t-dark .tag{color:rgba(255,255,255,.6)}
+
+  /* ---------- Colors ---------- */
+  .swatch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .swatch{
+    border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--hairline);
+    background:var(--white);
+  }
+  .swatch .chip{height:96px;position:relative}
+  .swatch .chip .role{
+    position:absolute;left:14px;bottom:12px;color:rgba(255,255,255,.95);
+    font-size:12px;font-weight:500;letter-spacing:.01em;
+  }
+  .swatch .chip.dark .role{color:rgba(255,255,255,.95)}
+  .swatch .chip.light .role{color:var(--deep-navy)}
+  .swatch .meta{padding:12px 14px}
+  .swatch .name{font-size:13px;font-weight:600;color:var(--deep-navy)}
+  .swatch .hex{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-gray);margin-top:2px}
+
+  .rule-card{
+    background:#FBFDFF;border:1px dashed var(--hairline);border-radius:var(--r-lg);
+    padding:20px;margin-top:24px;
+  }
+  .rule-card h4{font-size:13px;color:var(--deep-navy);margin:0 0 12px;font-weight:600;letter-spacing:.02em}
+  .rule-list{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:10px 24px;font-size:13px;color:var(--text-gray)}
+  .rule-list li{display:flex;gap:10px;align-items:flex-start}
+  .rule-list .dot{width:6px;height:6px;border-radius:50%;background:var(--primary-blue);margin-top:8px;flex-shrink:0}
+  .rule-list .dot.warn{background:var(--warning)}
+  .rule-list .dot.err{background:var(--error)}
+  .rule-list .dot.ok{background:var(--success)}
+
+  /* ---------- Type ---------- */
+  .type-row{
+    display:grid;grid-template-columns:140px 1fr 200px;gap:24px;
+    padding:20px 0;border-bottom:1px solid var(--hairline);align-items:baseline;
+  }
+  .type-row:last-child{border-bottom:none}
+  .type-row .label{
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;
+  }
+  .type-row .spec{
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--text-gray);text-align:right;
+  }
+  .type-h1{font-family:'Manrope',sans-serif;font-weight:700;font-size:40px;line-height:1.1;letter-spacing:-.02em;color:var(--deep-navy)}
+  .type-h2{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;line-height:1.2;letter-spacing:-.01em;color:var(--deep-navy)}
+  .type-h3{font-family:'Inter',sans-serif;font-weight:600;font-size:20px;line-height:1.3;color:var(--deep-navy)}
+  .type-body{font-family:'Inter',sans-serif;font-weight:400;font-size:16px;line-height:1.55;color:var(--text)}
+  .type-label{font-family:'Inter',sans-serif;font-weight:500;font-size:14px;color:var(--deep-navy)}
+  .type-small{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;color:var(--text-gray)}
+
+  /* ---------- Foundations row ---------- */
+  .foundations{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .found-card{background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:24px}
+  .found-card h4{margin:0 0 16px;font-size:13px;color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;font-weight:600;font-family:'JetBrains Mono',monospace}
+  .radius-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;font-size:12px;color:var(--text-gray);font-family:'JetBrains Mono',monospace}
+  .radius-box{background:var(--primary-blue);width:44px;height:44px}
+  .shadow-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:12px;color:var(--text-gray);font-family:'JetBrains Mono',monospace}
+  .shadow-box{width:48px;height:48px;background:var(--white);border-radius:var(--r-md)}
+  .spacing-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--text-gray);font-family:'JetBrains Mono',monospace}
+  .spacing-bar{background:var(--accent-cyan);height:8px;border-radius:2px}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    border:1px solid transparent;border-radius:var(--r-md);
+    padding:10px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    transition:all .15s ease;line-height:1;
+  }
+  .btn .icon{width:16px;height:16px;display:inline-grid;place-items:center}
+  .btn-primary{background:var(--primary-blue);color:var(--white)}
+  .btn-primary:hover{background:var(--secondary-blue)}
+  .btn-secondary{background:var(--white);color:var(--primary-blue);border-color:var(--primary-blue)}
+  .btn-secondary:hover{background:rgba(10,107,207,.06)}
+  .btn-ghost{background:transparent;color:var(--primary-blue)}
+  .btn-ghost:hover{background:rgba(10,107,207,.06)}
+  .btn-destructive{background:var(--error);color:var(--white)}
+  .btn-destructive:hover{background:#B91C1C}
+  .btn-disabled{background:var(--surface);color:var(--text-soft);cursor:not-allowed}
+  .btn-sm{padding:7px 12px;font-size:13px;border-radius:var(--r-sm)}
+  .btn-lg{padding:14px 24px;font-size:15px;border-radius:var(--r-md)}
+
+  .btn-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:18px 0;border-bottom:1px solid var(--hairline)}
+  .btn-row:last-child{border-bottom:none}
+  .btn-row .row-label{
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;
+    width:120px;flex-shrink:0;
+  }
+
+  /* ---------- Inputs ---------- */
+  .input-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+  .field label{
+    display:block;font-size:13px;font-weight:500;color:var(--deep-navy);
+    margin-bottom:6px;
+  }
+  .field .hint{font-size:12px;color:var(--text-gray);margin-top:6px}
+  .field .hint.err{color:var(--error)}
+  .input{
+    width:100%;font-family:'Inter',sans-serif;font-size:14px;
+    background:var(--white);border:1px solid var(--hairline);
+    border-radius:var(--r-sm);padding:11px 14px;color:var(--deep-navy);
+    transition:border-color .15s,box-shadow .15s;
+  }
+  .input::placeholder{color:var(--text-soft)}
+  .input:focus{outline:none;border-color:var(--primary-blue);box-shadow:0 0 0 3px rgba(10,107,207,.15)}
+  .input.err{border-color:var(--error)}
+  .input.err:focus{box-shadow:0 0 0 3px rgba(220,38,38,.15)}
+  .input-icon{position:relative}
+  .input-icon .input{padding-left:38px}
+  .input-icon svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-soft);width:16px;height:16px}
+
+  .select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:14px;padding-right:36px}
+
+  /* ---------- Badges ---------- */
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 10px;border-radius:var(--r-pill);
+    font-size:12px;font-weight:600;line-height:1.4;
+  }
+  .badge svg{width:12px;height:12px}
+  .badge-default{background:var(--surface);color:var(--deep-navy)}
+  .badge-success{background:var(--success-soft);color:var(--success)}
+  .badge-warning{background:var(--warning-soft);color:#B45309}
+  .badge-error{background:var(--error-soft);color:var(--error)}
+  .badge-info{background:var(--info-soft);color:#0884B0}
+
+  /* ---------- Avatars ---------- */
+  .av{
+    width:44px;height:44px;border-radius:50%;
+    background:rgba(10,107,207,.12);color:var(--primary-blue);
+    display:inline-grid;place-items:center;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    border:2px solid var(--white);
+  }
+  .av-sm{width:32px;height:32px;font-size:12px}
+  .av-lg{width:64px;height:64px;font-size:20px}
+  .av-stack{display:inline-flex}
+  .av-stack .av+.av{margin-left:-10px}
+  .av-img{background-size:cover;background-position:center}
+  .av-verified{position:relative}
+  .av-verified::after{
+    content:"";position:absolute;right:-2px;bottom:-2px;
+    width:16px;height:16px;border-radius:50%;background:var(--success);
+    border:2px solid var(--white);
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>");
+    background-size:9px;background-position:center;background-repeat:no-repeat;
+  }
+
+  /* ---------- Star rating ---------- */
+  .stars{display:inline-flex;gap:2px;color:var(--warning)}
+  .stars svg{width:16px;height:16px}
+  .stars .off{color:var(--hairline)}
+
+  /* ---------- Toggle ---------- */
+  .toggle{
+    width:40px;height:24px;border-radius:var(--r-pill);background:var(--hairline);
+    position:relative;cursor:pointer;transition:background .15s;flex-shrink:0;
+  }
+  .toggle::after{
+    content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;
+    background:var(--white);box-shadow:var(--shadow-sm);transition:transform .15s;
+  }
+  .toggle.on{background:var(--primary-blue)}
+  .toggle.on::after{transform:translateX(16px)}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--hairline);margin-bottom:0}
+  .tab{
+    font-size:14px;font-weight:500;color:var(--text-gray);
+    padding:12px 16px;border-bottom:2px solid transparent;cursor:pointer;
+    transition:all .15s;
+  }
+  .tab.active{color:var(--primary-blue);border-bottom-color:var(--primary-blue);font-weight:600}
+  .tab:hover:not(.active){color:var(--deep-navy)}
+
+  /* ---------- Service cards ---------- */
+  .ex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+
+  .service-card{
+    background:var(--white);border:1px solid var(--hairline);
+    border-radius:var(--r-xl);padding:20px;
+    transition:transform .15s,box-shadow .15s;cursor:pointer;
+  }
+  .service-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+  .service-icon{
+    width:48px;height:48px;border-radius:var(--r-md);
+    background:rgba(10,107,207,.08);color:var(--primary-blue);
+    display:grid;place-items:center;margin-bottom:16px;
+  }
+  .service-icon.cyan{background:rgba(24,193,255,.14);color:#0884B0}
+  .service-icon.navy{background:rgba(14,44,86,.08);color:var(--deep-navy)}
+  .service-title{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:17px;
+    color:var(--deep-navy);margin:0 0 4px;
+  }
+  .service-desc{font-size:13px;color:var(--text-gray);margin:0 0 16px;line-height:1.5}
+  .service-foot{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+  .service-price{color:var(--deep-navy);font-weight:600}
+  .service-price span{color:var(--text-gray);font-weight:400;font-size:12px;margin-left:2px}
+  .service-count{color:var(--text-gray);display:flex;align-items:center;gap:4px;font-size:12px}
+
+  /* ---------- Technician card ---------- */
+  .tech-card{
+    background:var(--white);border:1px solid var(--hairline);
+    border-radius:var(--r-xl);padding:24px;
+    display:flex;gap:20px;align-items:flex-start;
+  }
+  .tech-card .av{width:72px;height:72px;font-size:22px;flex-shrink:0}
+  .tech-body{flex:1;min-width:0}
+  .tech-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .tech-name{font-size:17px;font-weight:600;color:var(--deep-navy)}
+  .tech-trade{font-size:13px;color:var(--text-gray);margin-bottom:10px}
+  .tech-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--text-gray);margin-bottom:14px}
+  .tech-meta span{display:flex;align-items:center;gap:5px}
+  .tech-meta svg{width:14px;height:14px;color:var(--text-soft)}
+  .tech-tags{display:flex;flex-wrap:wrap;gap:6px}
+
+  /* ---------- Empty state ---------- */
+  .empty{
+    background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-xl);
+    padding:48px;text-align:center;
+  }
+  .empty-illu{
+    width:120px;height:120px;margin:0 auto 20px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,rgba(24,193,255,.18),rgba(10,107,207,.08) 70%);
+    display:grid;place-items:center;color:var(--primary-blue);
+  }
+  .empty h3{margin:0 0 8px;font-family:'Inter',sans-serif;font-weight:600;font-size:18px;color:var(--deep-navy)}
+  .empty p{margin:0 0 20px;color:var(--text-gray);font-size:14px;max-width:36ch;margin-left:auto;margin-right:auto}
+
+  /* ---------- Sidebar (admin) ---------- */
+  .nav-row{display:grid;grid-template-columns:260px 1fr;gap:24px}
+  .sidebar{
+    background:var(--deep-navy);color:rgba(255,255,255,.85);
+    border-radius:var(--r-xl);padding:20px;
+    font-size:14px;
+  }
+  .sidebar .brand{padding:6px 8px 20px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:16px}
+  .sidebar .brand .wordmark{color:var(--white)}
+  .sidebar .brand .wordmark span{color:var(--accent-cyan)}
+  .nav-group{margin-bottom:18px}
+  .nav-group-label{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase;
+    padding:0 8px 8px;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:12px;
+    padding:10px 12px;border-radius:var(--r-sm);
+    color:rgba(255,255,255,.75);cursor:pointer;transition:background .15s,color .15s;
+  }
+  .nav-item svg{width:18px;height:18px}
+  .nav-item:hover{background:rgba(255,255,255,.05);color:var(--white)}
+  .nav-item.active{background:var(--primary-blue);color:var(--white)}
+  .nav-item .count{
+    margin-left:auto;background:rgba(255,255,255,.12);color:var(--white);
+    font-size:11px;padding:2px 8px;border-radius:var(--r-pill);font-weight:600;
+  }
+  .nav-item.active .count{background:rgba(255,255,255,.18)}
+
+  .nav-preview{
+    background:var(--surface);border-radius:var(--r-xl);padding:24px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .nav-preview .crumbs{font-size:12px;color:var(--text-gray)}
+  .nav-preview h3{margin:0;font-family:'Inter',sans-serif;color:var(--deep-navy)}
+  .nav-preview .row{
+    background:var(--white);border-radius:var(--r-md);padding:14px 16px;
+    display:flex;align-items:center;gap:14px;font-size:13px;color:var(--text-gray);
+    border:1px solid var(--hairline);
+  }
+  .nav-preview .row b{color:var(--deep-navy);font-weight:600}
+
+  /* ---------- Bottom tab bar (mobile) ---------- */
+  .phone-grid{display:grid;grid-template-columns:280px 1fr;gap:32px;align-items:center}
+  .phone{
+    width:280px;height:560px;background:var(--white);
+    border:1px solid var(--hairline);border-radius:36px;
+    padding:14px 14px 0;position:relative;
+    box-shadow:var(--shadow-lg);overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  .phone-notch{
+    width:100px;height:22px;background:#0E2C56;border-radius:0 0 14px 14px;
+    margin:0 auto 12px;
+  }
+  .phone-screen{
+    flex:1;background:var(--bg);border-radius:18px 18px 0 0;padding:18px;
+    overflow:hidden;display:flex;flex-direction:column;gap:12px;
+  }
+  .phone-screen h4{margin:0;color:var(--deep-navy);font-size:16px}
+  .phone-screen .ph-search{
+    background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-md);
+    padding:10px 12px;font-size:12px;color:var(--text-soft);
+    display:flex;align-items:center;gap:8px;
+  }
+  .phone-screen .ph-search svg{width:14px;height:14px}
+  .ph-card{
+    background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-md);
+    padding:12px;display:flex;gap:10px;align-items:center;font-size:12px;
+  }
+  .ph-card .av{width:32px;height:32px;font-size:11px;border-width:1px}
+  .ph-card .ph-name{color:var(--deep-navy);font-weight:600;font-size:13px}
+  .ph-card .ph-sub{color:var(--text-gray);font-size:11px}
+  .ph-card .stars svg{width:11px;height:11px}
+
+  .tabbar{
+    background:var(--white);border-top:1px solid var(--hairline);
+    display:flex;justify-content:space-around;align-items:center;
+    padding:8px 4px 14px;
+  }
+  .tabbar-item{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--text-soft);font-size:10px;font-weight:500;flex:1;
+  }
+  .tabbar-item svg{width:20px;height:20px}
+  .tabbar-item.active{color:var(--primary-blue)}
+
+  .phone-notes ul{margin:0;padding-left:18px;color:var(--text-gray);font-size:14px;line-height:1.8}
+  .phone-notes b{color:var(--deep-navy);font-weight:600}
+
+  /* ---------- Date / time selector mock ---------- */
+  .dt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .dt-tile{
+    background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-sm);
+    padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s;
+  }
+  .dt-tile .dt-day{font-size:10px;color:var(--text-gray);text-transform:uppercase;letter-spacing:.06em}
+  .dt-tile .dt-num{font-family:'Manrope',sans-serif;font-weight:700;font-size:18px;color:var(--deep-navy);margin-top:2px}
+  .dt-tile.selected{background:var(--primary-blue);border-color:var(--primary-blue)}
+  .dt-tile.selected .dt-day,.dt-tile.selected .dt-num{color:var(--white)}
+  .time-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .time-chip{
+    background:var(--white);border:1px solid var(--hairline);border-radius:var(--r-pill);
+    padding:6px 14px;font-size:13px;color:var(--deep-navy);cursor:pointer;
+  }
+  .time-chip.selected{background:var(--primary-blue);color:var(--white);border-color:var(--primary-blue)}
+  .time-chip.disabled{color:var(--text-soft);background:var(--surface);cursor:not-allowed}
+
+  /* utility */
+  .stack{display:flex;flex-direction:column;gap:24px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
+  .label-mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+
+  /* footer credit */
+  .footer{
+    margin-top:80px;padding-top:24px;border-top:1px solid var(--hairline);
+    display:flex;justify-content:space-between;font-size:12px;color:var(--text-soft);
+    font-family:'JetBrains Mono',monospace;letter-spacing:.04em;
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo.png" alt="Tumantenimiento" />
+      <div class="wordmark">Tu<span>mantenimiento</span></div>
+    </div>
+    <div class="meta">
+      <div>VERSION <b>1.0</b></div>
+      <div>MARKET <b>Guadalajara · MX</b></div>
+      <div>STATUS <b style="color:var(--success)">● Published</b></div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-card">
+      <div>
+        <div class="hero-eyebrow">Design System · v1.0</div>
+        <h1 class="hero-title">Mantenimiento confiable, a un toque.</h1>
+        <p class="hero-sub">Sistema visual para la plataforma que conecta hogares y negocios con técnicos verificados en la Zona Metropolitana de Guadalajara.</p>
+      </div>
+      <div class="hero-meta">
+        <div><span>Familia</span><b>Manrope · Inter</b></div>
+        <div><span>Color base</span><b>#0A6BCF</b></div>
+        <div><span>Componentes</span><b>32</b></div>
+      </div>
+    </div>
+    <div class="essence">
+      <div class="essence-row">
+        <div class="essence-icon"><i data-lucide="shield-check"></i></div>
+        <div><h4>Confianza</h4><p>Verificación visible. Identidad clara. Nunca pretendemos lo que no somos.</p></div>
+      </div>
+      <div class="essence-row">
+        <div class="essence-icon"><i data-lucide="hard-hat"></i></div>
+        <div><h4>Profesionalismo</h4><p>Tipografía precisa, jerarquía honesta, ritmo de 4px. Estándar de oficio.</p></div>
+      </div>
+      <div class="essence-row">
+        <div class="essence-icon"><i data-lucide="heart-handshake"></i></div>
+        <div><h4>Cercanía</h4><p>Lenguaje de barrio, esquinas suaves, color cálido en el azul. Para todo México.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOGO -->
+  <section>
+    <div class="sec-head">
+      <h2>Marca</h2>
+      <div class="sec-tag">01 · Brand</div>
+      <p>Aplicar siempre el logo completo. Espacio libre mínimo = altura de la casa. No deformar.</p>
+    </div>
+    <div class="panel">
+      <div class="logo-grid">
+        <div class="logo-tile t-light">
+          <span class="tag">Sobre blanco</span>
+          <img src="assets/logo.png" alt="Logo on white" />
+        </div>
+        <div class="logo-tile t-soft">
+          <span class="tag">Sobre superficie</span>
+          <img src="assets/logo.png" alt="Logo on surface" />
+        </div>
+        <div class="logo-tile t-dark">
+          <span class="tag">Sobre fondo oscuro</span>
+          <img src="assets/logo.png" alt="Logo on navy" style="filter:brightness(1.1)" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COLORS -->
+  <section>
+    <div class="sec-head">
+      <h2>Paleta</h2>
+      <div class="sec-tag">02 · Color</div>
+      <p>El azul domina la jerarquía. Verde, ámbar y rojo están reservados — no son decoración.</p>
+    </div>
+
+    <div class="panel">
+      <div class="label-mono">Marca</div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="chip dark" style="background:#0A6BCF"><span class="role">CTA principal</span></div><div class="meta"><div class="name">Primary Blue</div><div class="hex">#0A6BCF</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#0894EA"><span class="role">Hover / activo</span></div><div class="meta"><div class="name">Secondary Blue</div><div class="hex">#0894EA</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#0E2C56"><span class="role">Headings / sidebar</span></div><div class="meta"><div class="name">Deep Navy</div><div class="hex">#0E2C56</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#18C1FF"><span class="role">Highlights · info</span></div><div class="meta"><div class="name">Accent Cyan</div><div class="hex">#18C1FF</div></div></div>
+      </div>
+
+      <div class="label-mono" style="margin-top:24px">Superficies y texto</div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="chip light" style="background:#F8FBFF;border-bottom:1px solid var(--hairline)"><span class="role">Pantalla</span></div><div class="meta"><div class="name">Background</div><div class="hex">#F8FBFF</div></div></div>
+        <div class="swatch"><div class="chip light" style="background:#EEF3F8"><span class="role">Cards · inputs</span></div><div class="meta"><div class="name">Surface Gray</div><div class="hex">#EEF3F8</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#6B7280"><span class="role">Secundario · labels</span></div><div class="meta"><div class="name">Text Gray</div><div class="hex">#6B7280</div></div></div>
+        <div class="swatch"><div class="chip light" style="background:#FFFFFF;border-bottom:1px solid var(--hairline)"><span class="role">Cards · panel</span></div><div class="meta"><div class="name">White</div><div class="hex">#FFFFFF</div></div></div>
+      </div>
+
+      <div class="label-mono" style="margin-top:24px">Reservados · Status</div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="chip dark" style="background:#18A66A"><span class="role">Verificación · KYC</span></div><div class="meta"><div class="name">Success Green</div><div class="hex">#18A66A</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#F59E0B"><span class="role">Urgencia · próxima cita</span></div><div class="meta"><div class="name">Warning Amber</div><div class="hex">#F59E0B</div></div></div>
+        <div class="swatch"><div class="chip dark" style="background:#DC2626"><span class="role">Error · cancelación</span></div><div class="meta"><div class="name">Error Red</div><div class="hex">#DC2626</div></div></div>
+        <div class="swatch"><div class="chip light" style="background:#E0F6FF"><span class="role">Info background</span></div><div class="meta"><div class="name">Info Soft</div><div class="hex">#E0F6FF</div></div></div>
+      </div>
+
+      <div class="rule-card">
+        <h4>Reglas estrictas</h4>
+        <ul class="rule-list">
+          <li><span class="dot"></span>El azul es la identidad. Domina jerarquía y CTAs principales.</li>
+          <li><span class="dot ok"></span>Verde <b>solo</b> para verificación, KYC aprobado, pago confirmado.</li>
+          <li><span class="dot warn"></span>Ámbar <b>solo</b> para urgencias temporales (técnico en camino, &lt; 2h).</li>
+          <li><span class="dot err"></span>Rojo <b>solo</b> para errores, cancelaciones, rechazo de KYC.</li>
+          <li><span class="dot"></span>Botón primario = Primary Blue. Sin excepciones por estética.</li>
+          <li><span class="dot"></span>Estrellas de calificación = Warning Amber (caso permitido).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- TYPE -->
+  <section>
+    <div class="sec-head">
+      <h2>Tipografía</h2>
+      <div class="sec-tag">03 · Type</div>
+      <p>Manrope solo para marca y H1 hero. Inter para toda la UI.</p>
+    </div>
+    <div class="panel">
+      <div class="type-row">
+        <div class="label">H1 · Display</div>
+        <div class="type-h1">Encuentra a tu técnico de confianza</div>
+        <div class="spec">Manrope 700 · 40 / 44</div>
+      </div>
+      <div class="type-row">
+        <div class="label">H2 · Section</div>
+        <div class="type-h2">Servicios cerca de Zapopan</div>
+        <div class="spec">Inter 700 · 28 / 34</div>
+      </div>
+      <div class="type-row">
+        <div class="label">H3 · Card</div>
+        <div class="type-h3">Plomería residencial</div>
+        <div class="spec">Inter 600 · 20 / 26</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Body</div>
+        <div class="type-body">Conectamos hogares y negocios con técnicos verificados en plomería, electricidad, herrería, gas, drenaje y más. Cotización transparente, agenda en minutos.</div>
+        <div class="spec">Inter 400 · 16 / 25</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Label · Caption</div>
+        <div class="type-label">Categoría · Tiempo estimado · Calificación</div>
+        <div class="spec">Inter 500 · 14 / 20</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Small · Meta</div>
+        <div class="type-small">Última actualización 19 may · Guadalajara, Jal.</div>
+        <div class="spec">Inter 400 · 12 / 16</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOUNDATIONS -->
+  <section>
+    <div class="sec-head">
+      <h2>Forma · Sombra · Espacio</h2>
+      <div class="sec-tag">04 · Foundations</div>
+      <p>Esquinas redondeadas suaves, sombras sutiles, ritmo de 4 px.</p>
+    </div>
+    <div class="foundations">
+      <div class="found-card">
+        <h4>Border radius</h4>
+        <div class="radius-row"><div class="radius-box" style="border-radius:6px"></div><span>sm · 6 — chips</span></div>
+        <div class="radius-row"><div class="radius-box" style="border-radius:8px"></div><span>md · 8 — inputs</span></div>
+        <div class="radius-row"><div class="radius-box" style="border-radius:10px"></div><span>lg · 10 — buttons</span></div>
+        <div class="radius-row"><div class="radius-box" style="border-radius:12px"></div><span>xl · 12 — cards</span></div>
+        <div class="radius-row"><div class="radius-box" style="border-radius:16px"></div><span>2xl · 16 — panels</span></div>
+        <div class="radius-row"><div class="radius-box" style="border-radius:999px;width:64px"></div><span>pill — badges</span></div>
+      </div>
+      <div class="found-card">
+        <h4>Shadow</h4>
+        <div class="shadow-row"><div class="shadow-box" style="box-shadow:var(--shadow-xs)"></div><span>xs · resting</span></div>
+        <div class="shadow-row"><div class="shadow-box" style="box-shadow:var(--shadow-sm)"></div><span>sm · card</span></div>
+        <div class="shadow-row"><div class="shadow-box" style="box-shadow:var(--shadow-md)"></div><span>md · hover</span></div>
+        <div class="shadow-row"><div class="shadow-box" style="box-shadow:var(--shadow-lg)"></div><span>lg · modal</span></div>
+      </div>
+      <div class="found-card">
+        <h4>Spacing · 4 px</h4>
+        <div class="spacing-row"><div class="spacing-bar" style="width:4px"></div><span>4</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:8px"></div><span>8</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:12px"></div><span>12</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:16px"></div><span>16</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:20px"></div><span>20</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:24px"></div><span>24</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:32px"></div><span>32</span></div>
+        <div class="spacing-row"><div class="spacing-bar" style="width:48px"></div><span>48</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUTTONS -->
+  <section>
+    <div class="sec-head">
+      <h2>Botones</h2>
+      <div class="sec-tag">05 · Components</div>
+      <p>Primary, secondary, ghost, destructive. Tamaños sm · md · lg.</p>
+    </div>
+    <div class="panel">
+      <div class="btn-row">
+        <div class="row-label">Primary</div>
+        <button class="btn btn-primary btn-sm">Agendar servicio</button>
+        <button class="btn btn-primary">Agendar servicio</button>
+        <button class="btn btn-primary btn-lg">Agendar servicio</button>
+        <button class="btn btn-primary"><span class="icon"><i data-lucide="plus"></i></span>Nueva orden</button>
+      </div>
+      <div class="btn-row">
+        <div class="row-label">Secondary</div>
+        <button class="btn btn-secondary btn-sm">Ver detalles</button>
+        <button class="btn btn-secondary">Ver detalles</button>
+        <button class="btn btn-secondary btn-lg">Ver detalles</button>
+        <button class="btn btn-secondary"><span class="icon"><i data-lucide="map-pin"></i></span>Cambiar zona</button>
+      </div>
+      <div class="btn-row">
+        <div class="row-label">Ghost</div>
+        <button class="btn btn-ghost btn-sm">Más tarde</button>
+        <button class="btn btn-ghost">Más tarde</button>
+        <button class="btn btn-ghost btn-lg">Más tarde</button>
+        <button class="btn btn-ghost"><span class="icon"><i data-lucide="arrow-right"></i></span>Saltar paso</button>
+      </div>
+      <div class="btn-row">
+        <div class="row-label">Destructive</div>
+        <button class="btn btn-destructive btn-sm">Cancelar cita</button>
+        <button class="btn btn-destructive">Cancelar cita</button>
+        <button class="btn btn-destructive btn-lg">Cancelar cita</button>
+      </div>
+      <div class="btn-row">
+        <div class="row-label">Disabled</div>
+        <button class="btn btn-disabled" disabled>Agendar servicio</button>
+        <button class="btn btn-primary"><span class="icon"><i data-lucide="loader"></i></span>Procesando…</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INPUTS -->
+  <section>
+    <div class="sec-head">
+      <h2>Inputs</h2>
+      <div class="sec-tag">06 · Components</div>
+      <p>Label arriba (decisión: explícita, accesible, sin trucos flotantes).</p>
+    </div>
+    <div class="panel">
+      <div class="input-grid">
+        <div class="field">
+          <label>Nombre completo</label>
+          <input class="input" placeholder="Juan Pérez Martínez" value="Mariana Velázquez Ríos" />
+        </div>
+        <div class="field">
+          <label>Correo electrónico</label>
+          <div class="input-icon">
+            <i data-lucide="mail"></i>
+            <input class="input" placeholder="tu@correo.mx" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Dirección del servicio</label>
+          <div class="input-icon">
+            <i data-lucide="map-pin"></i>
+            <input class="input" value="Av. Vallarta 5500, Col. Vallarta Universidad, Zapopan, Jal." />
+          </div>
+          <div class="hint">Incluye calle y número, colonia, ciudad y estado.</div>
+        </div>
+        <div class="field">
+          <label>Servicio requerido</label>
+          <select class="input select">
+            <option>Plomería · Fuga de agua</option>
+            <option>Electricidad · Apagón parcial</option>
+            <option>Gas · Revisión de instalación</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Teléfono de contacto</label>
+          <input class="input err" value="33 1234 567" />
+          <div class="hint err">Faltan dígitos — usa el formato 10 dígitos sin prefijo.</div>
+        </div>
+        <div class="field">
+          <label>Descripción del problema</label>
+          <textarea class="input" rows="3" placeholder="Cuéntale al técnico qué pasó, cuándo empezó y si ya intentaste algo."></textarea>
+        </div>
+      </div>
+
+      <!-- Date / time picker -->
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--hairline)">
+        <div class="label-mono" style="margin-bottom:4px">Selector de fecha y hora</div>
+        <div style="font-size:13px;color:var(--text-gray);margin-bottom:8px">Lunes 19 al jueves 22 de mayo</div>
+        <div class="dt-grid" style="max-width:380px">
+          <div class="dt-tile"><div class="dt-day">Lun</div><div class="dt-num">19</div></div>
+          <div class="dt-tile selected"><div class="dt-day">Mar</div><div class="dt-num">20</div></div>
+          <div class="dt-tile"><div class="dt-day">Mié</div><div class="dt-num">21</div></div>
+          <div class="dt-tile"><div class="dt-day">Jue</div><div class="dt-num">22</div></div>
+        </div>
+        <div class="time-row">
+          <div class="time-chip disabled">09:00</div>
+          <div class="time-chip">10:30</div>
+          <div class="time-chip selected">12:00</div>
+          <div class="time-chip">13:30</div>
+          <div class="time-chip">15:00</div>
+          <div class="time-chip">17:30</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BADGES / AVATARS / STARS / TOGGLE / TABS -->
+  <section>
+    <div class="sec-head">
+      <h2>Insignias, avatares, estrellas</h2>
+      <div class="sec-tag">07 · Components</div>
+      <p>Cada color cuenta una historia. Estrellas en ámbar — único uso decorativo permitido.</p>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="label-mono">Badges</div>
+        <div class="row" style="gap:10px">
+          <span class="badge badge-default">Categoría</span>
+          <span class="badge badge-success"><i data-lucide="badge-check"></i>Técnico verificado</span>
+          <span class="badge badge-warning"><i data-lucide="clock"></i>Llega en 22 min</span>
+          <span class="badge badge-error"><i data-lucide="x"></i>Cancelado</span>
+          <span class="badge badge-info"><i data-lucide="info"></i>Nuevo en zona</span>
+        </div>
+        <div class="label-mono" style="margin-top:24px">Toggles</div>
+        <div class="row" style="gap:24px">
+          <div class="row" style="gap:10px"><div class="toggle on"></div><span style="font-size:14px;color:var(--deep-navy)">Notificaciones</span></div>
+          <div class="row" style="gap:10px"><div class="toggle"></div><span style="font-size:14px;color:var(--deep-navy)">WhatsApp</span></div>
+        </div>
+        <div class="label-mono" style="margin-top:24px">Tabs · admin</div>
+        <div class="tabs">
+          <div class="tab active">Todos</div>
+          <div class="tab">Pendientes</div>
+          <div class="tab">En curso</div>
+          <div class="tab">Completados</div>
+          <div class="tab">Cancelados</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="label-mono">Avatares</div>
+        <div class="row" style="gap:14px;align-items:center">
+          <div class="av av-sm">MV</div>
+          <div class="av">JR</div>
+          <div class="av av-verified">CG</div>
+          <div class="av av-lg" style="background:rgba(24,193,255,.18);color:#0884B0">AS</div>
+        </div>
+        <div class="label-mono" style="margin-top:24px">Stack · equipo</div>
+        <div class="av-stack">
+          <div class="av">JR</div>
+          <div class="av" style="background:rgba(24,193,255,.18);color:#0884B0">AS</div>
+          <div class="av" style="background:rgba(14,44,86,.1);color:var(--deep-navy)">MV</div>
+          <div class="av" style="background:var(--surface);color:var(--text-gray)">+8</div>
+        </div>
+
+        <div class="label-mono" style="margin-top:24px">Calificación</div>
+        <div class="row" style="gap:18px">
+          <div class="row" style="gap:6px">
+            <div class="stars">
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+            </div>
+            <span style="font-size:13px;color:var(--deep-navy);font-weight:600">4.9</span>
+            <span style="font-size:12px;color:var(--text-gray)">(214)</span>
+          </div>
+          <div class="row" style="gap:6px">
+            <div class="stars">
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="1"></i>
+              <i data-lucide="star" data-fill="0"></i>
+            </div>
+            <span style="font-size:13px;color:var(--deep-navy);font-weight:600">4.2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICE CARDS -->
+  <section>
+    <div class="sec-head">
+      <h2>Tarjeta de servicio</h2>
+      <div class="sec-tag">08 · Patterns</div>
+      <p>Icono, título, descripción corta, precio desde, técnicos disponibles.</p>
+    </div>
+    <div class="ex-grid">
+      <div class="service-card">
+        <div class="service-icon"><i data-lucide="wrench"></i></div>
+        <h3 class="service-title">Plomería</h3>
+        <p class="service-desc">Fugas, instalaciones, calentadores, drenaje doméstico.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $350<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 42 técnicos</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon cyan"><i data-lucide="zap"></i></div>
+        <h3 class="service-title">Electricidad</h3>
+        <p class="service-desc">Cortos, contactos, lámparas, tableros y centros de carga.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $420<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 31 técnicos</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon navy"><i data-lucide="flame"></i></div>
+        <h3 class="service-title">Gas</h3>
+        <p class="service-desc">Revisión de instalación, fugas, reubicación de tanques.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $480<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 18 técnicos</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon"><i data-lucide="paint-roller"></i></div>
+        <h3 class="service-title">Pintura</h3>
+        <p class="service-desc">Interior, exterior, recubrimientos y detalles finos.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $1,200<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 24 técnicos</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon cyan"><i data-lucide="bug"></i></div>
+        <h3 class="service-title">Control de plagas</h3>
+        <p class="service-desc">Cucaracha, chinche, roedores, fumigación certificada.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $650<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 12 técnicos</div>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon navy"><i data-lucide="droplets"></i></div>
+        <h3 class="service-title">Impermeabilización</h3>
+        <p class="service-desc">Azoteas, terrazas, balcones, juntas y muros.</p>
+        <div class="service-foot">
+          <div class="service-price">desde $980<span> MXN</span></div>
+          <div class="service-count"><i data-lucide="users"></i> 19 técnicos</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECHNICIAN PROFILES -->
+  <section>
+    <div class="sec-head">
+      <h2>Perfil de técnico</h2>
+      <div class="sec-tag">09 · Patterns</div>
+      <p>Avatar verificado, oficio, calificación, zona, especialidades.</p>
+    </div>
+    <div class="stack">
+      <div class="tech-card">
+        <div class="av av-verified" style="background:rgba(10,107,207,.12)">RM</div>
+        <div class="tech-body">
+          <div class="tech-head">
+            <span class="tech-name">Ricardo Mendoza Aguilar</span>
+            <span class="badge badge-success"><i data-lucide="badge-check"></i>Verificado</span>
+            <span class="badge badge-info"><i data-lucide="award"></i>Top en Zapopan</span>
+          </div>
+          <div class="tech-trade">Plomería · 12 años de oficio</div>
+          <div class="tech-meta">
+            <span><i data-lucide="map-pin"></i> Zapopan, Providencia, Vallarta</span>
+            <span><i data-lucide="clock"></i> Responde en ~12 min</span>
+            <span>
+              <div class="stars">
+                <i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i>
+              </div>
+              <b style="color:var(--deep-navy);margin-left:4px">4.9</b>
+              <span style="margin-left:2px">(214 trabajos)</span>
+            </span>
+          </div>
+          <div class="tech-tags">
+            <span class="badge badge-default">Calentadores</span>
+            <span class="badge badge-default">Drenaje</span>
+            <span class="badge badge-default">Cisternas</span>
+            <span class="badge badge-default">Emergencias 24h</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <div style="font-family:'Manrope',sans-serif;font-weight:700;color:var(--deep-navy);font-size:18px">$450 <span style="font-size:12px;color:var(--text-gray);font-weight:400">visita</span></div>
+          <button class="btn btn-primary">Agendar</button>
+          <button class="btn btn-ghost btn-sm">Ver perfil</button>
+        </div>
+      </div>
+
+      <div class="tech-card">
+        <div class="av av-verified" style="background:rgba(24,193,255,.18);color:#0884B0">AG</div>
+        <div class="tech-body">
+          <div class="tech-head">
+            <span class="tech-name">Adriana García Soto</span>
+            <span class="badge badge-success"><i data-lucide="badge-check"></i>Verificada</span>
+            <span class="badge badge-warning"><i data-lucide="clock"></i>Llega en 38 min</span>
+          </div>
+          <div class="tech-trade">Electricidad · 8 años de oficio</div>
+          <div class="tech-meta">
+            <span><i data-lucide="map-pin"></i> Tlaquepaque, Tonalá</span>
+            <span><i data-lucide="clock"></i> Responde en ~6 min</span>
+            <span>
+              <div class="stars">
+                <i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i>
+              </div>
+              <b style="color:var(--deep-navy);margin-left:4px">4.8</b>
+              <span style="margin-left:2px">(167 trabajos)</span>
+            </span>
+          </div>
+          <div class="tech-tags">
+            <span class="badge badge-default">Tableros</span>
+            <span class="badge badge-default">Iluminación</span>
+            <span class="badge badge-default">Centros de carga</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <div style="font-family:'Manrope',sans-serif;font-weight:700;color:var(--deep-navy);font-size:18px">$520 <span style="font-size:12px;color:var(--text-gray);font-weight:400">visita</span></div>
+          <button class="btn btn-primary">Agendar</button>
+          <button class="btn btn-ghost btn-sm">Ver perfil</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EMPTY STATE -->
+  <section>
+    <div class="sec-head">
+      <h2>Estados vacíos</h2>
+      <div class="sec-tag">10 · Patterns</div>
+      <p>Ilustración suave + título honesto + CTA único.</p>
+    </div>
+    <div class="empty">
+      <div class="empty-illu"><i data-lucide="calendar-x" style="width:48px;height:48px"></i></div>
+      <h3>Aún no tienes citas agendadas</h3>
+      <p>Cuando agendes una visita con un técnico verificado, aparecerá aquí con la hora de llegada y el resumen del trabajo.</p>
+      <button class="btn btn-primary"><span class="icon"><i data-lucide="plus"></i></span>Agendar primer servicio</button>
+    </div>
+  </section>
+
+  <!-- SIDEBAR (admin) -->
+  <section>
+    <div class="sec-head">
+      <h2>Navegación · Admin web</h2>
+      <div class="sec-tag">11 · Layout</div>
+      <p>Sidebar oscuro sobre Deep Navy, icono + label, contadores en línea.</p>
+    </div>
+    <div class="nav-row">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="assets/logo.png" alt="" />
+          <div class="wordmark">Tu<span>mantenimiento</span></div>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-label">Operación</div>
+          <div class="nav-item active"><i data-lucide="layout-dashboard"></i> Panel <span class="count">12</span></div>
+          <div class="nav-item"><i data-lucide="calendar-clock"></i> Órdenes <span class="count">38</span></div>
+          <div class="nav-item"><i data-lucide="messages-square"></i> Conversaciones <span class="count">5</span></div>
+          <div class="nav-item"><i data-lucide="map"></i> Mapa de zona</div>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-label">Red</div>
+          <div class="nav-item"><i data-lucide="hard-hat"></i> Técnicos</div>
+          <div class="nav-item"><i data-lucide="user-check"></i> Verificaciones <span class="count">3</span></div>
+          <div class="nav-item"><i data-lucide="users"></i> Clientes</div>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-label">Negocio</div>
+          <div class="nav-item"><i data-lucide="receipt"></i> Pagos</div>
+          <div class="nav-item"><i data-lucide="bar-chart-3"></i> Reportes</div>
+          <div class="nav-item"><i data-lucide="settings"></i> Ajustes</div>
+        </div>
+      </aside>
+
+      <div class="nav-preview">
+        <div class="crumbs">Panel · Hoy, 19 may 2026 · Guadalajara</div>
+        <h3 class="type-h2">Buen día, Equipo Operaciones</h3>
+        <div class="row" style="gap:12px;margin-bottom:8px">
+          <span class="badge badge-warning"><i data-lucide="clock"></i> 4 servicios &lt; 2h</span>
+          <span class="badge badge-success"><i data-lucide="badge-check"></i> 3 verificaciones por aprobar</span>
+          <span class="badge badge-info"><i data-lucide="trending-up"></i> +18% solicitudes vs ayer</span>
+        </div>
+        <div class="row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="row" style="background:var(--white);border-radius:var(--r-md);padding:14px 16px;border:1px solid var(--hairline);font-size:13px;color:var(--text-gray);gap:14px">
+            <div class="av av-sm" style="background:rgba(245,158,11,.18);color:#B45309"><i data-lucide="alert-triangle" style="width:14px;height:14px"></i></div>
+            <div><b style="color:var(--deep-navy)">Orden #4821</b> · Fuga en Col. Providencia · técnico aún sin asignar</div>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto">Asignar</button>
+          </div>
+          <div class="row" style="background:var(--white);border-radius:var(--r-md);padding:14px 16px;border:1px solid var(--hairline);font-size:13px;color:var(--text-gray);gap:14px">
+            <div class="av av-sm" style="background:rgba(24,166,106,.18);color:var(--success)"><i data-lucide="badge-check" style="width:14px;height:14px"></i></div>
+            <div><b style="color:var(--deep-navy)">Ricardo Mendoza</b> · KYC aprobado · listo para tomar órdenes</div>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto">Ver perfil</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MOBILE -->
+  <section>
+    <div class="sec-head">
+      <h2>Navegación · App cliente</h2>
+      <div class="sec-tag">12 · Mobile</div>
+      <p>Bottom tab bar con 5 destinos. Hit target ≥ 44 px.</p>
+    </div>
+    <div class="phone-grid">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <h4>Buenas tardes, Mariana</h4>
+          <div class="ph-search"><i data-lucide="search"></i> Buscar servicio o técnico…</div>
+          <div class="ph-card">
+            <div class="av av-verified" style="background:rgba(10,107,207,.12)">RM</div>
+            <div style="flex:1;min-width:0">
+              <div class="ph-name">Ricardo M.</div>
+              <div class="ph-sub">Plomería · Zapopan</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+              <div class="stars"><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i></div>
+              <span style="font-size:10px;color:var(--text-gray)">4.9 · 214</span>
+            </div>
+          </div>
+          <div class="ph-card">
+            <div class="av av-verified" style="background:rgba(24,193,255,.18);color:#0884B0">AG</div>
+            <div style="flex:1;min-width:0">
+              <div class="ph-name">Adriana G.</div>
+              <div class="ph-sub">Electricidad · Tlaquepaque</div>
+            </div>
+            <span class="badge badge-warning" style="font-size:10px;padding:2px 8px"><i data-lucide="clock"></i>38m</span>
+          </div>
+          <div class="ph-card" style="background:linear-gradient(120deg,rgba(10,107,207,.06),rgba(24,193,255,.06));border:1px dashed rgba(10,107,207,.25)">
+            <div style="font-size:11px;color:var(--deep-navy)"><b>¿Emergencia?</b> Técnico en 1h garantizado.</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tabbar-item active"><i data-lucide="home"></i><span>Inicio</span></div>
+          <div class="tabbar-item"><i data-lucide="calendar"></i><span>Citas</span></div>
+          <div class="tabbar-item"><i data-lucide="search"></i><span>Buscar</span></div>
+          <div class="tabbar-item"><i data-lucide="message-circle"></i><span>Chat</span></div>
+          <div class="tabbar-item"><i data-lucide="user"></i><span>Perfil</span></div>
+        </div>
+      </div>
+
+      <div class="phone-notes">
+        <ul>
+          <li><b>Inicio</b> · saludo personalizado, búsqueda destacada, técnicos sugeridos por zona y oficio.</li>
+          <li><b>Citas</b> · estado en vivo (Confirmada → En camino → Trabajando → Completado). Ámbar solo en "En camino".</li>
+          <li><b>Buscar</b> · filtros por colonia (CDMX-style mexicano), oficio, calificación, disponibilidad inmediata.</li>
+          <li><b>Chat</b> · conversación con técnico y soporte; nunca expone teléfonos personales.</li>
+          <li><b>Perfil</b> · direcciones guardadas, métodos de pago, historial, programa de confianza.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>TUMANTENIMIENTO · DESIGN SYSTEM v1.0 · 19 MAY 2026</span>
+    <span>GUADALAJARA · JALISCO · MX</span>
+  </footer>
+
+</div>
+
+<script>
+  // Render icons
+  lucide.createIcons({
+    attrs: { 'stroke-width': 1.75 }
+  });
+
+  // Star fills — convert lucide outline stars to filled where data-fill="1"
+  document.querySelectorAll('.stars svg').forEach(svg => {
+    const host = svg.parentElement;
+    // find original element to read data-fill from? Not preserved by lucide; instead fill all stars in non-off stars by default.
+  });
+
+  // Simpler: fill all stars in .stars by default (warning color) and add .off class via CSS
+  document.querySelectorAll('.stars svg').forEach(svg => {
+    svg.setAttribute('fill', 'currentColor');
+  });
+  // Add .off class to stars whose parent's last child siblings appear muted — instead use a manual approach:
+  document.querySelectorAll('.stars').forEach(group => {
+    const items = group.querySelectorAll('svg');
+    // If group has 5 items and we want partial, look at the parent original markup — we encoded "off" via data-fill="0" on the <i> ; lucide removed the <i> though. Mark off ones with the .off class by checking data-fill attribute on the svg's data-* (lucide carries some attrs). As fallback, look for `data-lucide` then... we'll skip fancy detection.
+  });
+
+  // Manual fix: in the 4-of-5 stars group (second one in the badges/avatars panel), mark the last star as off.
+  const allStarGroups = document.querySelectorAll('.stars');
+  allStarGroups.forEach(group => {
+    const stars = group.querySelectorAll('svg');
+    // We'll mark stars with class "off" based on a custom data attribute we'll set inline.
+  });
+
+  // Apply explicit off styling for the second star group in the 'Calificación' panel
+  // Find any .stars group, then walk: if the 5th star originally had data-fill="0", set off.
+  // Since lucide replaces <i> tags entirely, we tagged them — easier: just manually mark the 5th star of any group whose immediate-following sibling text begins with "4.2".
+  document.querySelectorAll('.stars').forEach(group => {
+    const next = group.nextElementSibling;
+    if (next && next.textContent && next.textContent.trim().startsWith('4.2')) {
+      const stars = group.querySelectorAll('svg');
+      if (stars.length >= 1) {
+        stars[stars.length - 1].setAttribute('fill', 'none');
+        stars[stars.length - 1].style.color = 'var(--hairline)';
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tumantenimiento · Índice de Prototipos</title>
+<meta name="description" content="Índice navegable de los 40 prototipos de Tumantenimiento — cliente, técnico y administración." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://unpkg.com/lucide@0.378.0/dist/umd/lucide.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  :root{
+    --blue:#0A6BCF; --navy:#0E2C56; --navy-deep:#061B3A; --cyan:#18C1FF;
+    --green:#18A66A; --amber:#F59E0B; --red:#DC2626;
+    --ink:#0E2C56; --muted:#5B6B82; --faint:#94A3B8;
+    --bg:#F4F6FA; --surface:#FFFFFF; --line:#E4E9F0; --line-soft:#EEF1F6;
+    --sans:'Inter',system-ui,sans-serif; --display:'Manrope',sans-serif; --mono:'JetBrains Mono',monospace;
+    --shadow:0 2px 10px rgba(14,44,86,.06);
+    --shadow-lift:0 16px 34px -10px rgba(14,44,86,.22);
+  }
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative;overflow:hidden;color:#fff;
+    background:linear-gradient(158deg,#061B3A 0%,#0E2C56 46%,#0A6BCF 122%)}
+  .hero::before{content:"";position:absolute;right:-120px;top:-150px;width:470px;height:470px;
+    background:radial-gradient(circle,rgba(24,193,255,.30),transparent 65%);pointer-events:none}
+  .hero::after{content:"";position:absolute;left:-150px;bottom:-200px;width:460px;height:460px;
+    background:radial-gradient(circle,rgba(10,107,207,.42),transparent 65%);pointer-events:none}
+  .hero-inner{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:28px 28px 48px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-mark{width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.20);display:grid;place-items:center;flex-shrink:0}
+  .brand-mark svg{width:31px;height:auto}
+  .brand-name{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
+  .brand-spacer{flex:1}
+  .brand-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(255,255,255,.66);border:1px solid rgba(255,255,255,.22);padding:6px 11px;border-radius:999px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--cyan);margin:44px 0 14px}
+  .hero h1{font-family:var(--display);font-weight:800;font-size:clamp(31px,4.6vw,52px);
+    line-height:1.05;letter-spacing:-.03em;margin:0;max-width:16ch}
+  .hero-lead{font-size:15.5px;line-height:1.62;color:rgba(255,255,255,.80);max-width:62ch;margin:17px 0 0}
+  .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:32px}
+  .stat{flex:1;min-width:150px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+    border-radius:14px;padding:15px 18px}
+  .stat-num{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.02em}
+  .stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+    color:rgba(255,255,255,.62);margin-top:6px}
+
+  /* ---------- TABS ---------- */
+  .tabs{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.88);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .tabs-inner{max-width:1240px;margin:0 auto;padding:9px 28px;display:flex;gap:7px;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:11px;
+    white-space:nowrap;border:1px solid transparent;transition:background .18s,border-color .18s}
+  .tab:hover{background:var(--line-soft)}
+  .tab.active{background:#EAF3FE;border-color:rgba(10,107,207,.22)}
+  .tab-num{font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:600}
+  .tab.active .tab-num{color:var(--blue)}
+  .tab-label{font-family:var(--display);font-weight:700;font-size:13.5px;color:var(--muted)}
+  .tab.active .tab-label{color:var(--blue)}
+  .tab-count{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--faint);
+    background:var(--line-soft);border-radius:999px;padding:2px 7px}
+  .tab.active .tab-count{background:#fff;color:var(--blue)}
+
+  /* ---------- SECTION ---------- */
+  .section{padding:54px 0 8px;scroll-margin-top:74px}
+  .section-head{display:flex;align-items:flex-start;gap:15px;margin-bottom:26px}
+  .section-num{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;background:var(--accent);
+    width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+  .section-headtext{flex:1;min-width:0}
+  .section-title{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;
+    margin:0;color:var(--navy)}
+  .section-sub{font-size:13.5px;color:var(--muted);margin:3px 0 0}
+  .section-count{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);
+    border-radius:999px;padding:6px 12px;white-space:nowrap;flex-shrink:0;background:#fff}
+
+  /* ---------- SUBHEAD (admin) ---------- */
+  .subhead{display:flex;align-items:center;gap:8px;margin:0 0 16px;
+    font-family:var(--display);font-weight:700;font-size:12.5px;color:var(--navy);
+    text-transform:uppercase;letter-spacing:.05em}
+  .subhead svg{width:16px;height:16px;color:var(--accent2)}
+  .subhead em{font-family:var(--mono);font-style:normal;font-size:11px;font-weight:600;color:var(--muted);
+    background:var(--line-soft);border-radius:999px;padding:2px 8px}
+  .grid + .subhead{margin-top:32px}
+
+  /* ---------- GRID ---------- */
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(258px,1fr))}
+
+  /* ---------- CARD ---------- */
+  .card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;overflow:hidden;box-shadow:var(--shadow);
+    transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .2s,border-color .2s;
+    animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+  .card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lift);
+    border-color:color-mix(in srgb,var(--accent) 32%,var(--line))}
+  .card:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .card-media{position:relative;height:92px;background:var(--wash);display:flex;align-items:center;
+    padding:0 18px;overflow:hidden}
+  .card-blob{position:absolute;right:-32px;top:-36px;width:124px;height:124px;border-radius:50%;
+    background:radial-gradient(circle,color-mix(in srgb,var(--accent2) 40%,transparent),transparent 70%);opacity:.55}
+  .card-mark{position:relative;width:54px;height:54px;border-radius:14px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:grid;place-items:center;
+    box-shadow:0 7px 15px -5px color-mix(in srgb,var(--accent) 65%,transparent)}
+  .card-mark svg{width:25px;height:25px}
+  .card-chips{position:absolute;top:11px;right:12px;display:flex;flex-wrap:wrap;gap:5px;
+    justify-content:flex-end;max-width:64%}
+  .card-body{flex:1;padding:14px 17px 13px;display:flex;flex-direction:column;gap:5px}
+  .card-title{font-family:var(--display);font-weight:700;font-size:16.5px;letter-spacing:-.01em;
+    margin:0;color:var(--navy)}
+  .card-desc{font-size:12.6px;line-height:1.5;color:var(--muted);margin:0;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card-foot{display:flex;align-items:center;justify-content:space-between;padding:11px 17px;
+    border-top:1px solid var(--line-soft)}
+  .card-idx{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--faint);letter-spacing:.03em}
+  .card-open{display:flex;align-items:center;gap:5px;font-family:var(--display);font-weight:700;
+    font-size:12px;color:var(--accent)}
+  .card-open svg{width:14px;height:14px;transition:transform .2s}
+  .card:hover .card-open svg{transform:translate(2px,-2px)}
+
+  /* ---------- CHIPS ---------- */
+  .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    padding:3px 7px;border-radius:6px;background:#fff;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .chip-pro{background:var(--amber);border-color:var(--amber);color:#fff}
+  .chip-ds{background:var(--navy);border-color:var(--navy);color:#fff}
+  .chip-plat{background:color-mix(in srgb,var(--accent2) 15%,#fff);
+    border-color:color-mix(in srgb,var(--accent2) 32%,#fff);color:var(--accent)}
+
+  /* ---------- SECTION ACCENTS ---------- */
+  .sec-foundations{--accent:#0E2C56;--accent2:#0A6BCF;--wash:#EDF1F7}
+  .sec-cliente{--accent:#0A6BCF;--accent2:#18C1FF;--wash:#E9F3FE}
+  .sec-tecnico{--accent:#D97D00;--accent2:#F7B23B;--wash:#FDF3E1}
+  .sec-admin{--accent:#0E2C56;--accent2:#0894EA;--wash:#E9F0F8}
+
+  /* ---------- FOOTER ---------- */
+  .foot{margin-top:62px;background:linear-gradient(160deg,#0E2C56,#061B3A);color:#fff}
+  .foot-inner{max-width:1240px;margin:0 auto;padding:34px 28px;display:flex;flex-wrap:wrap;gap:22px;
+    align-items:center;justify-content:space-between}
+  .foot-brand{display:flex;align-items:center;gap:12px}
+  .foot-mark{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);display:grid;place-items:center;flex-shrink:0}
+  .foot-mark svg{width:26px;height:auto}
+  .foot-name{font-family:var(--display);font-weight:800;font-size:15px}
+  .foot-note{font-size:12px;color:rgba(255,255,255,.56);margin-top:2px}
+  .foot-meta{display:flex;flex-wrap:wrap;gap:9px}
+  .foot-pill{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.82);
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:7px 13px}
+
+  /* ---------- NOSCRIPT ---------- */
+  .noscript{max-width:680px;margin:60px auto;padding:24px 26px;text-align:center;background:#fff;
+    border:1px solid var(--line);border-radius:14px;font-size:14px;line-height:1.6;color:var(--muted)}
+
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+  @media (max-width:680px){
+    .hero-inner{padding:22px 20px 40px}
+    .wrap{padding:0 20px}
+    .tabs-inner{padding:9px 20px}
+    .eyebrow{margin-top:36px}
+    .stat{min-width:calc(50% - 7px)}
+    .section{padding:44px 0 6px}
+    .section-count{display:none}
+    .foot-inner{padding:30px 20px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .card{animation:none}
+    .card:hover{transform:none}
+    .card:hover .card-open svg{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg viewBox="330 282 364 298" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="bm1" x1="330" y1="295" x2="690" y2="545" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#20D7FF"/><stop offset=".55" stop-color="#0B84F3"/><stop offset="1" stop-color="#0B3DAD"/>
+            </linearGradient>
+            <clipPath id="bm2"><path d="M512 291c-7 0-14 2-20 6L356 380c-11 7-18 19-18 32v6c0 8 6 14 14 14h30v92c0 22 18 40 40 40h180c22 0 40-18 40-40v-92h30c8 0 14-6 14-14v-6c0-13-7-25-18-32L532 297c-6-4-13-6-20-6z"/></clipPath>
+          </defs>
+          <path d="M512 291c-7 0-14 2-20 6L356 380c-11 7-18 19-18 32v6c0 8 6 14 14 14h30v92c0 22 18 40 40 40h180c22 0 40-18 40-40v-92h30c8 0 14-6 14-14v-6c0-13-7-25-18-32L532 297c-6-4-13-6-20-6z" fill="url(#bm1)"/>
+          <g clip-path="url(#bm2)">
+            <path d="M419 380c-29 30-33 77-8 112l-59 111c-6 12-2 27 10 33l25 13c12 6 27 2 33-10l60-111c41 3 81-19 100-57 13-26 13-56 0-82l-39 75-56-30 40-75c-40-3-78 15-106 21z" fill="#FFFFFF" opacity="0.96"/>
+          </g>
+        </svg>
+      </span>
+      <span class="brand-name">Tumantenimiento</span>
+      <span class="brand-spacer"></span>
+      <span class="brand-tag">Revisión de diseño</span>
+    </div>
+
+    <p class="eyebrow">Índice de prototipos · v1.0</p>
+    <h1>Recorrido completo del producto</h1>
+    <p class="hero-lead">40 prototipos navegables que cubren las experiencias de cliente, técnico y administración — del primer contacto del usuario a la operación diaria del negocio.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-num">40</div><div class="stat-label">Prototipos</div></div>
+      <div class="stat"><div class="stat-num">136</div><div class="stat-label">Pantallas</div></div>
+      <div class="stat"><div class="stat-num">35</div><div class="stat-label">Componentes UI</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Audiencias</div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs"><div class="tabs-inner" id="tabsInner"></div></nav>
+
+<main class="wrap" id="app"></main>
+<noscript><div class="noscript"><strong>Este índice necesita JavaScript activado.</strong><br>Actívalo para ver las 40 tarjetas de prototipos, o abre cada archivo HTML directamente desde la carpeta del proyecto.</div></noscript>
+
+<footer class="foot">
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <span class="foot-mark">
+        <svg viewBox="330 282 364 298" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="bm3" x1="330" y1="295" x2="690" y2="545" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#20D7FF"/><stop offset=".55" stop-color="#0B84F3"/><stop offset="1" stop-color="#0B3DAD"/>
+            </linearGradient>
+            <clipPath id="bm4"><path d="M512 291c-7 0-14 2-20 6L356 380c-11 7-18 19-18 32v6c0 8 6 14 14 14h30v92c0 22 18 40 40 40h180c22 0 40-18 40-40v-92h30c8 0 14-6 14-14v-6c0-13-7-25-18-32L532 297c-6-4-13-6-20-6z"/></clipPath>
+          </defs>
+          <path d="M512 291c-7 0-14 2-20 6L356 380c-11 7-18 19-18 32v6c0 8 6 14 14 14h30v92c0 22 18 40 40 40h180c22 0 40-18 40-40v-92h30c8 0 14-6 14-14v-6c0-13-7-25-18-32L532 297c-6-4-13-6-20-6z" fill="url(#bm3)"/>
+          <g clip-path="url(#bm4)">
+            <path d="M419 380c-29 30-33 77-8 112l-59 111c-6 12-2 27 10 33l25 13c12 6 27 2 33-10l60-111c41 3 81-19 100-57 13-26 13-56 0-82l-39 75-56-30 40-75c-40-3-78 15-106 21z" fill="#FFFFFF" opacity="0.96"/>
+          </g>
+        </svg>
+      </span>
+      <div>
+        <div class="foot-name">Tumantenimiento</div>
+        <div class="foot-note">Índice de prototipos · documento de revisión de diseño</div>
+      </div>
+    </div>
+    <div class="foot-meta">
+      <span class="foot-pill">136 pantallas</span>
+      <span class="foot-pill">40 prototipos</span>
+      <span class="foot-pill">35 componentes</span>
+      <span class="foot-pill">Versión 1.0</span>
+      <span class="foot-pill">22 may 2026</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+const DATA = {
+  "project": "Tumantenimiento",
+  "version": "1.0",
+  "generated": "2026-05-22",
+  "totals": { "files": 40, "screens": 136, "components": 35, "audiences": 3 },
+  "sections": [
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "subtitle": "Sistema de diseño y librería de componentes — la base técnica.",
+      "items": [
+        { "file": "Design System.html", "title": "Design System", "description": "Marca, paleta, tipografía y los componentes base del sistema visual.", "icon": "palette", "badge": "Design System" },
+        { "file": "UILibraryPrimitives.html", "title": "UI · Primitives", "description": "Átomos del sistema: botones, inputs, badges, avatares y rating.", "icon": "box", "components": 7 },
+        { "file": "UILibraryContainers.html", "title": "UI · Containers", "description": "Tarjetas, list items, estados vacíos, loaders y alertas.", "icon": "layout-grid", "components": 5 },
+        { "file": "UILibraryNavigation.html", "title": "UI · Navigation", "description": "Tab bars, app bars, sidebar, breadcrumbs y tabs.", "icon": "navigation", "components": 5 },
+        { "file": "UILibraryForms.html", "title": "UI · Forms", "description": "Selects, date y time pickers, toggles, checkboxes y carga de fotos.", "icon": "clipboard-list", "components": 6 },
+        { "file": "UILibraryDataDisplay.html", "title": "UI · Data Display", "description": "Tablas, KPI cards, líneas de tiempo y filas de estadísticas.", "icon": "bar-chart-3", "components": 4 },
+        { "file": "UILibraryDomain.html", "title": "UI · Domain", "description": "Componentes de negocio: técnico, servicio, precios, chat y KYC.", "icon": "package", "components": 8 }
+      ]
+    },
+    {
+      "id": "cliente",
+      "title": "Cliente · Mobile",
+      "subtitle": "El viaje del cliente, de la primera apertura a su cuenta.",
+      "items": [
+        { "file": "Onboarding.html", "title": "Onboarding", "description": "Splash, carrusel de valor, selección de rol y registro con código OTP.", "icon": "sparkles", "screens": 7, "platform": "mobile" },
+        { "file": "B2.html", "title": "Onboarding · Datos", "description": "Continuación tras el OTP: datos personales, dirección y permisos.", "icon": "user-plus", "screens": 4, "platform": "mobile" },
+        { "file": "Home.html", "title": "Home", "description": "Pantalla de inicio con categorías y técnicos destacados cerca del cliente.", "icon": "home", "screens": 1, "platform": "mobile" },
+        { "file": "Discovery.html", "title": "Descubrimiento", "description": "Búsqueda de técnicos en vista de lista, mapa y filtros avanzados.", "icon": "search", "screens": 4, "platform": "mobile" },
+        { "file": "Profile.html", "title": "Perfil del Técnico", "description": "Perfil público del técnico — la pantalla decisiva para contratar.", "icon": "badge-check", "screens": 1, "platform": "mobile" },
+        { "file": "Wizard.html", "title": "Solicitud de Servicio", "description": "Wizard de cinco pasos: problema, dirección, fecha, resumen y envío.", "icon": "list-checks", "screens": 5, "platform": "mobile" },
+        { "file": "Tracking.html", "title": "Seguimiento", "description": "Seguimiento del servicio en vivo a través de seis estados clave.", "icon": "route", "screens": 7, "platform": "mobile" },
+        { "file": "Inbox.html", "title": "Mensajes", "description": "Bandeja de mensajes del cliente con búsqueda, filtros y estados vacíos.", "icon": "inbox", "screens": 6, "platform": "mobile" },
+        { "file": "Chat.html", "title": "Chat", "description": "Conversación entre cliente y técnico con adjuntos y moderación.", "icon": "message-circle", "screens": 3, "platform": "mobile" },
+        { "file": "Pago.html", "title": "Pago", "description": "Flujo de pago con tarjeta, OXXO, efectivo y confirmación anti-fraude.", "icon": "credit-card", "screens": 8, "platform": "mobile" },
+        { "file": "SinPagos.html", "title": "Sin Pagos", "description": "Variante de cotización por mensaje: flujo sin integración de pagos en línea.", "icon": "message-square", "screens": 1, "platform": "mobile" },
+        { "file": "Calificacion.html", "title": "Calificación", "description": "Calificación del servicio con flujo positivo y manejo de casos negativos.", "icon": "star", "screens": 5, "platform": "mobile" },
+        { "file": "MisServicios.html", "title": "Mis Servicios", "description": "Histórico del cliente: servicios activos, completados y cancelados.", "icon": "history", "screens": 4, "platform": "mobile" },
+        { "file": "PerfilCliente.html", "title": "Perfil del Cliente", "description": "Mi cuenta: perfil, direcciones, métodos de pago y baja de cuenta.", "icon": "user", "screens": 7, "platform": "mobile" }
+      ]
+    },
+    {
+      "id": "tecnico",
+      "title": "Técnico · PRO",
+      "subtitle": "El viaje del técnico, del alta a la ejecución del servicio.",
+      "items": [
+        { "file": "TecnicoOnboarding.html", "title": "Onboarding PRO", "description": "Alta del técnico: bienvenida, celular, datos, zona de cobertura e INE.", "icon": "hard-hat", "screens": 6, "platform": "mobile", "pro": true },
+        { "file": "TecnicoPerfilTarifas.html", "title": "Perfil + Tarifas", "description": "Pasos finales del alta: perfil profesional, categorías y tarifas base.", "icon": "tag", "screens": 2, "platform": "mobile", "pro": true },
+        { "file": "TecnicoHome.html", "title": "Home PRO", "description": "Inbox de solicitudes del técnico en tres estados de actividad.", "icon": "bell", "screens": 3, "platform": "mobile", "pro": true },
+        { "file": "TecnicoDetalleSolicitud.html", "title": "Detalle de Solicitud", "description": "Evaluación de una solicitud entrante: detalle, rechazo y aceptación.", "icon": "file-text", "screens": 3, "platform": "mobile", "pro": true },
+        { "file": "TecnicoEjecucion.html", "title": "Ejecución del Servicio", "description": "De aceptado a cobro: en camino, diagnóstico, extras y evidencia.", "icon": "wrench", "screens": 10, "platform": "mobile", "pro": true },
+        { "file": "TecnicoAgenda.html", "title": "Agenda", "description": "Agenda del técnico en tres tabs y configuración de disponibilidad.", "icon": "calendar", "screens": 5, "platform": "mobile", "pro": true },
+        { "file": "TecnicoPerfil.html", "title": "Perfil PRO", "description": "Cuenta del técnico: perfil, vista pública, bio, KYC y pausa de cuenta.", "icon": "settings", "screens": 5, "platform": "mobile", "pro": true }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Admin",
+      "subtitle": "Herramientas de operación, en móvil y en web.",
+      "items": [
+        { "file": "AdminMobile.html", "title": "Admin Mobile", "description": "Acceso móvil del admin: login, MFA y dashboard de operación en vivo.", "icon": "smartphone", "screens": 3, "platform": "mobile" },
+        { "file": "AdminKycDisputas.html", "title": "KYC y Disputas", "description": "Aprobación de KYC y gestión de disputas desde el móvil.", "icon": "shield-check", "screens": 5, "platform": "mobile" },
+        { "file": "Login.html", "title": "Login del Panel", "description": "Acceso al panel web: login, error, verificación MFA y recuperación.", "icon": "lock", "screens": 5, "platform": "web" },
+        { "file": "Dashboard.html", "title": "Dashboard", "description": "Dashboard operativo del administrador en dos densidades de información.", "icon": "layout-dashboard", "screens": 2, "platform": "web" },
+        { "file": "Clientes.html", "title": "Clientes", "description": "Gestión de clientes: listado y detalle con resumen de actividad.", "icon": "users", "screens": 2, "platform": "web" },
+        { "file": "Tecnicos.html", "title": "Técnicos", "description": "Gestión de técnicos: listado, detalle de KYC y modal de rechazo.", "icon": "hard-hat", "screens": 3, "platform": "web" },
+        { "file": "Servicios.html", "title": "Servicios", "description": "Gestión de servicios: listado, línea de tiempo y casos con disputa.", "icon": "clipboard-list", "screens": 3, "platform": "web" },
+        { "file": "Catalogo.html", "title": "Catálogo", "description": "Catálogo de servicios con edición completa y estado vacío.", "icon": "book-open", "screens": 2, "platform": "web" },
+        { "file": "Soporte.html", "title": "Soporte", "description": "Soporte y disputas: bandeja de tickets, disputa activa y estado al día.", "icon": "life-buoy", "screens": 2, "platform": "web" },
+        { "file": "Finanzas.html", "title": "Finanzas", "description": "Finanzas: resumen, conciliación con Mercado Pago y retiros a técnicos.", "icon": "banknote", "screens": 4, "platform": "web" },
+        { "file": "Reportes.html", "title": "Reportes", "description": "Reportes y analytics: overview, desempeño de técnicos y vista geográfica.", "icon": "trending-up", "screens": 3, "platform": "web" },
+        { "file": "Regiones.html", "title": "Regiones", "description": "Regiones y cobertura: mapa con polígonos y tabla de colonias.", "icon": "map", "screens": 3, "platform": "web" },
+        { "file": "Config.html", "title": "Configuración", "description": "Configuración del sistema: comisiones, cancelaciones y MFA.", "icon": "sliders-horizontal", "screens": 3, "platform": "web" }
+      ]
+    }
+  ]
+};
+
+const pad = (n) => String(n).padStart(2, "0");
+const ic = (name) => '<i data-lucide="' + name + '"></i>';
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+function cardHTML(item, idx, label, secId) {
+  const href = encodeURI(item.file);
+  const chips = [];
+  if (item.pro) chips.push('<span class="chip chip-pro">PRO</span>');
+  if (secId === "admin") chips.push('<span class="chip chip-plat">' + (item.platform === "web" ? "Web" : "Mobile") + "</span>");
+  if (item.badge) chips.push('<span class="chip chip-ds">' + esc(item.badge) + "</span>");
+  if (item.components != null) chips.push('<span class="chip">' + item.components + " comp.</span>");
+  if (item.screens != null) chips.push('<span class="chip">' + item.screens + (item.screens === 1 ? " pantalla" : " pantallas") + "</span>");
+  const delay = Math.min(idx * 42, 520);
+  return '<a class="card" href="' + href + '" target="_blank" rel="noopener" style="animation-delay:' + delay + 'ms"'
+    + ' aria-label="Abrir ' + esc(item.title) + '">'
+    + '<div class="card-media"><span class="card-blob"></span>'
+    +   '<span class="card-mark">' + ic(item.icon) + '</span>'
+    +   '<div class="card-chips">' + chips.join("") + '</div></div>'
+    + '<div class="card-body"><h3 class="card-title">' + esc(item.title) + '</h3>'
+    +   '<p class="card-desc">' + esc(item.description) + '</p></div>'
+    + '<div class="card-foot"><span class="card-idx">' + label + '</span>'
+    +   '<span class="card-open">Abrir prototipo ' + ic("arrow-up-right") + '</span></div>'
+    + '</a>';
+}
+
+function sectionHTML(sec, sIndex) {
+  let inner;
+  if (sec.id === "admin") {
+    const mob = sec.items.filter((i) => i.platform === "mobile");
+    const web = sec.items.filter((i) => i.platform === "web");
+    inner = '<div class="subhead">' + ic("smartphone") + "<span>Mobile</span><em>" + mob.length + "</em></div>"
+      + '<div class="grid">' + mob.map((it, i) => cardHTML(it, i, "M·" + pad(i + 1), sec.id)).join("") + "</div>"
+      + '<div class="subhead">' + ic("monitor") + "<span>Web</span><em>" + web.length + "</em></div>"
+      + '<div class="grid">' + web.map((it, i) => cardHTML(it, i, "W·" + pad(i + 1), sec.id)).join("") + "</div>";
+  } else {
+    inner = '<div class="grid">' + sec.items.map((it, i) => cardHTML(it, i, pad(i + 1), sec.id)).join("") + "</div>";
+  }
+  let screens = 0, comps = 0;
+  sec.items.forEach((i) => { screens += i.screens || 0; comps += i.components || 0; });
+  const count = sec.id === "foundations"
+    ? sec.items.length + " archivos · " + comps + " componentes"
+    : sec.items.length + " archivos · " + screens + " pantallas";
+  return '<section id="' + sec.id + '" class="section sec-' + sec.id + '">'
+    + '<div class="section-head"><span class="section-num">' + pad(sIndex + 1) + '</span>'
+    +   '<div class="section-headtext"><h2 class="section-title">' + esc(sec.title) + '</h2>'
+    +     '<p class="section-sub">' + esc(sec.subtitle) + '</p></div>'
+    +   '<span class="section-count">' + count + '</span></div>'
+    + inner + '</section>';
+}
+
+document.getElementById("tabsInner").innerHTML = DATA.sections.map((s, i) =>
+  '<a class="tab' + (i === 0 ? " active" : "") + '" href="#' + s.id + '" data-tab="' + s.id + '">'
+  + '<span class="tab-num">' + pad(i + 1) + '</span>'
+  + '<span class="tab-label">' + esc(s.title) + '</span>'
+  + '<span class="tab-count">' + s.items.length + '</span></a>'
+).join("");
+
+document.getElementById("app").innerHTML = DATA.sections.map(sectionHTML).join("");
+
+if (window.lucide) lucide.createIcons();
+
+const tabEls = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((e) => {
+    if (e.isIntersecting) {
+      tabEls.forEach((t) => t.classList.toggle("active", t.getAttribute("data-tab") === e.target.id));
+    }
+  });
+}, { rootMargin: "-46% 0px -48% 0px", threshold: 0 });
+DATA.sections.forEach((s) => {
+  const el = document.getElementById(s.id);
+  if (el) spy.observe(el);
+});
+</script>
+</body>
+</html>

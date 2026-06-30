@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+/*
+ * Tumantenimiento — design system (web). Brand tokens mirror the mobile
+ * `src/theme` palette and the HTML prototypes' Design System. Tailwind v4
+ * CSS-first config: tokens below become `bg-primary`, `text-navy`, etc.
+ */
+@theme {
+  --color-primary: #0a6bcf;
+  --color-primary-2: #0894ea;
+  --color-navy: #0e2c56;
+  --color-cyan: #18c1ff;
+
+  --color-success: #18a66a;
+  --color-warning: #f59e0b;
+  --color-error: #dc2626;
+  --color-info: #18c1ff;
+
+  --color-canvas: #f4f6fa;
+  --color-surface: #f8fbff;
+  --color-surface-2: #eef3f8;
+  --color-muted: #6b7280;
+  --color-faint: #9ca3af;
+  --color-line: #e1e8f0;
+  --color-success-soft: #e5f7ee;
+  --color-warning-soft: #fef3dc;
+  --color-error-soft: #fce9e9;
+  --color-info-soft: #e0f6ff;
+  --color-warning-ink: #b45309;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), sans-serif;
+  --font-mono: var(--font-jbmono), ui-monospace, monospace;
+
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  --shadow-card: 0 1px 3px rgba(14, 44, 86, 0.06), 0 1px 2px rgba(14, 44, 86, 0.04);
+  --shadow-hover: 0 6px 16px rgba(14, 44, 86, 0.08), 0 2px 4px rgba(14, 44, 86, 0.04);
+  --shadow-overlay: 0 18px 40px rgba(14, 44, 86, 0.1), 0 4px 10px rgba(14, 44, 86, 0.05);
+
+  /* All micro-interactions + loaders ported from the HTML prototypes. */
+  --animate-spin-slow: spin 0.9s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-caret: caret 1s step-end infinite;
+  --animate-bounce-dot: bounce-dot 1.2s ease-in-out infinite;
+  --animate-typing: typing 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 0; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@keyframes caret {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+@keyframes bounce-dot {
+  0%, 100% { opacity: 0.4; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-4px); }
+}
+@keyframes typing {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+html, body {
+  background: var(--color-canvas);
+  color: var(--color-navy);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Brand gradient helpers used by avatars / progress bars in the prototypes. */
+.bg-grad-brand { background-image: linear-gradient(135deg, var(--color-primary), var(--color-cyan)); }
+.bg-grad-progress { background-image: linear-gradient(90deg, var(--color-primary), var(--color-cyan)); }

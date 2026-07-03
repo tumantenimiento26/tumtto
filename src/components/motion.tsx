@@ -6,7 +6,7 @@ import { motion, AnimatePresence, type HTMLMotionProps } from 'framer-motion';
  * prototype's easing/timings so screens stay declarative: <FadeIn>, <Stagger>,
  * <Reveal>. Page transitions live in PageTransition (used by role layouts).
  */
-const EASE = [0.2, 0.7, 0.3, 1] as const;
+export const EASE = [0.2, 0.7, 0.3, 1] as const;
 
 export { motion, AnimatePresence };
 

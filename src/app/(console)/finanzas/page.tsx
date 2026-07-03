@@ -7,6 +7,7 @@ import {
   BadgeCheck, AlertTriangle, ExternalLink, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react';
 import { PageHeading, Panel, StatCard, BarChart, BreakdownBars, DataTable, Modal, exportCsv, type Column } from '@/components/admin';
+import { LineChart } from '@/components/charts';
 import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
@@ -37,7 +38,11 @@ const METHOD_META: Record<string, { label: string; icon: typeof CreditCard; colo
 // Mock daily GMV (últimos 14 días) para enriquecer la gráfica como el prototipo.
 const DAILY_GMV = [
   72, 88, 61, 95, 110, 74, 49, 102, 118, 86, 93, 124, 79, 134,
-].map((v, i) => ({ label: `${14 + i} jun`, value: v * 1000 }));
+].map((v, i) => ({
+  label: `${14 + i} jun`,
+  value: v * 1000,
+  meta: `comisión plataforma ~15% · $${Math.round(v * 1000 * 0.15).toLocaleString('es-MX')}`,
+}));
 
 // Filas extra realistas (ZMG) además del pago vivo del demo.
 const MOCK_PAYMENTS: PayRow[] = [
@@ -200,7 +205,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-[1fr_380px] gap-6">
         <FadeIn>
           <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(DAILY_GMV.reduce((s, d) => s + d.value, 0))} MXN</span>}>
-            <BarChart data={DAILY_GMV} height={220} />
+            <LineChart data={DAILY_GMV} height={220} format={mx} />
           </Panel>
         </FadeIn>
         <FadeIn>

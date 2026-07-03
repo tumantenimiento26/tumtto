@@ -5,7 +5,8 @@ import {
   CalendarRange, ChevronDown, Download, Link2, Star, TrendingUp,
   AlertTriangle, MapPin, HardHat, Snowflake, UserPlus,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, BarChart, BreakdownBars, exportCsv, type Column } from '@/components/admin';
+import { PageHeading, Panel, StatCard, DataTable, BarChart, exportCsv, type Column } from '@/components/admin';
+import { LineChart, HBars, HeatCalendar } from '@/components/charts';
 import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
@@ -48,6 +49,19 @@ const RANGE_DATA: Record<Range, {
     svcDelta: '+112% YoY', gmvDelta: '+124% YoY', periodo: 'Jul 2025 – Jun 2026',
   },
 };
+
+// ── Demanda por día y hora (demo determinista) ───────────────────────────────
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const HORAS = Array.from({ length: 12 }, (_, i) => `${8 + i}h`);
+// demo: patrón determinista — picos matutinos (10–12 h) y fin de semana,
+// mismo shape que el artefacto del Design System.
+function demanda(r: number, c: number) {
+  const h = 8 + c;
+  const matutino = Math.exp(-((h - 11) ** 2) / 8);
+  const vespertino = 0.5 * Math.exp(-((h - 17) ** 2) / 10);
+  const finde = r >= 5 ? 1.45 : 1;
+  return Math.round((14 + 46 * Math.max(matutino, vespertino)) * finde * (1 + 0.06 * ((r * 7 + c * 3) % 5)));
+}
 
 const COLD_ZONES = [
   { name: 'Tlajomulco Centro', city: 'Tlajomulco', ratio: '8.4 : 1', demand: 142, techs: 17, note: 'Alta demanda de plomería y electricidad con cobertura insuficiente en horario pico.' },
@@ -101,8 +115,11 @@ export default function ReportesPage() {
       .map((t, i) => ({ ...t, rank: i + 1 }));
   }, []);
 
-  const breakdown = cats
-    .map((c, i) => ({ name: c.name, value: c.services, color: ['#0A6BCF', '#0894EA', '#18C1FF', '#5CB7F0', '#0E2C56'][i % 5] }))
+  // ponytail: sin ticket promedio por categoría — los pagos del demo son muy
+  // escasos para derivarlo; solo conteo de servicios vivo.
+  const catRows = cats
+    .filter(c => c.services > 0)
+    .map(c => ({ label: c.name, value: c.services }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
@@ -177,7 +194,8 @@ export default function ReportesPage() {
         </FadeIn>
         <FadeIn>
           <Panel title={`Ingresos (GMV) · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.gmvDelta}</span>}>
-            <div className="pt-2"><BarChart key={`gmv-${range}`} data={serie.gmv} height={200} color="#0894EA" /></div>
+            {/* key por rango: al cambiar de serie se repite el draw-in */}
+            <div className="pt-2"><LineChart key={`gmv-${range}`} data={serie.gmv} height={200} format={v => `$${v.toLocaleString('es-MX')}K`} /></div>
           </Panel>
         </FadeIn>
       </div>
@@ -186,7 +204,7 @@ export default function ReportesPage() {
       <div className="grid grid-cols-[380px_1fr] gap-6">
         <FadeIn>
           <Panel title="Desempeño por categoría" action={<span className="text-[11.5px] text-muted">servicios</span>}>
-            <div className="pt-2"><BreakdownBars data={breakdown} /></div>
+            <div className="pt-2"><HBars rows={catRows} /></div>
           </Panel>
         </FadeIn>
         <FadeIn>
@@ -228,6 +246,13 @@ export default function ReportesPage() {
             <div className="h-2.5 flex-1 rounded-md" style={{ background: 'linear-gradient(90deg,#DDE7F1,#5CB7F0,#0A6BCF,#0E2C56)' }} />
             <span className="text-[11.5px] text-muted">Demanda alta</span>
           </div>
+        </Panel>
+      </FadeIn>
+
+      {/* Demanda por día y hora */}
+      <FadeIn>
+        <Panel title="Demanda por día y hora" action={<span className="text-[11.5px] text-muted">solicitudes · promedio 30 días · 8–20 h</span>}>
+          <HeatCalendar rows={7} cols={12} value={demanda} rowLabels={DIAS} colLabels={HORAS} format={v => `${v} solicitudes`} />
         </Panel>
       </FadeIn>
 

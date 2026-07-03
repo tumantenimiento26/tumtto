@@ -1,6 +1,7 @@
 'use client';
 import { TrendingUp, TrendingDown, X, type LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, ProgressBar } from './motion';
+import { Sparkline } from './charts';
 import type { RequestStatus } from '@/lib/demo/world';
 
 /**
@@ -35,8 +36,8 @@ export function Panel({ title, action, children, className = '' }: { title?: str
   );
 }
 
-export function StatCard({ label, value, suffix, delta, trend, note, progress, icon: Icon, index = 0 }: {
-  label: string; value: string | number; suffix?: string; delta?: string; trend?: 'up' | 'down'; note?: string; progress?: number; icon?: LucideIcon; index?: number;
+export function StatCard({ label, value, suffix, delta, trend, note, progress, spark, icon: Icon, index = 0 }: {
+  label: string; value: React.ReactNode; suffix?: string; delta?: string; trend?: 'up' | 'down'; note?: string; progress?: number; spark?: number[]; icon?: LucideIcon; index?: number;
 }) {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -49,6 +50,7 @@ export function StatCard({ label, value, suffix, delta, trend, note, progress, i
         <span className="text-[28px] font-bold tracking-tight text-navy">{value}</span>
         {suffix && <span className="font-mono text-[12px] text-faint">{suffix}</span>}
       </div>
+      {spark && <div className="mt-1.5"><Sparkline values={spark} /></div>}
       {delta && (
         <div className="mt-1.5 flex items-center gap-1.5 text-[12px]">
           <span className={`inline-flex items-center gap-0.5 font-semibold ${trend === 'down' ? 'text-error' : 'text-success'}`}>

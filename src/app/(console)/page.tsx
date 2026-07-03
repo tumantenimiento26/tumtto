@@ -13,6 +13,9 @@ import type { Column } from '@/components/admin';
 const CAT_COLORS = ['#0A6BCF', '#0894EA', '#18C1FF', '#5CB7F0', '#9AD3F5'];
 
 // ponytail: serie histórica demo — 11 semanas sembradas; la 12.ª es el GMV vivo.
+// Periodo anterior (12 semanas previas) para la comparativa del LineChart.
+const GMV_PREV = [820, 960, 900, 1080, 1010, 1195, 1150, 1290, 1240, 1355, 1310, 1420];
+
 const GMV_SEMANAS = [
   { label: '13 abr', value: 980 }, { label: '20 abr', value: 1120 }, { label: '27 abr', value: 1050 },
   { label: '04 may', value: 1290 }, { label: '11 may', value: 1180 }, { label: '18 may', value: 1420 },
@@ -154,7 +157,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <FadeIn className="min-w-0 lg:col-span-7">
           <Panel title="GMV semanal · 12 semanas" action={<span className="text-[12px] text-faint">Semana en curso en vivo</span>}>
-            <LineChart data={gmvSerie} height={230} format={v => `$${v.toLocaleString('es-MX')}`} />
+            <LineChart
+              data={gmvSerie} height={230} format={v => `$${v.toLocaleString('es-MX')}`}
+              controls={{
+                ranges: [{ label: '4 sem', n: 4 }, { label: '8 sem', n: 8 }, { label: '12 sem', n: 12 }],
+                avg: true,
+                compare: { label: 'Periodo anterior', values: GMV_PREV },
+              }}
+            />
           </Panel>
         </FadeIn>
 

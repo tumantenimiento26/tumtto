@@ -205,7 +205,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-[1fr_380px] gap-6">
         <FadeIn>
           <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(DAILY_GMV.reduce((s, d) => s + d.value, 0))} MXN</span>}>
-            <LineChart data={DAILY_GMV} height={220} format={mx} />
+            <LineChart data={DAILY_GMV} height={220} format={mx} controls={{ avg: true }} />
           </Panel>
         </FadeIn>
         <FadeIn>

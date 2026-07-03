@@ -63,6 +63,14 @@ function demanda(r: number, c: number) {
   return Math.round((14 + 46 * Math.max(matutino, vespertino)) * finde * (1 + 0.06 * ((r * 7 + c * 3) % 5)));
 }
 
+// demo: cancelaciones concentradas en tarde-noche y zonas frías del finde.
+function cancelaciones(r: number, c: number) {
+  const h = 8 + c;
+  const tarde = Math.exp(-((h - 18) ** 2) / 6);
+  const finde = r >= 5 ? 1.6 : 1;
+  return Math.round((1 + 5 * tarde) * finde * (1 + 0.12 * ((r * 5 + c * 2) % 4)));
+}
+
 const COLD_ZONES = [
   { name: 'Tlajomulco Centro', city: 'Tlajomulco', ratio: '8.4 : 1', demand: 142, techs: 17, note: 'Alta demanda de plomería y electricidad con cobertura insuficiente en horario pico.' },
   { name: 'El Salto Industrial', city: 'El Salto', ratio: '6.1 : 1', demand: 98, techs: 16, note: 'Servicios de refrigeración con tiempos de respuesta por encima del SLA objetivo.' },
@@ -195,7 +203,7 @@ export default function ReportesPage() {
         <FadeIn>
           <Panel title={`Ingresos (GMV) · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.gmvDelta}</span>}>
             {/* key por rango: al cambiar de serie se repite el draw-in */}
-            <div className="pt-2"><LineChart key={`gmv-${range}`} data={serie.gmv} height={200} format={v => `$${v.toLocaleString('es-MX')}K`} /></div>
+            <div className="pt-2"><LineChart key={`gmv-${range}`} data={serie.gmv} height={200} format={v => `$${v.toLocaleString('es-MX')}K`} controls={{ avg: true }} /></div>
           </Panel>
         </FadeIn>
       </div>
@@ -204,7 +212,7 @@ export default function ReportesPage() {
       <div className="grid grid-cols-[380px_1fr] gap-6">
         <FadeIn>
           <Panel title="Desempeño por categoría" action={<span className="text-[11.5px] text-muted">servicios</span>}>
-            <div className="pt-2"><HBars rows={catRows} /></div>
+            <div className="pt-2"><HBars rows={catRows} controls showPct /></div>
           </Panel>
         </FadeIn>
         <FadeIn>
@@ -252,7 +260,13 @@ export default function ReportesPage() {
       {/* Demanda por día y hora */}
       <FadeIn>
         <Panel title="Demanda por día y hora" action={<span className="text-[11.5px] text-muted">solicitudes · promedio 30 días · 8–20 h</span>}>
-          <HeatCalendar rows={7} cols={12} value={demanda} rowLabels={DIAS} colLabels={HORAS} format={v => `${v} solicitudes`} />
+          <HeatCalendar
+            rows={7} cols={12} rowLabels={DIAS} colLabels={HORAS}
+            metrics={[
+              { label: 'Solicitudes', value: demanda, format: v => `${v} solicitudes` },
+              { label: 'Cancelaciones', value: cancelaciones, format: v => `${v} cancelaciones` },
+            ]}
+          />
         </Panel>
       </FadeIn>
 

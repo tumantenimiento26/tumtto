@@ -11,7 +11,6 @@ import {
   MapPin,
   TrendingUp,
   Clock,
-  Wrench,
   UserRound,
   Timer,
   RefreshCw,
@@ -19,7 +18,7 @@ import {
   MailCheck,
 } from 'lucide-react';
 import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion } from '@/components/motion';
-import { PrimaryButton } from '@/components/ui';
+import { PrimaryButton, BrandMark } from '@/components/ui';
 import { Toasts, toast } from '@/components/toast';
 
 function GoogleG({ size = 18 }: { size?: number }) {
@@ -68,9 +67,7 @@ export default function LoginPage() {
 
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-white/15 grid place-items-center">
-                <Wrench size={18} />
-              </div>
+              <BrandMark size={36} className="rounded-xl shadow-card" />
               <span className="font-display text-lg font-semibold tracking-tight">Tumantenimiento</span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] font-mono bg-white/10 rounded-full px-3 py-1">

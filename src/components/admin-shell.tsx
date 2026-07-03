@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { PageTransition } from './motion';
+import { BrandMark } from './ui';
 import { getOpenSupportCount, useTick } from '@/lib/demo/store';
 
 /**
@@ -54,7 +55,7 @@ function Sidebar() {
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy text-white">
       <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-[18px] pb-4 pt-5">
-        <span className="bg-grad-brand grid h-7 w-7 place-items-center rounded-lg text-[13px] font-extrabold">T</span>
+        <BrandMark size={28} className="rounded-lg" />
         <div>
           <div className="font-display text-sm font-extrabold leading-none">Tumantenimiento</div>
           <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-white/50">Admin Panel</div>

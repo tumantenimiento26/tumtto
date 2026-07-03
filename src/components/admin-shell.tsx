@@ -6,7 +6,8 @@ import {
   BarChart3, Settings, ChevronRight, ChevronDown, LogOut, Search, HelpCircle, Bell,
   type LucideIcon,
 } from 'lucide-react';
-import { motion } from './motion';
+import { AnimatePresence, PageTransition } from './motion';
+import { getOpenSupportCount, useTick } from '@/lib/demo/store';
 
 /**
  * Desktop admin console shell — mirrors admin-shell.jsx: 240px deep-navy sidebar
@@ -15,7 +16,7 @@ import { motion } from './motion';
  */
 const USER = { name: 'Sofía Martínez', role: 'Admin Soporte', initials: 'SM' };
 
-interface NavItem { href: string; icon: LucideIcon; label: string; count?: number; sub?: { href: string; label: string }[] }
+interface NavItem { href: string; icon: LucideIcon; label: string; live?: boolean; sub?: { href: string; label: string }[] }
 const NAV: NavItem[] = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/clientes', icon: Users, label: 'Usuarios', sub: [{ href: '/clientes', label: 'Clientes' }, { href: '/tecnicos', label: 'Técnicos' }] },
@@ -23,7 +24,7 @@ const NAV: NavItem[] = [
   { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
   { href: '/regiones', icon: Map, label: 'Regiones y cobertura' },
   { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
-  { href: '/soporte', icon: LifeBuoy, label: 'Soporte y disputas', count: 3 },
+  { href: '/soporte', icon: LifeBuoy, label: 'Soporte y disputas', live: true },
   { href: '/reportes', icon: BarChart3, label: 'Reportes' },
   { href: '/config', icon: Settings, label: 'Configuración' },
 ];
@@ -48,6 +49,8 @@ function useActive(href: string, pathname: string) {
 
 function Sidebar() {
   const pathname = usePathname();
+  useTick();
+  const supportCount = getOpenSupportCount();
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy text-white">
       <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-[18px] pb-4 pt-5">
@@ -69,7 +72,7 @@ function Sidebar() {
                 {(active || subOpen) && <span className="absolute -left-3 bottom-1.5 top-1.5 w-[3px] rounded bg-cyan" />}
                 <Icon size={18} className={active || subOpen ? 'text-white' : 'text-white/75'} strokeWidth={1.75} />
                 <span className={`flex-1 text-[13.5px] font-medium ${active || subOpen ? 'text-white' : 'text-white/[0.78]'}`}>{it.label}</span>
-                {it.count != null && <span className="rounded-full bg-error/[0.18] px-[7px] py-px text-[11px] font-semibold text-[#FCA5A5]">{it.count}</span>}
+                {it.live && supportCount > 0 && <span className="rounded-full bg-error/[0.18] px-[7px] py-px text-[11px] font-semibold text-error-soft">{supportCount}</span>}
                 {it.sub && (subOpen ? <ChevronDown size={14} className="text-white/50" /> : <ChevronRight size={14} className="text-white/50" />)}
               </Link>
               {it.sub && subOpen && (
@@ -138,20 +141,19 @@ function Header() {
 }
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <motion.main key={usesKey()} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.2, 0.7, 0.3, 1] }} className="flex-1 overflow-y-auto bg-canvas p-7">
-          {children}
-        </motion.main>
+        <main className="flex-1 overflow-y-auto bg-canvas p-7">
+          {/* Re-key on route change so content re-animates on navigation. */}
+          <AnimatePresence mode="popLayout" initial={false}>
+            <PageTransition key={pathname}>{children}</PageTransition>
+          </AnimatePresence>
+        </main>
       </div>
     </div>
   );
-}
-
-// Re-key main on route change so content re-animates on navigation.
-function usesKey() {
-  return usePathname();
 }

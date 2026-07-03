@@ -5,22 +5,49 @@ import {
   CalendarRange, ChevronDown, Download, Link2, Star, TrendingUp,
   AlertTriangle, MapPin, HardHat, Snowflake, UserPlus,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, BarChart, BreakdownBars, type Column } from '@/components/admin';
+import { PageHeading, Panel, StatCard, DataTable, BarChart, BreakdownBars, exportCsv, type Column } from '@/components/admin';
 import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
+import { toast } from '@/components/toast';
 import { getTechniciansWithProfile, getMetrics, getCategoriesWithCounts, useTick } from '@/lib/demo/store';
 
-const RANGES = ['7 días', '30 días', 'Trimestre', 'Año', 'Personalizado'];
+const RANGES = ['7 días', '30 días', 'Trimestre', 'Año'] as const;
+type Range = (typeof RANGES)[number];
 
-// ── Mock series (prototype is fully mocked) ──────────────────────────────────
-const SVC_MONTHLY = [
-  { label: 'Dic', value: 312 }, { label: 'Ene', value: 358 }, { label: 'Feb', value: 401 },
-  { label: 'Mar', value: 447 }, { label: 'Abr', value: 489 }, { label: 'May', value: 542 },
-];
-const GMV_MONTHLY = [
-  { label: 'Dic', value: 313 }, { label: 'Ene', value: 352 }, { label: 'Feb', value: 398 },
-  { label: 'Mar', value: 431 }, { label: 'Abr', value: 468 }, { label: 'May', value: 498 },
-];
+// ── Series por rango (mock, valores en servicios y $K MXN) ──────────────────
+const pts = (labels: string[], values: number[]) => labels.map((label, i) => ({ label, value: values[i] }));
+const RANGE_DATA: Record<Range, {
+  svc: { label: string; value: number }[];
+  gmv: { label: string; value: number }[];
+  svcDelta: string; gmvDelta: string; periodo: string;
+}> = {
+  '7 días': {
+    svc: pts(['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'], [64, 71, 58, 82, 96, 118, 87]),
+    gmv: pts(['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'], [61, 68, 52, 79, 92, 121, 83]),
+    svcDelta: '+6% WoW', gmvDelta: '+9% WoW', periodo: '25 jun – 01 jul 2026',
+  },
+  '30 días': {
+    svc: pts(['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], [498, 531, 507, 576]),
+    gmv: pts(['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], [471, 502, 489, 548]),
+    svcDelta: '+11% MoM', gmvDelta: '+18% MoM', periodo: '02 jun – 01 jul 2026',
+  },
+  Trimestre: {
+    svc: pts(['Abr', 'May', 'Jun'], [489, 542, 601]),
+    gmv: pts(['Abr', 'May', 'Jun'], [468, 498, 553]),
+    svcDelta: '+23% QoQ', gmvDelta: '+27% QoQ', periodo: 'Abr – Jun 2026',
+  },
+  Año: {
+    svc: pts(
+      ['Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+      [201, 224, 248, 271, 296, 312, 358, 401, 447, 489, 542, 601],
+    ),
+    gmv: pts(
+      ['Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+      [188, 212, 239, 260, 288, 313, 352, 398, 431, 468, 498, 553],
+    ),
+    svcDelta: '+112% YoY', gmvDelta: '+124% YoY', periodo: 'Jul 2025 – Jun 2026',
+  },
+};
 
 const COLD_ZONES = [
   { name: 'Tlajomulco Centro', city: 'Tlajomulco', ratio: '8.4 : 1', demand: 142, techs: 17, note: 'Alta demanda de plomería y electricidad con cobertura insuficiente en horario pico.' },
@@ -46,10 +73,13 @@ interface TechRow {
 
 export default function ReportesPage() {
   useTick();
-  const [range, setRange] = useState('30 días');
+  const [range, setRange] = useState<Range>('30 días');
 
   const metrics = getMetrics();
   const cats = getCategoriesWithCounts();
+  const serie = RANGE_DATA[range];
+  const gmvTotal = serie.gmv.reduce((s, d) => s + d.value, 0);
+  const svcTotal = serie.svc.reduce((s, d) => s + d.value, 0);
 
   const techRows: TechRow[] = useMemo(() => {
     const regions = ['Guadalajara', 'Zapopan', 'Tlaquepaque', 'Tonalá', 'Tlajomulco'];
@@ -108,11 +138,18 @@ export default function ReportesPage() {
           <div className="flex items-center gap-2.5">
             <div className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2">
               <CalendarRange className="text-cyan" size={14} />
-              <span className="text-[12.5px] font-medium text-navy">01/12/2025 – 19/05/2026</span>
+              <span className="text-[12.5px] font-medium text-navy">{serie.periodo}</span>
               <ChevronDown className="text-faint" size={13} />
             </div>
-            <GhostButton><Link2 size={14} className="mr-2" />Compartir link</GhostButton>
-            <PrimaryButton><Download size={14} className="mr-2" />Exportar PDF</PrimaryButton>
+            <GhostButton
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                toast.success('Link copiado al portapapeles');
+              }}
+            >
+              <Link2 size={14} className="mr-2" />Compartir link
+            </GhostButton>
+            <PrimaryButton onClick={() => window.print()}><Download size={14} className="mr-2" />Exportar PDF</PrimaryButton>
           </div>
         }
       />
@@ -125,22 +162,22 @@ export default function ReportesPage() {
 
       {/* Summary StatCards */}
       <Stagger className="grid grid-cols-4 gap-4">
-        <StaggerItem><StatCard index={0} label="GMV del periodo" value="$498K" delta="+18% MoM" trend="up" note="Crecimiento sostenido" icon={TrendingUp} /></StaggerItem>
-        <StaggerItem><StatCard index={1} label="Servicios completados" value={metrics.completedToday} suffix="serv." delta="+11%" trend="up" note="vs. periodo anterior" /></StaggerItem>
-        <StaggerItem><StatCard index={2} label="Comisión plataforma" value={fmtMXN(metrics.platformFee)} delta="+18% MoM" trend="up" note="Take rate 12%" /></StaggerItem>
+        <StaggerItem><StatCard index={0} label="GMV del periodo" value={`$${gmvTotal.toLocaleString('es-MX')}K`} delta={serie.gmvDelta} trend="up" note="Crecimiento sostenido" icon={TrendingUp} /></StaggerItem>
+        <StaggerItem><StatCard index={1} label="Servicios completados" value={svcTotal.toLocaleString('es-MX')} suffix="serv." delta={serie.svcDelta} trend="up" note="vs. periodo anterior" /></StaggerItem>
+        <StaggerItem><StatCard index={2} label="Comisión plataforma" value={`$${Math.round(gmvTotal * 0.12).toLocaleString('es-MX')}K`} delta={serie.gmvDelta} trend="up" note="Take rate 12%" /></StaggerItem>
         <StaggerItem><StatCard index={3} label="Técnicos activos" value={metrics.activeTechs} suffix={`/ ${metrics.totalTechs}`} note="Cobertura ZMG 86%" icon={HardHat} /></StaggerItem>
       </Stagger>
 
       {/* Two charts */}
       <div className="grid grid-cols-2 gap-6">
         <FadeIn>
-          <Panel title="Volumen de servicios · últimos 6 meses" action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />+11% MoM</span>}>
-            <div className="pt-2"><BarChart data={SVC_MONTHLY} height={200} /></div>
+          <Panel title={`Volumen de servicios · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.svcDelta}</span>}>
+            <div className="pt-2"><BarChart key={`svc-${range}`} data={serie.svc} height={200} /></div>
           </Panel>
         </FadeIn>
         <FadeIn>
-          <Panel title="Ingresos (GMV) · últimos 6 meses" action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />+18% MoM</span>}>
-            <div className="pt-2"><BarChart data={GMV_MONTHLY} height={200} color="#0894EA" /></div>
+          <Panel title={`Ingresos (GMV) · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.gmvDelta}</span>}>
+            <div className="pt-2"><BarChart key={`gmv-${range}`} data={serie.gmv} height={200} color="#0894EA" /></div>
           </Panel>
         </FadeIn>
       </div>
@@ -153,7 +190,22 @@ export default function ReportesPage() {
           </Panel>
         </FadeIn>
         <FadeIn>
-          <Panel title="Top técnicos · este mes" action={<GhostButton><Download size={12} className="mr-1.5" />CSV</GhostButton>}>
+          <Panel
+            title="Top técnicos · este mes"
+            action={
+              <GhostButton
+                onClick={() => {
+                  exportCsv('top-tecnicos.csv', techRows.map(t => ({
+                    Rank: t.rank, Técnico: t.name, Región: t.region,
+                    Rating: t.rating.toFixed(2), Servicios: t.jobs, GMV: t.gmv,
+                  })));
+                  toast.success(`CSV exportado · ${techRows.length} técnicos`);
+                }}
+              >
+                <Download size={12} className="mr-1.5" />CSV
+              </GhostButton>
+            }
+          >
             <DataTable columns={columns} rows={techRows} empty="Sin técnicos" />
           </Panel>
         </FadeIn>

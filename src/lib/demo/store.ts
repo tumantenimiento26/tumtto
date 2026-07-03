@@ -6,10 +6,15 @@ import {
   nextId,
   CLIENT_ID,
   TECH_USER_ID,
+  ADMIN_ID,
   type RequestStatus,
   type ServiceRequest,
   type Rating,
   type Payment,
+  type Subcategory,
+  type Category,
+  type Note,
+  type Ticket,
 } from './world';
 
 /**
@@ -73,6 +78,22 @@ export const getDisputes = (status?: string) =>
 export const getDocuments = (techId: string) => w().documents.filter(d => d.technician_id === techId);
 export const getWallet = (techId: string) => w().wallets.find(x => x.technician_id === techId) ?? null;
 export const getPayouts = (techId: string) => w().payouts.filter(p => p.technician_id === techId);
+export const getAllPayouts = () => w().payouts;
+export const getWalletTxns = (techId: string) => {
+  const wallet = getWallet(techId);
+  return wallet ? w().walletTxns.filter(t => t.wallet_id === wallet.id) : [];
+};
+export const getTechnician = (techId: string) => w().technicians.find(t => t.id === techId) ?? null;
+export const getTechCategories = (techId: string) =>
+  w().technicianCategories.filter(tc => tc.technician_id === techId);
+export const getNotes = (entityId: string) =>
+  w().notes.filter(n => n.entity_id === entityId).sort(byNewest);
+export const getTickets = () => [...w().tickets].sort(byNewest);
+export const getTicket = (id: string) => w().tickets.find(t => t.id === id) ?? null;
+/** Badge del sidebar: disputas no resueltas + tickets sin resolver. */
+export const getOpenSupportCount = () =>
+  w().disputes.filter(d => d.status === 'open' || d.status === 'in_review').length +
+  w().tickets.filter(t => t.status !== 'resolved').length;
 
 function byNewest(a: { created_at: string }, b: { created_at: string }) {
   return b.created_at.localeCompare(a.created_at);
@@ -190,12 +211,200 @@ export function submitRating(requestId: string, stars: number, comment: string, 
 
 export function resolveKyc(techId: string, approve: boolean) {
   const t = w().technicians.find(x => x.id === techId);
-  if (t) { t.kyc_status = approve ? 'approved' : 'rejected'; bump(); }
+  if (!t) return;
+  t.kyc_status = approve ? 'approved' : 'rejected';
+  t.kyc_reviewed_by = ADMIN_ID;
+  t.kyc_reviewed_at = now();
+  bump();
 }
 
+/** Rechaza el KYC guardando el motivo como nota interna del técnico. */
+export function rejectKyc(techId: string, reason: string) {
+  addNote(techId, `KYC rechazado — ${reason}`, 'Sofía Admin');
+  resolveKyc(techId, false);
+}
+
+/** Aprueba/rechaza un documento KYC individual. */
+export function resolveDocument(docId: string, approve: boolean) {
+  const d = w().documents.find(x => x.id === docId);
+  if (!d) return;
+  d.status = approve ? 'approved' : 'rejected';
+  d.reviewed_by = ADMIN_ID;
+  d.reviewed_at = now();
+  bump();
+}
+
+// La suspensión de técnicos vive en profiles.status del usuario dueño.
+export function suspendTechnician(techId: string) {
+  const t = getTechnician(techId);
+  if (!t) return;
+  t.is_available = false;
+  suspendUser(t.user_id);
+}
+export function reactivateTechnician(techId: string) {
+  const t = getTechnician(techId);
+  if (!t) return;
+  t.is_available = true;
+  reactivateUser(t.user_id);
+}
+
+export function suspendUser(userId: string) {
+  const p = getProfile(userId);
+  if (p) { p.status = 'suspended'; p.updated_at = now(); bump(); }
+}
+export function reactivateUser(userId: string) {
+  const p = getProfile(userId);
+  if (p) { p.status = 'active'; p.updated_at = now(); bump(); }
+}
+
+export function reassignRequest(requestId: string, techUserId: string) {
+  const req = getRequest(requestId);
+  if (!req) return;
+  req.technician_id = techUserId;
+  req.updated_at = now();
+  const name = getProfile(techUserId)?.full_name ?? techUserId;
+  w().events.push({ id: nextId('ev'), request_id: requestId, status: req.status, actor_id: ADMIN_ID, geo: null, note: `Reasignado a ${name} por admin`, created_at: now() });
+  bump();
+}
+
+// ponytail: no hay estado 'reembolsado' en request_status — el reembolso marca
+// el pago 'refunded' y cancela el servicio con nota en el evento.
+export function refundPayment(requestId: string) {
+  const pay = getPayment(requestId);
+  if (!pay || pay.status !== 'paid') return null;
+  pay.status = 'refunded';
+  pay.updated_at = now();
+  const req = getRequest(requestId);
+  if (req) { req.status = 'cancelado'; req.updated_at = now(); }
+  w().events.push({ id: nextId('ev'), request_id: requestId, status: 'cancelado', actor_id: ADMIN_ID, geo: null, note: 'Reembolso emitido al cliente', created_at: now() });
+  bump();
+  return pay;
+}
+
+/** Marca los payouts pendientes como procesados. Devuelve conteo y total. */
+export function processPayoutBatch() {
+  const pending = w().payouts.filter(p => p.status === 'pending');
+  const batch = `B-${new Date().toISOString().slice(0, 7)}`;
+  for (const p of pending) {
+    p.status = 'processed';
+    p.processed_at = now();
+    p.batch_id = batch;
+    p.updated_at = now();
+  }
+  bump();
+  return { count: pending.length, total: pending.reduce((s, p) => s + p.amount, 0) };
+}
+
+export function addNote(entityId: string, text: string, author = 'Sofía Admin'): Note {
+  const note: Note = { id: nextId('n'), entity_id: entityId, author, text, created_at: now() };
+  w().notes.unshift(note);
+  bump();
+  return note;
+}
+
+// ── Catálogo ─────────────────────────────────────────────────────────────────
+export function upsertSubcategory(input: Partial<Subcategory> & { category_id: string; name: string }): Subcategory {
+  const existing = input.id ? w().subcategories.find(s => s.id === input.id) : null;
+  if (existing) {
+    Object.assign(existing, input, { updated_at: now() });
+    bump();
+    return existing;
+  }
+  const sub: Subcategory = {
+    id: nextId('sub'),
+    category_id: input.category_id,
+    name: input.name,
+    description: input.description ?? null,
+    price_min: input.price_min ?? 0,
+    price_max: input.price_max ?? 0,
+    base_price_suggested: input.base_price_suggested ?? 0,
+    is_active: input.is_active ?? true,
+    created_at: now(),
+    updated_at: now(),
+  };
+  w().subcategories.push(sub);
+  bump();
+  return sub;
+}
+
+export function deleteSubcategory(subId: string) {
+  const ws = w();
+  ws.subcategories = ws.subcategories.filter(s => s.id !== subId);
+  bump();
+}
+
+export function toggleCategory(catId: string) {
+  const c = w().categories.find(x => x.id === catId);
+  if (c) { c.is_active = !c.is_active; c.updated_at = now(); bump(); }
+}
+
+export function createCategory(name: string, icon = 'wrench'): Category {
+  const cat: Category = { id: nextId('cat'), name, icon, description: null, is_active: true, created_at: now(), updated_at: now() };
+  w().categories.push(cat);
+  bump();
+  return cat;
+}
+
+/** Elimina la categoría; falla (false) si aún tiene subcategorías. */
+export function deleteCategory(catId: string): boolean {
+  const ws = w();
+  if (ws.subcategories.some(s => s.category_id === catId)) return false;
+  ws.categories = ws.categories.filter(c => c.id !== catId);
+  bump();
+  return true;
+}
+
+// ── Soporte ──────────────────────────────────────────────────────────────────
 export function resolveDispute(disputeId: string, resolution: string) {
   const d = w().disputes.find(x => x.id === disputeId);
   if (d) { d.status = 'resolved'; d.resolution = resolution; bump(); }
 }
 
-export { CLIENT_ID, TECH_USER_ID };
+/** Escala la disputa a nivel 2: sigue abierta (in_review), con nota. */
+export function escalateDispute(disputeId: string) {
+  const d = w().disputes.find(x => x.id === disputeId);
+  if (d) { d.status = 'in_review'; d.resolution = 'Escalado a nivel 2 — pendiente de revisión'; bump(); }
+}
+
+export function createTicket(input: {
+  subject: string;
+  requester_id: string;
+  role?: Ticket['role'];
+  priority?: Ticket['priority'];
+  request_id?: string | null;
+  content?: string;
+}): Ticket {
+  const role = input.role ?? (getProfile(input.requester_id)?.role === 'tecnico' ? 'tecnico' : 'cliente');
+  const ticket: Ticket = {
+    id: nextId('TK'),
+    subject: input.subject,
+    requester_id: input.requester_id,
+    role,
+    status: 'open',
+    priority: input.priority ?? 'media',
+    request_id: input.request_id ?? null,
+    created_at: now(),
+    messages: [],
+  };
+  if (input.content) {
+    ticket.messages.push({ id: nextId('tm'), ticket_id: ticket.id, sender_id: ADMIN_ID, content: input.content, attachments: [], is_flagged: false, created_at: now() });
+  }
+  w().tickets.unshift(ticket);
+  bump();
+  return ticket;
+}
+
+export function replyTicket(ticketId: string, senderId: string, content: string) {
+  const t = getTicket(ticketId);
+  if (!t) return;
+  t.messages.push({ id: nextId('tm'), ticket_id: ticketId, sender_id: senderId, content, attachments: [], is_flagged: false, created_at: now() });
+  if (senderId === ADMIN_ID && t.status === 'open') t.status = 'pending';
+  bump();
+}
+
+export function resolveTicket(ticketId: string) {
+  const t = getTicket(ticketId);
+  if (t) { t.status = 'resolved'; bump(); }
+}
+
+export { CLIENT_ID, TECH_USER_ID, ADMIN_ID };

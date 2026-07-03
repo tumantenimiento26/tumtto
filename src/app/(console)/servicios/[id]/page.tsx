@@ -4,15 +4,18 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, FolderTree, Calendar, MapPin, MessageSquare, UserCog, Ban, RotateCcw,
-  UserRound, HardHat, BadgeCheck, Star, ArrowRight, ReceiptText, Plus, CreditCard,
-  GitCommitVertical, Wand2, Info, Smartphone, ShieldAlert, ChevronDown,
+  BadgeCheck, Star, ArrowRight, Plus, CreditCard, Send, LifeBuoy,
+  GitCommitVertical, Wand2, Info, Smartphone, ShieldAlert, ChevronDown, Check,
 } from 'lucide-react';
-import { PageHeading, Panel, StatusPill } from '@/components/admin';
-import { GhostButton, Avatar, Textarea } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
+import { PageHeading, Panel, StatusPill, Modal } from '@/components/admin';
+import { GhostButton, PrimaryButton, Avatar, Textarea, Badge } from '@/components/ui';
+import { FadeIn, Reveal } from '@/components/motion';
+import { toast } from '@/components/toast';
 import {
   useTick, getRequest, getProfile, getSubcategories, getCategories,
-  getExtras, getPayment, getTechByUser, setStatus,
+  getExtras, getPayment, getTechByUser, getTechniciansWithProfile, getMessages,
+  getNotes, setStatus, reassignRequest, refundPayment, sendMessage, addNote,
+  createTicket, ADMIN_ID,
 } from '@/lib/demo/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { useState } from 'react';
@@ -48,6 +51,10 @@ export default function ServicioDetailPage() {
   const { id } = useParams<{ id: string }>();
   const req = getRequest(id);
   const [note, setNote] = useState('');
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [caseTicketId, setCaseTicketId] = useState<string | null>(null);
 
   if (!req) {
     return (
@@ -66,6 +73,7 @@ export default function ServicioDetailPage() {
   const techRec = techUserId ? getTechByUser(techUserId) : null;
   const extras = getExtras(req.id);
   const payment = getPayment(req.id);
+  const notes = getNotes(req.id);
 
   const base = req.base_price ?? sub?.base_price_suggested ?? 0;
   const extrasTotal = extras.reduce((a, e) => a + e.amount, 0);
@@ -80,8 +88,31 @@ export default function ServicioDetailPage() {
   const currentIndex = FLOW.indexOf(req.status);
   const isTerminal = req.status === 'cancelado' || req.status === 'rechazado';
   const disputed = req.status === 'cancelado';
+  const refundable = payment?.status === 'paid';
 
-  const override = (s: RequestStatus) => setStatus(req.id, s);
+  const override = (s: RequestStatus) => {
+    setStatus(req.id, s, ADMIN_ID);
+    toast.success(`Estado actualizado · ${FLOW_LABEL[s]}`);
+  };
+
+  function onSaveNote() {
+    if (!note.trim()) return;
+    addNote(req!.id, note.trim());
+    setNote('');
+    toast.success('Nota guardada');
+  }
+
+  function onOpenCase() {
+    if (caseTicketId) return;
+    const t = createTicket({
+      subject: `Caso de soporte · Servicio #${req!.id}`,
+      requester_id: req!.client_id,
+      priority: 'alta',
+      request_id: req!.id,
+    });
+    setCaseTicketId(t.id);
+    toast.success(`Caso de soporte abierto · #${t.id}`);
+  }
 
   return (
     <div className="flex flex-col gap-5 text-navy">
@@ -94,7 +125,7 @@ export default function ServicioDetailPage() {
 
       {disputed && (
         <FadeIn>
-          <div className="flex items-center gap-4 rounded-2xl bg-grad-brand p-4 text-white shadow-card" style={{ background: 'linear-gradient(135deg,#DC2626,#991B1B)' }}>
+          <div className="flex items-center gap-4 rounded-2xl p-4 text-white shadow-card" style={{ background: 'linear-gradient(135deg,var(--color-error),#991B1B)' }}>
             <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/15">
               <ShieldAlert size={20} />
             </div>
@@ -102,9 +133,15 @@ export default function ServicioDetailPage() {
               <div className="text-[14px] font-bold">Servicio cancelado · Posible disputa abierta</div>
               <div className="mt-0.5 text-[12.5px] text-white/85">El cliente reporta inconformidad con el resultado. Revisa la evidencia y el chat antes de resolver.</div>
             </div>
-            <button className="inline-flex shrink-0 items-center rounded-lg bg-white px-3.5 py-2 text-[13px] font-semibold text-error">
-              Abrir caso de soporte
-            </button>
+            {caseTicketId ? (
+              <Link href="/soporte" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-[13px] font-semibold text-error">
+                Ver en soporte <ArrowRight size={13} />
+              </Link>
+            ) : (
+              <button onClick={onOpenCase} className="inline-flex shrink-0 items-center rounded-lg bg-white px-3.5 py-2 text-[13px] font-semibold text-error">
+                Abrir caso de soporte
+              </button>
+            )}
           </div>
         </FadeIn>
       )}
@@ -122,10 +159,10 @@ export default function ServicioDetailPage() {
             </div>
           </div>
           <div className="flex shrink-0 gap-2.5">
-            <GhostButton onClick={() => {}}>
+            <GhostButton onClick={() => setChatOpen(true)}>
               <span className="inline-flex items-center gap-2"><MessageSquare size={14} /> Ver chat</span>
             </GhostButton>
-            <button className="inline-flex items-center gap-2 rounded-xl border border-primary px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft">
+            <button onClick={() => setChatOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-primary px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft">
               <UserCog size={14} /> Intervenir
             </button>
             <button onClick={() => override('cancelado')} className="inline-flex items-center gap-2 rounded-xl border border-error px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
@@ -184,9 +221,11 @@ export default function ServicioDetailPage() {
                     </div>
                   </div>
                   <div className="mt-3 text-[12.5px] text-muted">{cat?.name} · {techRec?.total_jobs ?? 0} trabajos</div>
-                  <Link href={`/tecnicos/${req.technician_id}`} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
-                    Ver perfil <ArrowRight size={12} />
-                  </Link>
+                  {techRec && (
+                    <Link href={`/tecnicos/${techRec.id}`} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
+                      Ver perfil <ArrowRight size={12} />
+                    </Link>
+                  )}
                 </>
               ) : (
                 <div className="text-[13px] text-muted">Sin técnico asignado todavía.</div>
@@ -222,6 +261,10 @@ export default function ServicioDetailPage() {
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">
                         <BadgeCheck size={10} /> Pagado{payment.paid_at ? ` · ${fmtTime(payment.paid_at)}` : ''}
                       </span>
+                    ) : payment?.status === 'refunded' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-error-soft px-2 py-0.5 text-[11px] font-semibold text-error">
+                        <RotateCcw size={10} /> Reembolsado
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">Pendiente</span>
                     )}
@@ -243,13 +286,13 @@ export default function ServicioDetailPage() {
                   <div className="text-[12px] text-muted">{FLOW.length} etapas · {extras.length} extras adjuntos</div>
                 </div>
               </div>
-              <Stagger className="flex flex-col pt-1.5">
+              <div className="flex flex-col pt-1.5">
                 {FLOW.map((s, i) => {
                   const done = i < currentIndex || isTerminal;
                   const current = i === currentIndex && !isTerminal;
                   const future = i > currentIndex && !isTerminal;
                   return (
-                    <StaggerItem key={s}>
+                    <Reveal key={s}>
                       <div className="flex gap-3.5">
                         <div className="flex shrink-0 flex-col items-center">
                           <div className={`grid size-[30px] place-items-center rounded-full text-[11px] font-bold ${done ? 'bg-success text-white' : current ? 'bg-primary text-white ring-4 ring-primary/15' : 'bg-surface-2 text-faint'}`}>
@@ -270,10 +313,10 @@ export default function ServicioDetailPage() {
                           <div className={`mt-0.5 text-[12.5px] ${future ? 'text-faint' : 'text-muted'}`}>Etapa {STATUS_HINT[s]}</div>
                         </div>
                       </div>
-                    </StaggerItem>
+                    </Reveal>
                   );
                 })}
-              </Stagger>
+              </div>
             </Panel>
           </FadeIn>
 
@@ -312,39 +355,63 @@ export default function ServicioDetailPage() {
                   <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint" />
                 </div>
               </div>
-              <button className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-[13px] font-semibold text-white hover:bg-primary-2">
+              <button onClick={() => setChatOpen(true)} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-[13px] font-semibold text-white hover:bg-primary-2">
                 <MessageSquare size={14} /> Ver chat completo
               </button>
-              <button className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
+              <button onClick={() => setReassignOpen(true)} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
                 <UserCog size={14} /> Reasignar técnico
               </button>
               <button onClick={() => override('cancelado')} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-error hover:bg-error-soft">
                 <Ban size={14} /> Cancelar servicio
               </button>
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-error bg-error-soft px-3.5 py-2.5 text-[13px] font-medium text-error">
-                <RotateCcw size={14} /> Iniciar reembolso
+              <button
+                onClick={() => refundable && setRefundOpen(true)}
+                disabled={!refundable}
+                title={refundable ? 'Devuelve el cobro al cliente' : payment?.status === 'refunded' ? 'Este pago ya fue reembolsado' : 'No hay un pago cobrado que reembolsar'}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3.5 py-2.5 text-[13px] font-medium ${refundable ? 'border-error bg-error-soft text-error' : 'cursor-not-allowed border-line bg-surface text-faint'}`}
+              >
+                <RotateCcw size={14} /> {payment?.status === 'refunded' ? 'Reembolso emitido' : 'Iniciar reembolso'}
               </button>
               <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-faint">
                 <Info size={11} /> <span>Acciones destructivas piden confirmación + motivo.</span>
               </div>
+              {!disputed && (
+                caseTicketId ? (
+                  <Link href="/soporte" className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
+                    <LifeBuoy size={14} /> Ver caso en soporte
+                  </Link>
+                ) : (
+                  <button onClick={onOpenCase} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-navy hover:bg-surface-2">
+                    <LifeBuoy size={14} /> Abrir caso de soporte
+                  </button>
+                )
+              )}
             </Panel>
           </FadeIn>
 
           <FadeIn>
             <Panel title="Notas internas">
               <Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Anota observaciones internas…" rows={3} />
-              <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
+              <button onClick={onSaveNote} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
                 <Wand2 size={13} /> Guardar nota
               </button>
               <div className="mt-3.5 mb-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">Historial</div>
-              <div className="rounded-xl border border-line bg-surface-2 p-3">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[12px] font-semibold">Sofía Admin</span>
-                  <span className="rounded bg-surface px-1.5 py-px text-[10px] text-faint">Admin</span>
-                  <span className="ml-auto font-mono text-[10.5px] text-faint">{fmtTime(req.created_at)}</span>
+              {notes.length === 0 ? (
+                <p className="py-1 text-[12.5px] text-faint">Sin notas todavía.</p>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {notes.map(n => (
+                    <FadeIn key={n.id} className="rounded-xl border border-line bg-surface-2 p-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[12px] font-semibold">{n.author}</span>
+                        <span className="rounded bg-surface px-1.5 py-px text-[10px] text-faint">Admin</span>
+                        <span className="ml-auto font-mono text-[10.5px] text-faint">{fmtTime(n.created_at)}</span>
+                      </div>
+                      <p className="mt-1.5 text-[12.5px] leading-snug text-navy">{n.text}</p>
+                    </FadeIn>
+                  ))}
                 </div>
-                <p className="mt-1.5 text-[12.5px] leading-snug text-navy">Servicio monitoreado. Sin incidencias reportadas hasta el momento.</p>
-              </div>
+              )}
             </Panel>
           </FadeIn>
 
@@ -360,7 +427,176 @@ export default function ServicioDetailPage() {
           </FadeIn>
         </div>
       </div>
+
+      {/* ── Modals ── */}
+      <ReassignModal
+        open={reassignOpen}
+        onClose={() => setReassignOpen(false)}
+        currentTechUserId={techUserId}
+        onSelect={(userId, name) => {
+          reassignRequest(req.id, userId);
+          setReassignOpen(false);
+          toast.success(`Servicio reasignado a ${name}`);
+        }}
+      />
+
+      <Modal
+        open={refundOpen}
+        onClose={() => setRefundOpen(false)}
+        title="Iniciar reembolso"
+        sub="El monto regresa al método de pago original del cliente. Esta acción no es reversible."
+        icon={<RotateCcw size={16} className="text-error" />}
+        width={480}
+        footer={
+          <>
+            <GhostButton onClick={() => setRefundOpen(false)}>Cancelar</GhostButton>
+            <button
+              onClick={() => {
+                refundPayment(req.id);
+                setRefundOpen(false);
+                toast.success(`Reembolso iniciado · ${money(payment?.gross_amount ?? subtotal)}`);
+              }}
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
+            >
+              <Check size={14} /> Confirmar reembolso
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between rounded-xl bg-error-soft p-4">
+            <span className="text-[13px] font-medium text-error">Monto a reembolsar</span>
+            <span className="font-mono text-[20px] font-bold text-error">{money(payment?.gross_amount ?? subtotal)}</span>
+          </div>
+          <p className="text-[12.5px] leading-relaxed text-muted">
+            El servicio <span className="font-mono font-medium text-navy">#{req.id}</span> pasará a estado <b className="font-semibold text-navy">Cancelado</b> y
+            el pago quedará marcado como <b className="font-semibold text-navy">Reembolsado</b> en Finanzas.
+          </p>
+        </div>
+      </Modal>
+
+      <ChatModal open={chatOpen} onClose={() => setChatOpen(false)} requestId={req.id} clientName={client?.full_name ?? 'Cliente'} techName={techProfile?.full_name ?? 'Técnico'} />
     </div>
+  );
+}
+
+// ── Reasignar técnico ─────────────────────────────────────────────────────────
+function ReassignModal({ open, onClose, onSelect, currentTechUserId }: {
+  open: boolean; onClose: () => void;
+  onSelect: (userId: string, name: string) => void;
+  currentTechUserId: string | null;
+}) {
+  const candidates = getTechniciansWithProfile().filter(({ tech, profile }) =>
+    tech.kyc_status === 'approved' && tech.is_available &&
+    profile?.status !== 'suspended' && tech.user_id !== currentTechUserId,
+  );
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Reasignar técnico"
+      sub="Solo se listan técnicos aprobados y disponibles ahora mismo."
+      icon={<UserCog size={16} />}
+      width={520}
+    >
+      {candidates.length === 0 ? (
+        <p className="py-6 text-center text-[13px] text-faint">No hay técnicos disponibles para reasignar.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {candidates.map(({ tech, profile }) => {
+            const name = profile?.full_name ?? 'Técnico';
+            return (
+              <button
+                key={tech.id}
+                onClick={() => onSelect(tech.user_id, name)}
+                className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition-colors hover:border-primary/40 hover:bg-info-soft"
+              >
+                <Avatar initials={initials(name)} size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-semibold text-navy">{name}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
+                    <Star size={11} className="text-warning" />
+                    {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.total_jobs} trabajos
+                  </div>
+                </div>
+                <Badge tone="success">Disponible</Badge>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Chat del servicio con intervención del admin ─────────────────────────────
+function ChatModal({ open, onClose, requestId, clientName, techName }: {
+  open: boolean; onClose: () => void; requestId: string; clientName: string; techName: string;
+}) {
+  useTick();
+  const [draft, setDraft] = useState('');
+  const messages = getMessages(requestId);
+
+  function send() {
+    const text = draft.trim();
+    if (!text) return;
+    sendMessage(requestId, ADMIN_ID, text);
+    setDraft('');
+    toast.success('Intervención enviada al chat');
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Chat del servicio · ${clientName} y ${techName}`}
+      sub="Puedes intervenir: tus mensajes se marcan como admin para ambas partes."
+      icon={<MessageSquare size={16} />}
+      width={560}
+    >
+      <div className="flex max-h-[380px] min-h-[200px] flex-col gap-3 overflow-y-auto rounded-xl border border-line bg-surface p-4">
+        {messages.length === 0 && (
+          <p className="py-8 text-center text-[12.5px] text-faint">Sin mensajes en este servicio.</p>
+        )}
+        {messages.map(m => {
+          const sender = getProfile(m.sender_id);
+          const isAdmin = m.sender_id === ADMIN_ID;
+          const isTech = !isAdmin && sender?.role === 'tecnico';
+          return (
+            <FadeIn key={m.id} className={`flex ${isTech || isAdmin ? 'justify-end' : 'justify-start'}`}>
+              <div className={`flex max-w-[80%] flex-col ${isTech || isAdmin ? 'items-end' : 'items-start'}`}>
+                {isAdmin && (
+                  <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning-ink">
+                    <UserCog size={10} /> Intervención del admin
+                  </span>
+                )}
+                <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed text-navy ${
+                  isAdmin
+                    ? 'border border-warning/40 bg-warning-soft'
+                    : isTech
+                      ? 'rounded-tr-sm border border-primary/[0.22] bg-primary/[0.10]'
+                      : 'rounded-tl-sm border border-line bg-white'
+                }`}>
+                  {m.content}
+                </div>
+                <span className="mt-1 font-mono text-[10.5px] text-faint">
+                  {isAdmin ? 'Sofía M. (admin)' : sender?.full_name ?? 'Usuario'} · {fmtTime(m.created_at)}
+                </span>
+              </div>
+            </FadeIn>
+          );
+        })}
+      </div>
+      <div className="mt-3">
+        <Textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Escribe como admin — visible para cliente y técnico…" />
+        <div className="mt-2 flex justify-end">
+          <PrimaryButton onClick={send} disabled={!draft.trim()} className="!min-h-[40px] !py-2">
+            <span className="inline-flex items-center gap-2"><Send size={13} /> Intervenir</span>
+          </PrimaryButton>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

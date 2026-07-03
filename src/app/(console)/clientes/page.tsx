@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Download, Filter, ShieldAlert, Star, MapPin, UserPlus, Users } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable } from '@/components/admin';
+import { PageHeading, Panel, StatCard, DataTable, exportCsv } from '@/components/admin';
 import type { Column } from '@/components/admin';
 import { GhostButton, Input, Chip, Avatar, Badge, Skeleton } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
+import { toast } from '@/components/toast';
 import { useTick, getClients, getAllRequests } from '@/lib/demo/store';
 
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
@@ -118,6 +119,14 @@ export default function ClientesPage() {
   const activos = rows.filter(r => r.status === 'active').length;
   const conDisputas = rows.filter(r => r.disputes > 0).length;
 
+  function onExport() {
+    exportCsv('clientes.csv', filtered.map(r => ({
+      ID: r.id, Nombre: r.name, Email: r.email, Teléfono: r.phone, Ciudad: r.city,
+      Servicios: r.services, GMV: r.gmv, Rating: r.rating || '', Estado: STATUS[r.status].label,
+    })));
+    toast.success(`CSV exportado · ${filtered.length} clientes`);
+  }
+
   const columns: Column<ClientRow>[] = [
     {
       key: 'name',
@@ -189,7 +198,7 @@ export default function ClientesPage() {
             <GhostButton>
               <span className="inline-flex items-center gap-2"><Filter size={14} /> Vistas guardadas</span>
             </GhostButton>
-            <GhostButton>
+            <GhostButton onClick={onExport}>
               <span className="inline-flex items-center gap-2 text-cyan"><Download size={14} /> Exportar CSV</span>
             </GhostButton>
           </div>

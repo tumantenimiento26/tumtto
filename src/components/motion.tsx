@@ -86,11 +86,13 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 }
 
 /** Animated progress bar fill (wizard, execution). value 0..1. */
-export function ProgressBar({ value, className = '' }: { value: number; className?: string }) {
+export function ProgressBar({ value, className = '', fillClassName = 'bg-grad-progress' }: {
+  value: number; className?: string; fillClassName?: string;
+}) {
   return (
     <div className={`h-2 w-full overflow-hidden rounded-full bg-surface-2 ${className}`}>
       <motion.div
-        className="h-full bg-grad-progress"
+        className={`h-full rounded-full ${fillClassName}`}
         initial={false}
         animate={{ width: `${Math.round(value * 100)}%` }}
         transition={{ duration: 0.45, ease: EASE }}

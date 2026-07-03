@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Calendar, FolderTree, Download, Plus, Activity, TrendingUp } from 'lucide-react';
+import { Search, FolderTree, Download, Plus, Activity, TrendingUp } from 'lucide-react';
 import {
   PageHeading,
   Panel,
   StatCard,
   StatusPill,
   DataTable,
+  Modal,
+  exportCsv,
   type Column,
 } from '@/components/admin';
-import { PrimaryButton, GhostButton, Chip, Avatar, Input, Skeleton } from '@/components/ui';
+import { PrimaryButton, GhostButton, Chip, Avatar, Input, Skeleton, Field, Textarea } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
+import { toast } from '@/components/toast';
 import {
   useTick,
   getMetrics,
@@ -20,6 +23,8 @@ import {
   getProfile,
   getCategories,
   getSubcategories,
+  getAddresses,
+  createRequest,
 } from '@/lib/demo/store';
 import type { ServiceRequest } from '@/lib/demo/world';
 
@@ -71,7 +76,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 }
 
 export default function ServiciosPage() {
-  useTick();
+  const tick = useTick();
   const router = useRouter();
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -80,6 +85,8 @@ export default function ServiciosPage() {
   }, []);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('Todas');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const metrics = getMetrics();
   const byStatus = metrics.byStatus;
@@ -91,7 +98,8 @@ export default function ServiciosPage() {
       map[sub.id] = cats.find(c => c.id === sub.category_id)?.name ?? '—';
     }
     return map;
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   const rows: Row[] = useMemo(() => {
     return getAllRequests().map(req => ({
@@ -102,10 +110,13 @@ export default function ServiciosPage() {
     }));
   }, [subToCategory]);
 
+  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], []);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
       if (statusFilter && r.req.status !== statusFilter) return false;
+      if (categoryFilter !== 'Todas' && r.categoryName !== categoryFilter) return false;
       if (!q) return true;
       return (
         r.req.id.toLowerCase().includes(q) ||
@@ -114,7 +125,16 @@ export default function ServiciosPage() {
         r.categoryName.toLowerCase().includes(q)
       );
     });
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, categoryFilter]);
+
+  function onExport() {
+    exportCsv('servicios.csv', filtered.map(r => ({
+      ID: r.req.id, Cliente: r.clientName, Técnico: r.techName ?? '',
+      Categoría: r.categoryName, Estado: STATUS_LABELS[r.req.status] ?? r.req.status,
+      Programado: r.req.scheduled_at ?? '', Total: r.req.total_price ?? r.req.base_price ?? '',
+    })));
+    toast.success(`CSV exportado · ${filtered.length} servicios`);
+  }
 
   const statusOrder = Object.keys(STATUS_LABELS).filter(s => byStatus[s] > 0);
   const topStatuses = statusOrder.slice(0, 4);
@@ -184,11 +204,11 @@ export default function ServiciosPage() {
         sub="Operación en tiempo real y histórico completo · ZMG"
         actions={
           <div className="flex gap-2.5">
-            <GhostButton>
+            <GhostButton onClick={onExport}>
               <Download size={14} className="mr-2" />
               Exportar
             </GhostButton>
-            <PrimaryButton>
+            <PrimaryButton onClick={() => setCreateOpen(true)}>
               <Plus size={14} className="mr-2" />
               Crear servicio
             </PrimaryButton>
@@ -229,12 +249,15 @@ export default function ServiciosPage() {
               </Chip>
             ))}
             <span className="ml-auto flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-navy">
-              <Calendar size={14} className="text-primary" />
-              Hoy · 27/06
-            </span>
-            <span className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-navy">
               <FolderTree size={14} className="text-primary" />
-              Categoría: todas
+              <span className="text-muted">Categoría:</span>
+              <select
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value)}
+                className="bg-transparent text-[12.5px] font-medium text-navy outline-none"
+              >
+                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </span>
           </div>
 
@@ -260,6 +283,87 @@ export default function ServiciosPage() {
           />
         </Panel>
       </FadeIn>
+
+      <CreateServiceModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={id => router.push(`/servicios/${id}`)}
+      />
     </div>
+  );
+}
+
+function CreateServiceModal({ open, onClose, onCreated }: {
+  open: boolean; onClose: () => void; onCreated: (id: string) => void;
+}) {
+  const subs = getSubcategories();
+  const cats = getCategories();
+  const addresses = getAddresses();
+  const [subId, setSubId] = useState('');
+  const [description, setDescription] = useState('');
+  const [addressId, setAddressId] = useState(addresses[0]?.id ?? '');
+
+  function submit() {
+    if (!subId) return;
+    const addr = addresses.find(a => a.id === addressId);
+    const req = createRequest({
+      subcategory_id: subId,
+      problem_description: description.trim() || null,
+      address_snapshot: addr ? { alias: addr.alias, line1: addr.line1, city: addr.city, state: addr.state } : null,
+      base_price: subs.find(s => s.id === subId)?.base_price_suggested ?? null,
+    });
+    toast.success(`Servicio creado · #${req.id}`);
+    setSubId('');
+    setDescription('');
+    onClose();
+    onCreated(req.id);
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Crear servicio"
+      sub="Alta manual a nombre del cliente demo (soporte telefónico)."
+      icon={<Plus size={16} />}
+      width={480}
+      footer={
+        <>
+          <GhostButton onClick={onClose}>Cancelar</GhostButton>
+          <PrimaryButton onClick={submit} disabled={!subId}>Crear servicio</PrimaryButton>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Field label="Subcategoría">
+          <select
+            value={subId}
+            onChange={e => setSubId(e.target.value)}
+            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
+          >
+            <option value="">Selecciona un servicio…</option>
+            {subs.map(s => (
+              <option key={s.id} value={s.id}>
+                {cats.find(c => c.id === s.category_id)?.name ?? '—'} · {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Descripción del problema">
+          <Textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="¿Qué reporta el cliente?" />
+        </Field>
+        <Field label="Dirección">
+          <select
+            value={addressId}
+            onChange={e => setAddressId(e.target.value)}
+            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
+          >
+            {addresses.map(a => (
+              <option key={a.id} value={a.id}>{a.alias} · {a.line1}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+    </Modal>
   );
 }

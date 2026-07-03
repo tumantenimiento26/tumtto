@@ -1,14 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  Search, MapPin, FolderTree, Star, X, Upload, Download, Check,
-  MoreVertical, ShieldCheck, ShieldAlert, UserCheck, Users,
+  Search, MapPin, FolderTree, Star, X, Download, Check,
+  ShieldCheck, ShieldAlert, UserCheck, Users,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, type Column } from '@/components/admin';
-import { Avatar, Badge, Chip, Stars, Input, GhostButton, PrimaryButton, Skeleton } from '@/components/ui';
+import { PageHeading, Panel, StatCard, DataTable, exportCsv, type Column } from '@/components/admin';
+import { Avatar, Badge, Chip, Stars, Input, PrimaryButton, Skeleton } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
-import { getTechniciansWithProfile, resolveKyc, useTick } from '@/lib/demo/store';
+import { toast } from '@/components/toast';
+import {
+  getTechniciansWithProfile, getTechCategories, getSubcategories, getCategories,
+  resolveKyc, rejectKyc, useTick,
+} from '@/lib/demo/store';
 
 type Kyc = 'approved' | 'pending_review' | 'rejected' | 'suspended';
 
@@ -23,7 +28,6 @@ interface Row {
   jobs: number;
   available: boolean;
   kyc: Kyc;
-  last: string;
 }
 
 const REGIONS = ['Todas', 'Guadalajara', 'Zapopan', 'Tlaquepaque', 'Tonalá', 'Tlajomulco', 'El Salto'];
@@ -35,26 +39,12 @@ const KYC_META: Record<Kyc, { label: string; tone: 'success' | 'warning' | 'erro
   suspended: { label: 'Suspendido', tone: 'neutral' },
 };
 
-// Extra realistic ZMG rows to make the roster look like the prototype.
-const MOCK: Row[] = [
-  { id: 'm-1', name: 'Miguel Ángel López Rentería', phone: '33 1842 5790', cats: ['Cristales'], region: 'Tlaquepaque', rating: 0, reviews: 0, jobs: 0, available: false, kyc: 'pending_review', last: 'hace 3 d' },
-  { id: 'm-2', name: 'José Carlos Juárez Mendoza', phone: '33 1567 2034', cats: ['Electricidad'], region: 'Guadalajara', rating: 4.9, reviews: 87, jobs: 87, available: true, kyc: 'approved', last: 'hace 4 h' },
-  { id: 'm-3', name: 'Lupita Pérez Vázquez', phone: '33 3120 9846', cats: ['Pintura', 'Impermeabilización'], region: 'Zapopan', rating: 4.6, reviews: 45, jobs: 45, available: true, kyc: 'approved', last: 'ayer' },
-  { id: 'm-4', name: 'Fernanda Olivares Ramírez', phone: '33 1029 7733', cats: ['Plomería', 'Gas'], region: 'Tonalá', rating: 0, reviews: 0, jobs: 0, available: false, kyc: 'pending_review', last: 'hace 1 d' },
-  { id: 'm-5', name: 'Luis Esteban Gómez Salinas', phone: '33 2811 4467', cats: ['Plomería'], region: 'Guadalajara', rating: 3.9, reviews: 27, jobs: 27, available: false, kyc: 'suspended', last: 'hace 3 d' },
-  { id: 'm-6', name: 'Carlos Iván Velázquez Robles', phone: '33 1992 0354', cats: ['Cristales', 'Herrería'], region: 'El Salto', rating: 0, reviews: 0, jobs: 0, available: true, kyc: 'pending_review', last: 'hace 5 h' },
-  { id: 'm-7', name: 'Roberto Villanueva Aceves', phone: '33 3678 1102', cats: ['Pintura'], region: 'Guadalajara', rating: 4.4, reviews: 56, jobs: 56, available: false, kyc: 'rejected', last: 'hace 18 h' },
-];
-
-const LIVE_CATS: Record<string, string[]> = {
-  't-ramon': ['Plomería', 'Drenaje'],
-  't-ag': ['Electricidad', 'Tableros'],
-  't-sc': ['Impermeabilización'],
-  't-do': ['Drenaje', 'Plomería'],
-  't-carla': ['Cristales'],
-};
-const LIVE_REGION: Record<string, string> = {
-  't-ramon': 'Zapopan', 't-ag': 'Tlaquepaque', 't-sc': 'Zapopan', 't-do': 'Tlajomulco', 't-carla': 'Guadalajara',
+// ponytail: la región del técnico no existe en el esquema demo — mapa presentacional.
+const TECH_REGION: Record<string, string> = {
+  't-ramon': 'Zapopan', 't-ag': 'Tlaquepaque', 't-sc': 'Zapopan', 't-do': 'Tlajomulco',
+  't-carla': 'Guadalajara', 't-miguel': 'Tlaquepaque', 't-jose': 'Guadalajara',
+  't-lupita': 'Zapopan', 't-fer': 'Tonalá', 't-luis': 'Guadalajara',
+  't-ivan': 'El Salto', 't-roberto': 'Guadalajara',
 };
 
 function initials(name: string) {
@@ -76,7 +66,8 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 }
 
 export default function TecnicosPage() {
-  useTick();
+  const tick = useTick();
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 450);
@@ -84,34 +75,47 @@ export default function TecnicosPage() {
   }, []);
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('Todas');
+  const [category, setCategory] = useState('Todas');
   const [tab, setTab] = useState<'all' | Kyc>('all');
 
   const rows = useMemo<Row[]>(() => {
-    const live: Row[] = getTechniciansWithProfile().map(({ tech, profile }) => ({
-      id: tech.id,
-      name: profile?.full_name ?? 'Técnico',
-      phone: (profile?.phone ?? '').replace('+52 ', ''),
-      cats: LIVE_CATS[tech.id] ?? ['General'],
-      region: LIVE_REGION[tech.id] ?? 'Zapopan',
-      rating: tech.rating_avg,
-      reviews: tech.ratings_count,
-      jobs: tech.total_jobs,
-      available: tech.is_available,
-      kyc: (tech.kyc_status as Kyc) ?? 'approved',
-      last: 'hace 2 h',
-    }));
-    return [...live, ...MOCK];
-  }, []);
+    const subs = getSubcategories();
+    const cats = getCategories();
+    return getTechniciansWithProfile().map(({ tech, profile }) => {
+      const catNames = [...new Set(
+        getTechCategories(tech.id).map(tc => {
+          const sub = subs.find(s => s.id === tc.subcategory_id);
+          return cats.find(c => c.id === sub?.category_id)?.name ?? '—';
+        }),
+      )];
+      return {
+        id: tech.id,
+        name: profile?.full_name ?? 'Técnico',
+        phone: (profile?.phone ?? '').replace('+52 ', ''),
+        cats: catNames.length ? catNames : ['General'],
+        region: TECH_REGION[tech.id] ?? 'Guadalajara',
+        rating: tech.rating_avg,
+        reviews: tech.ratings_count,
+        jobs: tech.total_jobs,
+        available: tech.is_available,
+        kyc: profile?.status === 'suspended' ? 'suspended' : ((tech.kyc_status as Kyc) ?? 'approved'),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
       if (tab !== 'all' && r.kyc !== tab) return false;
       if (region !== 'Todas' && r.region !== region) return false;
+      if (category !== 'Todas' && !r.cats.includes(category)) return false;
       if (q && !`${r.name} ${r.phone}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rows, query, region, tab]);
+  }, [rows, query, region, category, tab]);
 
   const total = rows.length;
   const activos = rows.filter(r => r.kyc === 'approved' && r.available).length;
@@ -119,11 +123,20 @@ export default function TecnicosPage() {
 
   const tabs: { id: 'all' | Kyc; label: string; count: number }[] = [
     { id: 'all', label: 'Todos', count: total },
-    { id: 'pending_review', label: 'Pendientes de KYC', count: rows.filter(r => r.kyc === 'pending_review').length },
+    { id: 'pending_review', label: 'Pendientes de KYC', count: pendientes },
     { id: 'approved', label: 'Aprobados', count: rows.filter(r => r.kyc === 'approved').length },
     { id: 'rejected', label: 'Rechazados', count: rows.filter(r => r.kyc === 'rejected').length },
     { id: 'suspended', label: 'Suspendidos', count: rows.filter(r => r.kyc === 'suspended').length },
   ];
+
+  function onExport() {
+    exportCsv('tecnicos.csv', filtered.map(r => ({
+      ID: r.id, Nombre: r.name, Teléfono: r.phone, Categorías: r.cats.join(' / '),
+      Región: r.region, Rating: r.rating || '', Trabajos: r.jobs,
+      Disponible: r.available ? 'Sí' : 'No', KYC: KYC_META[r.kyc].label,
+    })));
+    toast.success(`CSV exportado · ${filtered.length} técnicos`);
+  }
 
   const columns: Column<Row>[] = [
     {
@@ -183,16 +196,21 @@ export default function TecnicosPage() {
       render: (r) => (
         <div className="flex items-center justify-end gap-1.5">
           {r.kyc === 'pending_review' && (
-            <button
-              onClick={() => resolveKyc(r.id, true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11.5px] font-semibold text-success hover:bg-success/15"
-            >
-              <Check size={12} /> Aprobar
-            </button>
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); resolveKyc(r.id, true); toast.success(`Técnico aprobado · ${r.name}`); }}
+                className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11.5px] font-semibold text-success hover:bg-success/15"
+              >
+                <Check size={12} /> Aprobar
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); rejectKyc(r.id, 'Rechazo rápido desde el listado'); toast.success(`KYC rechazado · ${r.name}`); }}
+                className="inline-flex items-center gap-1 rounded-lg border border-error/30 bg-error/10 px-2.5 py-1 text-[11.5px] font-semibold text-error hover:bg-error/15"
+              >
+                <X size={12} /> Rechazar
+              </button>
+            </>
           )}
-          <button className="grid place-items-center rounded-lg p-1.5 text-muted hover:bg-surface-2" aria-label="Acciones">
-            <MoreVertical size={16} />
-          </button>
         </div>
       ),
     },
@@ -206,10 +224,9 @@ export default function TecnicosPage() {
         title="Técnicos"
         sub="Gestión y verificación de prestadores de servicio · ZMG"
         actions={
-          <div className="flex gap-2.5">
-            <GhostButton><span className="inline-flex items-center gap-2"><Upload size={14} /> Importar</span></GhostButton>
-            <PrimaryButton><span className="inline-flex items-center gap-2"><Download size={14} /> Exportar CSV</span></PrimaryButton>
-          </div>
+          <PrimaryButton onClick={onExport}>
+            <span className="inline-flex items-center gap-2"><Download size={14} /> Exportar CSV</span>
+          </PrimaryButton>
         }
       />
 
@@ -255,20 +272,29 @@ export default function TecnicosPage() {
                 {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
-              <FolderTree size={14} className="text-cyan" /> Categoría: <span className="font-medium text-navy">Todas</span>
+            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
+              <FolderTree size={14} className="text-cyan" />
+              <span className="text-[12px] text-muted">Categoría:</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-transparent text-[13px] font-medium text-navy outline-none">
+                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               <Star size={14} className="text-warning" /> Rating ≥ <span className="font-mono font-semibold text-navy">3.8</span>
             </div>
-            {(query || region !== 'Todas' || tab !== 'all') && (
-              <Chip onClick={() => { setQuery(''); setRegion('Todas'); setTab('all'); }}>
+            {(query || region !== 'Todas' || category !== 'Todas' || tab !== 'all') && (
+              <Chip onClick={() => { setQuery(''); setRegion('Todas'); setCategory('Todas'); setTab('all'); }}>
                 <span className="inline-flex items-center gap-1"><X size={13} /> Limpiar filtros</span>
               </Chip>
             )}
           </div>
 
-          <DataTable columns={columns} rows={filtered} empty="No hay técnicos que coincidan con los filtros." />
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            onRowClick={r => router.push(`/tecnicos/${r.id}`)}
+            empty="No hay técnicos que coincidan con los filtros."
+          />
 
           <div className="flex items-center justify-between pt-4 text-[12.5px] text-muted">
             <span>Mostrando <b className="font-semibold text-navy">{filtered.length}</b> de <b className="font-semibold text-navy">{total}</b> técnicos</span>

@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Download, Settings, DollarSign, Percent, Wallet, Hourglass,
-  CreditCard, Store, Banknote, ArrowRight, TrendingUp, Zap,
-  BadgeCheck, AlertTriangle, ExternalLink,
+  CreditCard, Store, Banknote, ArrowRight, TrendingUp, Zap, Check,
+  BadgeCheck, AlertTriangle, ExternalLink, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, BarChart, BreakdownBars, DataTable, type Column } from '@/components/admin';
+import { PageHeading, Panel, StatCard, BarChart, BreakdownBars, DataTable, Modal, exportCsv, type Column } from '@/components/admin';
 import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
-import { getMetrics, getAllPayments, getPayouts, getWallet, useTick } from '@/lib/demo/store';
+import { toast } from '@/components/toast';
+import {
+  getMetrics, getAllPayments, getAllPayouts, getWallet, getWalletTxns,
+  getTechnician, getProfile, getRequest, processPayoutBatch, useTick,
+} from '@/lib/demo/store';
 
 interface PayRow {
   id: string; request_id: string; method: string; status: string;
@@ -26,6 +30,7 @@ const METHOD_META: Record<string, { label: string; icon: typeof CreditCard; colo
   tarjeta: { label: 'Tarjeta', icon: CreditCard, color: '#0A6BCF' },
   oxxo: { label: 'OXXO Pay', icon: Store, color: '#B45309' },
   mp: { label: 'MP wallet', icon: Wallet, color: '#0894EA' },
+  mercadopago: { label: 'MP wallet', icon: Wallet, color: '#0894EA' },
   efectivo: { label: 'Efectivo', icon: Banknote, color: '#18A66A' },
 };
 
@@ -36,17 +41,13 @@ const DAILY_GMV = [
 
 // Filas extra realistas (ZMG) además del pago vivo del demo.
 const MOCK_PAYMENTS: PayRow[] = [
-  { id: 'pay-2851', request_id: 'SVC-2851', method: 'oxxo', status: 'pending', gross_amount: 980, platform_fee: 147, technician_net: 833, client: 'Laura Gómez' },
   { id: 'pay-2848', request_id: 'SVC-2848', method: 'mp', status: 'paid', gross_amount: 2150, platform_fee: 322, technician_net: 1828, client: 'Carlos Méndez' },
   { id: 'pay-2844', request_id: 'SVC-2844', method: 'efectivo', status: 'paid', gross_amount: 640, platform_fee: 96, technician_net: 544, client: 'Ana Rivera' },
   { id: 'pay-2840', request_id: 'SVC-2840', method: 'tarjeta', status: 'refunded', gross_amount: 1320, platform_fee: 198, technician_net: 1122, client: 'Jorge Salas' },
 ];
 
-const MOCK_PAYOUTS: PayoutRow[] = [
-  { id: 'po-2', amount: 5420, status: 'pending', clabe_snapshot: '012180001234567890', name: 'Carla Domínguez', initials: 'CD', bank: 'BBVA', kyc: 'ok' },
-  { id: 'po-3', amount: 3180, status: 'pending', clabe_snapshot: '044580009876543210', name: 'Agustín Herrera', initials: 'AH', bank: 'Santander', kyc: 'review' },
-  { id: 'po-4', amount: 2240, status: 'processing', clabe_snapshot: '014320005566778899', name: 'Luis Navarro', initials: 'LN', bank: 'Banorte', kyc: 'ok' },
-];
+// ponytail: banco detectado por prefijo de CLABE — solo presentacional.
+const BANK_BY_PREFIX: Record<string, string> = { '012': 'BBVA', '044': 'Santander', '014': 'Banorte' };
 
 const PAY_STATUS: Record<string, { label: string; cls: string }> = {
   paid: { label: 'Pagado', cls: 'bg-success-soft text-success' },
@@ -77,8 +78,10 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 }
 
 export default function FinanzasPage() {
-  useTick();
+  const tick = useTick();
   const [ready, setReady] = useState(false);
+  const [loteOpen, setLoteOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 450);
     return () => clearTimeout(t);
@@ -86,26 +89,55 @@ export default function FinanzasPage() {
   const m = getMetrics();
 
   const payments = useMemo<PayRow[]>(() => {
-    const live: PayRow[] = getAllPayments().map((p) => ({
-      id: p.id, request_id: p.request_id, method: p.method, status: p.status,
-      gross_amount: p.gross_amount, platform_fee: p.platform_fee,
-      technician_net: p.technician_net, client: 'Cliente demo',
-    }));
+    const live: PayRow[] = getAllPayments().map((p) => {
+      const req = getRequest(p.request_id);
+      const client = req ? getProfile(req.client_id)?.full_name ?? 'Cliente' : 'Cliente';
+      return {
+        id: p.id, request_id: p.request_id, method: p.method, status: p.status,
+        gross_amount: p.gross_amount, platform_fee: p.platform_fee,
+        technician_net: p.technician_net, client,
+      };
+    });
     return [...live, ...MOCK_PAYMENTS];
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   const payouts = useMemo<PayoutRow[]>(() => {
-    const live: PayoutRow[] = getPayouts('t-ramon').map((p) => ({
-      id: p.id, amount: p.amount, status: p.status, clabe_snapshot: p.clabe_snapshot,
-      name: 'Ramón Aguilar', initials: 'RA', bank: 'BBVA', kyc: 'ok',
-    }));
-    return [...MOCK_PAYOUTS, ...live];
-  }, []);
+    return getAllPayouts().map((p) => {
+      const tech = getTechnician(p.technician_id);
+      const name = (tech && getProfile(tech.user_id)?.full_name) ?? 'Técnico';
+      return {
+        id: p.id, amount: p.amount, status: p.status, clabe_snapshot: p.clabe_snapshot,
+        name,
+        initials: name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase(),
+        bank: BANK_BY_PREFIX[p.clabe_snapshot?.slice(0, 3) ?? ''] ?? 'BBVA',
+        kyc: tech?.kyc_status === 'approved' ? 'ok' : 'review',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   const wallet = getWallet('t-ramon');
+  const walletTxns = getWalletTxns('t-ramon');
+  const ramonName = getProfile('demo-tecnico')?.full_name ?? 'Ramón Hernández';
 
   const pendingTotal = payouts.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
   const pendingCount = payouts.filter((p) => p.status === 'pending').length;
+
+  function onExport() {
+    exportCsv('transacciones.csv', payments.map(p => ({
+      ID: p.id, Servicio: p.request_id, Cliente: p.client, Método: METHOD_META[p.method]?.label ?? p.method,
+      Bruto: p.gross_amount, Comisión: p.platform_fee, 'Neto técnico': p.technician_net,
+      Estado: PAY_STATUS[p.status]?.label ?? p.status,
+    })));
+    toast.success(`CSV exportado · ${payments.length} transacciones`);
+  }
+
+  function onProcessBatch() {
+    const { count, total } = processPayoutBatch();
+    setLoteOpen(false);
+    toast.success(`Lote procesado · ${count} retiros por ${mx(total)}`);
+  }
 
   // Desglose por método (a partir de los pagos cobrados + pendientes).
   const byMethod = useMemo(() => {
@@ -150,7 +182,7 @@ export default function FinanzasPage() {
         sub="Conciliación de pagos, comisiones y retiros a técnicos."
         actions={
           <div className="flex gap-2.5">
-            <GhostButton><span className="inline-flex items-center gap-2"><Download size={14} />Exportar</span></GhostButton>
+            <GhostButton onClick={onExport}><span className="inline-flex items-center gap-2"><Download size={14} />Exportar</span></GhostButton>
             <GhostButton><span className="inline-flex items-center gap-2"><Settings size={14} />Configurar reglas</span></GhostButton>
           </div>
         }
@@ -190,7 +222,11 @@ export default function FinanzasPage() {
         <FadeIn>
           <Panel
             title="Solicitudes de retiro (payouts)"
-            action={<PrimaryButton><span className="inline-flex items-center gap-2"><Zap size={14} />Procesar lote</span></PrimaryButton>}
+            action={
+              <PrimaryButton onClick={() => setLoteOpen(true)} disabled={pendingCount === 0}>
+                <span className="inline-flex items-center gap-2"><Zap size={14} />Procesar lote</span>
+              </PrimaryButton>
+            }
           >
             <DataTable
               columns={[
@@ -230,10 +266,10 @@ export default function FinanzasPage() {
             <div className="flex flex-col gap-4">
               <div className="rounded-xl bg-grad-brand p-5 text-white">
                 <div className="flex items-center gap-2.5">
-                  <Avatar initials="RA" size={36} />
+                  <Avatar initials="RH" size={36} />
                   <div>
-                    <div className="text-[13px] font-semibold">Ramón Aguilar</div>
-                    <div className="text-[11px] text-white/80">Cristales · Guadalajara</div>
+                    <div className="text-[13px] font-semibold">{ramonName}</div>
+                    <div className="text-[11px] text-white/80">Plomería · Zapopan</div>
                   </div>
                 </div>
                 <div className="mt-4 text-[11px] text-white/80">Saldo disponible</div>
@@ -257,7 +293,7 @@ export default function FinanzasPage() {
                 </div>
               </div>
 
-              <GhostButton><span className="inline-flex items-center gap-2"><ExternalLink size={14} />Ver historial de wallet</span></GhostButton>
+              <GhostButton onClick={() => setWalletOpen(true)}><span className="inline-flex items-center gap-2"><ExternalLink size={14} />Ver historial de wallet</span></GhostButton>
             </div>
           </Panel>
         </FadeIn>
@@ -272,6 +308,96 @@ export default function FinanzasPage() {
           ]} height={180} color="#18C1FF" />
         </Panel>
       </FadeIn>
+
+      {/* ── Modal: procesar lote (prototipo finanzas.jsx · ConfirmLoteModal) ── */}
+      <Modal
+        open={loteOpen}
+        onClose={() => setLoteOpen(false)}
+        title="Procesar lote de retiros"
+        sub="Revisa el resumen antes de confirmar. Esta acción genera SPEI inmediato a cada técnico."
+        icon={<Zap size={18} />}
+        width={620}
+        footer={
+          <>
+            <GhostButton onClick={() => setLoteOpen(false)}>Cancelar</GhostButton>
+            <PrimaryButton onClick={onProcessBatch}>
+              <span className="inline-flex items-center gap-2"><Check size={14} />Confirmar y procesar lote</span>
+            </PrimaryButton>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <SummaryTile label="Retiros a procesar" value={String(pendingCount)} sub="Solo estatus pendiente" />
+            <SummaryTile label="Monto total" value={mx(pendingTotal)} suffix="MXN" sub="Sin contar en proceso" />
+            <SummaryTile label="Comisión bancaria" value={mx(pendingCount * 10)} suffix="MXN" sub="$10 MXN por SPEI" />
+            <SummaryTile label="Cargo a Tumantenimiento" value={mx(pendingTotal + pendingCount * 10)} suffix="MXN" sub="Saldo cuenta operativa: $4.2M" primary />
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft p-3.5 text-[12.5px]">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+            <div>
+              <b className="font-semibold text-warning-ink">Los retiros en proceso quedarán fuera</b>
+              <span className="text-muted"> hasta que el banco confirme la transferencia anterior.</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface p-3.5">
+            <input type="checkbox" defaultChecked className="mt-0.5 h-4 w-4 accent-primary" />
+            <div>
+              <div className="text-[13.5px] font-medium text-navy">Entiendo que esto genera {pendingCount} transferencia(s) SPEI no reversibles.</div>
+              <div className="mt-1 text-[12px] text-muted">Quedará registro en la bitácora de auditoría a nombre de Sofía Martínez (Admin Soporte).</div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal: historial de wallet ── */}
+      <Modal
+        open={walletOpen}
+        onClose={() => setWalletOpen(false)}
+        title={`Historial de wallet · ${ramonName}`}
+        sub={`Saldo disponible ${mx(wallet?.balance ?? 0)} MXN`}
+        icon={<Wallet size={16} />}
+        width={480}
+      >
+        {walletTxns.length === 0 ? (
+          <p className="py-6 text-center text-[13px] text-faint">Sin movimientos registrados.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {walletTxns.map(t => {
+              const credit = t.type === 'credit';
+              return (
+                <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3">
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${credit ? 'bg-success-soft text-success' : 'bg-error-soft text-error'}`}>
+                    {credit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold capitalize text-navy">{credit ? 'Abono' : t.type === 'payout' ? 'Retiro' : t.type}</div>
+                    <div className="mt-0.5 font-mono text-[11.5px] text-muted">{t.reference ?? '—'} · {new Date(t.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</div>
+                  </div>
+                  <span className={`font-mono text-[13.5px] font-bold ${credit ? 'text-success' : 'text-error'}`}>
+                    {credit ? '+' : '−'}{mx(t.amount)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, suffix, sub, primary }: {
+  label: string; value: string; suffix?: string; sub?: string; primary?: boolean;
+}) {
+  return (
+    <div className={`rounded-xl border p-3.5 ${primary ? 'border-primary/25 bg-info-soft' : 'border-line bg-surface'}`}>
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-faint">{label}</div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className={`font-display text-[22px] font-bold tracking-tight ${primary ? 'text-primary' : 'text-navy'}`}>{value}</span>
+        {suffix && <span className="font-mono text-[11px] text-faint">{suffix}</span>}
+      </div>
+      {sub && <div className="mt-1 text-[11.5px] text-muted">{sub}</div>}
     </div>
   );
 }

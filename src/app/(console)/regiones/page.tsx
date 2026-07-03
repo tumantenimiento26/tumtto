@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { PageHeading, Panel, StatCard, DataTable, type Column } from '@/components/admin';
 import { Chip, Badge, GhostButton, PrimaryButton } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem, motion } from '@/components/motion';
+import { FadeIn, Stagger, StaggerItem, motion, ProgressBar } from '@/components/motion';
 import { useTick, getCoverage, getTechniciansWithProfile } from '@/lib/demo/store';
 
 type Zone = {
@@ -218,9 +218,7 @@ export default function RegionesPage() {
                       <span><span className="font-mono text-navy">{z.colonias}</span> colonias</span>
                       <span className={pct < 80 ? 'text-warning' : 'text-success'}>{pct}% cobertura</span>
                     </div>
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                      <div className={`h-full rounded-full ${pct < 80 ? 'bg-warning' : 'bg-grad-progress'}`} style={{ width: `${pct}%` }} />
-                    </div>
+                    <ProgressBar value={pct / 100} className="mt-2 !h-1.5" fillClassName={pct < 80 ? 'bg-warning' : 'bg-grad-progress'} />
                   </button>
                 );
               })}

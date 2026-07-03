@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import {
-  MapPin, Map as MapIcon, Layers, HardHat, Flame, Hexagon, Plus, Minus,
-  LocateFixed, Users, AlertTriangle, CheckCircle2, Globe, Pencil,
+  MapPin, HardHat, Hexagon, Users, AlertTriangle, CheckCircle2, Globe, Pencil,
 } from 'lucide-react';
 import { PageHeading, Panel, StatCard, DataTable, type Column } from '@/components/admin';
 import { Chip, Badge, GhostButton, PrimaryButton } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem, motion, ProgressBar } from '@/components/motion';
+import { FadeIn, Stagger, StaggerItem, ProgressBar } from '@/components/motion';
+import { CoverageMap } from '@/components/coverage-map';
 import { useTick, getCoverage, getTechniciansWithProfile } from '@/lib/demo/store';
 
 type Zone = {
@@ -19,14 +19,13 @@ type Zone = {
   techs: number;
   jobs: number;
   gaps: string[];
-  pin: { x: number; y: number };
 };
 
 const ZONES: Zone[] = [
-  { id: 'zap', name: 'Zapopan', status: 'ok', colonias: 198, covered: 194, techs: 318, jobs: 1084, gaps: ['Loma Bonita Ejidal', 'Real de la Loma'], pin: { x: 230, y: 180 } },
-  { id: 'gdl', name: 'Guadalajara', status: 'ok', colonias: 245, covered: 240, techs: 412, jobs: 1462, gaps: ['Oblatos', 'San Andrés'], pin: { x: 470, y: 250 } },
-  { id: 'tlaq', name: 'Tlaquepaque', status: 'ok', colonias: 124, covered: 118, techs: 142, jobs: 612, gaps: ['Las Juntas', 'El Órgano'], pin: { x: 560, y: 360 } },
-  { id: 'tlaj', name: 'Tlajomulco de Zúñiga', status: 'warn', colonias: 64, covered: 41, techs: 48, jobs: 188, gaps: ['Santa Fe', 'Chulavista', 'Hacienda Sta. Fe', 'El Zapote'], pin: { x: 360, y: 460 } },
+  { id: 'zap', name: 'Zapopan', status: 'ok', colonias: 198, covered: 194, techs: 318, jobs: 1084, gaps: ['Loma Bonita Ejidal', 'Real de la Loma'] },
+  { id: 'gdl', name: 'Guadalajara', status: 'ok', colonias: 245, covered: 240, techs: 412, jobs: 1462, gaps: ['Oblatos', 'San Andrés'] },
+  { id: 'tlaq', name: 'Tlaquepaque', status: 'ok', colonias: 124, covered: 118, techs: 142, jobs: 612, gaps: ['Las Juntas', 'El Órgano'] },
+  { id: 'tlaj', name: 'Tlajomulco de Zúñiga', status: 'warn', colonias: 64, covered: 41, techs: 48, jobs: 188, gaps: ['Santa Fe', 'Chulavista', 'Hacienda Sta. Fe', 'El Zapote'] },
 ];
 
 const ZONE_STATUS: Record<Zone['status'], 'success' | 'warning'> = { ok: 'success', warn: 'warning' };
@@ -98,7 +97,7 @@ export default function RegionesPage() {
 
       {/* Map + zone list */}
       <div className="grid grid-cols-[1fr_380px] gap-6">
-        {/* Map placeholder */}
+        {/* Mapa real (Mapbox GL) */}
         <FadeIn>
           <Panel
             title="Mapa de cobertura · ZMG"
@@ -108,86 +107,11 @@ export default function RegionesPage() {
               </button>
             }
           >
-            <div className="relative h-[520px] w-full overflow-hidden rounded-xl border border-line bg-grad-brand">
-              {/* grid overlay */}
-              <div
-                className="absolute inset-0 opacity-[0.18]"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(rgba(255,255,255,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.5) 1px,transparent 1px)',
-                  backgroundSize: '40px 40px',
-                }}
-              />
-              <svg viewBox="0 0 760 520" className="absolute inset-0 h-full w-full">
-                {/* ZMG blob */}
-                <path
-                  d="M120 120 Q 260 70 420 110 Q 560 140 600 260 Q 620 380 480 440 Q 320 480 200 420 Q 90 360 90 240 Z"
-                  fill="rgba(255,255,255,0.22)"
-                  stroke="rgba(255,255,255,0.55)"
-                  strokeWidth="2"
-                />
-                {ZONES.map((z) => {
-                  const sel = z.id === selected;
-                  return (
-                    <g
-                      key={z.id}
-                      transform={`translate(${z.pin.x},${z.pin.y})`}
-                      onClick={() => setSelected(z.id)}
-                      className="cursor-pointer"
-                    >
-                      <circle r={sel ? 30 : 22} fill={z.status === 'warn' ? 'rgba(245,158,11,.28)' : 'rgba(255,255,255,.30)'} />
-                      <motion.circle
-                        r={sel ? 12 : 9}
-                        fill="#fff"
-                        stroke={z.status === 'warn' ? '#F59E0B' : '#0A6BCF'}
-                        strokeWidth="3"
-                        animate={{ scale: sel ? [1, 1.12, 1] : 1 }}
-                        transition={{ repeat: sel ? Infinity : 0, duration: 1.8 }}
-                      />
-                      <text x="0" y={-(sel ? 30 : 24)} textAnchor="middle" className="font-display" fontSize="13" fontWeight="700" fill="#fff">
-                        {z.name}
-                      </text>
-                      <text x="0" y={-(sel ? 16 : 10)} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,.85)">
-                        {z.techs} téc · {Math.round((z.covered / z.colonias) * 100)}%
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {/* layers panel */}
-              <div className="absolute right-4 top-4 w-56 rounded-xl border border-line bg-white/95 p-3 shadow-hover backdrop-blur">
-                <div className="flex items-center gap-2 border-b border-line pb-2 text-[12px] font-semibold text-navy">
-                  <Layers size={14} /> Capas
-                </div>
-                {[
-                  { icon: HardHat, color: 'text-primary', label: 'Técnicos activos', sub: `${totalTechs} técnicos` },
-                  { icon: Flame, color: 'text-warning', label: 'Demanda semanal', sub: '3,346 servicios' },
-                  { icon: Hexagon, color: 'text-success', label: 'Polígonos de colonia', sub: `${ZONES.length} zonas` },
-                ].map((l) => (
-                  <div key={l.label} className="flex items-center gap-2.5 py-2">
-                    <span className={`grid h-7 w-7 place-items-center rounded-lg bg-info-soft ${l.color}`}>
-                      <l.icon size={13} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-semibold text-navy">{l.label}</div>
-                      <div className="text-[10.5px] text-faint">{l.sub}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* zoom controls */}
-              <div className="absolute bottom-4 left-4 flex flex-col overflow-hidden rounded-lg border border-line bg-white shadow-card">
-                <button className="grid h-9 w-9 place-items-center border-b border-line text-navy hover:bg-surface"><Plus size={15} /></button>
-                <button className="grid h-9 w-9 place-items-center border-b border-line text-navy hover:bg-surface"><Minus size={15} /></button>
-                <button className="grid h-9 w-9 place-items-center text-primary hover:bg-surface"><LocateFixed size={15} /></button>
-              </div>
-
-              <div className="absolute bottom-4 right-4 rounded-md bg-white/85 px-3 py-1.5 font-mono text-[11px] text-navy">
-                20.7° N · 103.4° W · 2 km
-              </div>
-            </div>
+            <CoverageMap
+              zones={ZONES.map(({ id, name, status, techs, covered, colonias }) => ({ id, name, status, techs, covered, colonias }))}
+              selected={selected}
+              onSelect={setSelected}
+            />
           </Panel>
         </FadeIn>
 

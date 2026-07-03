@@ -367,7 +367,14 @@ export function HeatCalendar({ rows, cols, value, rowLabels, colLabels, format =
 }
 
 // ── Sparkline (mini tendencia para StatCards) ────────────────────────────────
-export function Sparkline({ values, width = 86, height = 26 }: { values: number[]; width?: number; height?: number }) {
+export function Sparkline({ values, width = 86, height = 26, area = false, fluid = false }: {
+  values: number[]; width?: number; height?: number;
+  /** Relleno degradado bajo la línea (para sparklines full-bleed de tarjeta). */
+  area?: boolean;
+  /** Ocupa el 100% del contenedor (preserveAspectRatio none + trazo no escalado). */
+  fluid?: boolean;
+}) {
+  const gid = useId();
   if (values.length < 2) return null;
   const min = Math.min(...values);
   const span = Math.max(1e-9, Math.max(...values) - min);
@@ -376,9 +383,27 @@ export function Sparkline({ values, width = 86, height = 26 }: { values: number[
   const py = (v: number) => P + (1 - (v - min) / span) * (height - 2 * P);
   const pts = values.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
   return (
-    <svg width={width} height={height} aria-hidden="true">
-      <polyline points={pts} fill="none" stroke={PRIMARY} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={px(values.length - 1)} cy={py(values[values.length - 1])} r={2.5} fill={CYAN} />
+    <svg
+      aria-hidden="true"
+      {...(fluid
+        ? { className: 'h-full w-full', viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none' }
+        : { width, height })}
+    >
+      {area && (
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={PRIMARY} stopOpacity={0.18} />
+            <stop offset="1" stopColor={PRIMARY} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+      )}
+      {area && <polygon points={`${px(0).toFixed(1)},${height} ${pts} ${px(values.length - 1).toFixed(1)},${height}`} fill={`url(#${gid})`} />}
+      <polyline
+        points={pts} fill="none" stroke={PRIMARY} strokeWidth={2}
+        strokeLinecap="round" strokeLinejoin="round"
+        {...(fluid ? { vectorEffect: 'non-scaling-stroke' } : {})}
+      />
+      {!fluid && <circle cx={px(values.length - 1)} cy={py(values[values.length - 1])} r={2.5} fill={CYAN} />}
     </svg>
   );
 }

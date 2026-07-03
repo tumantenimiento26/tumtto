@@ -138,16 +138,16 @@ export default function DashboardPage() {
 
       <Stagger className="grid grid-cols-4 gap-4">
         <StaggerItem>
-          <StatCard index={0} icon={Activity} label="Servicios activos ahora" value={<CountUp value={m.active} />} spark={SPARKS.activos} delta="+12%" trend="up" note="vs ayer" />
+          <StatCard index={0} icon={Activity} live href="/servicios" label="Servicios activos ahora" value={<CountUp value={m.active} />} spark={SPARKS.activos} delta="+12%" trend="up" note="vs ayer" />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={1} icon={CheckCircle2} label="Completados hoy" value={<CountUp value={m.completedToday} />} spark={SPARKS.completados} delta="+8%" trend="up" note="vs ayer" />
+          <StatCard index={1} icon={CheckCircle2} href="/servicios" label="Completados hoy" value={<CountUp value={m.completedToday} />} spark={SPARKS.completados} delta="+8%" trend="up" note="vs ayer" />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={2} icon={DollarSign} label="GMV del día" value={<CountUp value={m.gmv} prefix="$" />} suffix="MXN" spark={SPARKS.gmv} delta="+15%" trend="up" note="vs ayer" />
+          <StatCard index={2} icon={DollarSign} href="/finanzas" label="GMV del día" value={<CountUp value={m.gmv} prefix="$" />} suffix="MXN" spark={SPARKS.gmv} delta="+15%" trend="up" note="vs ayer" />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={3} icon={Wrench} label="Técnicos activos" value={<CountUp value={m.activeTechs} suffix={`/${m.totalTechs}`} />} spark={SPARKS.tecnicos} progress={m.totalTechs ? m.activeTechs / m.totalTechs : 0} note={`${Math.round((m.activeTechs / Math.max(m.totalTechs, 1)) * 100)}% disponibles`} />
+          <StatCard index={3} icon={Wrench} href="/tecnicos" label="Técnicos activos" value={<CountUp value={m.activeTechs} suffix={`/${m.totalTechs}`} />} spark={SPARKS.tecnicos} progress={m.totalTechs ? m.activeTechs / m.totalTechs : 0} note={`${Math.round((m.activeTechs / Math.max(m.totalTechs, 1)) * 100)}% disponibles`} />
         </StaggerItem>
       </Stagger>
 

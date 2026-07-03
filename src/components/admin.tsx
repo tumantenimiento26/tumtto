@@ -1,5 +1,6 @@
 'use client';
-import { TrendingUp, TrendingDown, X, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import { TrendingUp, TrendingDown, ArrowUpRight, X, type LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, ProgressBar } from './motion';
 import { Sparkline } from './charts';
 import type { RequestStatus } from '@/lib/demo/world';
@@ -36,30 +37,62 @@ export function Panel({ title, action, children, className = '' }: { title?: str
   );
 }
 
-export function StatCard({ label, value, suffix, delta, trend, note, progress, spark, icon: Icon, index = 0 }: {
+export function StatCard({ label, value, suffix, delta, trend, note, progress, spark, icon: Icon, index = 0, href, live }: {
   label: string; value: React.ReactNode; suffix?: string; delta?: string; trend?: 'up' | 'down'; note?: string; progress?: number; spark?: number[]; icon?: LucideIcon; index?: number;
+  /** Convierte la tarjeta en enlace (hover: elevación + flecha en el tile del icono). */
+  href?: string;
+  /** Punto cyan pulsante junto a la etiqueta — métricas "ahora / en vivo". */
+  live?: boolean;
 }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="rounded-2xl border border-line bg-white p-5 shadow-card">
-      <div className="flex items-center justify-between">
-        <span className="text-[12.5px] font-medium text-muted">{label}</span>
-        {Icon && <span className="grid h-8 w-8 place-items-center rounded-lg bg-info-soft text-primary"><Icon size={16} /></span>}
-      </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <span className="text-[28px] font-bold tracking-tight text-navy">{value}</span>
-        {suffix && <span className="font-mono text-[12px] text-faint">{suffix}</span>}
-      </div>
-      {spark && <div className="mt-1.5"><Sparkline values={spark} /></div>}
-      {delta && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-[12px]">
-          <span className={`inline-flex items-center gap-0.5 font-semibold ${trend === 'down' ? 'text-error' : 'text-success'}`}>
-            {trend === 'down' ? <TrendingDown size={13} /> : <TrendingUp size={13} />}{delta}
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+          {live && (
+            <span className="relative flex h-2 w-2" aria-label="en vivo">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan opacity-60 motion-reduce:animate-none" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan" />
+            </span>
+          )}
+          {label}
+        </span>
+        {Icon && (
+          <span className="relative grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-info-soft text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-white">
+            <Icon size={16} className={href ? 'transition-opacity duration-200 group-hover:opacity-0' : undefined} />
+            {href && <ArrowUpRight size={16} className="absolute opacity-0 transition-opacity duration-200 group-hover:opacity-100" />}
           </span>
-          {note && <span className="text-faint">{note}</span>}
+        )}
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="font-display text-[30px] font-extrabold leading-none tracking-tight text-navy [font-variant-numeric:tabular-nums]">{value}</span>
+        {suffix && <span className="font-mono text-[12px] text-faint">{suffix}</span>}
+        {delta && (
+          <span className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[11px] font-bold ${trend === 'down' ? 'bg-error-soft text-error' : 'bg-success-soft text-success'}`}>
+            {trend === 'down' ? <TrendingDown size={12} /> : <TrendingUp size={12} />}{delta}
+          </span>
+        )}
+      </div>
+      {note && <div className="mt-1.5 text-[11.5px] text-faint">{note}</div>}
+      {progress != null && <ProgressBar value={progress} className="mt-3 !h-1.5" />}
+
+      {spark && (
+        <div className="-mx-5 -mb-5 mt-3 h-[42px] overflow-hidden rounded-b-2xl opacity-80 transition-opacity duration-200 group-hover:opacity-100">
+          <Sparkline values={spark} area fluid />
         </div>
       )}
-      {progress != null && <ProgressBar value={progress} className="mt-3 !h-1.5" />}
+    </>
+  );
+
+  const cls =
+    'group block h-full rounded-2xl border border-line bg-white p-5 shadow-card transition-[transform,box-shadow,border-color] duration-200 ' +
+    (href
+      ? 'hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-hover focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-primary/35'
+      : 'hover:shadow-hover');
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: index * 0.05 }} className="h-full">
+      {href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>}
     </motion.div>
   );
 }

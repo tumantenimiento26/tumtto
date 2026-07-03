@@ -6,7 +6,7 @@ import {
   BarChart3, Settings, ChevronRight, ChevronDown, LogOut, Search, HelpCircle, Bell,
   type LucideIcon,
 } from 'lucide-react';
-import { AnimatePresence, PageTransition } from './motion';
+import { PageTransition } from './motion';
 import { getOpenSupportCount, useTick } from '@/lib/demo/store';
 
 /**
@@ -148,10 +148,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
         <main className="flex-1 overflow-y-auto bg-canvas p-7">
-          {/* Re-key on route change so content re-animates on navigation. */}
-          <AnimatePresence mode="popLayout" initial={false}>
-            <PageTransition key={pathname}>{children}</PageTransition>
-          </AnimatePresence>
+          {/* Re-key on route change so content re-animates on navigation.
+              No AnimatePresence here: route-level presence tracking flakily
+              leaves the entering page frozen at opacity 0 after many
+              navigations. Keyed remount plays the enter animation reliably. */}
+          <PageTransition key={pathname}>{children}</PageTransition>
         </main>
       </div>
     </div>

@@ -128,6 +128,7 @@ export function CoverageMap({
   const [ready, setReady] = useState(false);
   const [noToken, setNoToken] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ zonas: true, demanda: true, tecnicos: false });
+  const [panelOpen, setPanelOpen] = useState(false);
 
   /* init */
   useEffect(() => {
@@ -336,32 +337,49 @@ export function CoverageMap({
       {/* Mapbox impone position:relative en el contenedor — dimensiona con h-full, no con inset. */}
       <div ref={host} className="h-full w-full" />
 
-      {/* capas funcionales */}
-      <div className="absolute right-3 top-3 w-56 rounded-xl border border-line bg-white/95 p-3 shadow-hover backdrop-blur">
-        <div className="flex items-center gap-2 border-b border-line pb-2 text-[12px] font-semibold text-navy">
-          <Layers size={14} /> Capas
-        </div>
-        {LAYER_DEFS.map(l => (
-          <label key={l.key} className="flex cursor-pointer items-center gap-2.5 py-2">
-            <span className={`grid h-7 w-7 place-items-center rounded-lg bg-info-soft ${l.tint}`}>
-              <l.icon size={13} />
-            </span>
-            <span className="min-w-0 flex-1 text-[12px] font-semibold text-navy">{l.label}</span>
-            <input
-              type="checkbox"
-              checked={layers[l.key]}
-              onChange={e => setLayers(s => ({ ...s, [l.key]: e.target.checked }))}
-              className="h-4 w-4 accent-primary"
-              aria-label={l.label}
-            />
-          </label>
-        ))}
-        <div className="mt-1 border-t border-line pt-2">
-          <div className="h-2 rounded-full" style={{ background: 'linear-gradient(90deg, rgba(10,107,207,0), #0A6BCF, #18C1FF, #F59E0B, #DC2626)' }} />
-          <div className="mt-1 flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-faint">
-            <span>Baja</span><span>Demanda</span><span>Alta</span>
+      {/* capas: pill que abre/cierra el panel */}
+      <div className="absolute right-3 top-3 flex flex-col items-end">
+        <button
+          onClick={() => setPanelOpen(o => !o)}
+          aria-expanded={panelOpen}
+          className="inline-flex items-center gap-2 rounded-full border border-line bg-white/95 px-3.5 py-2 text-[12.5px] font-semibold text-navy shadow-hover backdrop-blur transition-colors hover:bg-surface"
+        >
+          <Layers size={14} className="text-primary" /> Capas
+          <span className="rounded-full bg-info-soft px-1.5 py-px font-mono text-[10px] text-primary">
+            {Object.values(layers).filter(Boolean).length}
+          </span>
+        </button>
+
+        {panelOpen && (
+          <div className="mt-2 w-60 origin-top-right animate-[capas-in_.18s_cubic-bezier(.2,.7,.3,1)] rounded-xl border border-line bg-white/95 p-3 shadow-hover backdrop-blur">
+            {LAYER_DEFS.map(l => {
+              const on = layers[l.key];
+              return (
+                <button
+                  key={l.key}
+                  role="switch"
+                  aria-checked={on}
+                  onClick={() => setLayers(s => ({ ...s, [l.key]: !s[l.key] }))}
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-1 py-2 text-left hover:bg-surface"
+                >
+                  <span className={`grid h-7 w-7 place-items-center rounded-lg bg-info-soft ${l.tint}`}>
+                    <l.icon size={13} />
+                  </span>
+                  <span className={`min-w-0 flex-1 text-[12px] font-semibold ${on ? 'text-navy' : 'text-faint'}`}>{l.label}</span>
+                  <span className={`relative h-[22px] w-9 flex-shrink-0 rounded-full transition-colors ${on ? 'bg-primary' : 'bg-surface-3'}`}>
+                    <span className={`absolute left-[3px] top-[3px] h-4 w-4 rounded-full bg-white shadow-card transition-transform duration-200 ${on ? 'translate-x-[14px]' : ''}`} />
+                  </span>
+                </button>
+              );
+            })}
+            <div className="mt-1 border-t border-line pt-2">
+              <div className="h-2 rounded-full" style={{ background: 'linear-gradient(90deg, rgba(10,107,207,0), #0A6BCF, #18C1FF, #F59E0B, #DC2626)' }} />
+              <div className="mt-1 flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-faint">
+                <span>Baja</span><span>Demanda</span><span>Alta</span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {!ready && (
@@ -371,6 +389,7 @@ export function CoverageMap({
       )}
 
       <style>{`
+        @keyframes capas-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
         .zmg-pop .mapboxgl-popup-content { background: #0E2C56; color: #fff; border-radius: 10px; padding: 10px 13px; box-shadow: 0 18px 40px rgba(14,44,86,.25); font-family: inherit; }
         .zmg-pop .mapboxgl-popup-tip { border-top-color: #0E2C56; border-bottom-color: #0E2C56; }
         .zmg-pop-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }

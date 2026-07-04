@@ -6,8 +6,8 @@ import {
   CreditCard, Store, Banknote, ArrowRight, TrendingUp, Zap, Check,
   BadgeCheck, AlertTriangle, ExternalLink, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, BarChart, BreakdownBars, DataTable, Modal, exportCsv, type Column } from '@/components/admin';
-import { LineChart } from '@/components/charts';
+import { PageHeading, Panel, StatCard, DataTable, Modal, exportCsv, type Column } from '@/components/admin';
+import { LineChart, VBars, HBars } from '@/components/charts';
 import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
@@ -210,7 +210,7 @@ export default function FinanzasPage() {
         </FadeIn>
         <FadeIn>
           <Panel title="Desglose por método · este periodo">
-            <BreakdownBars data={byMethod} />
+            <HBars rows={byMethod.map(b => ({ label: b.name, value: b.value }))} showPct format={mx} />
           </Panel>
         </FadeIn>
       </div>
@@ -306,11 +306,15 @@ export default function FinanzasPage() {
 
       <FadeIn>
         <Panel title="Resumen mensual" action={<span className="inline-flex items-center gap-1 text-[12.5px] text-success"><TrendingUp size={13} />Tendencia positiva</span>}>
-          <BarChart data={[
-            { label: 'Ene', value: 1840000 }, { label: 'Feb', value: 2010000 },
-            { label: 'Mar', value: 2230000 }, { label: 'Abr', value: 2480000 },
-            { label: 'May', value: 2640000 }, { label: 'Jun', value: m.gmv || 2847000 },
-          ]} height={180} color="#18C1FF" />
+          <VBars
+            data={[
+              { label: 'Ene', value: 1840000 }, { label: 'Feb', value: 2010000 },
+              { label: 'Mar', value: 2230000 }, { label: 'Abr', value: 2480000 },
+              { label: 'May', value: 2640000 }, { label: 'Jun', value: m.gmv || 2847000, meta: 'mes en curso · en vivo' },
+            ]}
+            height={200} format={mx}
+            controls={{ avg: true, compare: { label: 'Año anterior', values: [1520000, 1690000, 1870000, 2050000, 2210000, 2340000] } }}
+          />
         </Panel>
       </FadeIn>
 

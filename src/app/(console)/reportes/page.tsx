@@ -5,8 +5,8 @@ import {
   CalendarRange, ChevronDown, Download, Link2, Star, TrendingUp,
   AlertTriangle, MapPin, HardHat, Snowflake, UserPlus,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, BarChart, exportCsv, type Column } from '@/components/admin';
-import { LineChart, HBars, HeatCalendar } from '@/components/charts';
+import { PageHeading, Panel, StatCard, DataTable, exportCsv, type Column } from '@/components/admin';
+import { LineChart, VBars, HBars, HeatCalendar } from '@/components/charts';
 import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
@@ -100,6 +100,8 @@ export default function ReportesPage() {
   const metrics = getMetrics();
   const cats = getCategoriesWithCounts();
   const serie = RANGE_DATA[range];
+  // ponytail: periodo anterior demo — factores fijos sobre la serie actual.
+  const svcPrev = serie.svc.map((d, i) => Math.round(d.value * [0.86, 0.92, 0.83, 0.9][i % 4]));
   const gmvTotal = serie.gmv.reduce((s, d) => s + d.value, 0);
   const svcTotal = serie.svc.reduce((s, d) => s + d.value, 0);
 
@@ -197,7 +199,13 @@ export default function ReportesPage() {
       <div className="grid grid-cols-2 gap-6">
         <FadeIn>
           <Panel title={`Volumen de servicios · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.svcDelta}</span>}>
-            <div className="pt-2"><BarChart key={`svc-${range}`} data={serie.svc} height={200} /></div>
+            <div className="pt-2">
+              <VBars
+                key={`svc-${range}`} data={serie.svc} height={200}
+                format={v => `${v.toLocaleString('es-MX')} serv.`}
+                controls={{ avg: true, compare: { label: 'Periodo anterior', values: svcPrev } }}
+              />
+            </div>
           </Panel>
         </FadeIn>
         <FadeIn>

@@ -499,6 +499,186 @@ export function HBars({ rows, format = num, controls = false, showPct = false }:
   );
 }
 
+// ── Barras verticales (hover rico, promedio, comparativa, teclado) ───────────
+export function VBars({ data, format = num, height = 220, controls }: {
+  data: { label: string; value: number; meta?: string }[];
+  format?: (v: number) => string;
+  height?: number;
+  controls?: {
+    /** Toggle de línea de promedio. */
+    avg?: boolean;
+    /** Serie del periodo anterior (misma longitud) — barras agrupadas. */
+    compare?: { label: string; values: number[] };
+  };
+}) {
+  const { ref, w } = useWidth();
+  const { tip, moveTip, showAt, hide } = useTip(ref);
+  const reduced = useReducedMotion();
+  const [hover, setHover] = useState<number | null>(null);
+  const [showAvg, setShowAvg] = useState(false);
+  const [showCmp, setShowCmp] = useState(false);
+  const clipId = useId();
+
+  const n = data.length;
+  const cmp = controls?.compare?.values ?? null;
+  const max = Math.max(1, ...data.map(d => d.value), ...(showCmp && cmp ? cmp : [0])) * 1.08;
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const avg = n ? data.reduce((s, d) => s + d.value, 0) / n : 0;
+
+  const ticks = [0.25, 0.5, 0.75, 1].map(t => ({ t, label: format(Math.round(max * t)) }));
+  const padLeft = 14 + Math.max(...ticks.map(x => x.label.length)) * 6.2;
+  const PAD = { top: 16, right: 10, bottom: 24, left: padLeft };
+  const iw = Math.max(10, w - PAD.left - PAD.right);
+  const ih = height - PAD.top - PAD.bottom;
+  const band = n ? iw / n : iw;
+  const barW = Math.max(6, Math.min(band * (showCmp && cmp ? 0.32 : 0.56), 64));
+  const xC = (i: number) => PAD.left + band * i + band / 2; // centro de banda
+  const y = (v: number) => PAD.top + ih - (v / max) * ih;
+  const baseline = PAD.top + ih;
+
+  const peak = useMemo(() => data.reduce((m, d, i) => (d.value > data[m].value ? i : m), 0), [data]);
+  const xIdx = useMemo(
+    () => (n <= 8 ? data.map((_, i) => i) : [...new Set(Array.from({ length: 6 }, (_, k) => Math.round((k * (n - 1)) / 5)))]),
+    [data, n],
+  );
+
+  const tipFor = (i: number) => {
+    const d = data[i];
+    const prev = i > 0 ? data[i - 1].value : null;
+    const deltaPct = prev ? ((d.value - prev) / prev) * 100 : null;
+    return (
+      <TipBody
+        title={d.label}
+        value={format(d.value)}
+        delta={deltaPct != null ? `${deltaPct >= 0 ? '▲ +' : '▼ '}${deltaPct.toFixed(1)}% vs anterior` : undefined}
+        deltaTone={deltaPct != null && deltaPct < 0 ? 'down' : 'up'}
+        rows={[
+          ...(showCmp && cmp?.[i] != null ? [{ label: controls!.compare!.label, value: format(cmp[i]) }] : []),
+          { label: 'Participación', value: `${total ? Math.round((d.value / total) * 100) : 0}%` },
+          ...(showAvg ? [{ label: 'Promedio', value: format(Math.round(avg)) }] : []),
+        ]}
+        meta={d.meta}
+      />
+    );
+  };
+
+  const focusIdx = (i: number) => { setHover(i); showAt(xC(i), y(data[i].value) - 8, tipFor(i)); };
+  function onMove(e: React.MouseEvent) {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r || !n) return;
+    const i = Math.min(n - 1, Math.max(0, Math.floor((e.clientX - r.left - PAD.left) / band)));
+    setHover(i);
+    moveTip(e, tipFor(i));
+  }
+  function onKey(e: React.KeyboardEvent) {
+    if (!n || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    e.preventDefault();
+    focusIdx(hover == null ? n - 1 : Math.min(n - 1, Math.max(0, hover + (e.key === 'ArrowRight' ? 1 : -1))));
+  }
+  const leave = () => { setHover(null); hide(); };
+
+  const hasControls = controls && (controls.avg || controls.compare);
+
+  return (
+    <div>
+      {hasControls && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {controls.avg && <CChip on={showAvg} onClick={() => setShowAvg(v => !v)} title="Línea de promedio">Promedio</CChip>}
+          {controls.compare && <CChip on={showCmp} onClick={() => setShowCmp(v => !v)} title="Periodo anterior (barras agrupadas)">{controls.compare.label}</CChip>}
+        </div>
+      )}
+
+      <div ref={ref} className="relative">
+        <svg width={w} height={height} role="img" aria-label={`Barras: ${n} periodos`}>
+          <defs>
+            <clipPath id={clipId}><rect x={PAD.left} y={PAD.top} width={iw} height={ih} /></clipPath>
+          </defs>
+          <line x1={PAD.left} x2={PAD.left + iw} y1={baseline} y2={baseline} stroke={GRID} />
+          {ticks.map(({ t, label }) => (
+            <g key={t}>
+              <line x1={PAD.left} x2={PAD.left + iw} y1={y(max * t)} y2={y(max * t)} stroke={GRID} />
+              <text x={PAD.left - 8} y={y(max * t) + 3} textAnchor="end" fontSize={10} fill={FAINT} className="font-mono tabular-nums">{label}</text>
+            </g>
+          ))}
+          {xIdx.map(i => (
+            <text key={i} x={xC(i)} y={height - 7} textAnchor="middle" fontSize={10} fill={hover === i ? INK : FAINT} fontWeight={hover === i ? 700 : 400} className="font-mono">{data[i].label}</text>
+          ))}
+
+          <g clipPath={`url(#${clipId})`}>
+            {data.map((d, i) => {
+              const dim = hover != null && hover !== i;
+              const cx = xC(i);
+              const curX = showCmp && cmp ? cx + 1.5 : cx - barW / 2;
+              return (
+                <g key={d.label + i} style={{ opacity: dim ? 0.4 : 1, transition: 'opacity .15s' }}>
+                  {showCmp && cmp?.[i] != null && (
+                    <motion.rect
+                      x={cx - barW - 1.5} width={barW} rx={4}
+                      y={y(cmp[i])} height={baseline - y(cmp[i]) + 6}
+                      fill={FAINT} fillOpacity={0.5}
+                      initial={{ scaleY: reduced ? 1 : 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true, amount: 0.3 }}
+                      transition={{ duration: 0.5, ease: EASE, delay: reduced ? 0 : i * 0.04 }}
+                      style={{ transformOrigin: `${cx - 1.5 - barW / 2}px ${baseline}px` }}
+                    />
+                  )}
+                  <motion.rect
+                    x={curX} width={barW} rx={4}
+                    y={y(d.value)} height={baseline - y(d.value) + 6}
+                    fill={hover === i ? '#0894EA' : PRIMARY}
+                    initial={{ scaleY: reduced ? 1 : 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true, amount: 0.3 }}
+                    transition={{ duration: 0.55, ease: EASE, delay: reduced ? 0 : i * 0.05 }}
+                    style={{ transformOrigin: `${curX + barW / 2}px ${baseline}px` }}
+                  />
+                </g>
+              );
+            })}
+          </g>
+
+          {/* etiqueta directa: pico siempre, hover el activo */}
+          {n > 0 && hover == null && (
+            <text x={xC(peak)} y={y(data[peak].value) - 6} textAnchor="middle" fontSize={10.5} fontWeight={700} fill={MUTED} className="font-mono tabular-nums">
+              {format(data[peak].value)}
+            </text>
+          )}
+          {hover != null && (
+            <text
+              x={xC(hover)} y={y(data[hover].value) - 6} textAnchor="middle" fontSize={11} fontWeight={700} fill={INK}
+              className="font-mono tabular-nums" style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}
+            >
+              {format(data[hover].value)}
+            </text>
+          )}
+
+          {showAvg && (
+            <g>
+              <line x1={PAD.left} x2={PAD.left + iw} y1={y(avg)} y2={y(avg)} stroke={MUTED} strokeWidth={1.4} strokeDasharray="6 4" />
+              <text x={PAD.left + iw - 4} y={y(avg) - 5} textAnchor="end" fontSize={9.5} fill={MUTED} className="font-mono tabular-nums">
+                prom {format(Math.round(avg))}
+              </text>
+            </g>
+          )}
+
+          <rect
+            x={PAD.left} y={PAD.top} width={iw} height={ih} fill="transparent" tabIndex={0} style={{ outline: 'none' }}
+            role="application"
+            aria-label={n ? `Barras de ${n} periodos. Flechas ← → para recorrer. Pico: ${data[peak].label}, ${format(data[peak].value)}` : undefined}
+            onMouseMove={onMove} onMouseLeave={leave} onKeyDown={onKey}
+            onFocus={() => { if (n) focusIdx(n - 1); }} onBlur={leave}
+          />
+        </svg>
+        <Tip tip={tip} />
+      </div>
+
+      {showCmp && controls?.compare && (
+        <div className="mt-2 flex items-center gap-4 text-[11px] text-muted">
+          <span className="inline-flex items-center gap-1.5"><span className="h-[9px] w-[9px] rounded-[3px] bg-primary" /> Actual</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-[9px] w-[9px] rounded-[3px]" style={{ background: FAINT, opacity: 0.6 }} /> {controls.compare.label}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Calendario de calor (métricas conmutables, guías de fila/columna) ────────
 export function HeatCalendar({ rows, cols, rowLabels, colLabels, metrics }: {
   rows: number; cols: number;

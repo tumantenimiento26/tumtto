@@ -147,20 +147,6 @@ export function DataTable<T>({ columns, rows, onRowClick, empty = 'Sin resultado
 }
 
 // ── Charts (dependency-free SVG, animated) ───────────────────────────────────
-export function BarChart({ data, height = 180, color = '#0A6BCF' }: { data: { label: string; value: number }[]; height?: number; color?: string }) {
-  const max = Math.max(1, ...data.map(d => d.value));
-  return (
-    <div className="flex items-end gap-1.5" style={{ height }}>
-      {data.map((d, i) => (
-        <div key={d.label} className="flex flex-1 flex-col items-center justify-end gap-1.5">
-          <motion.div initial={{ height: 0 }} animate={{ height: `${(d.value / max) * (height - 24)}px` }} transition={{ duration: 0.5, delay: i * 0.03 }}
-            className="w-full rounded-t-md" style={{ background: color, minHeight: 2 }} title={`${d.label}: ${d.value}`} />
-          <span className="font-mono text-[9.5px] text-faint">{d.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ── Modal (scrim + scale/slide, AnimatePresence) ─────────────────────────────
 export function Modal({ open, onClose, title, sub, icon, children, footer, width = 560 }: {
@@ -219,22 +205,3 @@ export function exportCsv(filename: string, rows: Record<string, string | number
 }
 
 /** Horizontal category breakdown bars with values. */
-export function BreakdownBars({ data }: { data: { name: string; value: number; color?: string }[] }) {
-  const max = Math.max(1, ...data.map(d => d.value));
-  return (
-    <div className="space-y-3">
-      {data.map((d, i) => (
-        <div key={d.name}>
-          <div className="mb-1 flex items-center justify-between text-[12.5px]">
-            <span className="text-navy">{d.name}</span>
-            <span className="font-mono font-semibold text-muted">{d.value}</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${(d.value / max) * 100}%` }} transition={{ duration: 0.5, delay: i * 0.04 }}
-              className="h-full rounded-full" style={{ background: d.color ?? '#0A6BCF' }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ShieldAlert, CreditCard, UserX, Clock, Activity, CheckCircle2, DollarSign, Wrench } from 'lucide-react';
-import { PageHeading, Panel, StatCard, StatusPill, DataTable, BreakdownBars } from '@/components/admin';
-import { CountUp, Donut, LineChart, STATUS_DONUT } from '@/components/charts';
+import { PageHeading, Panel, StatCard, StatusPill, DataTable } from '@/components/admin';
+import { CountUp, Donut, LineChart, HBars, STATUS_DONUT } from '@/components/charts';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { Avatar, Skeleton } from '@/components/ui';
 import { useTick, getMetrics, getAllRequests, getAllPayments, getProfile, getSubcategories } from '@/lib/demo/store';
@@ -205,7 +205,7 @@ export default function DashboardPage() {
 
           <FadeIn>
             <Panel title="Servicios por categoría" action={<span className="text-[12px] text-faint">{m.totalRequests} en total</span>}>
-              <BreakdownBars data={breakdown} />
+              <HBars rows={breakdown.map(b => ({ label: b.name, value: b.value }))} showPct />
             </Panel>
           </FadeIn>
         </div>

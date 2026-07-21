@@ -58,7 +58,7 @@ function ProfileScreen() {
 
   return (
     <div style={c.wrap}>
-      <StepHeader stepLabel="Perfil profesional" step={4} total={5} />
+      <StepHeader stepLabel="Perfil profesional" step={5} total={6} />
 
       <div style={c.body}>
         <div style={c.titleBlock}>
@@ -269,7 +269,7 @@ function RatesScreen() {
 
   return (
     <div style={c.wrap}>
-      <StepHeader stepLabel="Tarifas base" step={5} total={5} />
+      <StepHeader stepLabel="Tarifas base" step={6} total={6} />
 
       <div style={c.body}>
         <div style={c.titleBlock}>

@@ -44,7 +44,7 @@ function AdminSidebar({ active = "dashboard", expanded = null }) {
   return (
     <aside style={adminStyles.sb.wrap}>
       <div style={adminStyles.sb.brand}>
-        <img src="assets/logo.png" alt="" style={{ width: 28, height: 28, filter: "brightness(1.2)" }} />
+        <img src="assets/brand/isotipo-blanco.svg" alt="" style={{ width: 28, height: 28 }} />
         <div>
           <div style={adminStyles.sb.brandWord}>Tumantenimiento</div>
           <div style={adminStyles.sb.brandSub}>Admin Panel</div>

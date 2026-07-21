@@ -309,7 +309,7 @@ function BrandPanelA() {
       <div style={brandA.halo} />
       <div style={brandA.topRow}>
         <div style={brandA.brandLockup}>
-          <img src="assets/logo.png" alt="Tumantenimiento" style={brandA.logo} />
+          <img src="assets/brand/isotipo-blanco.svg" alt="Tumantenimiento" style={brandA.logo} />
           <div style={brandA.wordmark}>Tumantenimiento</div>
         </div>
         <div style={brandA.envBadge}>
@@ -357,7 +357,7 @@ function BrandPanelB() {
 
       <div style={brandB.topRow}>
         <div style={brandB.brandLockup}>
-          <img src="assets/logo.png" alt="Tumantenimiento" style={brandB.logo} />
+          <img src="assets/brand/isotipo-blanco.svg" alt="Tumantenimiento" style={brandB.logo} />
           <div style={brandB.wordmark}>Tumantenimiento</div>
         </div>
         <div style={brandB.envBadge}>
@@ -711,7 +711,7 @@ const brandA = {
   },
   topRow: { position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 },
   brandLockup: { display: "flex", alignItems: "center", gap: 12 },
-  logo: { width: 36, height: 36, objectFit: "contain", filter: "brightness(1.2)" },
+  logo: { width: 36, height: 36, objectFit: "contain" },
   wordmark: { fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em", color: "#FFFFFF" },
   envBadge: {
     fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: ".12em",
@@ -749,7 +749,7 @@ const brandB = {
   },
   topRow: { position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 },
   brandLockup: { display: "flex", alignItems: "center", gap: 12 },
-  logo: { width: 34, height: 34, objectFit: "contain", filter: "brightness(1.2)" },
+  logo: { width: 34, height: 34, objectFit: "contain" },
   wordmark: { fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 18, letterSpacing: "-0.01em", color: "#FFFFFF" },
   envBadge: {
     fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: ".12em",

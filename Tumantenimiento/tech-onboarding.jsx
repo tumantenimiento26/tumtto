@@ -284,7 +284,7 @@ function PhoneScreen() {
 function PersonalScreen() {
   return (
     <div style={o.wrap}>
-      <StepHeader stepLabel="Datos personales" step={1} total={5} />
+      <StepHeader stepLabel="Datos personales" step={1} total={6} />
 
       <div style={o.body}>
         <div style={o.titleBlock}>
@@ -408,7 +408,7 @@ function AddressScreen() {
   ];
   return (
     <div style={o.wrap}>
-      <StepHeader stepLabel="Dirección y zona" step={2} total={5} />
+      <StepHeader stepLabel="Dirección y zona" step={2} total={6} />
 
       <div style={o.body}>
         <div style={o.titleBlock}>
@@ -671,7 +671,7 @@ function PhoneFrame({ children }) {
 function IdScreen() {
   return (
     <div style={o.wrap}>
-      <StepHeader stepLabel="Identificación oficial" step={3} total={5} />
+      <StepHeader stepLabel="Identificación oficial" step={3} total={6} />
 
       <div style={o.body}>
         <div style={o.titleBlock}>
@@ -875,12 +875,121 @@ function IneFront() {
 }
 
 // =====================================================================
-// SCREEN 06 — CERTIFICACIONES (opcional)
+// SCREEN 06 — VERIFICACIÓN Y COBRO (selfie + comprobante + CLABE)
+// =====================================================================
+function KycScreen() {
+  return (
+    <div style={o.wrap}>
+      <StepHeader stepLabel="Verificación y cobro" step={4} total={6} />
+
+      <div style={o.body}>
+        <div style={o.titleBlock}>
+          <div style={o.bigTitle}>Verifica tu identidad y tu cuenta</div>
+          <div style={o.bigSub}>
+            Una selfie, un comprobante de domicilio y tu <b style={{ color: "#0E2C56", fontWeight: 700 }}>CLABE</b> para depositarte tus ganancias.
+          </div>
+        </div>
+
+        {/* Selfie — captured */}
+        <div style={o.idCardWrap}>
+          <div style={o.idLabelRow}>
+            <span style={o.idLabelNum}>1</span>
+            <span style={o.idLabelText}>SELFIE DE VERIFICACIÓN</span>
+            <span style={o.idLabelStatusOk}>
+              <Ic name="check" size={9} color="#0F8A56" stroke={3} />
+              Verificada
+            </span>
+          </div>
+          <div style={o.idCardFilled}>
+            <div style={o.selfieFill}>
+              <div style={o.selfieRing}>
+                <Ic name="scan-face" size={40} color="#0A6BCF" />
+              </div>
+            </div>
+            <div style={o.idCardOverlay}>
+              <div style={o.idCardOverlayChip}>
+                <Ic name="check" size={10} color="#FFFFFF" stroke={3.5} />
+                <span>Coincide con tu INE</span>
+              </div>
+              <button style={o.idCardOverlayBtn}>
+                <Ic name="refresh-cw" size={11} color="#FFFFFF" />
+                <span>Repetir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Comprobante de domicilio — empty upload state */}
+        <div style={o.idCardWrap}>
+          <div style={o.idLabelRow}>
+            <span style={o.idLabelNum}>2</span>
+            <span style={o.idLabelText}>COMPROBANTE DE DOMICILIO</span>
+            <span style={o.idLabelStatusPending}>Pendiente</span>
+          </div>
+          <button style={o.idCardEmpty}>
+            <div style={o.idCardEmptyInner}>
+              <div style={o.idCardEmptyIcon}>
+                <Ic name="file-text" size={22} color="#0A6BCF" />
+              </div>
+              <div style={o.idCardEmptyTitle}>Sube tu comprobante</div>
+              <div style={o.idCardEmptySub}>CFE, agua, teléfono o estado de cuenta · máx. 3 meses</div>
+              <div style={o.idCardEmptyActions}>
+                <span style={o.idCardEmptyChip}>
+                  <Ic name="camera" size={11} color="#0A6BCF" />
+                  Cámara
+                </span>
+                <span style={o.idCardEmptyChip}>
+                  <Ic name="file-up" size={11} color="#0A6BCF" />
+                  Archivo
+                </span>
+              </div>
+              <div style={{ ...o.idCorner, top: 8, left: 8 }} />
+              <div style={{ ...o.idCorner, top: 8, right: 8, transform: "scaleX(-1)" }} />
+              <div style={{ ...o.idCorner, bottom: 8, left: 8, transform: "scaleY(-1)" }} />
+              <div style={{ ...o.idCorner, bottom: 8, right: 8, transform: "scale(-1,-1)" }} />
+            </div>
+          </button>
+        </div>
+
+        {/* Datos de cobro */}
+        <SectionLabel n="3" label="Cuenta para depósitos" sub="Aquí te depositamos tus ganancias cada semana" />
+        <Field label="Banco" value="BBVA México" icon="landmark" select required />
+        <div style={{ height: 12 }} />
+        <Field label="CLABE interbancaria" value="0121 8000 1234 5678 90" icon="hash" required hint="18 dígitos · la encuentras en tu app bancaria" />
+        <div style={{ height: 12 }} />
+        <Field label="Titular de la cuenta" value="Ramón Hernández García" icon="user" verified required hint="Debe coincidir con el nombre de tu INE" />
+
+        {/* Privacy */}
+        <div style={o.legalCard}>
+          <div style={o.legalIcon}>
+            <Ic name="shield-check" size={14} color="#0F8A56" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={o.legalTitle}>Tus datos bancarios están cifrados</div>
+            <div style={o.legalText}>
+              Solo se usan para depositarte. Nunca se muestran a clientes ni a terceros.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={o.footer}>
+        <button style={{ ...o.primaryBtn, ...o.primaryBtnDisabled }}>
+          <Ic name="file-text" size={15} color="#9CA3AF" style={{ marginRight: 8 }} />
+          <span>Falta el comprobante</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// SCREEN 07 — CERTIFICACIONES (opcional)
 // =====================================================================
 function CertScreen() {
   return (
     <div style={o.wrap}>
-      <StepHeader stepLabel="Certificaciones" step={4} total={5} />
+      <StepHeader stepLabel="Certificaciones" step={5} total={6} />
 
       <div style={o.body}>
         <div style={o.titleBlock}>
@@ -1053,7 +1162,7 @@ function SuggestedCert({ title, issuer, duration, cost, tone, icon }) {
 function App() {
   return (
     <DesignCanvas>
-      <DCSection id="onb" title="Onboarding · Técnico" subtitle="6 pantallas · cuenta PRO · Tumantenimiento">
+      <DCSection id="onb" title="Onboarding · Técnico" subtitle="7 pantallas · cuenta PRO · Tumantenimiento">
         <DCArtboard id="welcome" label="01 · Bienvenida" width={438} height={892}>
           <PhoneFrame><Welcome /></PhoneFrame>
         </DCArtboard>
@@ -1069,7 +1178,10 @@ function App() {
         <DCArtboard id="id" label="05 · Identificación (INE)" width={438} height={892}>
           <PhoneFrame><IdScreen /></PhoneFrame>
         </DCArtboard>
-        <DCArtboard id="cert" label="06 · Certificaciones (opcional)" width={438} height={892}>
+        <DCArtboard id="kyc" label="06 · Verificación y cobro (KYC)" width={438} height={892}>
+          <PhoneFrame><KycScreen /></PhoneFrame>
+        </DCArtboard>
+        <DCArtboard id="cert" label="07 · Certificaciones (opcional)" width={438} height={892}>
           <PhoneFrame><CertScreen /></PhoneFrame>
         </DCArtboard>
       </DCSection>
@@ -1253,6 +1365,8 @@ const o = {
   idLabelStatusPending: { padding: "2px 8px", background: "rgba(245,158,11,0.14)", color: "#B45309", borderRadius: 999, fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", textTransform: "uppercase" },
 
   idCardFilled: { position: "relative", borderRadius: 14, overflow: "hidden", border: "1.5px solid #18A66A", boxShadow: "0 6px 16px rgba(24,166,106,0.18)" },
+  selfieFill: { aspectRatio: "1.586/1", display: "grid", placeItems: "center", background: "linear-gradient(135deg, #E0F6FF 0%, #EEF3F8 100%)" },
+  selfieRing: { width: 84, height: 84, borderRadius: "50%", background: "#FFFFFF", border: "2.5px solid #18A66A", display: "grid", placeItems: "center", boxShadow: "0 6px 16px rgba(14,44,86,0.12)" },
   idCardOverlay: { position: "absolute", inset: 0, padding: 10, display: "flex", flexDirection: "column", justifyContent: "space-between", background: "linear-gradient(180deg, rgba(14,44,86,0.0) 60%, rgba(14,44,86,0.45) 100%)", pointerEvents: "none" },
   idCardOverlayChip: { alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", background: "#18A66A", color: "#FFFFFF", borderRadius: 999, fontSize: 10, fontWeight: 700, boxShadow: "0 2px 6px rgba(24,166,106,0.40)" },
   idCardOverlayBtn: { alignSelf: "flex-end", display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 11px", background: "rgba(255,255,255,0.94)", border: "none", borderRadius: 999, fontSize: 11, color: "#0E2C56", fontWeight: 700, cursor: "pointer", backdropFilter: "blur(4px)", pointerEvents: "auto" },

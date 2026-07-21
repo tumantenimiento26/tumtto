@@ -93,7 +93,7 @@ function Sidebar({ density }) {
   return (
     <aside style={sb.wrap}>
       <div style={sb.brand}>
-        <img src="assets/logo.png" alt="" style={{ width: 28, height: 28, filter: "brightness(1.2)" }} />
+        <img src="assets/brand/isotipo-blanco.svg" alt="" style={{ width: 28, height: 28 }} />
         <div>
           <div style={sb.brandWord}>Tumantenimiento</div>
           <div style={sb.brandSub}>Admin Panel</div>

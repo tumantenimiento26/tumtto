@@ -31,7 +31,7 @@ function Splash() {
       <div style={s.splashHalo2} />
 
       <div style={s.splashCenter}>
-        <img src="assets/logo.png" alt="Tumantenimiento" style={s.splashLogo} />
+        <img src="assets/brand/isotipo-blanco.svg" alt="Tumantenimiento" style={s.splashLogo} />
         <div style={s.splashWord}>Tumantenimiento</div>
         <div style={s.splashTagline}>Servicios de mantenimiento, sin sorpresas.</div>
       </div>
@@ -259,7 +259,7 @@ function RoleSelector() {
   return (
     <div style={s.rWrap}>
       <div style={s.rHeader}>
-        <img src="assets/logo.png" alt="Tumantenimiento" style={s.rLogo} />
+        <img src="assets/brand/isotipo-color.svg" alt="Tumantenimiento" style={s.rLogo} />
         <span style={s.rWordmark}><b style={{ color: "#0A6BCF", fontWeight: 700 }}>Tu</b>mantenimiento</span>
       </div>
 
@@ -493,7 +493,7 @@ const s = {
     position: "relative", display: "flex", flexDirection: "column", alignItems: "center",
     paddingTop: 80,
   },
-  splashLogo: { width: 120, height: 120, objectFit: "contain", filter: "brightness(1.15)" },
+  splashLogo: { width: 120, height: 120, objectFit: "contain" },
   splashWord: {
     fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 28, letterSpacing: "-0.02em",
     marginTop: 22, color: "#FFFFFF",

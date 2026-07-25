@@ -158,49 +158,45 @@ export function PulseRings({ className = '' }: { className?: string }) {
   );
 }
 
+/** Geometría de marca: casa + llave española calada. Ver Tumantenimiento-Logo/README. */
+const HOUSE = 'M256 118 L398 246 L398 402 L114 402 L114 246 Z';
+const WRENCH =
+  'M-44 -118 Q-62 -112 -62 -80 L-60 -30 Q-58 -4 -38 6 Q-22 14 -22 32 L-22 176 Q-22 198 0 198 Q22 198 22 176 L22 32 Q22 14 38 6 Q58 -4 60 -30 L62 -80 Q62 -112 44 -118 L30 -74 Q26 -60 16 -52 Q0 -44 -16 -52 Q-26 -60 -30 -74 Z';
+const WRENCH_AT = 'translate(258 300) rotate(-36) scale(0.72) translate(0 -40)';
+/** Las esquinas redondeadas salen del trazo de 44 con uniones round, no de math a mano. */
+const HOUSE_STROKE = { strokeWidth: 44, strokeLinejoin: 'round', strokeLinecap: 'round' } as const;
+
 /**
- * Marca «llave en T» — mismo glifo que el app icon móvil y el favicon.
- * tile=true monta el glifo sobre el tile de gradiente de marca (mini app icon).
+ * Marca Tumantenimiento — mismo glifo que el app icon móvil y el favicon.
+ * tile=true monta el glifo blanco sobre el tile de gradiente de marca (mini app icon);
+ * tile=false devuelve el isotipo suelto (casa en gradiente, llave blanca).
  */
 export function BrandMark({ size = 32, tile = true, className = '' }: { size?: number; tile?: boolean; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox={tile ? '0 0 200 200' : '28 30 144 144'} className={className} aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 512 512" className={className} aria-hidden="true">
       <defs>
-        <linearGradient id="bmw-tg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#1FCBFF" /><stop offset=".48" stopColor="#0A6BCF" /><stop offset="1" stopColor="#0A3A9E" />
+        <linearGradient id="bmw-tg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#0E2C56" /><stop offset=".55" stopColor="#0A6BCF" /><stop offset="1" stopColor="#18C1FF" />
         </linearGradient>
-        <linearGradient id="bmw-ice" x1="52" y1="56" x2="148" y2="164" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#C9E4FA" />
-        </linearGradient>
-        <linearGradient id="bmw-steel" x1="92" y1="74" x2="108" y2="74" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#E9F4FD" /><stop offset="1" stopColor="#B3D4F0" />
-        </linearGradient>
-        <linearGradient id="bmw-navy" x1="100" y1="56" x2="100" y2="164" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#1B4C8F" /><stop offset="1" stopColor="#0A2B58" />
-        </linearGradient>
-        <linearGradient id="bmw-cyan" x1="100" y1="126" x2="100" y2="156" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#8FE9FF" /><stop offset="1" stopColor="#18C1FF" />
-        </linearGradient>
+        {tile && (
+          <mask id="bmw-cut">
+            <rect width="512" height="512" fill="#000" />
+            <path d={HOUSE} fill="#fff" stroke="#fff" {...HOUSE_STROKE} />
+            <g transform={WRENCH_AT}><path d={WRENCH} fill="#000" /></g>
+          </mask>
+        )}
       </defs>
-      {tile && <rect width="200" height="200" rx="45" fill="url(#bmw-tg)" />}
-      <g transform={tile ? 'translate(0 -3)' : undefined}>
-        <g transform="translate(2.5 4)" opacity=".35">
-          <rect x="52" y="56" width="96" height="21" rx="10.5" fill="#08306B" />
-          <rect x="92" y="74" width="16" height="50" rx="4" fill="#08306B" />
-          <path d="M100 118 L120 129.5 L120 152.5 L100 164 L80 152.5 L80 129.5 Z" fill="#08306B" />
-        </g>
-        <rect x="52" y="56" width="96" height="21" rx="10.5" fill="url(#bmw-ice)" />
-        <rect x="52" y="56" width="22" height="21" rx="10.5" fill="url(#bmw-navy)" />
-        <rect x="126" y="56" width="22" height="21" rx="10.5" fill="url(#bmw-navy)" />
-        <rect x="58" y="61" width="3" height="11" rx="1.5" fill="#7FD8FF" opacity=".55" />
-        <rect x="64" y="61" width="3" height="11" rx="1.5" fill="#7FD8FF" opacity=".55" />
-        <rect x="133" y="61" width="3" height="11" rx="1.5" fill="#7FD8FF" opacity=".55" />
-        <rect x="139" y="61" width="3" height="11" rx="1.5" fill="#7FD8FF" opacity=".55" />
-        <rect x="92" y="74" width="16" height="50" rx="4" fill="url(#bmw-steel)" />
-        <path d="M100 118 L120 129.5 L120 152.5 L100 164 L80 152.5 L80 129.5 Z" fill="url(#bmw-navy)" />
-        <path d="M100 126 L113 133.5 L113 148.5 L100 156 L87 148.5 L87 133.5 Z" fill="url(#bmw-cyan)" />
-        <path d="M100 133 L107 137 L107 145 L100 149 L93 145 L93 137 Z" fill="#0A2B58" />
-      </g>
+      {tile ? (
+        <>
+          <rect width="512" height="512" rx="112" fill="url(#bmw-tg)" />
+          <rect width="512" height="512" rx="112" fill="#fff" mask="url(#bmw-cut)" />
+        </>
+      ) : (
+        <>
+          <path d={HOUSE} fill="url(#bmw-tg)" stroke="url(#bmw-tg)" {...HOUSE_STROKE} />
+          <g transform={WRENCH_AT}><path d={WRENCH} fill="#FFFFFF" /></g>
+        </>
+      )}
     </svg>
   );
 }

@@ -19,7 +19,7 @@ const USER = { name: 'Sofía Martínez', role: 'Admin Soporte', initials: 'SM' }
 
 interface NavItem { href: string; icon: LucideIcon; label: string; live?: boolean; sub?: { href: string; label: string }[] }
 const NAV: NavItem[] = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/clientes', icon: Users, label: 'Usuarios', sub: [{ href: '/clientes', label: 'Clientes' }, { href: '/tecnicos', label: 'Técnicos' }] },
   { href: '/servicios', icon: Wrench, label: 'Servicios' },
   { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
 
 // pathname -> breadcrumb trail
 const CRUMB: Record<string, string[]> = {
-  '/': ['Inicio', 'Dashboard'],
+  '/dashboard': ['Inicio', 'Dashboard'],
   '/clientes': ['Usuarios', 'Clientes'],
   '/tecnicos': ['Usuarios', 'Técnicos'],
   '/servicios': ['Operación', 'Servicios'],
@@ -97,7 +97,7 @@ function Sidebar() {
           <div className="truncate text-[13px] font-semibold">{USER.name}</div>
           <div className="text-[11px] text-white/55">{USER.role}</div>
         </div>
-        <Link href="/login" aria-label="Cerrar sesión" className="grid place-items-center rounded-lg border border-white/[0.08] p-1.5 hover:bg-white/5"><LogOut size={16} className="text-white/70" /></Link>
+        <Link href="/login" onClick={() => localStorage.removeItem('tumtto-admin')} aria-label="Cerrar sesión" className="grid place-items-center rounded-lg border border-white/[0.08] p-1.5 hover:bg-white/5"><LogOut size={16} className="text-white/70" /></Link>
       </div>
     </aside>
   );

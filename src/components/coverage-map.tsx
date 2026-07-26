@@ -26,7 +26,7 @@ export interface MapZone {
 // ponytail: polígonos aproximados dibujados a mano sobre la mancha urbana —
 // suficientes para operación visual; sustituir por GeoJSON municipal (INEGI)
 // vía "Importar GeoJSON" cuando exista el flujo.
-const ZONE_POLYGONS: Record<string, [number, number][]> = {
+export const ZONE_POLYGONS: Record<string, [number, number][]> = {
   zap: [
     [-103.52, 20.79], [-103.45, 20.82], [-103.38, 20.80], [-103.36, 20.75],
     [-103.38, 20.70], [-103.44, 20.67], [-103.50, 20.68], [-103.54, 20.73],
@@ -60,7 +60,7 @@ const HEAT_PAINT = {
 } as const;
 
 /** Puntos de demanda demo, deterministas, agrupados por hubs reales. */
-function demandPoints() {
+export function demandPoints() {
   let seed = 20260703;
   const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
   const hubs: [number, number, number, number][] = [
@@ -86,7 +86,7 @@ function demandPoints() {
 }
 
 /** Anillo de cobertura (círculo geodésico aproximado) alrededor de una base. */
-function coverageRing(center: [number, number], km: number) {
+export function coverageRing(center: [number, number], km: number) {
   const pts: [number, number][] = [];
   const kmLat = km / 110.574;
   const kmLng = km / (111.32 * Math.cos((center[1] * Math.PI) / 180));
@@ -97,7 +97,7 @@ function coverageRing(center: [number, number], km: number) {
   return pts;
 }
 
-const TECH_BASES: { name: string; center: [number, number]; km: number }[] = [
+export const TECH_BASES: { name: string; center: [number, number]; km: number }[] = [
   { name: 'Ramón Hernández', center: [-103.40, 20.71], km: 10 },
   { name: 'Adriana García', center: [-103.34, 20.66], km: 8 },
   { name: 'Sergio Camarena', center: [-103.30, 20.60], km: 7 },

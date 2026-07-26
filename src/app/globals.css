@@ -69,6 +69,41 @@
   40% { opacity: 1; transform: translateY(-2px); }
 }
 
+/* ── Landing pública (marketing) — auroras, marquee, floats, pulse ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@keyframes aur-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(70px, 40px) scale(1.15); }
+}
+@keyframes aur-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, 50px) scale(0.9); }
+}
+@keyframes aur-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(50px, -60px) scale(1.12); }
+}
+@keyframes float-a {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-11px); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Anclas del landing con nav sticky de 66px (offset −72). */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
 html, body {
   background: var(--color-canvas);
   color: var(--color-navy);

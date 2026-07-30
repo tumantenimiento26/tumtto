@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   ShieldAlert, Inbox, FileBadge, Users, ArrowLeftRight, Check, X, Plus,
   FileText, Clock, MessageSquare, CheckCircle2, ArrowUpRight, Camera,
-  Search, Send, Wrench, UserRound, ArrowRight, LifeBuoy,
+  Search, Send, Wrench, UserRound, ArrowLeft, ArrowRight, LifeBuoy,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeading, Panel, StatCard, StatusPill, Modal } from '@/components/admin';
@@ -423,12 +423,12 @@ function TicketsPanel() {
 
   return (
     <FadeIn>
-      {/* ponytail: bajo lg las 3 columnas se apilan (bandeja acotada, luego
-          conversación y contexto). Sin master-detail navegable: una columna
-          basta para consultar y responder desde el móvil. */}
+      {/* Bajo xl es master-detail: la bandeja ocupa la columna hasta que se
+          elige un ticket, y entonces cede el lugar a la conversación (con
+          «volver»). Desde xl las tres columnas conviven. */}
       <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-line bg-white shadow-card xl:h-[680px] xl:grid-cols-[300px_minmax(0,1fr)_300px]">
         {/* LEFT — bandeja */}
-        <aside className="flex max-h-[340px] min-h-0 flex-col border-b border-line xl:max-h-none xl:border-b-0 xl:border-r">
+        <aside className={`max-h-[70vh] min-h-0 flex-col border-line xl:flex xl:max-h-none xl:border-r ${ticket ? 'hidden' : 'flex'}`}>
           <div className="border-b border-line/70 p-4">
             <h2 className="mb-3 font-display text-[17px] font-bold text-navy">Bandeja</h2>
             <div className="relative">
@@ -478,9 +478,9 @@ function TicketsPanel() {
 
         {/* CENTER — conversación */}
         {ticket ? (
-          <TicketConversation key={ticket.id} ticket={ticket} />
+          <TicketConversation key={ticket.id} ticket={ticket} onBack={() => setSelectedId(null)} />
         ) : (
-          <div className="grid place-items-center bg-surface">
+          <div className="hidden place-items-center bg-surface xl:grid">
             <EmptyState
               icon={LifeBuoy}
               title="Selecciona un ticket"
@@ -500,7 +500,7 @@ function TicketsPanel() {
   );
 }
 
-function TicketConversation({ ticket }: { ticket: Ticket }) {
+function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => void }) {
   const [draft, setDraft] = useState('');
   const requester = getProfile(ticket.requester_id);
   const st = TICKET_STATUS[ticket.status];
@@ -516,7 +516,14 @@ function TicketConversation({ ticket }: { ticket: Ticket }) {
   return (
     <div className="flex min-h-0 flex-col bg-surface">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-line bg-white px-5 py-4">
+      <div className="flex items-center gap-3 border-b border-line bg-white px-4 py-4 sm:px-5">
+        <button
+          onClick={onBack}
+          aria-label="Volver a la bandeja"
+          className="-ml-1.5 grid shrink-0 place-items-center rounded-lg p-1.5 text-muted hover:bg-surface xl:hidden"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <Avatar initials={initials(requester?.full_name)} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -534,7 +541,7 @@ function TicketConversation({ ticket }: { ticket: Ticket }) {
       </div>
 
       {/* Messages */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      <div className="min-h-[280px] flex-1 overflow-y-auto p-4 sm:p-5 xl:min-h-0">
         {ticket.messages.map(m => {
           const isAdmin = m.sender_id === ADMIN_ID;
           const sender = getProfile(m.sender_id);

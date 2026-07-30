@@ -70,7 +70,7 @@ function ConfigCard({ title, sub, icon: Icon, headRight, children }: {
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex items-center gap-2.5 border-b border-line px-5 py-4">
+      <div className="flex items-center gap-2.5 border-b border-line px-4 py-4 sm:px-5">
         <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-info-soft">
           <Icon size={14} className="text-cyan" />
         </div>
@@ -144,7 +144,7 @@ function NumField({ label, value, unit, onChange }: { label: string; value: numb
 function AuditTrail() {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 py-3.5 sm:px-5">
         <History size={15} className="text-cyan" />
         <span className="text-[13.5px] font-semibold text-navy">Últimos cambios en este módulo</span>
         <span className="font-mono text-[11px] text-faint">{AUDIT.length} eventos</span>
@@ -238,9 +238,9 @@ export default function ConfigPage() {
         }
       />
 
-      <div className="mt-6 grid grid-cols-[280px_1fr] items-start gap-6">
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         {/* ---- side nav ---- */}
-        <aside className="sticky top-4 overflow-hidden rounded-2xl border border-line bg-surface">
+        <aside className="overflow-hidden rounded-2xl border border-line bg-surface lg:sticky lg:top-4">
           <div className="flex items-center gap-2 border-b border-line px-4 py-3.5">
             <Settings size={14} className="text-navy" />
             <span className="text-[13px] font-semibold text-navy">Configuración</span>
@@ -275,7 +275,7 @@ export default function ConfigPage() {
             {/* GENERAL */}
             {active === 'general' && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ConfigCard title="Datos de la plataforma" icon={Building2}>
                     <Labeled label="Nombre comercial">
                       <Input value={general.name} onChange={e => { setGeneral({ ...general, name: e.target.value }); touch(); }} />
@@ -283,7 +283,7 @@ export default function ConfigPage() {
                     <Labeled label="Correo de soporte">
                       <Input value={general.email} onChange={e => { setGeneral({ ...general, email: e.target.value }); touch(); }} />
                     </Labeled>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Labeled label="Teléfono">
                         <Input value={general.phone} onChange={e => { setGeneral({ ...general, phone: e.target.value }); touch(); }} />
                       </Labeled>
@@ -303,7 +303,7 @@ export default function ConfigPage() {
 
                 <ConfigCard title="Categorías activas" icon={ListChecks}
                   sub="Activa o desactiva la disponibilidad de cada categoría de servicio.">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {cats.map(c => (
                       <div key={c.id} className="flex items-center gap-3 rounded-lg border border-line bg-canvas px-4 py-3">
                         <div className="min-w-0 flex-1">
@@ -322,7 +322,7 @@ export default function ConfigPage() {
             {/* COMMISSION */}
             {active === 'commission' && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ConfigCard title="Comisión global" icon={Hash}
                     sub="Se aplica a todas las categorías que no tengan comisión específica.">
                     <PercentField label="Porcentaje de comisión default" value={globalCommission}
@@ -362,7 +362,7 @@ export default function ConfigPage() {
                   </ConfigCard>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ConfigCard title="Tarifa base por defecto" icon={Tag}
                     sub="Precios mínimos, máximos y sugeridos por subcategoría.">
                     <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas p-3.5">
@@ -383,7 +383,7 @@ export default function ConfigPage() {
                         <Toggle on={program.on} onChange={v => { setProgram({ ...program, on: v }); touch(); }} />
                       </div>
                     }>
-                    <div className="grid grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <PercentField label="Comisión durante el programa" value={program.pct}
                         onChange={v => { setProgram({ ...program, pct: v }); touch(); }} />
                       <NumField label="Duración del programa" value={program.days} unit="días"
@@ -399,7 +399,7 @@ export default function ConfigPage() {
             {/* SLA */}
             {active === 'sla' && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ConfigCard title="Tiempo de aceptación" icon={AlarmClock}
                     sub="Minutos para que el técnico acepte o rechace una solicitud.">
                     <NumField label="Ventana de aceptación" value={sla.accept} unit="minutos"
@@ -417,7 +417,7 @@ export default function ConfigPage() {
 
                   <ConfigCard title="SLA de soporte" icon={Timer}
                     sub="Tiempos objetivo de respuesta del equipo de operaciones.">
-                    <div className="grid grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField label="Primera respuesta" value={sla.firstResponse} unit="min"
                         onChange={v => { setSla({ ...sla, firstResponse: v }); touch(); }} />
                       <NumField label="Resolución de disputas" value={sla.dispute} unit="horas"
@@ -433,9 +433,9 @@ export default function ConfigPage() {
             {/* CANCEL */}
             {active === 'cancel' && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ConfigCard title="Política de cancelación del cliente" icon={UserX}>
-                    <div className="grid grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField label="Ventana sin costo" value={cancel.window} unit="h antes"
                         onChange={v => { setCancel({ ...cancel, window: v }); touch(); }} />
                       <PercentField label="Penalización tardía" value={cancel.penalty} big={false}
@@ -461,7 +461,7 @@ export default function ConfigPage() {
 
                 <ConfigCard title="No-show del cliente" icon={UserMinus}
                   sub="Cuando el cliente no está disponible al momento de la visita.">
-                  <div className="grid grid-cols-[200px_1fr] items-start gap-4">
+                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                     <NumField label="Tiempo de espera del técnico" value={cancel.wait} unit="min"
                       onChange={v => { setCancel({ ...cancel, wait: v }); touch(); }} />
                     <div className="rounded-xl border border-line bg-canvas px-4 py-3.5">
@@ -576,13 +576,13 @@ export default function ConfigPage() {
         {modal && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 grid place-items-center bg-navy/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 grid place-items-center bg-navy/50 p-4 backdrop-blur-sm"
             onClick={() => setModal(false)}
           >
             <motion.div
               initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="w-[560px] overflow-hidden rounded-2xl bg-surface shadow-hover"
+              className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-surface shadow-hover"
             >
               <div className="flex items-start gap-3.5 border-b border-line px-6 py-5">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-error/10">

@@ -55,7 +55,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
       <div className="flex flex-col gap-3">
@@ -205,7 +205,7 @@ export default function ClientesPage() {
         }
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard index={0} label="Total clientes" value={fmt(total)} icon={Users} note="Base registrada en ZMG" />
         <StatCard index={1} label="Nuevos este mes" value={fmt(nuevos)} trend="up" delta="+12%" icon={UserPlus} />
         <StatCard index={2} label="Activos" value={fmt(activos)} note={`${Math.round((activos / total) * 100)}% de la base`} progress={activos / total} />
@@ -215,7 +215,7 @@ export default function ClientesPage() {
       <FadeIn>
         <Panel>
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="relative max-w-[320px] flex-1">
+            <div className="relative w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-[320px]">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
               <Input
                 value={query}

@@ -13,12 +13,12 @@ import type { RequestStatus } from '@/lib/demo/world';
 
 export function PageHeading({ title, sub, actions }: { title: string; sub?: string; actions?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-navy">{title}</h1>
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">{title}</h1>
         {sub && <p className="mt-1 text-[13.5px] text-muted">{sub}</p>}
       </div>
-      {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -27,12 +27,12 @@ export function Panel({ title, action, children, className = '' }: { title?: str
   return (
     <section className={`rounded-2xl border border-line bg-white shadow-card ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:px-5">
           {title && <h2 className="text-[15px] font-bold text-navy">{title}</h2>}
           {action}
         </div>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -120,12 +120,14 @@ export function DataTable<T>({ columns, rows, onRowClick, empty = 'Sin resultado
   columns: Column<T>[]; rows: T[]; onRowClick?: (row: T) => void; empty?: string;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left">
+    // ponytail: en móvil la tabla scrollea en horizontal (min-w) en vez de
+    // convertirse en tarjetas — mismo markup, cero componente extra.
+    <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+      <table className="w-full min-w-[720px] border-collapse text-left">
         <thead>
           <tr className="border-b border-line">
             {columns.map(c => (
-              <th key={c.key} className={`px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wide text-faint ${c.className ?? ''}`}>{c.header}</th>
+              <th key={c.key} className={`whitespace-nowrap px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wide text-faint ${c.className ?? ''}`}>{c.header}</th>
             ))}
           </tr>
         </thead>
@@ -160,7 +162,7 @@ export function Modal({ open, onClose, title, sub, icon, children, footer, width
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="fixed inset-0 z-50 grid place-items-center bg-navy/45 p-6 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 grid place-items-center bg-navy/45 p-4 backdrop-blur-[2px] sm:p-6"
         >
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -171,7 +173,7 @@ export function Modal({ open, onClose, title, sub, icon, children, footer, width
             style={{ width, maxWidth: '100%' }}
             className="max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-overlay"
           >
-            <div className="flex items-start gap-3.5 border-b border-line/70 px-6 pb-4 pt-5">
+            <div className="flex items-start gap-3.5 border-b border-line/70 px-4 pb-4 pt-5 sm:px-6">
               {icon && <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-info-soft text-primary">{icon}</span>}
               <div className="min-w-0 flex-1">
                 <div className="text-[16px] font-bold text-navy">{title}</div>
@@ -181,8 +183,8 @@ export function Modal({ open, onClose, title, sub, icon, children, footer, width
                 <X size={15} />
               </button>
             </div>
-            <div className="px-6 py-5">{children}</div>
-            {footer && <div className="flex justify-end gap-2.5 border-t border-line/70 px-6 py-4">{footer}</div>}
+            <div className="px-4 py-5 sm:px-6">{children}</div>
+            {footer && <div className="flex flex-wrap justify-end gap-2.5 border-t border-line/70 px-4 py-4 sm:px-6">{footer}</div>}
           </motion.div>
         </motion.div>
       )}

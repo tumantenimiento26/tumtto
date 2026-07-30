@@ -140,7 +140,7 @@ export default function ReportesPage() {
       <span className={`inline-grid h-6 w-6 place-items-center rounded-md font-mono text-[11px] font-bold ${r.rank <= 3 ? 'bg-grad-brand text-white' : 'bg-surface-2 text-muted'}`}>{r.rank}</span>
     ) },
     { key: 'name', header: 'Técnico', render: r => (
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <Avatar initials={r.initials} size={32} />
         <span className="text-[13px] font-semibold text-navy">{r.name}</span>
       </div>
@@ -162,7 +162,7 @@ export default function ReportesPage() {
         title="Reportes y analítica"
         sub="Insights de negocio, adquisición, desempeño y cobertura geográfica."
         actions={
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2">
               <CalendarRange className="text-cyan" size={14} />
               <span className="text-[12.5px] font-medium text-navy">{serie.periodo}</span>
@@ -188,7 +188,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Summary StatCards */}
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem><StatCard index={0} label="GMV del periodo" value={`$${gmvTotal.toLocaleString('es-MX')}K`} delta={serie.gmvDelta} trend="up" note="Crecimiento sostenido" icon={TrendingUp} /></StaggerItem>
         <StaggerItem><StatCard index={1} label="Servicios completados" value={svcTotal.toLocaleString('es-MX')} suffix="serv." delta={serie.svcDelta} trend="up" note="vs. periodo anterior" /></StaggerItem>
         <StaggerItem><StatCard index={2} label="Comisión plataforma" value={`$${Math.round(gmvTotal * 0.12).toLocaleString('es-MX')}K`} delta={serie.gmvDelta} trend="up" note="Take rate 12%" /></StaggerItem>
@@ -196,7 +196,7 @@ export default function ReportesPage() {
       </Stagger>
 
       {/* Two charts */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <FadeIn>
           <Panel title={`Volumen de servicios · ${range.toLowerCase()}`} action={<span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"><TrendingUp size={11} />{serie.svcDelta}</span>}>
             <div className="pt-2">
@@ -217,7 +217,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Category breakdown + top techs */}
-      <div className="grid grid-cols-[380px_1fr] gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
         <FadeIn>
           <Panel title="Desempeño por categoría" action={<span className="text-[11.5px] text-muted">servicios</span>}>
             <div className="pt-2"><HBars rows={catRows} controls showPct /></div>
@@ -246,7 +246,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Geo stats */}
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem><StatCard index={0} label="Colonias activas" value="758" delta="+24 este mes" trend="up" icon={MapPin} /></StaggerItem>
         <StaggerItem><StatCard index={1} label="Cobertura técnica" value="86%" note="al menos 1 técnico" icon={HardHat} /></StaggerItem>
         <StaggerItem><StatCard index={2} label="Demanda total · mes" value="2,847" delta="+18%" trend="up" /></StaggerItem>
@@ -281,10 +281,10 @@ export default function ReportesPage() {
       {/* Cold zones */}
       <FadeIn>
         <Panel title="Zonas frías · alta demanda con baja oferta" action={<span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 text-[11.5px] font-semibold text-warning"><Snowflake size={11} />Expandir red</span>}>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {COLD_ZONES.map(z => (
               <div key={z.name} className="rounded-xl border border-warning/30 bg-warning/[0.06] p-4">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <AlertTriangle className="text-warning" size={16} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-semibold text-navy">{z.name}</div>

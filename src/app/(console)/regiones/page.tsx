@@ -88,7 +88,7 @@ export default function RegionesPage() {
       />
 
       {/* Stat cards */}
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem><StatCard index={0} label="Cobertura ZMG" value={`${covPct}%`} progress={covPct / 100} note={`${totalCovered}/${totalColonias} colonias`} icon={Hexagon} /></StaggerItem>
         <StaggerItem><StatCard index={1} label="Técnicos en operación" value={totalTechs.toLocaleString('es-MX')} delta="+24" trend="up" note="vs. mes anterior" icon={Users} /></StaggerItem>
         <StaggerItem><StatCard index={2} label="Zonas activas" value={`${ZONES.filter((z) => z.status === 'ok').length}/${ZONES.length}`} note="1 zona parcial" icon={MapPin} /></StaggerItem>
@@ -96,7 +96,7 @@ export default function RegionesPage() {
       </Stagger>
 
       {/* Map + zone list */}
-      <div className="grid grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* Mapa real (Mapbox GL) */}
         <FadeIn>
           <Panel
@@ -152,7 +152,7 @@ export default function RegionesPage() {
       </div>
 
       {/* Detail row: gaps + assigned techs */}
-      <div className="grid grid-cols-[380px_1fr] gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
         <FadeIn>
           <Panel title={`Brechas de cobertura · ${active.name}`}>
             <p className="mb-3 text-[12.5px] text-muted">

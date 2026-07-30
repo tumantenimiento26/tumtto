@@ -55,7 +55,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
       <div className="flex flex-col gap-3">
@@ -230,7 +230,7 @@ export default function TecnicosPage() {
         }
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard index={0} label="Total de técnicos" value={total} icon={Users} note="Roster completo ZMG" />
         <StatCard index={1} label="Activos y disponibles" value={activos} icon={UserCheck} trend="up" delta="+3" note="vs. semana pasada" />
         <StatCard index={2} label="KYC pendiente" value={pendientes} icon={ShieldAlert} note="Requieren revisión" />
@@ -240,12 +240,12 @@ export default function TecnicosPage() {
       <FadeIn>
         <Panel>
           {/* Tabs */}
-          <div className="flex gap-6 border-b border-line">
+          <div className="-mx-4 flex gap-6 overflow-x-auto border-b border-line px-4 sm:-mx-5 sm:px-5">
             {tabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`relative flex items-center gap-2 pb-3.5 pt-1 text-[13.5px] ${tab === t.id ? 'font-semibold text-cyan' : 'font-medium text-muted'}`}
+                className={`relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap pb-3.5 pt-1 text-[13.5px] ${tab === t.id ? 'font-semibold text-cyan' : 'font-medium text-muted'}`}
               >
                 <span>{t.label}</span>
                 <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">{t.count.toLocaleString('es-MX')}</span>
@@ -256,7 +256,7 @@ export default function TecnicosPage() {
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-3 py-4">
-            <div className="relative max-w-xs flex-1">
+            <div className="relative w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-xs">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
               <Input
                 value={query}

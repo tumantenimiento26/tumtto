@@ -265,7 +265,7 @@ export default function ClientDetailPage() {
       </FadeIn>
 
       {/* Stat cards */}
-      <Stagger className="mb-6 grid grid-cols-4 gap-4">
+      <Stagger className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem><StatCard index={0} label="Servicios totales" value={requests.length} icon={Wrench} note={`${completados} completados`} delta={`${completados}`} trend="up" /></StaggerItem>
         <StaggerItem><StatCard index={1} label="Gasto total" value={peso(totalGasto)} icon={CreditCard} note="histórico" /></StaggerItem>
         <StaggerItem><StatCard index={2} label="Ticket promedio" value={peso(requests.length ? Math.round(totalGasto / requests.length) : 0)} icon={BarChart3} /></StaggerItem>
@@ -273,13 +273,13 @@ export default function ClientDetailPage() {
       </Stagger>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-6 border-b border-line">
+      <div className="mb-6 flex gap-6 overflow-x-auto border-b border-line">
         {TABS.map(t => {
           const active = t.id === tab;
           const Icon = t.icon;
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`relative flex items-center gap-2 pb-3.5 pt-3 text-[13.5px] ${active ? 'font-semibold text-primary' : 'font-medium text-muted hover:text-navy'}`}>
+              className={`relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap pb-3.5 pt-3 text-[13.5px] ${active ? 'font-semibold text-primary' : 'font-medium text-muted hover:text-navy'}`}>
               <Icon size={14} /> {t.label}
               {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded bg-primary" />}
             </button>
@@ -297,10 +297,10 @@ export default function ClientDetailPage() {
           transition={{ duration: 0.22, ease: [0.2, 0.7, 0.3, 1] }}
         >
           {tab === 'resumen' && (
-            <div className="grid grid-cols-[1.5fr_1fr] gap-5">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
               <div className="flex flex-col gap-5">
                 <Panel title="Información personal">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <KV label="Nombre completo" value={name} />
                     <KV label="Email" value={email} />
                     <KV label="Teléfono" value={phone} mono />

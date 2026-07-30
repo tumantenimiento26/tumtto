@@ -56,7 +56,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
       <div className="flex flex-col gap-3">
@@ -139,7 +139,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <PageHeading title="Panel de control" sub="Resumen operativo en tiempo real · Zona Metropolitana de Guadalajara" />
 
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
           <StatCard index={0} icon={Activity} live href="/servicios" label="Servicios activos ahora" value={<CountUp value={m.active} />} spark={SPARKS.activos} delta="+12%" trend="up" note="vs ayer" />
         </StaggerItem>

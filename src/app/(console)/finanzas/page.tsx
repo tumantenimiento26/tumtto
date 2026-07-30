@@ -72,7 +72,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
       <div className="flex flex-col gap-3">
@@ -194,7 +194,7 @@ export default function FinanzasPage() {
       />
 
       {/* KPIs */}
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem><StatCard index={0} label="GMV del periodo" value={mx(m.gmv)} suffix="MXN" delta="+12.4%" trend="up" note="vs. mes anterior" icon={DollarSign} /></StaggerItem>
         <StaggerItem><StatCard index={1} label="Comisión plataforma" value={mx(m.platformFee)} suffix="MXN" delta="+9.1%" trend="up" note="15% promedio" icon={Percent} /></StaggerItem>
         <StaggerItem><StatCard index={2} label="Neto a técnicos" value={mx(m.techNet)} suffix="MXN" note="después de comisión" icon={Wallet} /></StaggerItem>
@@ -202,7 +202,7 @@ export default function FinanzasPage() {
       </Stagger>
 
       {/* Gráfica de ingresos + desglose por método */}
-      <div className="grid grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <FadeIn>
           <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(DAILY_GMV.reduce((s, d) => s + d.value, 0))} MXN</span>}>
             <LineChart data={DAILY_GMV} height={220} format={mx} controls={{ avg: true }} />
@@ -223,7 +223,7 @@ export default function FinanzasPage() {
       </FadeIn>
 
       {/* Payouts + wallet */}
-      <div className="grid grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <FadeIn>
           <Panel
             title="Solicitudes de retiro (payouts)"
@@ -336,7 +336,7 @@ export default function FinanzasPage() {
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <SummaryTile label="Retiros a procesar" value={String(pendingCount)} sub="Solo estatus pendiente" />
             <SummaryTile label="Monto total" value={mx(pendingTotal)} suffix="MXN" sub="Sin contar en proceso" />
             <SummaryTile label="Comisión bancaria" value={mx(pendingCount * 10)} suffix="MXN" sub="$10 MXN por SPEI" />

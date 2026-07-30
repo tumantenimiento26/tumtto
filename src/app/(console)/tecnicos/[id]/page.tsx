@@ -109,7 +109,7 @@ export default function TecnicoDetailPage() {
 
       {/* Header */}
       <FadeIn>
-        <div className="flex items-center gap-5 border-b border-line pb-5">
+        <div className="flex flex-wrap items-center gap-5 border-b border-line pb-5">
           <Avatar initials={initials(name)} size={84} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
@@ -159,11 +159,11 @@ export default function TecnicoDetailPage() {
       </FadeIn>
 
       {/* Two-column body */}
-      <div className="grid grid-cols-[1.5fr_1fr] items-start gap-5">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.5fr_1fr]">
         <Stagger className="flex flex-col gap-5">
           <StaggerItem>
             <Panel title="Datos personales" action={<ContactRound size={15} className="text-primary" />}>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <KV label="Nombre completo" value={name} />
                 <KV label="Teléfono" value={profile.phone ?? '—'} mono />
                 <KV label="Email" value={email} />
@@ -196,7 +196,7 @@ export default function TecnicoDetailPage() {
 
           <StaggerItem>
             <Panel title="Datos bancarios" action={<Landmark size={15} className="text-primary" />}>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <KV label="CLABE interbancaria" value={fmtClabe(tech.payout_clabe)} mono span={2} />
                 <KV label="Banco detectado" value="BBVA México" />
                 <div>

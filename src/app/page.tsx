@@ -5,8 +5,8 @@ import { MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion
 import Link from 'next/link';
 import {
   Apple, BadgeCheck, Brush, Calendar, Check, ChevronDown, ChevronLeft, CreditCard, Droplets,
-  Flame, Hammer, LifeBuoy, Mail, MapPin, MessageCircle, Navigation, Phone, Play, Plus, Search,
-  ShieldCheck, Square, Star, TrendingUp, Wallet, Wrench, Zap, type LucideIcon,
+  Flame, Hammer, LifeBuoy, Mail, MapPin, Menu, MessageCircle, Navigation, Phone, Play, Plus, Search,
+  ShieldCheck, Square, Star, TrendingUp, Wallet, Wrench, X, Zap, type LucideIcon,
 } from 'lucide-react';
 import { BrandMark } from '@/components/ui';
 import { LandingMap } from '@/components/landing-map';
@@ -325,12 +325,54 @@ const FAQS: [string, string][] = [
 
 /* ── Piezas compartidas ── */
 const KICKER = 'mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-cyan';
-const H2 = 'mb-3 font-display text-[38px] font-extrabold leading-[1.3] tracking-[-1px] text-white [text-wrap:pretty]';
+const H2 = 'mb-3 font-display text-[clamp(26px,5.2vw,38px)] font-extrabold leading-[1.3] tracking-[-1px] text-white [text-wrap:pretty]';
 const GRAD_TEXT = 'bg-[linear-gradient(92deg,#7CD8FF,#18C1FF_45%,#0894EA)] bg-clip-text text-transparent';
 const GRAD_NUM = 'bg-[linear-gradient(92deg,#7CD8FF,#18C1FF_50%,#0894EA)] bg-clip-text text-transparent';
 const GLASS_CHIP = 'rounded-full border border-white/[0.12] bg-white/[0.05] px-3.5 py-[7px] text-[12.5px] text-white/85';
 const ICON_TILE = 'bg-grad-brand flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center shadow-[0_8px_22px_rgba(10,107,207,0.4)]';
 const STORE_BADGE = 'flex items-center gap-2.5 rounded-[13px] border border-white/[0.18] bg-white/[0.08] py-[9px] pl-3.5 pr-[18px] text-left text-white backdrop-blur-[10px] transition-all duration-200 hover:border-cyan/50 hover:bg-white/[0.16] hover:shadow-[0_8px_30px_rgba(24,193,255,0.2)] min-h-[54px] cursor-pointer';
+
+/* ── Nav sticky. Bajo md los enlaces de sección viven en un panel desplegable. ── */
+function Nav() {
+  const [open, setOpen] = useState(false);
+  return (
+    <header className="sticky top-0 z-[60] border-b border-white/[0.08] bg-[rgba(8,26,51,0.72)] backdrop-blur-[16px]">
+      <div className="mx-auto flex h-[66px] max-w-[1160px] items-center gap-4 px-4 sm:px-6 lg:gap-7">
+        <a href="#top" className="flex min-w-0 items-center gap-2.5">
+          <BrandMark size={33} className="shrink-0 rounded-[9px] shadow-[0_4px_16px_rgba(24,193,255,0.25)]" />
+          {/* El wordmark no cabe junto al CTA bajo sm; el isotipo solo es suficiente. */}
+          <span className="hidden font-display text-[17px] font-extrabold tracking-[-0.2px] text-white sm:inline">Tumantenimiento</span>
+        </a>
+        <nav className="ml-auto hidden items-center gap-[22px] lg:flex">
+          {NAV_LINKS.map(([label, href]) => (
+            <a key={href} href={href} className="text-[13.5px] font-medium text-white/65 transition-colors hover:text-white">{label}</a>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-2.5 lg:ml-0">
+          <a href="#unete" className="mr-1 hidden text-[13.5px] font-medium text-white/65 transition-colors hover:text-white lg:inline">Soy técnico</a>
+          <Link href="/login" className="hidden min-h-10 items-center justify-center rounded-xl border border-white/[0.16] bg-white/[0.06] px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-white/[0.12] sm:inline-flex">Iniciar sesión</Link>
+          <a href="#top" className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-xl bg-[linear-gradient(90deg,#0A6BCF,#18C1FF)] px-4 text-[13.5px] font-bold text-white shadow-[0_6px_20px_rgba(10,107,207,0.45)] transition-[filter] hover:brightness-[1.12] sm:px-[18px]">Descargar app</a>
+          <button
+            onClick={() => setOpen(o => !o)}
+            aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={open}
+            className="grid min-h-10 w-10 place-items-center rounded-xl border border-white/[0.16] bg-white/[0.06] text-white lg:hidden"
+          >
+            {open ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </div>
+      {open && (
+        <nav className="border-t border-white/[0.08] bg-[rgba(8,26,51,0.96)] px-4 pb-4 pt-2 backdrop-blur-[16px] sm:px-6 lg:hidden">
+          {[...NAV_LINKS, ['Soy técnico', '#unete'] as [string, string]].map(([label, href]) => (
+            <a key={href} href={href} onClick={() => setOpen(false)} className="block border-b border-white/[0.06] py-3 text-[14.5px] font-medium text-white/75 transition-colors hover:text-white">{label}</a>
+          ))}
+          <Link href="/login" className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-white/[0.16] bg-white/[0.06] px-4 text-[14px] font-semibold text-white sm:hidden">Iniciar sesión</Link>
+        </nav>
+      )}
+    </header>
+  );
+}
 
 function StarRow({ size = 13, className = '' }: { size?: number; className?: string }) {
   return (
@@ -346,24 +388,7 @@ export default function LandingPage() {
       <div className="min-h-screen bg-[#081A33] font-sans leading-[normal] text-white antialiased">
 
         {/* ── Nav ── */}
-        <header className="sticky top-0 z-[60] border-b border-white/[0.08] bg-[rgba(8,26,51,0.72)] backdrop-blur-[16px]">
-          <div className="mx-auto flex h-[66px] max-w-[1160px] items-center gap-7 px-6">
-            <a href="#top" className="flex items-center gap-2.5">
-              <BrandMark size={33} className="rounded-[9px] shadow-[0_4px_16px_rgba(24,193,255,0.25)]" />
-              <span className="font-display text-[17px] font-extrabold tracking-[-0.2px] text-white">Tumantenimiento</span>
-            </a>
-            <nav className="ml-auto flex items-center gap-[22px] max-md:hidden">
-              {NAV_LINKS.map(([label, href]) => (
-                <a key={href} href={href} className="text-[13.5px] font-medium text-white/65 transition-colors hover:text-white">{label}</a>
-              ))}
-            </nav>
-            <div className="flex items-center gap-2.5">
-              <a href="#unete" className="mr-1 text-[13.5px] font-medium text-white/65 transition-colors hover:text-white">Soy técnico</a>
-              <Link href="/login" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/[0.16] bg-white/[0.06] px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-white/[0.12]">Iniciar sesión</Link>
-              <a href="#top" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#0A6BCF,#18C1FF)] px-[18px] text-[13.5px] font-bold text-white shadow-[0_6px_20px_rgba(10,107,207,0.45)] transition-[filter] hover:brightness-[1.12]">Descargar app</a>
-            </div>
-          </div>
-        </header>
+        <Nav />
 
         {/* ── Hero ── */}
         <section className="relative overflow-hidden">
@@ -371,7 +396,7 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute -right-[180px] top-10 h-[540px] w-[540px] animate-[aur-b_26s_ease-in-out_infinite] rounded-full bg-[radial-gradient(circle,rgba(24,193,255,0.32),transparent_65%)] blur-[80px] motion-reduce:animate-none" />
           <div className="pointer-events-none absolute -bottom-[280px] left-[30%] h-[580px] w-[580px] animate-[aur-c_30s_ease-in-out_infinite] rounded-full bg-[radial-gradient(circle,rgba(8,148,234,0.28),transparent_65%)] blur-[90px] motion-reduce:animate-none" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.75)_1px,transparent_1px)] opacity-[0.07] [background-size:26px_26px]" />
-          <div className="relative mx-auto grid max-w-[1160px] grid-cols-[1.05fr_0.95fr] items-center gap-10 px-6 pb-10 pt-[72px] max-lg:grid-cols-1">
+          <div className="relative mx-auto grid max-w-[1160px] grid-cols-[1.05fr_0.95fr] items-center gap-10 px-4 pb-10 pt-14 sm:px-6 sm:pt-[72px] max-lg:grid-cols-1">
             <div>
               <R className="mb-[18px]">
                 <p className="inline-flex items-center gap-[9px] rounded-full border border-white/[0.14] bg-white/[0.05] px-3.5 py-[7px] font-mono text-[10.5px] font-medium uppercase tracking-[0.16em] text-cyan">
@@ -380,7 +405,7 @@ export default function LandingPage() {
                 </p>
               </R>
               <R delay={0.05}>
-                <h1 className="mb-5 font-display text-[60px] font-extrabold leading-[1.04] tracking-[-1.8px] text-white [text-wrap:pretty]">
+                <h1 className="mb-5 font-display text-[clamp(34px,7.2vw,60px)] font-extrabold leading-[1.06] tracking-[-1.8px] text-white [text-wrap:pretty]">
                   El técnico correcto, <span className={GRAD_TEXT}>verificado y en camino.</span>
                 </h1>
               </R>
@@ -450,7 +475,7 @@ export default function LandingPage() {
 
         {/* ── Categorías ── */}
         <section id="servicios" className="scroll-mt-[72px]">
-          <div className="mx-auto max-w-[1160px] px-6 py-24">
+          <div className="mx-auto max-w-[1160px] px-4 py-16 sm:px-6 sm:py-24">
             <R><p className={KICKER}>Categorías de servicio</p></R>
             <R delay={0.05}><h2 className={H2}>Un técnico para cada problema</h2></R>
             <R delay={0.1}>
@@ -483,7 +508,7 @@ export default function LandingPage() {
         {/* ── Stats ── */}
         <section id="stats" className="relative overflow-hidden border-y border-white/[0.07] bg-white/[0.025]">
           <div className="pointer-events-none absolute -top-[180px] left-1/2 h-[360px] w-[700px] -translate-x-1/2 bg-[radial-gradient(ellipse,rgba(10,107,207,0.3),transparent_70%)] blur-[60px]" />
-          <div className="relative mx-auto grid max-w-[1160px] grid-cols-4 gap-6 px-6 py-14 max-lg:grid-cols-2">
+          <div className="relative mx-auto grid max-w-[1160px] grid-cols-4 gap-6 px-4 py-12 sm:px-6 sm:py-14 max-lg:grid-cols-2">
             {([
               [<Counter key="c" to={4.9} decimals={1} className={GRAD_NUM} />, 'Calificación promedio'],
               [<Counter key="c" to={3346} className={GRAD_NUM} />, 'Servicios completados'],
@@ -491,7 +516,7 @@ export default function LandingPage() {
               [<span key="c" className={GRAD_NUM}>30 días</span>, 'Garantía por escrito'],
             ] as [React.ReactNode, string][]).map(([num, label]) => (
               <div key={label} className="text-center">
-                <p className="font-display text-[46px] font-extrabold tracking-[-1px]">{num}</p>
+                <p className="font-display text-[clamp(32px,5.4vw,46px)] font-extrabold tracking-[-1px]">{num}</p>
                 <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-white/50">{label}</p>
               </div>
             ))}
@@ -500,7 +525,7 @@ export default function LandingPage() {
 
         {/* ── Cómo funciona ── */}
         <section id="como" className="scroll-mt-[72px]">
-          <div className="mx-auto grid max-w-[1160px] grid-cols-[1.1fr_0.9fr] items-center gap-14 px-6 py-24 max-lg:grid-cols-1">
+          <div className="mx-auto grid max-w-[1160px] grid-cols-[1.1fr_0.9fr] items-center gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:gap-14 max-lg:grid-cols-1">
             <div>
               <R><p className={KICKER}>Cómo funciona</p></R>
               <R delay={0.05}><h2 className={H2}>Del problema a la solución, en cuatro pasos</h2></R>
@@ -543,7 +568,7 @@ export default function LandingPage() {
 
         {/* ── Técnicos verificados ── */}
         <section id="tecnicos" className="scroll-mt-[72px] border-t border-white/[0.07] bg-white/[0.02]">
-          <div className="mx-auto grid max-w-[1160px] grid-cols-[0.9fr_1.1fr] items-center gap-14 px-6 py-24 max-lg:grid-cols-1">
+          <div className="mx-auto grid max-w-[1160px] grid-cols-[0.9fr_1.1fr] items-center gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:gap-14 max-lg:grid-cols-1">
             <div>
               <R><p className={KICKER}>Técnicos verificados</p></R>
               <R delay={0.05}><h2 className={H2}>Verificados uno por uno, sin excepciones</h2></R>
@@ -602,7 +627,7 @@ export default function LandingPage() {
 
         {/* ── Cobertura / mapa ── */}
         <section id="cobertura" className="scroll-mt-[72px] border-t border-white/[0.07]">
-          <div className="mx-auto max-w-[1160px] px-6 py-24">
+          <div className="mx-auto max-w-[1160px] px-4 py-16 sm:px-6 sm:py-24">
             <div className="mb-9 flex flex-wrap items-end justify-between gap-6">
               <div>
                 <R><p className={KICKER}>Cobertura en vivo</p></R>
@@ -621,7 +646,7 @@ export default function LandingPage() {
               </R>
             </div>
             <R>
-              <div className="relative h-[560px] overflow-hidden rounded-[20px] border border-white/[0.12] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+              <div className="relative h-[420px] overflow-hidden rounded-[20px] sm:h-[560px] border border-white/[0.12] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
                 <div className="absolute inset-0"><LandingMap /></div>
                 <div className="pointer-events-none absolute right-4 top-4 z-[500] flex flex-col gap-[9px] rounded-[14px] border border-white/[0.14] bg-[rgba(13,36,69,0.85)] px-[15px] py-[13px] backdrop-blur-[14px]">
                   <span className="flex items-center gap-[9px] text-[11.5px] text-white/80"><span className="h-3 w-3 rounded-[4px] border-[1.5px] border-cyan bg-cyan/25" />Zona con cobertura</span>
@@ -655,7 +680,7 @@ export default function LandingPage() {
 
         {/* ── Precios ── */}
         <section id="precios" className="scroll-mt-[72px] border-t border-white/[0.07] bg-white/[0.02]">
-          <div className="mx-auto grid max-w-[1160px] grid-cols-2 items-center gap-14 px-6 py-24 max-lg:grid-cols-1">
+          <div className="mx-auto grid max-w-[1160px] grid-cols-2 items-center gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:gap-14 max-lg:grid-cols-1">
             <div>
               <R><p className={KICKER}>Precios y cotización</p></R>
               <R delay={0.05}><h2 className={H2}>Precios claros desde el inicio</h2></R>
@@ -697,12 +722,12 @@ export default function LandingPage() {
 
         {/* ── Únete como técnico ── */}
         <section id="unete" className="scroll-mt-[72px]">
-          <div className="mx-auto max-w-[1160px] px-6 py-24">
+          <div className="mx-auto max-w-[1160px] px-4 py-16 sm:px-6 sm:py-24">
             <R>
               <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(135deg,#0E2C56,#0A6BCF_55%,#18C1FF)] shadow-[0_30px_90px_rgba(10,107,207,0.35)]">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.9)_1px,transparent_1px)] opacity-[0.12] [background-size:22px_22px]" />
                 <div className="pointer-events-none absolute -right-20 -top-[120px] h-[340px] w-[340px] rounded-full bg-cyan/35 blur-[80px]" />
-                <div className="relative grid grid-cols-[1.1fr_0.9fr] items-center gap-14 px-14 py-16 max-lg:grid-cols-1 max-sm:px-7">
+                <div className="relative grid grid-cols-[1.1fr_0.9fr] items-center gap-10 px-6 py-12 sm:px-10 sm:py-14 lg:gap-14 lg:px-14 lg:py-16 max-lg:grid-cols-1">
                   <div>
                     <p className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/85">Para técnicos</p>
                     <h2 className={H2}>Tu oficio. Tu agenda. Tus ingresos.</h2>
@@ -726,7 +751,7 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <div className="relative w-[340px] animate-[float-b_8s_ease-in-out_infinite] motion-reduce:animate-none">
+                    <div className="relative w-full max-w-[340px] animate-[float-b_8s_ease-in-out_infinite] motion-reduce:animate-none">
                       <div className="rounded-[18px] bg-white p-[22px] shadow-[0_30px_70px_rgba(0,0,0,0.4)]">
                         <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Tu billetera</p>
                         <p className="font-display text-[32px] font-extrabold text-navy">$4,820 <span className="text-[15px] font-bold text-faint">MXN</span></p>
@@ -763,7 +788,7 @@ export default function LandingPage() {
 
         {/* ── FAQ ── */}
         <section id="faq" className="scroll-mt-[72px]">
-          <div className="mx-auto max-w-[780px] px-6 pb-24 pt-10">
+          <div className="mx-auto max-w-[780px] px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-10">
             <R><p className={`${KICKER} text-center`}>Preguntas frecuentes</p></R>
             <R delay={0.05}><h2 className={`${H2} mb-9 text-center`}>Resolvemos tus dudas</h2></R>
             <div className="flex flex-col gap-3">
@@ -784,7 +809,7 @@ export default function LandingPage() {
 
         {/* ── Footer ── */}
         <footer className="border-t border-white/[0.08] bg-[#061428]">
-          <div className="mx-auto max-w-[1160px] px-6 pt-16">
+          <div className="mx-auto max-w-[1160px] px-4 pt-14 sm:px-6 sm:pt-16">
             <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-10 pb-12 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <div>
                 <div className="mb-3.5 flex items-center gap-2.5">

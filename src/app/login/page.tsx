@@ -110,7 +110,7 @@ export default function LoginPage() {
     }`;
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#081A33] flex flex-col items-center justify-center gap-5 p-6">
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#081A33] flex flex-col items-center justify-center gap-5 p-4 sm:p-6">
       {/* Fondo de marca — mismas auroras y retícula que la landing */}
       <div className="pointer-events-none absolute -left-[140px] -top-[200px] h-[620px] w-[620px] animate-[aur-a_22s_ease-in-out_infinite] rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(10,107,207,0.5),transparent_65%)] blur-[70px] motion-reduce:animate-none" />
       <div className="pointer-events-none absolute -bottom-[240px] -right-[160px] h-[560px] w-[560px] animate-[aur-b_26s_ease-in-out_infinite] rounded-full bg-[radial-gradient(circle,rgba(24,193,255,0.28),transparent_65%)] blur-[80px] motion-reduce:animate-none" />

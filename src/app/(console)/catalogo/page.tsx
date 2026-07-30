@@ -113,7 +113,7 @@ export default function CatalogoPage() {
         }
       />
 
-      <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* LEFT — category list */}
         <FadeIn>
           <aside className="bg-surface border border-line rounded-2xl overflow-hidden sticky top-2">
@@ -168,7 +168,7 @@ export default function CatalogoPage() {
           ) : (
             <>
               <FadeIn>
-                <div className="flex items-center gap-4 bg-surface border border-line rounded-2xl p-5">
+                <div className="flex flex-wrap items-center gap-4 bg-surface border border-line rounded-2xl p-4 sm:p-5">
                   <div className="w-16 h-16 rounded-2xl bg-info-soft grid place-items-center shrink-0">
                     <ActiveIcon size={28} className="text-primary" />
                   </div>
@@ -205,7 +205,7 @@ export default function CatalogoPage() {
               >
                 <SectionLead num="01" icon={Settings} />
                 {/* ponytail: inputs de config quedan session-local (solo demo). */}
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <Field label="Nombre"><Input key={`name-${active.id}`} defaultValue={active.name} /></Field>
                   <Field label="Slug"><Input key={`slug-${active.id}`} defaultValue={active.id} className="font-mono" /></Field>
                   <div className="col-span-2">
@@ -274,7 +274,7 @@ export default function CatalogoPage() {
                         <span className="text-sm font-semibold text-navy">{editing === '__new__' ? 'Nueva subcategoría' : 'Editar subcategoría'}</span>
                         <button onClick={() => { setEditing(null); setDraft(null); }} className="p-1.5 rounded-lg border border-line hover:bg-surface"><X size={14} className="text-muted" /></button>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="col-span-2">
                           <Field label="Nombre"><Input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></Field>
                         </div>

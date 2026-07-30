@@ -173,7 +173,7 @@ export default function ServicioDetailPage() {
       </FadeIn>
 
       {/* 3-col body */}
-      <div className="grid grid-cols-[minmax(0,360px)_minmax(0,1fr)_minmax(0,320px)] gap-5">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)_minmax(0,320px)]">
         {/* LEFT */}
         <div className="flex flex-col gap-4">
           <FadeIn>

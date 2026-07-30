@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   ShieldAlert, Inbox, FileBadge, Users, ArrowLeftRight, Check, X, Plus,
   FileText, Clock, MessageSquare, CheckCircle2, ArrowUpRight, Camera,
-  Search, Send, Wrench, UserRound, ArrowRight, LifeBuoy,
+  Search, Send, Wrench, UserRound, ArrowLeft, ArrowRight, LifeBuoy,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeading, Panel, StatCard, StatusPill, Modal } from '@/components/admin';
@@ -72,7 +72,7 @@ export default function SoportePage() {
       />
 
       {/* Stat cards */}
-      <Stagger className="grid grid-cols-4 gap-4">
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
           <StatCard label="Tickets abiertos" value={openTickets.length} icon={Inbox} index={0}
             note="Bandeja general · SLA 98%" />
@@ -196,7 +196,7 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
         </span>
       </div>
 
-      <div className="grid grid-cols-[1fr_280px] gap-6 p-5">
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Left: parties + evidence */}
         <div className="space-y-4">
           <div className="rounded-xl border border-line bg-info-soft p-4">
@@ -322,7 +322,7 @@ function KycPanel() {
             body="No hay técnicos pendientes de verificación."
           />
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <AnimatePresence mode="popLayout">
               {pending.map((t) => (
                 <KycCard key={t.id} techId={t.id} userId={t.user_id} />
@@ -423,9 +423,12 @@ function TicketsPanel() {
 
   return (
     <FadeIn>
-      <div className="grid h-[680px] grid-cols-[300px_1fr_300px] overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+      {/* Bajo xl es master-detail: la bandeja ocupa la columna hasta que se
+          elige un ticket, y entonces cede el lugar a la conversación (con
+          «volver»). Desde xl las tres columnas conviven. */}
+      <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-line bg-white shadow-card xl:h-[680px] xl:grid-cols-[300px_minmax(0,1fr)_300px]">
         {/* LEFT — bandeja */}
-        <aside className="flex min-h-0 flex-col border-r border-line">
+        <aside className={`max-h-[70vh] min-h-0 flex-col border-line xl:flex xl:max-h-none xl:border-r ${ticket ? 'hidden' : 'flex'}`}>
           <div className="border-b border-line/70 p-4">
             <h2 className="mb-3 font-display text-[17px] font-bold text-navy">Bandeja</h2>
             <div className="relative">
@@ -475,9 +478,9 @@ function TicketsPanel() {
 
         {/* CENTER — conversación */}
         {ticket ? (
-          <TicketConversation key={ticket.id} ticket={ticket} />
+          <TicketConversation key={ticket.id} ticket={ticket} onBack={() => setSelectedId(null)} />
         ) : (
-          <div className="grid place-items-center bg-surface">
+          <div className="hidden place-items-center bg-surface xl:grid">
             <EmptyState
               icon={LifeBuoy}
               title="Selecciona un ticket"
@@ -490,14 +493,14 @@ function TicketsPanel() {
         {ticket ? (
           <TicketContext ticket={ticket} />
         ) : (
-          <aside className="border-l border-line bg-surface" />
+          <aside className="hidden border-line xl:block xl:border-l bg-surface" />
         )}
       </div>
     </FadeIn>
   );
 }
 
-function TicketConversation({ ticket }: { ticket: Ticket }) {
+function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => void }) {
   const [draft, setDraft] = useState('');
   const requester = getProfile(ticket.requester_id);
   const st = TICKET_STATUS[ticket.status];
@@ -513,7 +516,14 @@ function TicketConversation({ ticket }: { ticket: Ticket }) {
   return (
     <div className="flex min-h-0 flex-col bg-surface">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-line bg-white px-5 py-4">
+      <div className="flex items-center gap-3 border-b border-line bg-white px-4 py-4 sm:px-5">
+        <button
+          onClick={onBack}
+          aria-label="Volver a la bandeja"
+          className="-ml-1.5 grid shrink-0 place-items-center rounded-lg p-1.5 text-muted hover:bg-surface xl:hidden"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <Avatar initials={initials(requester?.full_name)} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -531,7 +541,7 @@ function TicketConversation({ ticket }: { ticket: Ticket }) {
       </div>
 
       {/* Messages */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      <div className="min-h-[280px] flex-1 overflow-y-auto p-4 sm:p-5 xl:min-h-0">
         {ticket.messages.map(m => {
           const isAdmin = m.sender_id === ADMIN_ID;
           const sender = getProfile(m.sender_id);
@@ -584,7 +594,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
     : [];
 
   return (
-    <aside className="flex min-h-0 flex-col gap-3.5 overflow-y-auto border-l border-line bg-white p-4">
+    <aside className="flex min-h-0 flex-col gap-3.5 overflow-y-auto border-t border-line xl:border-l xl:border-t-0 bg-white p-4">
       {/* Requester */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold text-navy">

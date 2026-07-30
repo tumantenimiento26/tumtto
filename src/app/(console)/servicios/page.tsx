@@ -65,7 +65,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
       <div className="flex flex-col gap-3">
@@ -216,7 +216,7 @@ export default function ServiciosPage() {
         }
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {topStatuses.map((s, i) => (
           <StatCard
             key={s}
@@ -231,7 +231,7 @@ export default function ServiciosPage() {
       <FadeIn>
         <Panel>
           <div className="mb-4 flex flex-wrap items-center gap-2.5">
-            <div className="flex h-9 max-w-[300px] flex-1 items-center rounded-lg border border-line bg-surface px-3">
+            <div className="flex h-9 w-full min-w-[220px] flex-1 items-center rounded-lg border border-line bg-surface px-3 sm:w-auto sm:max-w-[300px]">
               <Search size={14} className="text-faint" />
               <Input
                 value={query}
@@ -248,7 +248,7 @@ export default function ServiciosPage() {
                 {STATUS_LABELS[s]} · {byStatus[s]}
               </Chip>
             ))}
-            <span className="ml-auto flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-navy">
+            <span className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-navy sm:ml-auto">
               <FolderTree size={14} className="text-primary" />
               <span className="text-muted">Categoría:</span>
               <select
@@ -261,7 +261,7 @@ export default function ServiciosPage() {
             </span>
           </div>
 
-          <div className="mb-4 flex items-center gap-3.5 rounded-xl border border-primary/20 bg-info-soft px-4 py-2.5">
+          <div className="mb-4 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-xl border border-primary/20 bg-info-soft px-4 py-2.5">
             <Activity size={14} className="text-success" />
             <span className="text-[13px] text-navy">
               <b className="font-bold">{metrics.active}</b> servicios en curso ahora mismo
@@ -270,7 +270,7 @@ export default function ServiciosPage() {
               <TrendingUp size={12} className="text-success" />
               +18% vs ayer
             </span>
-            <span className="ml-auto font-mono text-[11.5px] text-faint">
+            <span className="font-mono text-[11.5px] text-faint sm:ml-auto">
               Mostrando {filtered.length} de {metrics.totalRequests}
             </span>
           </div>

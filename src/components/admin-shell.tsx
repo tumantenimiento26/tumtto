@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Wrench, FolderTree, Map, Wallet, LifeBuoy,
@@ -9,14 +9,21 @@ import {
 } from 'lucide-react';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
-import { getOpenSupportCount, useTick } from '@/lib/demo/store';
+import { getOpenSupportCount, loadWorld, setErrorNotifier, useTick } from '@/lib/data/store';
+import { useAuth } from '@/lib/auth';
+import { toast } from './toast';
 
 /**
  * Admin console shell — 240px deep-navy sidebar with active indicator + sub-items,
  * y header de 64px (breadcrumbs, buscador, acciones, pill de usuario). Wraps every
  * console route. Bajo `lg` la sidebar se vuelve cajón off-canvas con scrim.
  */
-const USER = { name: 'Sofía Martínez', role: 'Admin Soporte', initials: 'SM' };
+function useAdminUser() {
+  const { usuario } = useAuth();
+  const name = usuario?.full_name ?? 'Admin';
+  const initials = name.split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || 'A';
+  return { name, role: 'Admin', initials };
+}
 
 interface NavItem { href: string; icon: LucideIcon; label: string; live?: boolean; sub?: { href: string; label: string }[] }
 const NAV: NavItem[] = [
@@ -51,6 +58,9 @@ function useActive(href: string, pathname: string) {
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useAuth();
+  const USER = useAdminUser();
   useTick();
   const supportCount = getOpenSupportCount();
   return (
@@ -101,7 +111,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="truncate text-[13px] font-semibold">{USER.name}</div>
           <div className="text-[11px] text-white/55">{USER.role}</div>
         </div>
-        <Link href="/login" onClick={() => localStorage.removeItem('tumtto-admin')} aria-label="Cerrar sesión" className="grid place-items-center rounded-lg border border-white/[0.08] p-1.5 hover:bg-white/5"><LogOut size={16} className="text-white/70" /></Link>
+        <button onClick={() => void signOut().then(() => router.replace('/login'))} aria-label="Cerrar sesión" className="grid place-items-center rounded-lg border border-white/[0.08] p-1.5 hover:bg-white/5"><LogOut size={16} className="text-white/70" /></button>
       </div>
     </aside>
   );
@@ -109,6 +119,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
 function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
+  const USER = useAdminUser();
   const base = '/' + (pathname.split('/')[1] ?? '');
   const crumbs = CRUMB[base] ?? CRUMB[pathname] ?? ['Inicio'];
   return (
@@ -155,6 +166,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   // Navegar cierra el cajón; en desktop nunca está abierto porque el aside es estático.
   useEffect(() => setOpen(false), [pathname]);
+  // Primer snapshot del backend al montar la consola (el gate ya validó admin).
+  useEffect(() => { setErrorNotifier(m => toast.error(m)); void loadWorld(); }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">

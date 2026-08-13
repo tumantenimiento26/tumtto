@@ -18,27 +18,30 @@ import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
   useTick,
+  useWorldReady,
   getMetrics,
   getAllRequests,
   getProfile,
   getCategories,
-  getSubcategories,
   getAddresses,
+  getClients,
   createRequest,
-} from '@/lib/demo/store';
+} from '@/lib/data/store';
 import type { ServiceRequest } from '@/lib/demo/world';
 
 const STATUS_LABELS: Record<string, string> = {
-  solicitado: 'Solicitados',
-  aceptado: 'Aceptados',
-  en_camino: 'En camino',
-  en_sitio: 'En sitio',
-  en_ejecucion: 'En ejecución',
-  completado: 'Completados',
-  pagado: 'Pagados',
-  calificado: 'Calificados',
-  cancelado: 'Cancelados',
-  rechazado: 'Rechazados',
+  requested: 'Solicitados',
+  accepted: 'Aceptados',
+  enroute: 'En camino',
+  onsite: 'En sitio',
+  quote: 'Cotización',
+  working: 'En ejecución',
+  closing: 'Por cerrar',
+  completed: 'Completados',
+  paid: 'Pagados',
+  closed: 'Cerrados',
+  expired: 'Expirados',
+  cancelled: 'Cancelados',
 };
 
 const fmtMoney = (n: number | null) =>
@@ -78,11 +81,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 export default function ServiciosPage() {
   const tick = useTick();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 450);
-    return () => clearTimeout(t);
-  }, []);
+  const ready = useWorldReady();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('Todas');
@@ -92,11 +91,8 @@ export default function ServiciosPage() {
   const byStatus = metrics.byStatus;
 
   const subToCategory = useMemo(() => {
-    const cats = getCategories();
     const map: Record<string, string> = {};
-    for (const sub of getSubcategories()) {
-      map[sub.id] = cats.find(c => c.id === sub.category_id)?.name ?? '—';
-    }
+    for (const cat of getCategories()) map[cat.id] = cat.name;
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
@@ -106,11 +102,12 @@ export default function ServiciosPage() {
       req,
       clientName: getProfile(req.client_id)?.full_name ?? 'Cliente',
       techName: req.technician_id ? getProfile(req.technician_id)?.full_name ?? null : null,
-      categoryName: subToCategory[req.subcategory_id] ?? '—',
+      categoryName: subToCategory[req.category_id] ?? '—',
     }));
   }, [subToCategory]);
 
-  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], [tick]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -131,7 +128,8 @@ export default function ServiciosPage() {
     exportCsv('servicios.csv', filtered.map(r => ({
       ID: r.req.id, Cliente: r.clientName, Técnico: r.techName ?? '',
       Categoría: r.categoryName, Estado: STATUS_LABELS[r.req.status] ?? r.req.status,
-      Programado: r.req.scheduled_at ?? '', Total: r.req.total_price ?? r.req.base_price ?? '',
+      Programado: r.req.accepted_at ?? r.req.created_at,
+      Total: r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : '',
     })));
     toast.success(`CSV exportado · ${filtered.length} servicios`);
   }
@@ -181,7 +179,7 @@ export default function ServiciosPage() {
     {
       key: 'fecha',
       header: 'Programado',
-      render: r => <span className="font-mono text-[12px] text-muted">{fmtDate(r.req.scheduled_at)}</span>,
+      render: r => <span className="font-mono text-[12px] text-muted">{fmtDate(r.req.accepted_at ?? r.req.created_at)}</span>,
     },
     {
       key: 'total',
@@ -189,7 +187,7 @@ export default function ServiciosPage() {
       className: 'text-right',
       render: r => (
         <span className="font-mono text-[13px] font-semibold text-navy">
-          {fmtMoney(r.req.total_price ?? r.req.base_price)}
+          {fmtMoney(r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : null)}
         </span>
       ),
     },
@@ -296,23 +294,27 @@ export default function ServiciosPage() {
 function CreateServiceModal({ open, onClose, onCreated }: {
   open: boolean; onClose: () => void; onCreated: (id: string) => void;
 }) {
-  const subs = getSubcategories();
   const cats = getCategories();
-  const addresses = getAddresses();
+  const clients = getClients();
+  const [clientId, setClientId] = useState('');
+  const addresses = getAddresses(clientId);
   const [subId, setSubId] = useState('');
   const [description, setDescription] = useState('');
-  const [addressId, setAddressId] = useState(addresses[0]?.id ?? '');
+  const [addressId, setAddressId] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  function submit() {
-    if (!subId) return;
-    const addr = addresses.find(a => a.id === addressId);
-    const req = createRequest({
-      subcategory_id: subId,
-      problem_description: description.trim() || null,
-      address_snapshot: addr ? { alias: addr.alias, line1: addr.line1, city: addr.city, state: addr.state } : null,
-      base_price: subs.find(s => s.id === subId)?.base_price_suggested ?? null,
+  async function submit() {
+    if (!subId || !clientId) return;
+    setSaving(true);
+    const req = await createRequest({
+      client_id: clientId,
+      category_id: subId,
+      description: description.trim() || null,
+      client_address_id: addresses.find(a => a.id === addressId)?.id ?? null,
     });
-    toast.success(`Servicio creado · #${req.id}`);
+    setSaving(false);
+    if (!req) return;
+    toast.success(`Servicio creado · #${req.id.slice(0, 8)}`);
     setSubId('');
     setDescription('');
     onClose();
@@ -324,28 +326,40 @@ function CreateServiceModal({ open, onClose, onCreated }: {
       open={open}
       onClose={onClose}
       title="Crear servicio"
-      sub="Alta manual a nombre del cliente demo (soporte telefónico)."
+      sub="Alta manual a nombre de un cliente (soporte telefónico)."
       icon={<Plus size={16} />}
       width={480}
       footer={
         <>
           <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!subId}>Crear servicio</PrimaryButton>
+          <PrimaryButton onClick={submit} disabled={!subId || !clientId || saving}>
+            {saving ? 'Creando…' : 'Crear servicio'}
+          </PrimaryButton>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Subcategoría">
+        <Field label="Cliente">
+          <select
+            value={clientId}
+            onChange={e => { setClientId(e.target.value); setAddressId(''); }}
+            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
+          >
+            <option value="">Selecciona un cliente…</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>{c.full_name ?? c.id}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Categoría">
           <select
             value={subId}
             onChange={e => setSubId(e.target.value)}
             className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
           >
             <option value="">Selecciona un servicio…</option>
-            {subs.map(s => (
-              <option key={s.id} value={s.id}>
-                {cats.find(c => c.id === s.category_id)?.name ?? '—'} · {s.name}
-              </option>
+            {cats.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </Field>
@@ -358,8 +372,9 @@ function CreateServiceModal({ open, onClose, onCreated }: {
             onChange={e => setAddressId(e.target.value)}
             className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
           >
+            <option value="">{addresses.length ? 'Selecciona una dirección…' : 'El cliente no tiene direcciones guardadas'}</option>
             {addresses.map(a => (
-              <option key={a.id} value={a.id}>{a.alias} · {a.line1}</option>
+              <option key={a.id} value={a.id}>{a.label} · {a.address_line}</option>
             ))}
           </select>
         </Field>

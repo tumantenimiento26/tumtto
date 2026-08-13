@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion, EASE } from '@/components/motion';
 import { PrimaryButton, BrandMark } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 
 /** Splash de entrada al panel: puente de marca entre el login y la consola. */
 function Splash() {
@@ -69,13 +70,9 @@ const STATS = [
 
 const EMAIL_RE = /\S+@\S+\.\S+/;
 
-// ponytail: credencial dummy hardcodeada — sustituir por Supabase Auth cuando
-// haya backend. El flag en localStorage es lo que AdminGate revisa.
-const DEMO_EMAIL = 'admin@tumantenimiento.mx';
-const DEMO_PASS = 'tumtto2026';
-
 export default function LoginPage() {
   const router = useRouter();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -87,21 +84,22 @@ export default function LoginPage() {
   // Con el dashboard precargado, el splash aterriza sin pantalla en blanco.
   useEffect(() => { router.prefetch('/dashboard'); }, [router]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const errs: typeof errors = {};
     if (!EMAIL_RE.test(email)) errs.email = 'Ingresa un correo válido.';
     if (!pass) errs.pass = 'Ingresa tu contraseña.';
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    if (email.trim().toLowerCase() !== DEMO_EMAIL || pass !== DEMO_PASS) {
+    setLoading(true);
+    const { error } = await signIn(email.trim(), pass);
+    if (error) {
+      setLoading(false);
       setAuthError(true);
       return;
     }
-    setLoading(true);
-    localStorage.setItem('tumtto-admin', '1');
-    // ponytail: el splash es puramente presentacional — 1.6s y adentro
-    setTimeout(() => router.push('/dashboard'), 1600);
+    // ponytail: el splash es puramente presentacional — breve puente de marca
+    setTimeout(() => router.push('/dashboard'), 900);
   }
 
   const field = (invalid: boolean) =>
@@ -297,19 +295,6 @@ export default function LoginPage() {
               {loading ? 'Entrando…' : 'Entrar al panel'}
             </PrimaryButton>
           </form>
-
-          <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-dashed border-line bg-surface-2/60 px-3.5 py-2.5 text-xs text-muted">
-            <span>
-              Demo: <b className="font-semibold text-navy">{DEMO_EMAIL}</b> · <b className="font-semibold text-navy">{DEMO_PASS}</b>
-            </span>
-            <button
-              type="button"
-              onClick={() => { setEmail(DEMO_EMAIL); setPass(DEMO_PASS); setErrors({}); setAuthError(false); }}
-              className="shrink-0 font-medium text-primary hover:text-primary-2"
-            >
-              Rellenar
-            </button>
-          </div>
 
           <p className="text-[11px] text-faint leading-relaxed mt-6">
             Acceso restringido a personal autorizado. Todas las sesiones son auditadas y registradas conforme a la

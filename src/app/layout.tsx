@@ -3,6 +3,8 @@ import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+import { AuthProvider } from '@/lib/auth';
+
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const manrope = Manrope({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-manrope' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jbmono' });
@@ -15,7 +17,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-MX" className={`${inter.variable} ${manrope.variable} ${mono.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

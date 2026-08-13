@@ -8,7 +8,7 @@ import type { Column } from '@/components/admin';
 import { GhostButton, Input, Chip, Avatar, Badge, Skeleton } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
-import { useTick, getClients, getAllRequests } from '@/lib/demo/store';
+import { useTick, useWorldReady, getClients, getAllRequests, getAllDisputes } from '@/lib/data/store';
 
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
@@ -37,19 +37,17 @@ const initials = (n: string) =>
 
 const fmt = (n: number) => n.toLocaleString('es-MX');
 
-// Extra realistic ZMG mock rows to enrich the table (the prototype is fully mocked).
-const MOCK: ClientRow[] = [
-  { id: 'c-mock-1', name: 'Laura Fernández Ríos', email: 'laura.fr@gmail.com', phone: '+52 33 2841 9930', city: 'Zapopan', services: 14, gmv: 18420, rating: 4.9, last: 'Hace 2 días', disputes: 0, status: 'active' },
-  { id: 'c-mock-2', name: 'Jorge Aceves Luna', email: 'j.aceves@outlook.com', phone: '+52 33 1190 4421', city: 'Guadalajara', services: 8, gmv: 9650, rating: 4.6, last: 'Hace 5 días', disputes: 1, status: 'active' },
-  { id: 'c-mock-3', name: 'Patricia Salinas M.', email: 'paty.salinas@gmail.com', phone: '+52 33 3382 1075', city: 'Tlaquepaque', services: 3, gmv: 3120, rating: 4.8, last: 'Hace 1 día', disputes: 0, status: 'new' },
-  { id: 'c-mock-4', name: 'Ricardo Beltrán O.', email: 'rbeltran@empresa.mx', phone: '+52 33 2207 6648', city: 'Tonalá', services: 21, gmv: 27890, rating: 4.7, last: 'Hoy', disputes: 0, status: 'active' },
-  { id: 'c-mock-5', name: 'Gabriela Mora Téllez', email: 'gaby.mora@gmail.com', phone: '+52 33 4451 2289', city: 'Zapopan', services: 1, gmv: 780, rating: 5.0, last: 'Hace 3 sem', disputes: 0, status: 'new' },
-  { id: 'c-mock-6', name: 'Héctor Vázquez Pineda', email: 'hector.vp@hotmail.com', phone: '+52 33 1672 5503', city: 'Guadalajara', services: 6, gmv: 7340, rating: 4.4, last: 'Hace 2 meses', disputes: 2, status: 'inactive' },
-  { id: 'c-mock-7', name: 'Mónica Reyes Chávez', email: 'monica.rc@gmail.com', phone: '+52 33 3098 7712', city: 'Tlajomulco', services: 11, gmv: 13560, rating: 4.9, last: 'Hace 4 días', disputes: 0, status: 'active' },
-  { id: 'c-mock-8', name: 'Andrés Pérez Gallo', email: 'andres.pg@gmail.com', phone: '+52 33 2519 8834', city: 'Zapopan', services: 0, gmv: 0, rating: 0, last: '—', disputes: 0, status: 'inactive' },
-];
-
 const FILTERS = ['Todos', 'Activos', 'Nuevos', 'Inactivos', 'Con disputas'] as const;
+
+const DAY_MS = 24 * 3600 * 1000;
+const relDays = (iso: string | null) => {
+  if (!iso) return '—';
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
+  if (d === 0) return 'Hoy';
+  if (d < 7) return `Hace ${d} día${d === 1 ? '' : 's'}`;
+  if (d < 60) return `Hace ${Math.floor(d / 7)} sem`;
+  return `Hace ${Math.floor(d / 30)} meses`;
+};
 
 function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
@@ -66,38 +64,36 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 }
 
 export default function ClientesPage() {
-  useTick();
+  const tick = useTick();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 450);
-    return () => clearTimeout(t);
-  }, []);
+  const ready = useWorldReady();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Todos');
 
   const rows = useMemo<ClientRow[]>(() => {
     const reqs = getAllRequests();
-    const live: ClientRow[] = getClients().map((p, i) => {
+    const disputes = getAllDisputes();
+    return getClients().map(p => {
       const myReqs = reqs.filter(r => r.client_id === p.id);
-      const gmv = myReqs.reduce((s, r) => s + (r.total_price ?? r.base_price ?? 0), 0);
-      const name = p.full_name ?? 'Cliente';
+      const gmv = myReqs.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
+      const lastReq = myReqs[0] ?? null; // getAllRequests ya viene ordenado por fecha
+      const recent = lastReq && Date.now() - new Date(lastReq.created_at).getTime() < 60 * DAY_MS;
       return {
         id: p.id,
-        name,
-        email: `${name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8)}@tumtto.mx`,
+        name: p.full_name ?? 'Cliente',
+        email: '—', // profiles no guarda email (vive en auth.users)
         phone: p.phone ?? '—',
-        city: i === 0 ? 'Zapopan' : 'Guadalajara',
+        city: lastReq?.municipality ?? '—',
         services: myReqs.length,
         gmv,
-        rating: myReqs.length ? 4.8 : 0,
-        last: myReqs.length ? 'Hace 1 día' : '—',
-        disputes: 0,
-        status: (myReqs.length ? 'active' : 'new') as ClientRow['status'],
+        rating: 0, // sin tabla de ratings por servicio todavía
+        last: relDays(lastReq?.created_at ?? null),
+        disputes: disputes.filter(d => d.opened_by === p.id).length,
+        status: (myReqs.length === 0 ? 'new' : recent ? 'active' : 'inactive') as ClientRow['status'],
       };
     });
-    return [...live, ...MOCK];
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

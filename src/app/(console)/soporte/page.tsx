@@ -12,11 +12,11 @@ import { Avatar, Badge, Chip, GhostButton, PrimaryButton, EmptyState, Input, Tex
 import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  getAllDisputes, getDisputes, getPendingKyc, getDocuments, getProfile, getRequest,
+  getAllDisputes, getDisputes, getPendingKyc, getKycSessions, getProfile, getRequest,
   getTickets, getTicket, getAllProfiles, getClientRequests, getTechRequests,
   resolveDispute, escalateDispute, resolveKyc, rejectKyc, createTicket, replyTicket,
   resolveTicket, useTick, ADMIN_ID,
-} from '@/lib/demo/store';
+} from '@/lib/data/store';
 import type { Ticket } from '@/lib/demo/world';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -55,6 +55,9 @@ export default function SoportePage() {
 
   const openCount = activeDisputes.length;
   const kycCount = pendingKyc.length;
+  const resolvedToday =
+    allDisputes.filter(d => d.resolved_at && new Date(d.resolved_at).toDateString() === new Date().toDateString()).length +
+    tickets.filter(t => t.status === 'resolved').length;
 
   return (
     <div className="space-y-6">
@@ -86,8 +89,8 @@ export default function SoportePage() {
             note="Esperando revisión" />
         </StaggerItem>
         <StaggerItem>
-          <StatCard label="Resueltos hoy" value={18} suffix="" icon={CheckCircle2} index={3}
-            trend="up" delta="+4 vs ayer" note="Tiempo prom. 4h 12m" />
+          <StatCard label="Resueltos" value={resolvedToday} suffix="" icon={CheckCircle2} index={3}
+            note="Disputas y tickets resueltos" />
         </StaggerItem>
       </Stagger>
 
@@ -155,10 +158,10 @@ function DisputesPanel() {
 }
 
 function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[number] }) {
-  const req = dispute.request_id ? getRequest(dispute.request_id) : null;
+  const req = getRequest(dispute.service_order_id);
   const opener = dispute.opened_by ? getProfile(dispute.opened_by) : null;
   const counterparty = req?.technician_id ? getProfile(req.technician_id) : null;
-  const typeLabel = (dispute.type && TYPE_LABEL[dispute.type]) || dispute.type || 'Disputa';
+  const typeLabel = dispute.reason;
   const escalated = dispute.status === 'in_review';
 
   return (
@@ -249,7 +252,7 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
 
           {escalated && (
             <div className="rounded-xl border border-warning/30 bg-warning-soft p-3 text-[12px] text-warning-ink">
-              {dispute.resolution ?? 'Escalada a nivel 2.'}
+              {dispute.resolution_notes ?? 'Escalada a nivel 2.'}
             </div>
           )}
 
@@ -325,7 +328,7 @@ function KycPanel() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <AnimatePresence mode="popLayout">
               {pending.map((t) => (
-                <KycCard key={t.id} techId={t.id} userId={t.user_id} />
+                <KycCard key={t.id} techId={t.id} userId={t.id} />
               ))}
             </AnimatePresence>
           </div>
@@ -337,7 +340,7 @@ function KycPanel() {
 
 function KycCard({ techId, userId }: { techId: string; userId: string }) {
   const profile = getProfile(userId);
-  const docs = getDocuments(techId);
+  const docs = getKycSessions(techId);
 
   return (
     <motion.div
@@ -374,7 +377,7 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
                 <div className="grid place-items-center w-8 h-8 rounded-md bg-grad-progress">
                   <FileText size={14} className="text-white" />
                 </div>
-                <span className="text-sm text-navy flex-1 truncate">{d.doc_type}</span>
+                <span className="text-sm text-navy flex-1 truncate">Verificación Didit · {d.status}</span>
                 <Link href={`/tecnicos/${techId}`} className="text-xs text-cyan font-medium inline-flex items-center gap-1">
                   Ver <MessageSquare size={11} />
                 </Link>
@@ -588,7 +591,7 @@ function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => 
 
 function TicketContext({ ticket }: { ticket: Ticket }) {
   const requester = getProfile(ticket.requester_id);
-  const req = ticket.request_id ? getRequest(ticket.request_id) : null;
+  const req = ticket.order_id ? getRequest(ticket.order_id) : null;
   const services = requester
     ? (ticket.role === 'tecnico' ? getTechRequests(requester.id) : getClientRequests(requester.id))
     : [];
@@ -634,7 +637,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
             <span className="font-mono text-[12.5px] font-medium text-primary">#{req.id}</span>
             <StatusPill status={req.status} />
           </div>
-          <p className="line-clamp-2 text-[12px] text-muted">{req.problem_description ?? '—'}</p>
+          <p className="line-clamp-2 text-[12px] text-muted">{req.description ?? '—'}</p>
           <Link href={`/servicios/${req.id}`} className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-primary">
             Ver servicio completo <ArrowRight size={11} />
           </Link>
@@ -668,7 +671,7 @@ function NewTicketModal({ open, onClose, onCreated }: { open: boolean; onClose: 
   const [subject, setSubject] = useState('');
   const [requesterId, setRequesterId] = useState('');
   const [priority, setPriority] = useState<Ticket['priority']>('media');
-  const people = getAllProfiles().filter(p => p.role === 'cliente' || p.role === 'tecnico');
+  const people = getAllProfiles().filter(p => p.role === 'client' || p.role === 'technician');
 
   function submit() {
     if (!subject.trim() || !requesterId) return;

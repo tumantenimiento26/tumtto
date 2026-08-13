@@ -98,16 +98,18 @@ export function StatCard({ label, value, suffix, delta, trend, note, progress, s
 }
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  solicitado: { label: 'Solicitado', cls: 'bg-surface-2 text-navy' },
-  aceptado: { label: 'Aceptado', cls: 'bg-info-soft text-primary-2' },
-  en_camino: { label: 'En camino', cls: 'bg-warning-soft text-warning-ink' },
-  en_sitio: { label: 'En sitio', cls: 'bg-warning-soft text-warning-ink' },
-  en_ejecucion: { label: 'En ejecución', cls: 'bg-primary/[0.12] text-primary' },
-  completado: { label: 'Completado', cls: 'bg-success-soft text-success' },
-  pagado: { label: 'Pagado', cls: 'bg-success-soft text-success' },
-  calificado: { label: 'Calificado', cls: 'bg-success-soft text-success' },
-  cancelado: { label: 'Cancelado', cls: 'bg-error-soft text-error' },
-  rechazado: { label: 'Rechazado', cls: 'bg-error-soft text-error' },
+  requested: { label: 'Solicitado', cls: 'bg-surface-2 text-navy' },
+  accepted: { label: 'Aceptado', cls: 'bg-info-soft text-primary-2' },
+  enroute: { label: 'En camino', cls: 'bg-warning-soft text-warning-ink' },
+  onsite: { label: 'En sitio', cls: 'bg-warning-soft text-warning-ink' },
+  quote: { label: 'Cotización', cls: 'bg-warning-soft text-warning-ink' },
+  working: { label: 'En ejecución', cls: 'bg-primary/[0.12] text-primary' },
+  closing: { label: 'Por cerrar', cls: 'bg-primary/[0.12] text-primary' },
+  completed: { label: 'Completado', cls: 'bg-success-soft text-success' },
+  paid: { label: 'Pagado', cls: 'bg-success-soft text-success' },
+  closed: { label: 'Cerrado', cls: 'bg-success-soft text-success' },
+  expired: { label: 'Expirado', cls: 'bg-error-soft text-error' },
+  cancelled: { label: 'Cancelado', cls: 'bg-error-soft text-error' },
 };
 export function StatusPill({ status }: { status: RequestStatus | string }) {
   const s = STATUS[status] ?? { label: status, cls: 'bg-surface-2 text-navy' };

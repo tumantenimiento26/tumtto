@@ -1,46 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ShieldAlert, CreditCard, UserX, Clock, Activity, CheckCircle2, DollarSign, Wrench } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Clock, Activity, CheckCircle2, DollarSign, Wrench } from 'lucide-react';
 import { PageHeading, Panel, StatCard, StatusPill, DataTable } from '@/components/admin';
 import { CountUp, Donut, LineChart, HBars, STATUS_DONUT } from '@/components/charts';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { Avatar, Skeleton } from '@/components/ui';
-import { useTick, getMetrics, getAllRequests, getAllPayments, getProfile, getSubcategories } from '@/lib/demo/store';
+import {
+  useTick, useWorldReady, getMetrics, getAllRequests, getAllPayments, getAllDisputes,
+  getPendingKyc, getProfile, getCategories,
+} from '@/lib/data/store';
 import type { Column } from '@/components/admin';
 
 const CAT_COLORS = ['#0A6BCF', '#0894EA', '#18C1FF', '#5CB7F0', '#9AD3F5'];
-
-// ponytail: serie histórica demo — 11 semanas sembradas; la 12.ª es el GMV vivo.
-// Periodo anterior (12 semanas previas) para la comparativa del LineChart.
-const GMV_PREV = [820, 960, 900, 1080, 1010, 1195, 1150, 1290, 1240, 1355, 1310, 1420];
-
-const GMV_SEMANAS = [
-  { label: '13 abr', value: 980 }, { label: '20 abr', value: 1120 }, { label: '27 abr', value: 1050 },
-  { label: '04 may', value: 1290 }, { label: '11 may', value: 1180 }, { label: '18 may', value: 1420 },
-  { label: '25 may', value: 1360 }, { label: '01 jun', value: 1510 }, { label: '08 jun', value: 1465 },
-  { label: '15 jun', value: 1580 }, { label: '22 jun', value: 1540 },
-];
-
-// ponytail: sparklines de demo — 8 puntos estáticos por KPI.
-const SPARKS = {
-  activos: [3, 4, 4, 6, 5, 7, 6, 8],
-  completados: [2, 3, 5, 4, 6, 6, 7, 9],
-  gmv: [820, 940, 880, 1120, 1050, 1310, 1280, 1640],
-  tecnicos: [4, 4, 5, 5, 6, 6, 6, 7],
-};
-
-const ALERTS = [
-  { tone: 'warn', icon: AlertTriangle, text: 'Servicio #SVC-2847 atorado en "en camino" hace 45 min', time: 'hace 45 min' },
-  { tone: 'err', icon: ShieldAlert, text: 'Disputa abierta en #SVC-2812 · Cliente: María Rodríguez', time: 'hace 1 h 20 min' },
-  { tone: 'err', icon: CreditCard, text: 'Pago OXXO fallido en #SVC-2799 · Reintentar antes de 18:00', time: 'hace 2 h' },
-  { tone: 'warn', icon: UserX, text: 'Técnico Ramón Hernández · 3 cancelaciones esta semana', time: 'hoy' },
-  { tone: 'warn', icon: Clock, text: '5 KYC pendientes de revisión hace +24 h', time: 'hace 1 d' },
-] as const;
-
-const ZONAS = ['Zapopan', 'Guadalajara', 'Tlaquepaque', 'Tonalá', 'Zapopan'];
-const TECNICOS = ['Ramón Hernández', 'Diana Ortega', 'Alberto García', 'Sergio Castro', 'Ramón Hernández'];
 
 type Row = {
   id: string;
@@ -50,6 +22,41 @@ type Row = {
   status: string;
   zona: string;
   total: number | null;
+};
+
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+/** Lunes 00:00 de la semana de `d`. */
+function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+/** GMV pagado por semana (pesos) para `n` semanas terminando en la actual, con offset en semanas. */
+function weeklyGmv(payments: { status: string; paid_at: string | null; amount_cents: number }[], n: number, offsetWeeks = 0) {
+  const thisWeek = startOfWeek(new Date()).getTime() - offsetWeeks * WEEK_MS;
+  return Array.from({ length: n }, (_, i) => {
+    const from = thisWeek - (n - 1 - i) * WEEK_MS;
+    const inWeek = payments.filter(p => {
+      if (p.status !== 'paid' || !p.paid_at) return false;
+      const t = new Date(p.paid_at).getTime();
+      return t >= from && t < from + WEEK_MS;
+    });
+    return {
+      label: new Date(from).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
+      value: Math.round(inWeek.reduce((s, p) => s + p.amount_cents, 0) / 100),
+      count: inWeek.length,
+    };
+  });
+}
+
+const relTime = (iso: string) => {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (min < 60) return `hace ${min} min`;
+  if (min < 60 * 24) return `hace ${Math.round(min / 60)} h`;
+  return `hace ${Math.round(min / 1440)} d`;
 };
 
 function SkeletonRows({ rows = 6 }: { rows?: number }) {
@@ -69,36 +76,23 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 export default function DashboardPage() {
   useTick();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 450);
-    return () => clearTimeout(t);
-  }, []);
+  const ready = useWorldReady();
   const m = getMetrics();
-  const subs = getSubcategories();
-  const subName = (id: string) => subs.find(s => s.id === id)?.name ?? '—';
+  const cats = getCategories();
+  const catName = (id: string) => cats.find(c => c.id === id)?.name ?? '—';
 
-  const rows: Row[] = getAllRequests().slice(0, 8).map((r, i) => ({
+  const rows: Row[] = getAllRequests().slice(0, 9).map(r => ({
     id: r.id,
     cliente: getProfile(r.client_id)?.full_name ?? 'Cliente',
-    tecnico: TECNICOS[i % TECNICOS.length],
-    categoria: subName(r.subcategory_id),
+    tecnico: r.technician_id ? getProfile(r.technician_id)?.full_name ?? '—' : '— sin asignar',
+    categoria: catName(r.category_id),
     status: r.status,
-    zona: ZONAS[i % ZONAS.length],
-    total: r.total_price,
+    zona: r.municipality ?? '—',
+    total: r.quoted_total_cents != null ? r.quoted_total_cents / 100 : null,
   }));
 
-  // Enrich the table so it reads like the prototype.
-  const filler: Row[] = [
-    { id: 'SVC-2847', cliente: 'Laura Méndez', tecnico: 'Diana Ortega', categoria: 'Fuga de agua', status: 'en_camino', zona: 'Guadalajara', total: 720 },
-    { id: 'SVC-2812', cliente: 'María Rodríguez', tecnico: 'Alberto García', categoria: 'Contactos y apagadores', status: 'cancelado', zona: 'Zapopan', total: 540 },
-    { id: 'SVC-2799', cliente: 'Jorge Salas', tecnico: 'Sergio Castro', categoria: 'Reparación de drenaje', status: 'completado', zona: 'Tlaquepaque', total: 980 },
-    { id: 'SVC-2788', cliente: 'Paola Reyes', tecnico: 'Ramón Hernández', categoria: 'Calentadores', status: 'en_ejecucion', zona: 'Tonalá', total: 1640 },
-  ];
-  const allRows = [...rows, ...filler].slice(0, 9);
-
   const columns: Column<Row>[] = [
-    { key: 'id', header: 'Servicio', render: r => <span className="font-mono text-[12.5px] text-primary">{r.id}</span> },
+    { key: 'id', header: 'Servicio', render: r => <span className="font-mono text-[12.5px] text-primary">#{r.id.slice(0, 8)}</span> },
     {
       key: 'cliente', header: 'Cliente', render: r => (
         <div className="flex items-center gap-2">
@@ -116,21 +110,46 @@ export default function DashboardPage() {
 
   const breakdown = m.byCategory.map((c, i) => ({ name: c.name, value: c.services, color: CAT_COLORS[i % CAT_COLORS.length] }));
 
-  // GMV semanal: 11 semanas sembradas + semana en curso viva (gmv actual).
-  const paidCount = getAllPayments().filter(p => p.status === 'paid').length;
-  const gmvSerie = [
-    ...GMV_SEMANAS.map(s => ({ ...s, meta: `${Math.max(1, Math.round(s.value / 820))} servicios pagados` })),
-    { label: 'Esta sem.', value: m.gmv, meta: `${paidCount} servicio${paidCount === 1 ? '' : 's'} pagado${paidCount === 1 ? '' : 's'}` },
+  // GMV semanal real: 12 semanas desde payments.paid_at, + comparativa del periodo anterior.
+  const payments = getAllPayments();
+  const gmvSerie = weeklyGmv(payments, 12).map(s => ({
+    label: s.label, value: s.value,
+    meta: `${s.count} servicio${s.count === 1 ? '' : 's'} pagado${s.count === 1 ? '' : 's'}`,
+  }));
+  const gmvPrev = weeklyGmv(payments, 12, 12).map(s => s.value);
+  const gmvPesos = Math.round(m.gmv / 100);
+
+  // Alertas operativas derivadas del mundo vivo.
+  const STUCK_MIN = 45;
+  const stuck = getAllRequests().filter(r =>
+    ['enroute', 'onsite', 'working'].includes(r.status) &&
+    Date.now() - new Date(r.updated_at).getTime() > STUCK_MIN * 60000);
+  const openDisputes = getAllDisputes().filter(d => d.status === 'open' || d.status === 'in_review');
+  const pendingKyc = getPendingKyc();
+  const alerts = [
+    ...stuck.slice(0, 3).map(r => ({
+      tone: 'warn' as const, icon: AlertTriangle,
+      text: `Servicio #${r.id.slice(0, 8)} atorado en "${r.status}"`, time: relTime(r.updated_at),
+    })),
+    ...openDisputes.slice(0, 3).map(d => ({
+      tone: 'err' as const, icon: ShieldAlert,
+      text: `Disputa abierta en #${d.service_order_id.slice(0, 8)} · ${getProfile(d.opened_by)?.full_name ?? 'Usuario'}`,
+      time: relTime(d.created_at),
+    })),
+    ...(pendingKyc.length ? [{
+      tone: 'warn' as const, icon: Clock,
+      text: `${pendingKyc.length} KYC pendiente${pendingKyc.length === 1 ? '' : 's'} de revisión`, time: 'ahora',
+    }] : []),
   ];
 
   // Pipeline vivo: byStatus agrupado en 4 estados (se actualiza con useTick).
   const bs = m.byStatus;
   const sum = (...keys: string[]) => keys.reduce((s, k) => s + (bs[k] ?? 0), 0);
   const pipeline = [
-    { key: 'done', label: 'Completados', value: sum('completado', 'pagado', 'calificado'), color: STATUS_DONUT.success },
-    { key: 'active', label: 'En curso', value: sum('aceptado', 'en_camino', 'en_sitio', 'en_ejecucion'), color: STATUS_DONUT.primary },
-    { key: 'pending', label: 'Pendientes', value: sum('solicitado'), color: STATUS_DONUT.warning },
-    { key: 'cancelled', label: 'Cancelados', value: sum('cancelado', 'rechazado'), color: STATUS_DONUT.error },
+    { key: 'done', label: 'Completados', value: sum('completed', 'paid', 'closed'), color: STATUS_DONUT.success },
+    { key: 'active', label: 'En curso', value: sum('accepted', 'enroute', 'onsite', 'quote', 'working', 'closing'), color: STATUS_DONUT.primary },
+    { key: 'pending', label: 'Pendientes', value: sum('requested'), color: STATUS_DONUT.warning },
+    { key: 'cancelled', label: 'Cancelados', value: sum('cancelled', 'expired'), color: STATUS_DONUT.error },
   ];
 
   if (!ready) return <SkeletonRows />;
@@ -141,16 +160,16 @@ export default function DashboardPage() {
 
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
-          <StatCard index={0} icon={Activity} live href="/servicios" label="Servicios activos ahora" value={<CountUp value={m.active} />} spark={SPARKS.activos} delta="+12%" trend="up" note="vs ayer" />
+          <StatCard index={0} icon={Activity} live href="/servicios" label="Servicios activos ahora" value={<CountUp value={m.active} />} />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={1} icon={CheckCircle2} href="/servicios" label="Completados hoy" value={<CountUp value={m.completedToday} />} spark={SPARKS.completados} delta="+8%" trend="up" note="vs ayer" />
+          <StatCard index={1} icon={CheckCircle2} href="/servicios" label="Completados" value={<CountUp value={m.completedToday} />} />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={2} icon={DollarSign} href="/finanzas" label="GMV del día" value={<CountUp value={m.gmv} prefix="$" />} suffix="MXN" spark={SPARKS.gmv} delta="+15%" trend="up" note="vs ayer" />
+          <StatCard index={2} icon={DollarSign} href="/finanzas" label="GMV acumulado" value={<CountUp value={gmvPesos} prefix="$" />} suffix="MXN" />
         </StaggerItem>
         <StaggerItem>
-          <StatCard index={3} icon={Wrench} href="/tecnicos" label="Técnicos activos" value={<CountUp value={m.activeTechs} suffix={`/${m.totalTechs}`} />} spark={SPARKS.tecnicos} progress={m.totalTechs ? m.activeTechs / m.totalTechs : 0} note={`${Math.round((m.activeTechs / Math.max(m.totalTechs, 1)) * 100)}% disponibles`} />
+          <StatCard index={3} icon={Wrench} href="/tecnicos" label="Técnicos activos" value={<CountUp value={m.activeTechs} suffix={`/${m.totalTechs}`} />} progress={m.totalTechs ? m.activeTechs / m.totalTechs : 0} note={`${Math.round((m.activeTechs / Math.max(m.totalTechs, 1)) * 100)}% disponibles`} />
         </StaggerItem>
       </Stagger>
 
@@ -162,7 +181,7 @@ export default function DashboardPage() {
               controls={{
                 ranges: [{ label: '4 sem', n: 4 }, { label: '8 sem', n: 8 }, { label: '12 sem', n: 12 }],
                 avg: true,
-                compare: { label: 'Periodo anterior', values: GMV_PREV },
+                compare: { label: 'Periodo anterior', values: gmvPrev },
               }}
             />
           </Panel>
@@ -178,15 +197,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <FadeIn className="min-w-0">
           <Panel title="Servicios recientes" action={<a href="/servicios" className="text-[12px] font-semibold text-primary hover:text-primary-2">Ver todos</a>}>
-            <DataTable columns={columns} rows={allRows} onRowClick={r => router.push(`/servicios/${r.id}`)} />
+            {rows.length
+              ? <DataTable columns={columns} rows={rows} onRowClick={r => router.push(`/servicios/${r.id}`)} />
+              : <p className="py-8 text-center text-[13px] text-muted">Aún no hay servicios registrados.</p>}
           </Panel>
         </FadeIn>
 
         <div className="flex min-w-0 flex-col gap-6">
           <FadeIn>
-            <Panel title="Alertas operativas" action={<span className="text-[12px] font-semibold text-error">{ALERTS.length} activas</span>}>
+            <Panel title="Alertas operativas" action={<span className={`text-[12px] font-semibold ${alerts.length ? 'text-error' : 'text-faint'}`}>{alerts.length ? `${alerts.length} activas` : 'sin alertas'}</span>}>
               <div className="flex flex-col gap-2.5">
-                {ALERTS.map((a, i) => {
+                {alerts.length === 0 && <p className="py-4 text-center text-[13px] text-muted">Todo en orden por ahora.</p>}
+                {alerts.map((a, i) => {
                   const Icon = a.icon;
                   const isErr = a.tone === 'err';
                   return (
@@ -205,7 +227,9 @@ export default function DashboardPage() {
 
           <FadeIn>
             <Panel title="Servicios por categoría" action={<span className="text-[12px] text-faint">{m.totalRequests} en total</span>}>
-              <HBars rows={breakdown.map(b => ({ label: b.name, value: b.value }))} showPct />
+              {breakdown.length
+                ? <HBars rows={breakdown.map(b => ({ label: b.name, value: b.value }))} showPct />
+                : <p className="py-4 text-center text-[13px] text-muted">Sin servicios por categoría aún.</p>}
             </Panel>
           </FadeIn>
         </div>

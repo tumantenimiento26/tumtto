@@ -8,7 +8,7 @@ import { PageHeading, Panel, StatCard, DataTable, type Column } from '@/componen
 import { Chip, Badge, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem, ProgressBar } from '@/components/motion';
 import { CoverageMap } from '@/components/coverage-map';
-import { useTick, getCoverage, getTechniciansWithProfile } from '@/lib/demo/store';
+import { useTick, getTechniciansWithProfile } from '@/lib/data/store';
 
 type Zone = {
   id: string;
@@ -32,7 +32,6 @@ const ZONE_STATUS: Record<Zone['status'], 'success' | 'warning'> = { ok: 'succes
 
 export default function RegionesPage() {
   useTick();
-  const coverage = getCoverage();
   const techs = getTechniciansWithProfile();
   const [selected, setSelected] = useState<string>('zap');
 
@@ -43,10 +42,9 @@ export default function RegionesPage() {
   const covPct = Math.round((totalCovered / totalColonias) * 100);
   const active = ZONES.find((z) => z.id === selected) ?? ZONES[0];
 
-  // technicians whose live coverage touches the selected region
-  const zoneTechs = techs.filter((t) =>
-    coverage.some((c) => c.technician_id === t.tech.user_id),
-  );
+  // ponytail: no hay tabla de cobertura por zona — se listan los técnicos
+  // disponibles como aproximación de la región seleccionada.
+  const zoneTechs = techs.filter(t => t.tech.is_available);
 
   const techCols: Column<(typeof techs)[number]>[] = [
     {
@@ -57,7 +55,7 @@ export default function RegionesPage() {
           <span className="grid h-7 w-7 place-items-center rounded-full bg-info-soft text-primary">
             <HardHat size={14} />
           </span>
-          <span className="font-medium text-navy">{r.profile?.full_name ?? r.tech.user_id}</span>
+          <span className="font-medium text-navy">{r.profile?.full_name ?? r.tech.id}</span>
         </div>
       ),
     },

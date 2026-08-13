@@ -17,9 +17,9 @@ import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion, ProgressBar } fr
 import { toast } from '@/components/toast';
 import {
   useTick, getProfile, getClientRequests, getAddresses, getCategories,
-  getSubcategories, getRating, getPayment, getAllDisputes, getNotes,
+  getRating, getPayment, getAllDisputes, getNotes,
   suspendUser, reactivateUser, addNote, createTicket,
-} from '@/lib/demo/store';
+} from '@/lib/data/store';
 import type { ServiceRequest, Payment } from '@/lib/demo/world';
 
 const peso = (n: number) =>
@@ -78,14 +78,9 @@ export default function ClientDetailPage() {
   const addresses = getAddresses(id);
   const notes = getNotes(id);
 
-  const subName = useMemo(() => {
-    const subs = getSubcategories();
+  const catName = useMemo(() => {
     const cats = getCategories();
-    return (subId: string) => {
-      const sub = subs.find(s => s.id === subId);
-      const cat = cats.find(c => c.id === sub?.category_id);
-      return { sub: sub?.name ?? '—', cat: cat?.name ?? '—' };
-    };
+    return (catId: string) => cats.find(c => c.id === catId)?.name ?? '—';
   }, []);
 
   if (!profile) {
@@ -102,34 +97,32 @@ export default function ClientDetailPage() {
   const phone = profile.phone ?? '—';
   const name = profile.full_name ?? 'Cliente';
   const suspended = profile.status === 'suspended';
-  // ponytail: email no existe en profiles — derivado presentacional del nombre.
-  const email = `${name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 12)}@correo.mx`;
-  const city = addresses.find(a => a.is_primary)?.city ?? addresses[0]?.city ?? 'Guadalajara';
+  // ponytail: el email vive en auth.users, no en profiles — sin columna que mostrar.
+  const email = '—';
+  const city =
+    addresses.find(a => a.is_default)?.municipality ?? addresses[0]?.municipality ?? 'Guadalajara';
 
-  const totalGasto = requests.reduce((s, r) => s + (r.total_price ?? 0), 0);
-  const completados = requests.filter(r => ['completado', 'pagado', 'calificado'].includes(r.status)).length;
+  const totalGasto = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
+  const completados = requests.filter(r => ['completed', 'paid', 'closed'].includes(r.status)).length;
 
   const payments = requests
     .map(r => ({ req: r, pay: getPayment(r.id) }))
     .filter((x): x is { req: ServiceRequest; pay: Payment } => x.pay != null);
 
-  const disputes = getAllDisputes().filter(d =>
-    d.opened_by === id || (d.request_id != null && requests.some(r => r.id === d.request_id)),
+  const disputes = getAllDisputes().filter(
+    d => d.opened_by === id || requests.some(r => r.id === d.service_order_id),
   );
 
   const tableRows = [...requests].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
   const columns: Column<ServiceRequest>[] = [
     { key: 'id', header: 'Folio', render: r => <span className="font-mono text-[12px] text-muted">#{r.id}</span> },
     {
-      key: 'cat', header: 'Servicio', render: r => {
-        const m = subName(r.subcategory_id);
-        return (
-          <div>
-            <div className="font-semibold text-navy">{m.cat}</div>
-            <div className="text-[12px] text-muted">{m.sub}</div>
-          </div>
-        );
-      },
+      key: 'cat', header: 'Servicio', render: r => (
+        <div>
+          <div className="font-semibold text-navy">{catName(r.category_id)}</div>
+          <div className="text-[12px] text-muted">{r.title ?? '—'}</div>
+        </div>
+      ),
     },
     { key: 'date', header: 'Fecha', render: r => <span className="text-[13px] text-muted">{fechaCorta(r.created_at)}</span> },
     { key: 'status', header: 'Estado', render: r => <StatusPill status={r.status} /> },
@@ -141,7 +134,11 @@ export default function ClientDetailPage() {
     },
     {
       key: 'total', header: 'Total', className: 'text-right',
-      render: r => <span className="font-mono font-semibold text-navy">{r.total_price != null ? peso(r.total_price) : '—'}</span>,
+      render: r => (
+        <span className="font-mono font-semibold text-navy">
+          {r.quoted_total_cents != null ? peso(r.quoted_total_cents / 100) : '—'}
+        </span>
+      ),
     },
   ];
 
@@ -155,19 +152,19 @@ export default function ClientDetailPage() {
     <Panel title="Direcciones guardadas" action={<span className="text-[12px] text-faint">{addresses.length} direcciones</span>}>
       <div className="flex flex-col gap-2.5">
         {addresses.map(a => {
-          const PinIcon = a.alias === 'Casa' ? Home : a.alias === 'Oficina' ? Briefcase : Heart;
+          const PinIcon = a.label === 'Casa' ? Home : a.label === 'Oficina' ? Briefcase : Heart;
           return (
-            <div key={a.id} className={`flex gap-3 rounded-xl border p-3 ${a.is_primary ? 'border-primary/30 bg-info-soft/40' : 'border-line bg-surface'}`}>
-              <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-white ${a.is_primary ? 'bg-primary' : 'bg-faint'}`}>
+            <div key={a.id} className={`flex gap-3 rounded-xl border p-3 ${a.is_default ? 'border-primary/30 bg-info-soft/40' : 'border-line bg-surface'}`}>
+              <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-white ${a.is_default ? 'bg-primary' : 'bg-faint'}`}>
                 <PinIcon size={13} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13.5px] font-semibold text-navy">{a.alias}</span>
-                  {a.is_primary && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">Principal</span>}
+                  <span className="text-[13.5px] font-semibold text-navy">{a.label}</span>
+                  {a.is_default && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">Principal</span>}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-navy">{a.line1}{a.line2 ? `, ${a.line2}` : ''}</div>
-                <div className="text-[12px] text-muted">{a.neighborhood}, {a.city}, {a.state} · {a.zip}</div>
+                <div className="mt-0.5 text-[12.5px] text-navy">{a.address_line}</div>
+                <div className="text-[12px] text-muted">{a.neighborhood}, {a.municipality}, {a.state} · {a.postal_code}</div>
               </div>
             </div>
           );
@@ -384,7 +381,7 @@ export default function ClientDetailPage() {
                     },
                   },
                   { key: 'date', header: 'Fecha', render: x => <span className="text-[12.5px] text-muted">{x.pay.paid_at ? fechaCorta(x.pay.paid_at) : '—'}</span> },
-                  { key: 'amount', header: 'Monto', className: 'text-right', render: x => <span className="font-mono font-semibold text-navy">{peso(x.pay.gross_amount)}</span> },
+                  { key: 'amount', header: 'Monto', className: 'text-right', render: x => <span className="font-mono font-semibold text-navy">{peso(x.pay.amount_cents / 100)}</span> },
                 ] as Column<{ req: ServiceRequest; pay: Payment }>[]}
                 rows={payments}
                 onRowClick={x => router.push(`/servicios/${x.req.id}`)}
@@ -407,10 +404,10 @@ export default function ClientDetailPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[12.5px] font-semibold text-navy">#{d.id}</span>
-                          <span className="text-[13px] capitalize text-navy">{d.type ?? 'Disputa'}</span>
+                          <span className="text-[13px] text-navy">{d.reason}</span>
                         </div>
                         <div className="mt-0.5 text-[12px] text-muted">
-                          {d.request_id ? `Servicio #${d.request_id} · ` : ''}{d.resolution ?? 'Sin resolución todavía'}
+                          Servicio #{d.service_order_id} · {d.resolution_notes ?? 'Sin resolución todavía'}
                         </div>
                       </div>
                       <Badge tone={d.status === 'resolved' ? 'success' : d.status === 'in_review' ? 'warning' : 'error'}>

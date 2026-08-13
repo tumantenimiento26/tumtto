@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Settings, Building2, Percent, Timer, Ban, Wallet, Bell, ShieldCheck,
   ListChecks, UsersRound, Hash, CreditCard, Store, Banknote, Tag, Rocket,
@@ -10,7 +10,8 @@ import {
 import { PageHeading, Panel } from '@/components/admin';
 import { PrimaryButton, GhostButton, Input, Toggle, Badge } from '@/components/ui';
 import { FadeIn, motion, AnimatePresence } from '@/components/motion';
-import { useTick, getCategoriesWithCounts, getMetrics } from '@/lib/demo/store';
+import { useTick, useWorldReady, getCategoriesWithCounts, getMetrics, getSettingInt, saveSettingInt } from '@/lib/data/store';
+import { toast } from '@/components/toast';
 
 const peso = (n: number) => `$${n.toLocaleString('es-MX')}`;
 const initials = (n: string) => n.split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
@@ -220,6 +221,23 @@ export default function ConfigPage() {
   // track dirty count loosely vs initial defaults (demo: count flips)
   const [dirty, setDirty] = useState(0);
   const touch = () => setDirty(d => d + 1);
+
+  // Valores reales desde platform_settings al cargar el snapshot.
+  // ponytail: solo commission_bps y request_ttl_minutes tienen backing real;
+  // el resto del formulario sigue siendo local hasta que existan sus keys.
+  const worldReady = useWorldReady();
+  useEffect(() => {
+    if (!worldReady) return;
+    setGlobalCommission(getSettingInt('commission_bps', 1500) / 100);
+    setSla(s => ({ ...s, accept: getSettingInt('request_ttl_minutes', 30) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [worldReady]);
+
+  async function persistSettings() {
+    await saveSettingInt('commission_bps', Math.round(globalCommission * 100));
+    await saveSettingInt('request_ttl_minutes', sla.accept);
+    toast.success('Configuración guardada');
+  }
 
   const [modal, setModal] = useState(false);
 
@@ -608,7 +626,7 @@ export default function ConfigPage() {
               </div>
               <div className="flex justify-end gap-2.5 border-t border-line px-6 py-4">
                 <GhostButton onClick={() => setModal(false)}>Cancelar</GhostButton>
-                <PrimaryButton onClick={() => { setModal(false); setDirty(0); }}>
+                <PrimaryButton onClick={() => { setModal(false); setDirty(0); void persistSettings(); }}>
                   <span className="inline-flex items-center gap-2"><Check size={14} /> Confirmar y guardar</span>
                 </PrimaryButton>
               </div>

@@ -12,9 +12,10 @@ import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  getMetrics, getAllPayments, getAllPayouts, getWallet, getWalletTxns,
+  getMetrics, getAllPayments, getAllPayouts, getLedger, getAllLedger, getWalletBalanceCents,
   getTechnician, getProfile, getRequest, processPayoutBatch, useTick,
-} from '@/lib/demo/store';
+  useWorldReady,
+} from '@/lib/data/store';
 
 interface PayRow {
   id: string; request_id: string; method: string; status: string;
@@ -28,28 +29,36 @@ interface PayoutRow {
 const mx = (n: number) => '$' + n.toLocaleString('es-MX');
 
 const METHOD_META: Record<string, { label: string; icon: typeof CreditCard; color: string }> = {
+  card: { label: 'Tarjeta', icon: CreditCard, color: '#0A6BCF' },
   tarjeta: { label: 'Tarjeta', icon: CreditCard, color: '#0A6BCF' },
   oxxo: { label: 'OXXO Pay', icon: Store, color: '#B45309' },
+  wallet: { label: 'MP wallet', icon: Wallet, color: '#0894EA' },
   mp: { label: 'MP wallet', icon: Wallet, color: '#0894EA' },
-  mercadopago: { label: 'MP wallet', icon: Wallet, color: '#0894EA' },
+  cash: { label: 'Efectivo', icon: Banknote, color: '#18A66A' },
   efectivo: { label: 'Efectivo', icon: Banknote, color: '#18A66A' },
 };
 
-// Mock daily GMV (últimos 14 días) para enriquecer la gráfica como el prototipo.
-const DAILY_GMV = [
-  72, 88, 61, 95, 110, 74, 49, 102, 118, 86, 93, 124, 79, 134,
-].map((v, i) => ({
-  label: `${14 + i} jun`,
-  value: v * 1000,
-  meta: `comisión plataforma ~15% · $${Math.round(v * 1000 * 0.15).toLocaleString('es-MX')}`,
-}));
+const DAY_MS = 24 * 3600 * 1000;
 
-// Filas extra realistas (ZMG) además del pago vivo del demo.
-const MOCK_PAYMENTS: PayRow[] = [
-  { id: 'pay-2848', request_id: 'SVC-2848', method: 'mp', status: 'paid', gross_amount: 2150, platform_fee: 322, technician_net: 1828, client: 'Carlos Méndez' },
-  { id: 'pay-2844', request_id: 'SVC-2844', method: 'efectivo', status: 'paid', gross_amount: 640, platform_fee: 96, technician_net: 544, client: 'Ana Rivera' },
-  { id: 'pay-2840', request_id: 'SVC-2840', method: 'tarjeta', status: 'refunded', gross_amount: 1320, platform_fee: 198, technician_net: 1122, client: 'Jorge Salas' },
-];
+/** GMV diario real (pesos) de los últimos 14 días, a partir de payments.paid_at. */
+function dailyGmv(payments: { status: string; paid_at: string | null; amount_cents: number; commission_cents: number }[]) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Array.from({ length: 14 }, (_, i) => {
+    const from = today.getTime() - (13 - i) * DAY_MS;
+    const inDay = payments.filter(p => {
+      if (p.status !== 'paid' || !p.paid_at) return false;
+      const t = new Date(p.paid_at).getTime();
+      return t >= from && t < from + DAY_MS;
+    });
+    const value = inDay.reduce((s, p) => s + p.amount_cents, 0) / 100;
+    const fee = inDay.reduce((s, p) => s + p.commission_cents, 0) / 100;
+    return {
+      label: new Date(from).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
+      value,
+      meta: `comisión plataforma · $${Math.round(fee).toLocaleString('es-MX')}`,
+    };
+  });
+}
 
 // ponytail: banco detectado por prefijo de CLABE — solo presentacional.
 const BANK_BY_PREFIX: Record<string, string> = { '012': 'BBVA', '044': 'Santander', '014': 'Banorte' };
@@ -84,35 +93,31 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 
 export default function FinanzasPage() {
   const tick = useTick();
-  const [ready, setReady] = useState(false);
+  const ready = useWorldReady();
   const [loteOpen, setLoteOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 450);
-    return () => clearTimeout(t);
-  }, []);
   const m = getMetrics();
 
   const payments = useMemo<PayRow[]>(() => {
     const live: PayRow[] = getAllPayments().map((p) => {
-      const req = getRequest(p.request_id);
+      const req = getRequest(p.service_order_id);
       const client = req ? getProfile(req.client_id)?.full_name ?? 'Cliente' : 'Cliente';
       return {
-        id: p.id, request_id: p.request_id, method: p.method, status: p.status,
-        gross_amount: p.gross_amount, platform_fee: p.platform_fee,
-        technician_net: p.technician_net, client,
+        id: p.id, request_id: p.service_order_id, method: p.method, status: p.status,
+        gross_amount: p.amount_cents / 100, platform_fee: p.commission_cents / 100,
+        technician_net: (p.amount_cents - p.commission_cents) / 100, client,
       };
     });
-    return [...live, ...MOCK_PAYMENTS];
+    return live;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   const payouts = useMemo<PayoutRow[]>(() => {
     return getAllPayouts().map((p) => {
       const tech = getTechnician(p.technician_id);
-      const name = (tech && getProfile(tech.user_id)?.full_name) ?? 'Técnico';
+      const name = (tech && getProfile(tech.id)?.full_name) ?? 'Técnico';
       return {
-        id: p.id, amount: p.amount, status: p.status, clabe_snapshot: p.clabe_snapshot,
+        id: p.id, amount: p.amount_cents / 100, status: p.status, clabe_snapshot: p.clabe_snapshot,
         name,
         initials: name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase(),
         bank: BANK_BY_PREFIX[p.clabe_snapshot?.slice(0, 3) ?? ''] ?? 'BBVA',
@@ -122,12 +127,47 @@ export default function FinanzasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  const wallet = getWallet('t-ramon');
-  const walletTxns = getWalletTxns('t-ramon');
-  const ramonName = getProfile('demo-tecnico')?.full_name ?? 'Ramón Hernández';
+  // Wallet destacado: el técnico con más movimiento en el ledger.
+  const walletTechId = useMemo(() => {
+    const counts: Record<string, number> = {};
+    getAllLedger().forEach(e => { counts[e.technician_id] = (counts[e.technician_id] ?? 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const daily = useMemo(() => dailyGmv(getAllPayments()), [tick]);
+  const walletBalance = walletTechId ? getWalletBalanceCents(walletTechId) / 100 : 0;
+  const walletTxns = walletTechId ? getLedger(walletTechId) : [];
+  const walletName = (walletTechId && getProfile(walletTechId)?.full_name) ?? 'Técnico';
+  const walletWithdrawn30d = walletTxns
+    .filter(e => e.entry_type === 'payout' && Date.now() - new Date(e.created_at).getTime() < 30 * DAY_MS)
+    .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
+  const walletFees = walletTxns
+    .filter(e => e.entry_type === 'commission_collected' || e.entry_type === 'commission_owed')
+    .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
 
   const pendingTotal = payouts.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
   const pendingCount = payouts.filter((p) => p.status === 'pending').length;
+
+  // GMV mensual real (últimos 6 meses) desde payments.paid_at.
+  const monthlyGmv = useMemo(() => {
+    const nowD = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(nowD.getFullYear(), nowD.getMonth() - (5 - i), 1);
+      const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      const value = getAllPayments().reduce((s, p) => {
+        if (p.status !== 'paid' || !p.paid_at) return s;
+        const t = new Date(p.paid_at).getTime();
+        return t >= d.getTime() && t < next.getTime() ? s + p.amount_cents : s;
+      }, 0) / 100;
+      return {
+        label: d.toLocaleDateString('es-MX', { month: 'short' }),
+        value,
+        ...(i === 5 ? { meta: 'mes en curso · en vivo' } : {}),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   function onExport() {
     exportCsv('transacciones.csv', payments.map(p => ({
@@ -195,17 +235,17 @@ export default function FinanzasPage() {
 
       {/* KPIs */}
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem><StatCard index={0} label="GMV del periodo" value={mx(m.gmv)} suffix="MXN" delta="+12.4%" trend="up" note="vs. mes anterior" icon={DollarSign} /></StaggerItem>
-        <StaggerItem><StatCard index={1} label="Comisión plataforma" value={mx(m.platformFee)} suffix="MXN" delta="+9.1%" trend="up" note="15% promedio" icon={Percent} /></StaggerItem>
-        <StaggerItem><StatCard index={2} label="Neto a técnicos" value={mx(m.techNet)} suffix="MXN" note="después de comisión" icon={Wallet} /></StaggerItem>
+        <StaggerItem><StatCard index={0} label="GMV del periodo" value={mx(m.gmv / 100)} suffix="MXN" note="pagos cobrados" icon={DollarSign} /></StaggerItem>
+        <StaggerItem><StatCard index={1} label="Comisión plataforma" value={mx(m.platformFee / 100)} suffix="MXN" note="sobre pagos cobrados" icon={Percent} /></StaggerItem>
+        <StaggerItem><StatCard index={2} label="Neto a técnicos" value={mx(m.techNet / 100)} suffix="MXN" note="después de comisión" icon={Wallet} /></StaggerItem>
         <StaggerItem><StatCard index={3} label="Pagos pendientes" value={mx(pendingTotal)} suffix="MXN" delta={`${pendingCount} retiros`} trend="down" note="por procesar" icon={Hourglass} /></StaggerItem>
       </Stagger>
 
       {/* Gráfica de ingresos + desglose por método */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <FadeIn>
-          <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(DAILY_GMV.reduce((s, d) => s + d.value, 0))} MXN</span>}>
-            <LineChart data={DAILY_GMV} height={220} format={mx} controls={{ avg: true }} />
+          <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(daily.reduce((s, d) => s + d.value, 0))} MXN</span>}>
+            <LineChart data={daily} height={220} format={mx} controls={{ avg: true }} />
           </Panel>
         </FadeIn>
         <FadeIn>
@@ -271,30 +311,30 @@ export default function FinanzasPage() {
             <div className="flex flex-col gap-4">
               <div className="rounded-xl bg-grad-brand p-5 text-white">
                 <div className="flex items-center gap-2.5">
-                  <Avatar initials="RH" size={36} />
+                  <Avatar initials={walletName.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'T'} size={36} />
                   <div>
-                    <div className="text-[13px] font-semibold">{ramonName}</div>
-                    <div className="text-[11px] text-white/80">Plomería · Zapopan</div>
+                    <div className="text-[13px] font-semibold">{walletName}</div>
+                    <div className="text-[11px] text-white/80">Mayor movimiento en el ledger</div>
                   </div>
                 </div>
                 <div className="mt-4 text-[11px] text-white/80">Saldo disponible</div>
                 <div className="font-display text-[30px] font-bold leading-tight">
-                  {mx(wallet?.balance ?? 0)}<span className="ml-1 font-mono text-[12px] font-medium text-white/70">MXN</span>
+                  {mx(walletBalance)}<span className="ml-1 font-mono text-[12px] font-medium text-white/70">MXN</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
                   <span className="text-[12.5px] text-muted">Retirado (30 d)</span>
-                  <span className="font-mono font-semibold text-navy">{mx(3000)}</span>
+                  <span className="font-mono font-semibold text-navy">{mx(walletWithdrawn30d)}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
-                  <span className="text-[12.5px] text-muted">En camino</span>
-                  <span className="font-mono font-semibold text-navy">{mx(0)}</span>
+                  <span className="text-[12.5px] text-muted">Movimientos</span>
+                  <span className="font-mono font-semibold text-navy">{walletTxns.length}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
                   <span className="text-[12.5px] text-muted">Comisión retenida</span>
-                  <span className="font-mono font-semibold text-navy">{mx(246)}</span>
+                  <span className="font-mono font-semibold text-navy">{mx(walletFees)}</span>
                 </div>
               </div>
 
@@ -305,16 +345,8 @@ export default function FinanzasPage() {
       </div>
 
       <FadeIn>
-        <Panel title="Resumen mensual" action={<span className="inline-flex items-center gap-1 text-[12.5px] text-success"><TrendingUp size={13} />Tendencia positiva</span>}>
-          <VBars
-            data={[
-              { label: 'Ene', value: 1840000 }, { label: 'Feb', value: 2010000 },
-              { label: 'Mar', value: 2230000 }, { label: 'Abr', value: 2480000 },
-              { label: 'May', value: 2640000 }, { label: 'Jun', value: m.gmv || 2847000, meta: 'mes en curso · en vivo' },
-            ]}
-            height={200} format={mx}
-            controls={{ avg: true, compare: { label: 'Año anterior', values: [1520000, 1690000, 1870000, 2050000, 2210000, 2340000] } }}
-          />
+        <Panel title="Resumen mensual · últimos 6 meses">
+          <VBars data={monthlyGmv} height={200} format={mx} controls={{ avg: true }} />
         </Panel>
       </FadeIn>
 
@@ -363,8 +395,8 @@ export default function FinanzasPage() {
       <Modal
         open={walletOpen}
         onClose={() => setWalletOpen(false)}
-        title={`Historial de wallet · ${ramonName}`}
-        sub={`Saldo disponible ${mx(wallet?.balance ?? 0)} MXN`}
+        title={`Historial de wallet · ${walletName}`}
+        sub={`Saldo disponible ${mx(walletBalance)} MXN`}
         icon={<Wallet size={16} />}
         width={480}
       >
@@ -373,18 +405,18 @@ export default function FinanzasPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {walletTxns.map(t => {
-              const credit = t.type === 'credit';
+              const credit = t.amount_cents > 0;
               return (
                 <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3">
                   <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${credit ? 'bg-success-soft text-success' : 'bg-error-soft text-error'}`}>
                     {credit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold capitalize text-navy">{credit ? 'Abono' : t.type === 'payout' ? 'Retiro' : t.type}</div>
-                    <div className="mt-0.5 font-mono text-[11.5px] text-muted">{t.reference ?? '—'} · {new Date(t.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</div>
+                    <div className="text-[13px] font-semibold text-navy">{t.description ?? (credit ? 'Abono' : 'Cargo')}</div>
+                    <div className="mt-0.5 font-mono text-[11.5px] text-muted">{t.service_order_id ?? '—'} · {new Date(t.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</div>
                   </div>
                   <span className={`font-mono text-[13.5px] font-bold ${credit ? 'text-success' : 'text-error'}`}>
-                    {credit ? '+' : '−'}{mx(t.amount)}
+                    {credit ? '+' : '−'}{mx(Math.abs(t.amount_cents) / 100)}
                   </span>
                 </div>
               );

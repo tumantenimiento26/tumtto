@@ -11,11 +11,12 @@ import { Avatar, Badge, Chip, Stars, Input, PrimaryButton, Skeleton } from '@/co
 import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  getTechniciansWithProfile, getTechCategories, getSubcategories, getCategories,
+  getTechniciansWithProfile, getTechCategories, getCategories,
   resolveKyc, rejectKyc, useTick,
-} from '@/lib/demo/store';
+  useWorldReady,
+} from '@/lib/data/store';
 
-type Kyc = 'approved' | 'pending_review' | 'rejected' | 'suspended';
+type Kyc = 'approved' | 'in_review' | 'declined' | 'suspended';
 
 interface Row {
   id: string;
@@ -34,17 +35,17 @@ const REGIONS = ['Todas', 'Guadalajara', 'Zapopan', 'Tlaquepaque', 'Tonalá', 'T
 
 const KYC_META: Record<Kyc, { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }> = {
   approved: { label: 'Aprobado', tone: 'success' },
-  pending_review: { label: 'Pendiente', tone: 'warning' },
-  rejected: { label: 'Rechazado', tone: 'error' },
+  in_review: { label: 'Pendiente', tone: 'warning' },
+  declined: { label: 'Rechazado', tone: 'error' },
   suspended: { label: 'Suspendido', tone: 'neutral' },
 };
 
 // ponytail: la región del técnico no existe en el esquema demo — mapa presentacional.
+// ponytail: no hay columna de región en technicians — se muestra '—' hasta que exista.
 const TECH_REGION: Record<string, string> = {
-  't-ramon': 'Zapopan', 't-ag': 'Tlaquepaque', 't-sc': 'Zapopan', 't-do': 'Tlajomulco',
-  't-carla': 'Guadalajara', 't-miguel': 'Tlaquepaque', 't-jose': 'Guadalajara',
-  't-lupita': 'Zapopan', 't-fer': 'Tonalá', 't-luis': 'Guadalajara',
-  't-ivan': 'El Salto', 't-roberto': 'Guadalajara',
+  'u-carla': 'Guadalajara', 'u-miguel': 'Tlaquepaque', 'u-jose': 'Guadalajara',
+  'u-lupita': 'Zapopan', 'u-fer': 'Tonalá', 'u-luis': 'Guadalajara',
+  'u-ivan': 'El Salto', 'u-roberto': 'Guadalajara',
 };
 
 function initials(name: string) {
@@ -68,43 +69,43 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 export default function TecnicosPage() {
   const tick = useTick();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 450);
-    return () => clearTimeout(t);
-  }, []);
+  const ready = useWorldReady();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('Todas');
   const [category, setCategory] = useState('Todas');
   const [tab, setTab] = useState<'all' | Kyc>('all');
 
   const rows = useMemo<Row[]>(() => {
-    const subs = getSubcategories();
     const cats = getCategories();
     return getTechniciansWithProfile().map(({ tech, profile }) => {
       const catNames = [...new Set(
-        getTechCategories(tech.id).map(tc => {
-          const sub = subs.find(s => s.id === tc.subcategory_id);
-          return cats.find(c => c.id === sub?.category_id)?.name ?? '—';
-        }),
+        getTechCategories(tech.id).map(tc => cats.find(c => c.id === tc.category_id)?.name ?? '—'),
       )];
       return {
         id: tech.id,
         name: profile?.full_name ?? 'Técnico',
         phone: (profile?.phone ?? '').replace('+52 ', ''),
         cats: catNames.length ? catNames : ['General'],
-        region: TECH_REGION[tech.id] ?? 'Guadalajara',
+        region: TECH_REGION[tech.id] ?? '—',
         rating: tech.rating_avg,
-        reviews: tech.ratings_count,
-        jobs: tech.total_jobs,
+        reviews: tech.rating_count,
+        jobs: tech.rating_count,
         available: tech.is_available,
-        kyc: profile?.status === 'suspended' ? 'suspended' : ((tech.kyc_status as Kyc) ?? 'approved'),
+        kyc:
+          profile?.status === 'suspended'
+            ? 'suspended'
+            : tech.kyc_status === 'approved'
+              ? 'approved'
+              : tech.kyc_status === 'declined'
+                ? 'declined'
+                : 'in_review',
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], [tick]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -119,13 +120,13 @@ export default function TecnicosPage() {
 
   const total = rows.length;
   const activos = rows.filter(r => r.kyc === 'approved' && r.available).length;
-  const pendientes = rows.filter(r => r.kyc === 'pending_review').length;
+  const pendientes = rows.filter(r => r.kyc === 'in_review').length;
 
   const tabs: { id: 'all' | Kyc; label: string; count: number }[] = [
     { id: 'all', label: 'Todos', count: total },
-    { id: 'pending_review', label: 'Pendientes de KYC', count: pendientes },
+    { id: 'in_review', label: 'Pendientes de KYC', count: pendientes },
     { id: 'approved', label: 'Aprobados', count: rows.filter(r => r.kyc === 'approved').length },
-    { id: 'rejected', label: 'Rechazados', count: rows.filter(r => r.kyc === 'rejected').length },
+    { id: 'declined', label: 'Rechazados', count: rows.filter(r => r.kyc === 'declined').length },
     { id: 'suspended', label: 'Suspendidos', count: rows.filter(r => r.kyc === 'suspended').length },
   ];
 
@@ -195,7 +196,7 @@ export default function TecnicosPage() {
       className: 'text-right',
       render: (r) => (
         <div className="flex items-center justify-end gap-1.5">
-          {r.kyc === 'pending_review' && (
+          {r.kyc === 'in_review' && (
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); resolveKyc(r.id, true); toast.success(`Técnico aprobado · ${r.name}`); }}

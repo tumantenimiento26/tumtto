@@ -10,7 +10,7 @@ import { LineChart, VBars, HBars, HeatCalendar } from '@/components/charts';
 import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
-import { getTechniciansWithProfile, getMetrics, getCategoriesWithCounts, useTick } from '@/lib/demo/store';
+import { getTechniciansWithProfile, getMetrics, getCategoriesWithCounts, useTick } from '@/lib/data/store';
 
 const RANGES = ['7 días', '30 días', 'Trimestre', 'Año'] as const;
 type Range = (typeof RANGES)[number];
@@ -117,8 +117,8 @@ export default function ReportesPage() {
           initials,
           region: regions[i % regions.length],
           rating: tech.rating_avg,
-          jobs: tech.total_jobs,
-          gmv: Math.round(tech.total_jobs * 1180),
+          jobs: tech.rating_count,
+          gmv: Math.round(tech.rating_count * 1180),
         };
       })
       .sort((a, b) => b.rating - a.rating || b.jobs - a.jobs)

@@ -12,36 +12,39 @@ import { GhostButton, PrimaryButton, Avatar, Textarea, Badge } from '@/component
 import { FadeIn, Reveal } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  useTick, getRequest, getProfile, getSubcategories, getCategories,
-  getExtras, getPayment, getTechByUser, getTechniciansWithProfile, getMessages,
+  useTick, getRequest, getProfile, getCategories,
+  getQuote, getQuoteItems, getPayment, getTechByUser, getTechniciansWithProfile, getMessages,
   getNotes, setStatus, reassignRequest, refundPayment, sendMessage, addNote,
   createTicket, ADMIN_ID,
-} from '@/lib/demo/store';
+} from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { useState } from 'react';
 
-const FLOW: RequestStatus[] = ['solicitado', 'aceptado', 'en_camino', 'en_sitio', 'en_ejecucion', 'completado', 'pagado', 'calificado'];
+const FLOW: RequestStatus[] = ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'closing', 'completed', 'paid', 'closed'];
 const FLOW_LABEL: Record<RequestStatus, string> = {
-  solicitado: 'Solicitud creada',
-  aceptado: 'Técnico aceptó el servicio',
-  en_camino: 'Técnico en camino',
-  en_sitio: 'Técnico llegó al sitio',
-  en_ejecucion: 'Trabajo en ejecución',
-  completado: 'Servicio completado',
-  pagado: 'Pago confirmado',
-  calificado: 'Cliente calificó el servicio',
-  cancelado: 'Servicio cancelado',
-  rechazado: 'Servicio rechazado',
+  requested: 'Solicitud creada',
+  accepted: 'Técnico aceptó el servicio',
+  enroute: 'Técnico en camino',
+  onsite: 'Técnico llegó al sitio',
+  quote: 'Cotización enviada al cliente',
+  working: 'Trabajo en ejecución',
+  closing: 'Cierre del trabajo',
+  completed: 'Servicio completado',
+  paid: 'Pago confirmado',
+  closed: 'Servicio cerrado',
+  expired: 'Solicitud expirada',
+  cancelled: 'Servicio cancelado',
 };
 const FLOW_ACTOR: Record<RequestStatus, string> = {
-  solicitado: 'Cliente', aceptado: 'Técnico', en_camino: 'Técnico', en_sitio: 'Técnico',
-  en_ejecucion: 'Técnico', completado: 'Técnico', pagado: 'Cliente', calificado: 'Cliente',
-  cancelado: 'Sistema', rechazado: 'Sistema',
+  requested: 'Cliente', accepted: 'Técnico', enroute: 'Técnico', onsite: 'Técnico',
+  quote: 'Técnico', working: 'Técnico', closing: 'Técnico', completed: 'Técnico',
+  paid: 'Cliente', closed: 'Cliente', expired: 'Sistema', cancelled: 'Sistema',
 };
 
 const initials = (name: string | null) =>
   (name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-const money = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
+/** Formatea centavos como MXN con decimales. */
+const money = (cents: number) => `$${(cents / 100).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -65,34 +68,33 @@ export default function ServicioDetailPage() {
     );
   }
 
-  const sub = getSubcategories().find(s => s.id === req.subcategory_id);
-  const cat = getCategories().find(c => c.id === sub?.category_id);
+  const cat = getCategories().find(c => c.id === req.category_id);
   const client = getProfile(req.client_id);
   const techUserId = req.technician_id;
   const techProfile = techUserId ? getProfile(techUserId) : null;
   const techRec = techUserId ? getTechByUser(techUserId) : null;
-  const extras = getExtras(req.id);
+  const quote = getQuote(req.id);
+  const quoteItems = quote ? getQuoteItems(quote.id) : [];
   const payment = getPayment(req.id);
   const notes = getNotes(req.id);
 
-  const base = req.base_price ?? sub?.base_price_suggested ?? 0;
-  const extrasTotal = extras.reduce((a, e) => a + e.amount, 0);
-  const subtotal = req.total_price ?? base + extrasTotal;
-  const commission = payment?.platform_fee ?? Math.round(subtotal * 0.15);
-  const techNet = payment?.technician_net ?? subtotal - commission;
+  const baseCents = quote?.labor_cents ?? 45000;
+  const subtotalCents = req.quoted_total_cents ?? quote?.total_cents ?? baseCents;
+  const commissionCents = payment?.commission_cents ?? req.commission_cents ?? Math.round(subtotalCents * 0.15);
+  const techNetCents = subtotalCents - commissionCents;
 
-  const addr = req.address_snapshot as Record<string, string> | null;
-  const addrLine = addr ? [addr.line1, addr.neighborhood].filter(Boolean).join(', ') : 'Dirección no disponible';
-  const addrCity = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '';
+  const addrLine = [req.address_line, req.neighborhood].filter(Boolean).join(', ') || 'Dirección no disponible';
+  const addrCity = [req.municipality, req.state].filter(Boolean).join(', ');
 
   const currentIndex = FLOW.indexOf(req.status);
-  const isTerminal = req.status === 'cancelado' || req.status === 'rechazado';
-  const disputed = req.status === 'cancelado';
+  const isTerminal = req.status === 'cancelled' || req.status === 'expired';
+  const disputed = req.is_disputed || req.status === 'cancelled';
   const refundable = payment?.status === 'paid';
 
   const override = (s: RequestStatus) => {
-    setStatus(req.id, s, ADMIN_ID);
-    toast.success(`Estado actualizado · ${FLOW_LABEL[s]}`);
+    void setStatus(req.id, s, 'Cambio manual desde la consola').then(r => {
+      if (r !== null) toast.success(`Estado actualizado · ${FLOW_LABEL[s]}`);
+    });
   };
 
   function onSaveNote() {
@@ -108,7 +110,7 @@ export default function ServicioDetailPage() {
       subject: `Caso de soporte · Servicio #${req!.id}`,
       requester_id: req!.client_id,
       priority: 'alta',
-      request_id: req!.id,
+      order_id: req!.id,
     });
     setCaseTicketId(t.id);
     toast.success(`Caso de soporte abierto · #${t.id}`);
@@ -153,9 +155,9 @@ export default function ServicioDetailPage() {
             <div className="mt-1 flex flex-wrap items-center gap-3">
               <h1 className="font-mono text-[26px] font-semibold tracking-tight">#{req.id}</h1>
               <StatusPill status={req.status} />
-              <MetaTag icon={FolderTree}>{cat?.name ?? '—'} · {sub?.name ?? '—'}</MetaTag>
-              <MetaTag icon={Calendar}>{req.scheduled_at ? fmtTime(req.scheduled_at) : fmtTime(req.created_at)}</MetaTag>
-              <MetaTag icon={MapPin}>{addr?.city ?? 'ZMG'}</MetaTag>
+              <MetaTag icon={FolderTree}>{cat?.name ?? '—'}{req.title ? ` · ${req.title}` : ''}</MetaTag>
+              <MetaTag icon={Calendar}>{fmtTime(req.accepted_at ?? req.created_at)}</MetaTag>
+              <MetaTag icon={MapPin}>{req.municipality ?? 'ZMG'}</MetaTag>
             </div>
           </div>
           <div className="flex shrink-0 gap-2.5">
@@ -165,7 +167,7 @@ export default function ServicioDetailPage() {
             <button onClick={() => setChatOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-primary px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft">
               <UserCog size={14} /> Intervenir
             </button>
-            <button onClick={() => override('cancelado')} className="inline-flex items-center gap-2 rounded-xl border border-error px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
+            <button onClick={() => override('cancelled')} className="inline-flex items-center gap-2 rounded-xl border border-error px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
               <Ban size={14} /> Cancelar
             </button>
           </div>
@@ -215,12 +217,12 @@ export default function ServicioDetailPage() {
                       <div className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
                         <Star size={11} className="text-warning" />
                         <b className="font-semibold text-navy">{techRec?.rating_avg ?? '—'}</b>
-                        <span>({techRec?.ratings_count ?? 0})</span>
+                        <span>({techRec?.rating_count ?? 0})</span>
                         <span>· {techProfile.phone}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 text-[12.5px] text-muted">{cat?.name} · {techRec?.total_jobs ?? 0} trabajos</div>
+                  <div className="mt-3 text-[12.5px] text-muted">{cat?.name} · {techRec?.rating_count ?? 0} trabajos</div>
                   {techRec && (
                     <Link href={`/tecnicos/${techRec.id}`} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
                       Ver perfil <ArrowRight size={12} />
@@ -235,22 +237,22 @@ export default function ServicioDetailPage() {
 
           <FadeIn>
             <Panel title="Cobro y comisión">
-              <div className="flex justify-between py-1.5 text-[13px]"><span>Tarifa base</span><span className="font-mono">{money(base)}</span></div>
-              {extras.map(e => (
+              <div className="flex justify-between py-1.5 text-[13px]"><span>Mano de obra / visita</span><span className="font-mono">{money(baseCents)}</span></div>
+              {quoteItems.map(e => (
                 <div key={e.id} className="flex justify-between py-1.5 text-[13px] text-muted">
                   <span className="flex items-center gap-1.5"><Plus size={11} className="text-cyan" />{e.description}</span>
-                  <span className="font-mono">+{money(e.amount)}</span>
+                  <span className="font-mono">+{money(e.total_cents)}</span>
                 </div>
               ))}
               <div className="mt-1 flex justify-between border-t border-line pt-2.5 text-[13px] font-semibold">
-                <span>Subtotal</span><span className="font-mono">{money(subtotal)}</span>
+                <span>Subtotal</span><span className="font-mono">{money(subtotalCents)}</span>
               </div>
               <div className="flex justify-between py-1.5 text-[12px] text-muted">
-                <span>Comisión plataforma · 15%</span><span className="font-mono">−{money(commission)}</span>
+                <span>Comisión plataforma · 15%</span><span className="font-mono">−{money(commissionCents)}</span>
               </div>
               <div className="mt-3 flex items-baseline justify-between rounded-xl bg-info-soft p-3">
                 <span className="text-[12px] font-medium text-muted">Neto técnico</span>
-                <span className="font-mono text-[18px] font-bold">{money(techNet)}<span className="ml-1 text-[11px] font-medium text-faint">MXN</span></span>
+                <span className="font-mono text-[18px] font-bold">{money(techNetCents)}<span className="ml-1 text-[11px] font-medium text-faint">MXN</span></span>
               </div>
               <div className="mt-3.5 flex items-center gap-3 rounded-xl border border-line bg-surface-2 p-3">
                 <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/[0.10]"><CreditCard size={16} className="text-primary" /></div>
@@ -283,7 +285,7 @@ export default function ServicioDetailPage() {
                 <div className="grid size-[30px] place-items-center rounded-lg bg-primary/[0.10]"><GitCommitVertical size={16} className="text-primary" /></div>
                 <div>
                   <div className="text-[13.5px] font-semibold">Línea de tiempo del servicio</div>
-                  <div className="text-[12px] text-muted">{FLOW.length} etapas · {extras.length} extras adjuntos</div>
+                  <div className="text-[12px] text-muted">{FLOW.length} etapas · {quoteItems.length} partidas cotizadas</div>
                 </div>
               </div>
               <div className="flex flex-col pt-1.5">
@@ -320,17 +322,10 @@ export default function ServicioDetailPage() {
             </Panel>
           </FadeIn>
 
-          {req.problem_description && (
+          {req.description && (
             <FadeIn>
               <Panel title="Descripción del problema">
-                <p className="text-[13px] leading-relaxed text-navy">{req.problem_description}</p>
-                {req.photos?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {req.photos.map((_, i) => (
-                      <div key={i} className="grid size-16 place-items-center rounded-xl bg-grad-brand text-white shadow-card">Foto {i + 1}</div>
-                    ))}
-                  </div>
-                )}
+                <p className="text-[13px] leading-relaxed text-navy">{req.description}</p>
               </Panel>
             </FadeIn>
           )}
@@ -348,7 +343,7 @@ export default function ServicioDetailPage() {
                     onChange={e => override(e.target.value as RequestStatus)}
                     className="w-full appearance-none rounded-xl border border-line bg-surface px-3 py-2.5 text-[13px] font-medium text-navy outline-none focus:border-primary"
                   >
-                    {[...FLOW, 'cancelado', 'rechazado'].map(s => (
+                    {[...FLOW, 'cancelled', 'expired'].map(s => (
                       <option key={s} value={s}>{FLOW_LABEL[s as RequestStatus]}</option>
                     ))}
                   </select>
@@ -361,7 +356,7 @@ export default function ServicioDetailPage() {
               <button onClick={() => setReassignOpen(true)} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-primary hover:bg-info-soft">
                 <UserCog size={14} /> Reasignar técnico
               </button>
-              <button onClick={() => override('cancelado')} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-error hover:bg-error-soft">
+              <button onClick={() => override('cancelled')} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-error hover:bg-error-soft">
                 <Ban size={14} /> Cancelar servicio
               </button>
               <button
@@ -419,7 +414,7 @@ export default function ServicioDetailPage() {
             <Panel title="Metadata">
               <div className="flex flex-col">
                 <MetaRow label="ID"><span className="font-mono text-[12.5px] font-medium">{req.id}</span></MetaRow>
-                <MetaRow label="Región"><span className="text-[12.5px]">{addr?.state ?? 'Jalisco'}</span></MetaRow>
+                <MetaRow label="Región"><span className="text-[12.5px]">{req.state ?? 'Jalisco'}</span></MetaRow>
                 <MetaRow label="Origen"><span className="flex items-center gap-1.5 text-[12.5px]"><Smartphone size={12} className="text-primary" /> App móvil</span></MetaRow>
                 <MetaRow label="Creado"><span className="text-[12.5px]">{fmtTime(req.created_at)}</span></MetaRow>
               </div>
@@ -454,7 +449,7 @@ export default function ServicioDetailPage() {
               onClick={() => {
                 refundPayment(req.id);
                 setRefundOpen(false);
-                toast.success(`Reembolso iniciado · ${money(payment?.gross_amount ?? subtotal)}`);
+                toast.success(`Reembolso iniciado · ${money(payment?.amount_cents ?? subtotalCents)}`);
               }}
               className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
             >
@@ -466,7 +461,7 @@ export default function ServicioDetailPage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between rounded-xl bg-error-soft p-4">
             <span className="text-[13px] font-medium text-error">Monto a reembolsar</span>
-            <span className="font-mono text-[20px] font-bold text-error">{money(payment?.gross_amount ?? subtotal)}</span>
+            <span className="font-mono text-[20px] font-bold text-error">{money(payment?.amount_cents ?? subtotalCents)}</span>
           </div>
           <p className="text-[12.5px] leading-relaxed text-muted">
             El servicio <span className="font-mono font-medium text-navy">#{req.id}</span> pasará a estado <b className="font-semibold text-navy">Cancelado</b> y
@@ -488,7 +483,7 @@ function ReassignModal({ open, onClose, onSelect, currentTechUserId }: {
 }) {
   const candidates = getTechniciansWithProfile().filter(({ tech, profile }) =>
     tech.kyc_status === 'approved' && tech.is_available &&
-    profile?.status !== 'suspended' && tech.user_id !== currentTechUserId,
+    profile?.status !== 'suspended' && tech.id !== currentTechUserId,
   );
 
   return (
@@ -509,7 +504,7 @@ function ReassignModal({ open, onClose, onSelect, currentTechUserId }: {
             return (
               <button
                 key={tech.id}
-                onClick={() => onSelect(tech.user_id, name)}
+                onClick={() => onSelect(tech.id, name)}
                 className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition-colors hover:border-primary/40 hover:bg-info-soft"
               >
                 <Avatar initials={initials(name)} size={40} />
@@ -517,7 +512,7 @@ function ReassignModal({ open, onClose, onSelect, currentTechUserId }: {
                   <div className="text-[13.5px] font-semibold text-navy">{name}</div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
                     <Star size={11} className="text-warning" />
-                    {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.total_jobs} trabajos
+                    {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.rating_count} trabajos
                   </div>
                 </div>
                 <Badge tone="success">Disponible</Badge>
@@ -562,7 +557,7 @@ function ChatModal({ open, onClose, requestId, clientName, techName }: {
         {messages.map(m => {
           const sender = getProfile(m.sender_id);
           const isAdmin = m.sender_id === ADMIN_ID;
-          const isTech = !isAdmin && sender?.role === 'tecnico';
+          const isTech = !isAdmin && sender?.role === 'technician';
           return (
             <FadeIn key={m.id} className={`flex ${isTech || isAdmin ? 'justify-end' : 'justify-start'}`}>
               <div className={`flex max-w-[80%] flex-col ${isTech || isAdmin ? 'items-end' : 'items-start'}`}>
@@ -601,9 +596,10 @@ function ChatModal({ open, onClose, requestId, clientName, techName }: {
 }
 
 const STATUS_HINT: Record<RequestStatus, string> = {
-  solicitado: 'inicial del flujo', aceptado: 'de confirmación', en_camino: 'de traslado',
-  en_sitio: 'de llegada', en_ejecucion: 'de trabajo activo', completado: 'de cierre técnico',
-  pagado: 'de cobro', calificado: 'de evaluación', cancelado: 'cancelada', rechazado: 'rechazada',
+  requested: 'inicial del flujo', accepted: 'de confirmación', enroute: 'de traslado',
+  onsite: 'de llegada', quote: 'de cotización', working: 'de trabajo activo', closing: 'de cierre',
+  completed: 'de cierre técnico', paid: 'de cobro', closed: 'de evaluación',
+  expired: 'expirada', cancelled: 'cancelada',
 };
 
 function MetaTag({ icon: Icon, children }: { icon: React.ComponentType<{ size?: number; className?: string }>; children: React.ReactNode }) {

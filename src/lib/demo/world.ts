@@ -1,38 +1,69 @@
-import type { Database } from '../supabase';
+import type { Database } from '@/types/supabase';
 
 /**
  * In-memory demo world — one coherent dataset shared across the Cliente,
- * Técnico and Admin role views. Services route here (instead of Supabase) when
- * demo mode is on, so a solicitud the cliente creates appears in the técnico
- * inbox and the admin dashboard, mutations persist in-session, and every flow
- * progresses end to end without a backend.
+ * Técnico and Admin console views. Selectors/mutators live in `store.ts`.
  *
- * Types mirror the real DB Row shapes so stores/screens stay unchanged.
+ * Types mirror the DEPLOYED DB Row shapes (tumtto-backend migrations) so the
+ * console renders exactly what production data will look like.
  */
 type T = Database['public']['Tables'];
 export type Profile = T['profiles']['Row'];
-export type Category = T['categories']['Row'];
-export type Subcategory = T['subcategories']['Row'];
-export type TechnicianProfile = T['technician_profiles']['Row'];
+export type ServiceCategory = T['service_categories']['Row'];
+export type Technician = T['technicians']['Row'];
 export type TechnicianCategory = T['technician_categories']['Row'];
-export type TechnicianCoverageArea = T['technician_coverage_areas']['Row'];
-export type TechnicianAvailability = T['technician_availability']['Row'];
+export type TechnicianRate = T['technician_rates']['Row'];
 export type ClientAddress = T['client_addresses']['Row'];
-export type ServiceRequest = T['service_requests']['Row'];
-export type ServiceExtra = T['service_extras']['Row'];
-export type ServiceStatusEvent = T['service_status_events']['Row'];
-export type Message = T['messages']['Row'];
+export type ServiceOrder = T['service_orders']['Row'];
+export type ServiceQuote = T['service_quotes']['Row'];
+export type ServiceQuoteItem = T['service_quote_items']['Row'];
+export type ServiceStatusEvent = T['service_order_status_events']['Row'];
 export type Payment = T['payments']['Row'];
-export type Rating = T['ratings']['Row'];
-export type TechnicianDocument = T['technician_documents']['Row'];
+export type LedgerEntry = T['ledger_entries']['Row'];
+export type KycSession = T['kyc_sessions']['Row'];
 export type Dispute = T['disputes']['Row'];
-export type TechnicianWallet = T['technician_wallet']['Row'];
-export type WalletTransaction = T['wallet_transactions']['Row'];
-export type Payout = T['payouts']['Row'];
-export type RequestStatus = Database['public']['Enums']['request_status'];
+export type OrderStatus = Database['public']['Enums']['service_order_status'];
+export type UserRole = Database['public']['Enums']['user_role'];
+export type KycStatus = Database['public']['Enums']['kyc_status'];
 
-// ── Demo-only shapes (no DB table behind them) ───────────────────────────────
-/** Internal admin note attached to any entity (request, técnico, cliente…). */
+// Compat alias while pages migrate naming.
+export type Category = ServiceCategory;
+export type ServiceRequest = ServiceOrder;
+export type RequestStatus = OrderStatus;
+
+// ── Demo-only shapes (no DB table behind them yet) ───────────────────────────
+// ponytail: chat, ratings, payout requests, notes y tickets no tienen tabla en
+// el esquema desplegado — viven solo en el demo world. Migraciones pendientes.
+export type DemoMessage = {
+  id: string;
+  order_id: string;
+  sender_id: string;
+  content: string | null;
+  created_at: string;
+};
+export type DemoRating = {
+  id: string;
+  order_id: string;
+  from_id: string;
+  to_id: string;
+  stars: number;
+  comment: string | null;
+  tags: string[];
+  created_at: string;
+};
+export type DemoPayout = {
+  id: string;
+  technician_id: string;
+  amount_cents: number;
+  status: 'pending' | 'processing' | 'processed' | 'failed';
+  clabe_snapshot: string | null;
+  batch_id: string | null;
+  processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Internal admin note attached to any entity (order, técnico, cliente…). */
 export interface Note {
   id: string;
   entity_id: string;
@@ -41,14 +72,12 @@ export interface Note {
   created_at: string;
 }
 
-/** Support-ticket message — mirrors the Message shape keyed by ticket_id. */
+/** Support-ticket message — keyed by ticket_id. */
 export interface TicketMessage {
   id: string;
   ticket_id: string;
   sender_id: string;
   content: string | null;
-  attachments: string[];
-  is_flagged: boolean;
   created_at: string;
 }
 
@@ -59,7 +88,7 @@ export interface Ticket {
   role: 'cliente' | 'tecnico';
   status: 'open' | 'pending' | 'resolved';
   priority: 'alta' | 'media' | 'baja';
-  request_id: string | null;
+  order_id: string | null;
   created_at: string;
   messages: TicketMessage[];
 }
@@ -70,343 +99,443 @@ let seq = 1000;
 export const nextId = (p: string) => `${p}-${++seq}`;
 
 // ── Identities ──────────────────────────────────────────────────────────────
+// technicians.id === profiles.id in the deployed schema (1:1).
 export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 export const ADMIN_ID = 'demo-admin';
 
-function profile(id: string, full_name: string, role: Profile['role'], phone = '+52 33 0000 0000'): Profile {
-  return { id, full_name, phone, role, avatar_url: null, status: 'active', ...ts() };
+function profile(id: string, full_name: string, role: UserRole, phone = '+52 33 0000 0000'): Profile {
+  return { id, full_name, phone, role, avatar_path: null, status: 'active', ...ts() };
 }
 
-// ── Catalog (mirrors the seed) ───────────────────────────────────────────────
-const CAT = (id: string, name: string, icon: string): Category => ({
-  id,
+// ── Catalog (mirrors supabase/seed.sql) ──────────────────────────────────────
+const CAT = (slug: string, name: string, icon: string, sort_order: number, description: string): ServiceCategory => ({
+  id: `cat-${slug}`,
+  slug,
   name,
   icon,
-  description: null,
-  is_active: true,
-  ...ts(),
-});
-const SUB = (id: string, category_id: string, name: string, min: number, max: number): Subcategory => ({
-  id,
-  category_id,
-  name,
-  description: null,
-  price_min: min,
-  price_max: max,
-  base_price_suggested: Math.round((min + max) / 2),
+  description,
+  sort_order,
   is_active: true,
   ...ts(),
 });
 
-// ── Technician profile factory ───────────────────────────────────────────────
-function tech(
-  id: string,
-  userId: string,
-  rating: number,
-  ratings: number,
-  jobs: number,
-  available = true,
-): TechnicianProfile {
+// ── Technician factory (id = profile id) ─────────────────────────────────────
+function tech(id: string, rating: number, ratings: number, available = true): Technician {
   return {
     id,
-    user_id: userId,
+    display_name: null,
     bio: 'Técnico certificado con experiencia comprobada. Garantía de 30 días.',
     kyc_status: 'approved',
-    kyc_reviewed_by: ADMIN_ID,
-    kyc_reviewed_at: now(),
     rating_avg: rating,
-    ratings_count: ratings,
-    total_jobs: jobs,
-    payout_clabe: '012345678901234567',
+    rating_count: ratings,
     is_available: available,
+    curp: null,
+    rfc: null,
+    home_address: null,
+    bank_name: 'BBVA',
+    clabe: '012345678901234567',
     ...ts(),
   };
 }
 
+const rate = (technician_id: string, category_id: string, visita: number, hora: number, minimo: number): TechnicianRate => ({
+  id: nextId('rate'),
+  technician_id,
+  category_id,
+  visita_cents: visita,
+  hora_cents: hora,
+  minimo_cents: minimo,
+  currency: 'MXN',
+  ...ts(),
+});
+
+const geo = (lng: number, lat: number) => ({ type: 'Point', coordinates: [lng, lat] });
+
 export interface World {
   profiles: Profile[];
-  categories: Category[];
-  subcategories: Subcategory[];
-  technicians: TechnicianProfile[];
+  categories: ServiceCategory[];
+  technicians: Technician[];
   technicianCategories: TechnicianCategory[];
-  coverage: TechnicianCoverageArea[];
-  availability: TechnicianAvailability[];
+  rates: TechnicianRate[];
   addresses: ClientAddress[];
-  requests: ServiceRequest[];
-  extras: ServiceExtra[];
+  orders: ServiceOrder[];
+  quotes: ServiceQuote[];
+  quoteItems: ServiceQuoteItem[];
   events: ServiceStatusEvent[];
-  messages: Message[];
   payments: Payment[];
-  ratings: Rating[];
-  documents: TechnicianDocument[];
+  ledger: LedgerEntry[];
+  kycSessions: KycSession[];
   disputes: Dispute[];
-  wallets: TechnicianWallet[];
-  walletTxns: WalletTransaction[];
-  payouts: Payout[];
+  // demo-only (no backing tables yet)
+  messages: DemoMessage[];
+  ratings: DemoRating[];
+  payouts: DemoPayout[];
   notes: Note[];
   tickets: Ticket[];
 }
 
 function build(): World {
   const profiles: Profile[] = [
-    profile(CLIENT_ID, 'María Cliente (demo)', 'cliente', '+52 33 1234 5678'),
-    profile(TECH_USER_ID, 'Ramón Hernández (demo)', 'tecnico', '+52 33 2345 6789'),
+    profile(CLIENT_ID, 'María Cliente (demo)', 'client', '+52 33 1234 5678'),
+    profile(TECH_USER_ID, 'Ramón Hernández (demo)', 'technician', '+52 33 2345 6789'),
     profile(ADMIN_ID, 'Sofía Admin (demo)', 'admin'),
-    profile('u-ag', 'Adriana García Soto', 'tecnico'),
-    profile('u-sc', 'Sergio Camarena R.', 'tecnico'),
-    profile('u-do', 'Daniela Ortega Camacho', 'tecnico'),
-    profile('u-carla', 'Carla Domínguez R.', 'tecnico'),
-    profile('u-carlos', 'Carlos Mendoza', 'cliente'),
+    profile('u-ag', 'Adriana García Soto', 'technician'),
+    profile('u-sc', 'Sergio Camarena R.', 'technician'),
+    profile('u-do', 'Daniela Ortega Camacho', 'technician'),
+    profile('u-carla', 'Carla Domínguez R.', 'technician'),
+    profile('u-carlos', 'Carlos Mendoza', 'client'),
     // Roster ZMG (antes mocks del listado de técnicos — ahora viven en el mundo
     // para que las acciones KYC muten filas reales).
-    profile('u-miguel', 'Miguel Ángel López Rentería', 'tecnico', '+52 33 1842 5790'),
-    profile('u-jose', 'José Carlos Juárez Mendoza', 'tecnico', '+52 33 1567 2034'),
-    profile('u-lupita', 'Lupita Pérez Vázquez', 'tecnico', '+52 33 3120 9846'),
-    profile('u-fer', 'Fernanda Olivares Ramírez', 'tecnico', '+52 33 1029 7733'),
-    profile('u-luis', 'Luis Esteban Gómez Salinas', 'tecnico', '+52 33 2811 4467'),
-    profile('u-ivan', 'Carlos Iván Velázquez Robles', 'tecnico', '+52 33 1992 0354'),
-    profile('u-roberto', 'Roberto Villanueva Aceves', 'tecnico', '+52 33 3678 1102'),
+    profile('u-miguel', 'Miguel Ángel López Rentería', 'technician', '+52 33 1842 5790'),
+    profile('u-jose', 'José Carlos Juárez Mendoza', 'technician', '+52 33 1567 2034'),
+    profile('u-lupita', 'Lupita Pérez Vázquez', 'technician', '+52 33 3120 9846'),
+    profile('u-fer', 'Fernanda Olivares Ramírez', 'technician', '+52 33 1029 7733'),
+    profile('u-luis', 'Luis Esteban Gómez Salinas', 'technician', '+52 33 2811 4467'),
+    profile('u-ivan', 'Carlos Iván Velázquez Robles', 'technician', '+52 33 1992 0354'),
+    profile('u-roberto', 'Roberto Villanueva Aceves', 'technician', '+52 33 3678 1102'),
   ];
   // Luis está suspendido a nivel usuario (la suspensión vive en profiles.status).
   profiles.find(p => p.id === 'u-luis')!.status = 'suspended';
 
   const categories = [
-    CAT('cat-plo', 'Plomería', 'wrench'),
-    CAT('cat-ele', 'Electricidad', 'zap'),
-    CAT('cat-gas', 'Gas', 'flame'),
-    CAT('cat-her', 'Herrería', 'hammer'),
-    CAT('cat-pin', 'Pintura', 'paintbrush'),
-    CAT('cat-cri', 'Cristales', 'square'),
-    CAT('cat-dre', 'Drenaje', 'droplets'),
-  ];
-  const subcategories = [
-    SUB('sub-fugas', 'cat-plo', 'Fugas', 300, 1500),
-    SUB('sub-calent', 'cat-plo', 'Calentadores', 400, 2500),
-    SUB('sub-drenaje', 'cat-plo', 'Drenaje de cocina', 350, 1800),
-    SUB('sub-wc', 'cat-plo', 'Instalación de WC', 400, 2000),
-    SUB('sub-contactos', 'cat-ele', 'Contactos y apagadores', 200, 1200),
-    SUB('sub-lamparas', 'cat-ele', 'Instalación de lámparas', 250, 1500),
-    SUB('sub-regulador', 'cat-gas', 'Cambio de regulador', 300, 1500),
-    SUB('sub-ventanas', 'cat-cri', 'Ventanas residenciales', 350, 2200),
-    SUB('sub-pintura-int', 'cat-pin', 'Pintura interior', 500, 4000),
-    SUB('sub-portones', 'cat-her', 'Puertas y portones', 600, 5000),
+    CAT('plumbing', 'Plomería', 'wrench', 10, 'Fugas, destapes, instalaciones hidráulicas'),
+    CAT('electrical', 'Electricidad', 'zap', 20, 'Cortocircuitos, instalaciones y mantenimiento eléctrico'),
+    CAT('gas', 'Gas', 'flame', 30, 'Fugas, instalación y revisión de gas LP/natural'),
+    CAT('ac', 'Aire acondicionado', 'wind', 40, 'Instalación, carga de gas y mantenimiento de AA'),
+    CAT('appliances', 'Electrodomésticos', 'plug', 50, 'Reparación de lavadoras, refrigeradores y más'),
+    CAT('locks', 'Cerrajería', 'key', 60, 'Aperturas, cambios de chapas y emergencias'),
   ];
 
   const technicians = [
-    tech('t-ramon', TECH_USER_ID, 4.9, 214, 214),
-    tech('t-ag', 'u-ag', 4.8, 167, 167),
-    tech('t-sc', 'u-sc', 4.7, 92, 92),
-    tech('t-do', 'u-do', 4.5, 38, 38, false),
-    tech('t-carla', 'u-carla', 0, 0, 0, false), // pendiente KYC
-    tech('t-miguel', 'u-miguel', 0, 0, 0, false), // pendiente KYC
-    tech('t-jose', 'u-jose', 4.9, 87, 87),
-    tech('t-lupita', 'u-lupita', 4.6, 45, 45),
-    tech('t-fer', 'u-fer', 0, 0, 0, false), // pendiente KYC
-    tech('t-luis', 'u-luis', 3.9, 27, 27, false), // suspendido (profiles.status)
-    tech('t-ivan', 'u-ivan', 0, 0, 0), // pendiente KYC
-    tech('t-roberto', 'u-roberto', 4.4, 56, 56, false), // rechazado
+    tech(TECH_USER_ID, 4.9, 214),
+    tech('u-ag', 4.8, 167),
+    tech('u-sc', 4.7, 92),
+    tech('u-do', 4.5, 38, false),
+    tech('u-carla', 0, 0, false), // pendiente KYC
+    tech('u-miguel', 0, 0, false), // pendiente KYC
+    tech('u-jose', 4.9, 87),
+    tech('u-lupita', 4.6, 45),
+    tech('u-fer', 0, 0, false), // pendiente KYC
+    tech('u-luis', 3.9, 27, false), // suspendido (profiles.status)
+    tech('u-ivan', 0, 0), // pendiente KYC
+    tech('u-roberto', 4.4, 56, false), // rechazado
   ];
-  const pendingKyc = ['t-carla', 't-miguel', 't-fer', 't-ivan'];
+  const pendingKyc = ['u-carla', 'u-miguel', 'u-fer', 'u-ivan'];
   for (const t of technicians) {
-    if (pendingKyc.includes(t.id)) {
-      t.kyc_status = 'pending_review';
-      t.kyc_reviewed_by = null;
-      t.kyc_reviewed_at = null;
-    }
+    if (pendingKyc.includes(t.id)) t.kyc_status = 'in_review';
   }
-  technicians.find(t => t.id === 't-roberto')!.kyc_status = 'rejected';
+  technicians.find(t => t.id === 'u-roberto')!.kyc_status = 'declined';
 
-  const technicianCategories: TechnicianCategory[] = [
-    { id: 'tc-1', technician_id: 't-ramon', subcategory_id: 'sub-fugas', base_price: 450, ...ts() },
-    { id: 'tc-2', technician_id: 't-ramon', subcategory_id: 'sub-calent', base_price: 550, ...ts() },
-    { id: 'tc-3', technician_id: 't-ramon', subcategory_id: 'sub-drenaje', base_price: 480, ...ts() },
-    { id: 'tc-4', technician_id: 't-do', subcategory_id: 'sub-fugas', base_price: 380, ...ts() },
-    { id: 'tc-5', technician_id: 't-ag', subcategory_id: 'sub-contactos', base_price: 400, ...ts() },
-    { id: 'tc-6', technician_id: 't-ag', subcategory_id: 'sub-lamparas', base_price: 420, ...ts() },
-    { id: 'tc-7', technician_id: 't-sc', subcategory_id: 'sub-regulador', base_price: 360, ...ts() },
-    { id: 'tc-8', technician_id: 't-carla', subcategory_id: 'sub-ventanas', base_price: 420, ...ts() },
-    { id: 'tc-9', technician_id: 't-miguel', subcategory_id: 'sub-ventanas', base_price: 450, ...ts() },
-    { id: 'tc-10', technician_id: 't-jose', subcategory_id: 'sub-contactos', base_price: 380, ...ts() },
-    { id: 'tc-11', technician_id: 't-lupita', subcategory_id: 'sub-pintura-int', base_price: 900, ...ts() },
-    { id: 'tc-12', technician_id: 't-fer', subcategory_id: 'sub-fugas', base_price: 400, ...ts() },
-    { id: 'tc-13', technician_id: 't-fer', subcategory_id: 'sub-regulador', base_price: 350, ...ts() },
-    { id: 'tc-14', technician_id: 't-luis', subcategory_id: 'sub-wc', base_price: 500, ...ts() },
-    { id: 'tc-15', technician_id: 't-ivan', subcategory_id: 'sub-ventanas', base_price: 380, ...ts() },
-    { id: 'tc-16', technician_id: 't-ivan', subcategory_id: 'sub-portones', base_price: 850, ...ts() },
-    { id: 'tc-17', technician_id: 't-roberto', subcategory_id: 'sub-pintura-int', base_price: 800, ...ts() },
-  ];
-
-  const coverage: TechnicianCoverageArea[] = [
-    {
-      id: 'cov-1',
-      technician_id: 't-ramon',
-      region_id: 'reg-zmg',
-      neighborhood_id: null,
-      center_geo: null,
-      radius_km: 10,
-      ...ts(),
-    },
-  ];
-
-  const availability: TechnicianAvailability[] = [1, 2, 3, 4, 5, 6].map((weekday, i) => ({
-    id: `av-${i}`,
-    technician_id: 't-ramon',
-    weekday,
-    start_time: '09:00',
-    end_time: '19:00',
+  const tcat = (technician_id: string, category_id: string): TechnicianCategory => ({
+    technician_id,
+    category_id,
     ...ts(),
-  }));
+  });
+  const technicianCategories: TechnicianCategory[] = [
+    tcat(TECH_USER_ID, 'cat-plumbing'),
+    tcat(TECH_USER_ID, 'cat-gas'),
+    tcat('u-ag', 'cat-electrical'),
+    tcat('u-sc', 'cat-gas'),
+    tcat('u-do', 'cat-plumbing'),
+    tcat('u-carla', 'cat-locks'),
+    tcat('u-miguel', 'cat-locks'),
+    tcat('u-jose', 'cat-electrical'),
+    tcat('u-lupita', 'cat-appliances'),
+    tcat('u-fer', 'cat-plumbing'),
+    tcat('u-fer', 'cat-gas'),
+    tcat('u-luis', 'cat-plumbing'),
+    tcat('u-ivan', 'cat-locks'),
+    tcat('u-roberto', 'cat-appliances'),
+  ];
+
+  const rates: TechnicianRate[] = [
+    rate(TECH_USER_ID, 'cat-plumbing', 45000, 35000, 45000),
+    rate(TECH_USER_ID, 'cat-gas', 36000, 30000, 36000),
+    rate('u-ag', 'cat-electrical', 40000, 32000, 40000),
+    rate('u-sc', 'cat-gas', 36000, 28000, 36000),
+    rate('u-do', 'cat-plumbing', 38000, 30000, 38000),
+    rate('u-jose', 'cat-electrical', 38000, 30000, 38000),
+    rate('u-lupita', 'cat-appliances', 90000, 45000, 90000),
+  ];
 
   const addresses: ClientAddress[] = [
     {
       id: 'addr-1',
-      user_id: CLIENT_ID,
-      alias: 'Casa',
-      line1: 'Av. Pablo Neruda 2825',
-      line2: null,
+      client_id: CLIENT_ID,
+      label: 'Casa',
+      address_line: 'Av. Pablo Neruda 2825',
       neighborhood: 'Providencia',
-      city: 'Zapopan',
+      municipality: 'Zapopan',
       state: 'Jalisco',
-      zip: '44630',
-      geo: null,
-      is_primary: true,
+      postal_code: '44630',
+      place_name: 'Av. Pablo Neruda 2825, Providencia, Zapopan',
+      location: geo(-103.3773, 20.7062),
+      mapbox_feature_id: null,
+      raw_mapbox_feature: null,
+      is_default: true,
       ...ts(),
     },
     {
       id: 'addr-2',
-      user_id: CLIENT_ID,
-      alias: 'Oficina',
-      line1: 'Av. Américas 1500',
-      line2: 'Piso 4',
+      client_id: CLIENT_ID,
+      label: 'Oficina',
+      address_line: 'Av. Américas 1500, Piso 4',
       neighborhood: 'Country Club',
-      city: 'Guadalajara',
+      municipality: 'Guadalajara',
       state: 'Jalisco',
-      zip: '44610',
-      geo: null,
-      is_primary: false,
+      postal_code: '44610',
+      place_name: 'Av. Américas 1500, Country Club, Guadalajara',
+      location: geo(-103.3695, 20.7096),
+      mapbox_feature_id: null,
+      raw_mapbox_feature: null,
+      is_default: false,
       ...ts(),
     },
   ];
 
-  // One historical completed+rated service, one active in-progress service.
+  // One historical closed+rated service, one active in-progress service.
   const old = new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString();
-  const requests: ServiceRequest[] = [
-    {
+  const mins = (n: number) => new Date(Date.now() - 1000 * 60 * n).toISOString();
+
+  function order(
+    partial: Partial<ServiceOrder> &
+      Pick<ServiceOrder, 'id' | 'client_id' | 'category_id' | 'status'>,
+  ): ServiceOrder {
+    return {
+      technician_id: null,
+      client_address_id: null,
+      title: null,
+      description: null,
+      is_urgent: false,
+      urgent_surcharge_bps: 0,
+      location: geo(-103.3773, 20.7062),
+      place_name: null,
+      address_line: null,
+      neighborhood: null,
+      municipality: 'Guadalajara',
+      state: 'Jalisco',
+      postal_code: null,
+      mapbox_feature_id: null,
+      raw_mapbox_feature: null,
+      quoted_subtotal_cents: null,
+      quoted_total_cents: null,
+      commission_bps: 1500,
+      commission_cents: null,
+      is_disputed: false,
+      accepted_at: null,
+      completed_at: null,
+      paid_at: null,
+      cancelled_at: null,
+      cancellation_reason: null,
+      expires_at: null,
+      ...ts(),
+      ...partial,
+    };
+  }
+
+  const orders: ServiceOrder[] = [
+    order({
       id: 'SVC-2835',
       client_id: CLIENT_ID,
       technician_id: TECH_USER_ID,
-      subcategory_id: 'sub-calent',
-      region_id: null,
-      status: 'calificado',
-      problem_description: 'Calentador no enciende, piloto apagado.',
-      photos: [],
-      address_snapshot: { alias: 'Casa', line1: 'Av. Pablo Neruda 2825' },
-      scheduled_at: old,
-      base_price: 550,
-      total_price: 1640,
+      category_id: 'cat-plumbing',
+      client_address_id: 'addr-1',
+      status: 'closed',
+      title: 'Calentador no enciende',
+      description: 'Calentador no enciende, piloto apagado.',
+      address_line: 'Av. Pablo Neruda 2825',
+      neighborhood: 'Providencia',
+      municipality: 'Zapopan',
+      quoted_subtotal_cents: 164000,
+      quoted_total_cents: 164000,
+      commission_cents: 24600,
+      accepted_at: old,
+      completed_at: old,
+      paid_at: old,
       created_at: old,
       updated_at: old,
-    },
-    {
+    }),
+    order({
       id: 'SVC-2851',
       client_id: CLIENT_ID,
       technician_id: TECH_USER_ID,
-      subcategory_id: 'sub-fugas',
-      region_id: null,
-      status: 'en_camino',
-      problem_description:
-        'Fuga debajo del lavabo del baño desde ayer. El agua gotea y mojó el piso.',
-      photos: [],
-      address_snapshot: { alias: 'Casa', line1: 'Av. Pablo Neruda 2825' },
-      scheduled_at: now(),
-      base_price: 450,
-      total_price: null,
+      category_id: 'cat-plumbing',
+      client_address_id: 'addr-1',
+      status: 'enroute',
+      title: 'Fuga en el baño',
+      description: 'Fuga debajo del lavabo del baño desde ayer. El agua gotea y mojó el piso.',
+      address_line: 'Av. Pablo Neruda 2825',
+      neighborhood: 'Providencia',
+      municipality: 'Zapopan',
+      accepted_at: mins(25),
+    }),
+  ];
+
+  const quotes: ServiceQuote[] = [
+    {
+      id: 'q-2851',
+      service_order_id: 'SVC-2851',
+      technician_id: TECH_USER_ID,
+      labor_cents: 45000,
+      materials_cents: 42000,
+      surcharge_cents: 0,
+      total_cents: 87000,
+      notes: 'Incluye cambio de llave angular y cespol.',
+      accepted_at: mins(20),
+      rejected_at: null,
       ...ts(),
     },
   ];
-
-  const events: ServiceStatusEvent[] = [
-    { id: 'ev-1', request_id: 'SVC-2851', status: 'solicitado', actor_id: CLIENT_ID, geo: null, note: null, created_at: old },
-    { id: 'ev-2', request_id: 'SVC-2851', status: 'aceptado', actor_id: TECH_USER_ID, geo: null, note: null, created_at: now() },
-    { id: 'ev-3', request_id: 'SVC-2851', status: 'en_camino', actor_id: TECH_USER_ID, geo: null, note: null, created_at: now() },
+  const quoteItems: ServiceQuoteItem[] = [
+    { id: 'qi-1', quote_id: 'q-2851', description: 'Cambio de llave angular dañada', quantity: 1, unit_cents: 18000, total_cents: 18000, ...ts() },
+    { id: 'qi-2', quote_id: 'q-2851', description: 'Reemplazo de cespol y sello', quantity: 1, unit_cents: 24000, total_cents: 24000, ...ts() },
   ];
 
-  const messages: Message[] = [
-    { id: 'm-1', request_id: 'SVC-2851', sender_id: TECH_USER_ID, content: '¡Hola! Ya acepté tu solicitud, voy en camino.', attachments: [], is_flagged: false, created_at: now() },
-    { id: 'm-2', request_id: 'SVC-2851', sender_id: CLIENT_ID, content: 'Perfecto, te espero. La fuga está en el baño principal.', attachments: [], is_flagged: false, created_at: now() },
-    { id: 'm-3', request_id: 'SVC-2851', sender_id: TECH_USER_ID, content: 'Entendido, llevo refacciones. Llego en 15 min.', attachments: [], is_flagged: false, created_at: now() },
+  const events: ServiceStatusEvent[] = [
+    { id: 'ev-1', service_order_id: 'SVC-2851', from_status: null, to_status: 'requested', actor_id: CLIENT_ID, note: null, created_at: mins(40), updated_at: mins(40) },
+    { id: 'ev-2', service_order_id: 'SVC-2851', from_status: 'requested', to_status: 'accepted', actor_id: TECH_USER_ID, note: null, created_at: mins(25), updated_at: mins(25) },
+    { id: 'ev-3', service_order_id: 'SVC-2851', from_status: 'accepted', to_status: 'enroute', actor_id: TECH_USER_ID, note: null, created_at: mins(12), updated_at: mins(12) },
   ];
 
   const payments: Payment[] = [
     {
       id: 'pay-2835',
-      request_id: 'SVC-2835',
-      method: 'tarjeta',
-      provider: 'stripe',
-      provider_payment_id: 'pi_demo_2835',
+      service_order_id: 'SVC-2835',
+      client_id: CLIENT_ID,
+      technician_id: TECH_USER_ID,
+      method: 'card',
       status: 'paid',
-      gross_amount: 1640,
-      platform_fee: 246,
-      technician_net: 1394,
+      amount_cents: 164000,
+      commission_cents: 24600,
+      currency: 'MXN',
+      mp_preference_id: 'pref_demo_2835',
+      mp_payment_id: 'mp_demo_2835',
+      mp_status: 'approved',
+      idempotency_key: null,
+      metadata: {},
       paid_at: old,
       created_at: old,
       updated_at: old,
     },
   ];
 
-  const ratings: Rating[] = [
-    { id: 'rt-1', request_id: 'SVC-2835', from_user_id: CLIENT_ID, to_user_id: TECH_USER_ID, stars: 5, comment: 'Excelente trabajo, muy puntual.', tags: ['Puntual', 'Profesional'], created_at: old },
+  // Signed amounts: positive = a favor del técnico, negative = cargo.
+  const led = (
+    id: string,
+    technician_id: string,
+    entry_type: LedgerEntry['entry_type'],
+    amount_cents: number,
+    description: string,
+    service_order_id: string | null = null,
+  ): LedgerEntry => ({
+    id,
+    technician_id,
+    service_order_id,
+    payment_id: null,
+    entry_type,
+    amount_cents,
+    currency: 'MXN',
+    description,
+    metadata: {},
+    created_at: old,
+    updated_at: old,
+  });
+  const ledger: LedgerEntry[] = [
+    led('led-1', TECH_USER_ID, 'adjustment', 139400, 'Neto SVC-2835 (tarjeta)', 'SVC-2835'),
+    led('led-2', TECH_USER_ID, 'commission_collected', -24600, 'Comisión plataforma SVC-2835', 'SVC-2835'),
+    led('led-3', 'u-ag', 'adjustment', 31800, 'Neto servicios de la semana'),
+    led('led-4', 'u-sc', 'adjustment', 22400, 'Neto servicios de la semana'),
   ];
 
-  const doc = (id: string, technician_id: string, doc_type: string): TechnicianDocument => ({
-    id, technician_id, doc_type, file_url: `demo://${id}`, status: 'pending', reviewed_by: null, reviewed_at: null, ...ts(),
+  const kyc = (id: string, technician_id: string, status: KycSession['status']): KycSession => ({
+    id,
+    technician_id,
+    didit_session_id: `didit-${id}`,
+    workflow_id: 'wf-demo',
+    vendor_data: technician_id,
+    status,
+    verification_url: 'https://verify.didit.me/session/demo',
+    session_token: null,
+    raw_decision: null,
+    last_webhook_at: null,
+    ...ts(),
   });
-  const documents: TechnicianDocument[] = [
-    doc('doc-1', 't-carla', 'INE · Anverso'),
-    doc('doc-2', 't-carla', 'Comprobante de domicilio'),
-    doc('doc-3', 't-ag', 'INE · Anverso'),
-    doc('doc-4', 't-miguel', 'INE · Anverso'),
-    doc('doc-5', 't-miguel', 'INE · Reverso'),
-    doc('doc-6', 't-miguel', 'Comprobante de domicilio (CFE, mayo 2026)'),
-    doc('doc-7', 't-fer', 'INE · Anverso'),
-    doc('doc-8', 't-fer', 'Certificación gas LP'),
-    doc('doc-9', 't-ivan', 'INE · Anverso'),
-    doc('doc-10', 't-ivan', 'Comprobante de domicilio'),
+  const kycSessions: KycSession[] = [
+    kyc('kyc-carla', 'u-carla', 'in_review'),
+    kyc('kyc-miguel', 'u-miguel', 'in_review'),
+    kyc('kyc-fer', 'u-fer', 'in_review'),
+    kyc('kyc-ivan', 'u-ivan', 'in_progress'),
+    kyc('kyc-roberto', 'u-roberto', 'declined'),
   ];
 
   const disputes: Dispute[] = [
-    { id: 'D-118', request_id: 'SVC-2835', opened_by: CLIENT_ID, type: 'cobro', status: 'open', assigned_admin: null, resolution: null, ...ts() },
-    { id: 'D-121', request_id: null, opened_by: 'u-carlos', type: 'cancelación', status: 'open', assigned_admin: null, resolution: null, ...ts() },
+    {
+      id: 'D-118',
+      service_order_id: 'SVC-2835',
+      opened_by: CLIENT_ID,
+      reason: 'Cobro no reconocido en el servicio de calentador.',
+      status: 'open',
+      resolution_notes: null,
+      resolved_by: null,
+      resolved_at: null,
+      ...ts(),
+    },
+    {
+      id: 'D-121',
+      service_order_id: 'SVC-2851',
+      opened_by: 'u-carlos',
+      reason: 'El técnico canceló de último momento.',
+      status: 'open',
+      resolution_notes: null,
+      resolved_by: null,
+      resolved_at: null,
+      ...ts(),
+    },
   ];
 
-  const wallets: TechnicianWallet[] = [
-    { id: 'w-ramon', technician_id: 't-ramon', balance: 4820, currency: 'MXN', ...ts() },
+  const messages: DemoMessage[] = [
+    { id: 'm-1', order_id: 'SVC-2851', sender_id: TECH_USER_ID, content: '¡Hola! Ya acepté tu solicitud, voy en camino.', created_at: mins(24) },
+    { id: 'm-2', order_id: 'SVC-2851', sender_id: CLIENT_ID, content: 'Perfecto, te espero. La fuga está en el baño principal.', created_at: mins(22) },
+    { id: 'm-3', order_id: 'SVC-2851', sender_id: TECH_USER_ID, content: 'Entendido, llevo refacciones. Llego en 15 min.', created_at: mins(20) },
   ];
-  const walletTxns: WalletTransaction[] = [
-    { id: 'wt-1', wallet_id: 'w-ramon', type: 'credit', amount: 1394, reference: 'SVC-2835', created_at: old },
+
+  const ratings: DemoRating[] = [
+    { id: 'rt-1', order_id: 'SVC-2835', from_id: CLIENT_ID, to_id: TECH_USER_ID, stars: 5, comment: 'Excelente trabajo, muy puntual.', tags: ['Puntual', 'Profesional'], created_at: old },
   ];
-  const payouts: Payout[] = [
-    { id: 'po-1', technician_id: 't-ramon', amount: 3000, status: 'processed', processed_at: old, batch_id: 'B-2026-05', clabe_snapshot: '012345678901234567', ...ts() },
-    { id: 'po-2', technician_id: 't-carla', amount: 5420, status: 'pending', processed_at: null, batch_id: null, clabe_snapshot: '012180001234567890', ...ts() },
-    { id: 'po-3', technician_id: 't-ag', amount: 3180, status: 'pending', processed_at: null, batch_id: null, clabe_snapshot: '044580009876543210', ...ts() },
-    { id: 'po-4', technician_id: 't-sc', amount: 2240, status: 'processing', processed_at: null, batch_id: 'B-2026-06', clabe_snapshot: '014320005566778899', ...ts() },
+
+  const payout = (id: string, technician_id: string, amount_cents: number, status: DemoPayout['status'], clabe: string, batch: string | null = null): DemoPayout => ({
+    id,
+    technician_id,
+    amount_cents,
+    status,
+    clabe_snapshot: clabe,
+    batch_id: batch,
+    processed_at: status === 'processed' ? old : null,
+    created_at: old,
+    updated_at: old,
+  });
+  const payouts: DemoPayout[] = [
+    payout('po-1', TECH_USER_ID, 300000, 'processed', '012345678901234567', 'B-2026-05'),
+    payout('po-2', 'u-carla', 542000, 'pending', '012180001234567890'),
+    payout('po-3', 'u-ag', 318000, 'pending', '044580009876543210'),
+    payout('po-4', 'u-sc', 224000, 'processing', '014320005566778899', 'B-2026-06'),
   ];
 
   const notes: Note[] = [
     { id: 'n-1', entity_id: 'SVC-2851', author: 'Sofía Admin', text: 'Servicio monitoreado. Sin incidencias reportadas hasta el momento.', created_at: now() },
     { id: 'n-2', entity_id: CLIENT_ID, author: 'Sofía Admin', text: 'Cliente recurrente y puntual con los pagos. Prefiere visitas por la mañana.', created_at: now() },
-    { id: 'n-3', entity_id: 't-miguel', author: 'Sofía Admin', text: 'Verifiqué dirección por WhatsApp. Vive en Las Juntas, confirmado. Doc CFE coincide.', created_at: old },
-    { id: 'n-4', entity_id: 't-miguel', author: 'Daniel Olvera', text: 'Llamada de bienvenida realizada. Habla claro, entiende el flujo. Le envié liga de tutorial.', created_at: old },
+    { id: 'n-3', entity_id: 'u-miguel', author: 'Sofía Admin', text: 'Verifiqué dirección por WhatsApp. Vive en Las Juntas, confirmado. Doc CFE coincide.', created_at: old },
+    { id: 'n-4', entity_id: 'u-miguel', author: 'Daniel Olvera', text: 'Llamada de bienvenida realizada. Habla claro, entiende el flujo. Le envié liga de tutorial.', created_at: old },
   ];
 
   const tmsg = (id: string, ticket_id: string, sender_id: string, content: string, created_at = now()): TicketMessage => ({
-    id, ticket_id, sender_id, content, attachments: [], is_flagged: false, created_at,
+    id, ticket_id, sender_id, content, created_at,
   });
   const tickets: Ticket[] = [
     {
       id: 'TK-501', subject: 'Cobro duplicado en mi tarjeta', requester_id: CLIENT_ID, role: 'cliente',
-      status: 'open', priority: 'alta', request_id: 'SVC-2835', created_at: old,
+      status: 'open', priority: 'alta', order_id: 'SVC-2835', created_at: old,
       messages: [
         tmsg('tm-1', 'TK-501', CLIENT_ID, 'Hola, me aparecen dos cargos por el servicio del calentador. ¿Me pueden ayudar?', old),
         tmsg('tm-2', 'TK-501', ADMIN_ID, 'Hola María, ya lo estamos revisando con el procesador de pagos. Te confirmo hoy mismo.', old),
@@ -414,7 +543,7 @@ function build(): World {
     },
     {
       id: 'TK-502', subject: 'No puedo actualizar mi CLABE', requester_id: TECH_USER_ID, role: 'tecnico',
-      status: 'pending', priority: 'media', request_id: null, created_at: old,
+      status: 'pending', priority: 'media', order_id: null, created_at: old,
       messages: [
         tmsg('tm-3', 'TK-502', TECH_USER_ID, 'La app me marca error al guardar mi nueva CLABE de BBVA.'),
         tmsg('tm-4', 'TK-502', ADMIN_ID, '¿Nos compartes una captura del error? Con eso lo escalamos a ingeniería.'),
@@ -422,12 +551,12 @@ function build(): World {
     },
     {
       id: 'TK-503', subject: 'El técnico llegó tarde a la cita', requester_id: 'u-carlos', role: 'cliente',
-      status: 'open', priority: 'baja', request_id: null, created_at: now(),
+      status: 'open', priority: 'baja', order_id: null, created_at: now(),
       messages: [tmsg('tm-5', 'TK-503', 'u-carlos', 'La cita era a las 10 y llegó 11:40. Quiero dejar constancia.')],
     },
     {
       id: 'TK-504', subject: '¿Cómo amplío mi zona de cobertura?', requester_id: 'u-ag', role: 'tecnico',
-      status: 'resolved', priority: 'baja', request_id: null, created_at: old,
+      status: 'resolved', priority: 'baja', order_id: null, created_at: old,
       messages: [
         tmsg('tm-6', 'TK-504', 'u-ag', 'Quiero cubrir también Tonalá, ¿dónde lo configuro?', old),
         tmsg('tm-7', 'TK-504', ADMIN_ID, 'Desde tu perfil > Cobertura puedes agregar zonas. Ya te habilité la opción. ¡Saludos!', old),
@@ -438,25 +567,48 @@ function build(): World {
   return {
     profiles,
     categories,
-    subcategories,
     technicians,
     technicianCategories,
-    coverage,
-    availability,
+    rates,
     addresses,
-    requests,
-    extras: [],
+    orders,
+    quotes,
+    quoteItems,
     events,
-    messages,
     payments,
-    ratings,
-    documents,
+    ledger,
+    kycSessions,
     disputes,
-    wallets,
-    walletTxns,
+    messages,
+    ratings,
     payouts,
     notes,
     tickets,
+  };
+}
+
+/** Empty world — the live data store starts here and fills it from Supabase. */
+export function emptyWorld(): World {
+  return {
+    profiles: [],
+    categories: [],
+    technicians: [],
+    technicianCategories: [],
+    rates: [],
+    addresses: [],
+    orders: [],
+    quotes: [],
+    quoteItems: [],
+    events: [],
+    payments: [],
+    ledger: [],
+    kycSessions: [],
+    disputes: [],
+    messages: [],
+    ratings: [],
+    payouts: [],
+    notes: [],
+    tickets: [],
   };
 }
 

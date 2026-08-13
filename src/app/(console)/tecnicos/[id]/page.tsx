@@ -13,10 +13,10 @@ import { Avatar, Badge, GhostButton, PrimaryButton, Textarea } from '@/component
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  useTick, getTechnician, getProfile, getTechCategories, getSubcategories,
-  getCategories, getDocuments, getNotes, resolveKyc, rejectKyc, resolveDocument,
+  useTick, getTechnician, getProfile, getTechRates,
+  getCategories, getKycSessions, getNotes, resolveKyc, rejectKyc,
   suspendTechnician, reactivateTechnician, addNote,
-} from '@/lib/demo/store';
+} from '@/lib/data/store';
 
 const initials = (name?: string | null) =>
   (name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -26,9 +26,14 @@ const fecha = (iso: string) =>
 const fmtClabe = (c?: string | null) => (c ? c.replace(/(\d{3})(\d{3})(\d{8})/, '$1 $2 •••• ') + c.slice(-4) : '—');
 
 const DOC_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'error' }> = {
+  not_started: { label: 'Sin iniciar', tone: 'warning' },
+  in_progress: { label: 'En curso', tone: 'warning' },
   pending: { label: 'Pendiente revisión', tone: 'warning' },
-  approved: { label: 'Aprobado', tone: 'success' },
-  rejected: { label: 'Rechazado', tone: 'error' },
+  in_review: { label: 'En revisión', tone: 'warning' },
+  approved: { label: 'Aprobada', tone: 'success' },
+  declined: { label: 'Rechazada', tone: 'error' },
+  abandoned: { label: 'Abandonada', tone: 'error' },
+  resubmitted: { label: 'Reenviada', tone: 'warning' },
 };
 
 const REJECT_REASONS = ['Documentos ilegibles', 'Información inconsistente', 'Documento expirado', 'Otro'];
@@ -40,7 +45,7 @@ export default function TecnicoDetailPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
 
   const tech = getTechnician(id);
-  const profile = tech ? getProfile(tech.user_id) : null;
+  const profile = tech ? getProfile(tech.id) : null;
 
   if (!tech || !profile) {
     return (
@@ -52,27 +57,28 @@ export default function TecnicoDetailPage() {
   }
 
   const name = profile.full_name ?? 'Técnico';
-  // ponytail: email/región no existen en el esquema demo — derivados presentacionales.
-  const email = `${name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 12)}@gmail.com`;
+  // ponytail: el email vive en auth.users, no en profiles — sin columna que mostrar.
+  const email = '—';
   const suspended = profile.status === 'suspended';
-  const kyc: 'approved' | 'pending_review' | 'rejected' | 'suspended' =
-    suspended ? 'suspended' : tech.kyc_status;
+  const kyc = suspended ? 'suspended' : tech.kyc_status;
 
-  const subs = getSubcategories();
   const cats = getCategories();
-  const rates = getTechCategories(tech.id).map(tc => {
-    const sub = subs.find(s => s.id === tc.subcategory_id);
-    const cat = cats.find(c => c.id === sub?.category_id);
-    return { id: tc.id, cat: cat?.name ?? '—', sub: sub?.name ?? '—', price: tc.base_price };
+  const rates = getTechRates(tech.id).map(r => {
+    const cat = cats.find(c => c.id === r.category_id);
+    return { id: r.id, cat: cat?.name ?? '—', sub: 'Tarifa de visita', price: r.visita_cents / 100 };
   });
-  const docs = getDocuments(tech.id);
-  const pendingDocs = docs.filter(d => d.status === 'pending');
+  const docs = getKycSessions(tech.id);
+  const pendingDocs = docs.filter(d => d.status === 'in_review' || d.status === 'in_progress');
   const notes = getNotes(tech.id);
 
-  const KYC_BADGE: Record<typeof kyc, { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }> = {
+  const KYC_BADGE: Record<string, { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }> = {
     approved: { label: 'KYC aprobado', tone: 'success' },
-    pending_review: { label: 'Pendiente de KYC', tone: 'warning' },
-    rejected: { label: 'KYC rechazado', tone: 'error' },
+    not_started: { label: 'KYC sin iniciar', tone: 'warning' },
+    pending: { label: 'Pendiente de KYC', tone: 'warning' },
+    in_review: { label: 'Pendiente de KYC', tone: 'warning' },
+    declined: { label: 'KYC rechazado', tone: 'error' },
+    abandoned: { label: 'KYC abandonado', tone: 'error' },
+    resubmitted: { label: 'KYC reenviado', tone: 'warning' },
     suspended: { label: 'Suspendido', tone: 'neutral' },
   };
 
@@ -95,8 +101,8 @@ export default function TecnicoDetailPage() {
     toast.success('Nota guardada');
   }
   function onApproveAllDocs() {
-    pendingDocs.forEach(d => resolveDocument(d.id, true));
-    toast.success(`${pendingDocs.length} documento(s) aprobados`);
+    resolveKyc(tech!.id, true);
+    toast.success('Verificación aprobada');
   }
 
   return (
@@ -129,7 +135,7 @@ export default function TecnicoDetailPage() {
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2.5">
-            {kyc === 'pending_review' && (
+            {kyc === 'in_review' && (
               <>
                 <button onClick={() => setRejectOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
                   <X size={14} /> Rechazar
@@ -139,7 +145,7 @@ export default function TecnicoDetailPage() {
                 </PrimaryButton>
               </>
             )}
-            {kyc === 'rejected' && (
+            {kyc === 'declined' && (
               <PrimaryButton onClick={onApprove}>
                 <span className="inline-flex items-center gap-2"><Check size={14} /> Aprobar KYC</span>
               </PrimaryButton>
@@ -169,7 +175,7 @@ export default function TecnicoDetailPage() {
                 <KV label="Email" value={email} />
                 <KV label="Fecha de registro" value={fecha(profile.created_at)} />
                 <KV label="Estado de cuenta" value={suspended ? 'Suspendida' : 'Activa'} />
-                <KV label="Trabajos completados" value={String(tech.total_jobs)} mono />
+                <KV label="Trabajos completados" value={String(tech.rating_count)} mono />
               </div>
             </Panel>
           </StaggerItem>
@@ -197,7 +203,7 @@ export default function TecnicoDetailPage() {
           <StaggerItem>
             <Panel title="Datos bancarios" action={<Landmark size={15} className="text-primary" />}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <KV label="CLABE interbancaria" value={fmtClabe(tech.payout_clabe)} mono span={2} />
+                <KV label="CLABE interbancaria" value={fmtClabe(tech.clabe)} mono span={2} />
                 <KV label="Banco detectado" value="BBVA México" />
                 <div>
                   <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Estado</div>
@@ -232,23 +238,23 @@ export default function TecnicoDetailPage() {
                   {docs.map(d => (
                     <div key={d.id} className="rounded-xl border border-line bg-surface p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-semibold leading-tight">{d.doc_type}</span>
+                        <span className="text-[13px] font-semibold leading-tight">Verificación Didit</span>
                         <Badge tone={DOC_STATUS[d.status].tone}>{DOC_STATUS[d.status].label}</Badge>
                       </div>
-                      <div className="my-2 font-mono text-[11px] text-faint">PDF · 2.1 MB · subido {fecha(d.created_at)}</div>
-                      {d.status === 'pending' && (
+                      <div className="my-2 font-mono text-[11px] text-faint">{d.didit_session_id} · iniciada {fecha(d.created_at)}</div>
+                      {(d.status === 'in_review' || d.status === 'in_progress') && (
                         <div className="flex gap-1.5">
                           <button
-                            onClick={() => { resolveDocument(d.id, true); toast.success('Documento aprobado'); }}
+                            onClick={() => { resolveKyc(tech!.id, true); toast.success('Verificación aprobada'); }}
                             className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"
                           >
-                            <Check size={12} /> Aprobar este doc
+                            <Check size={12} /> Aprobar verificación
                           </button>
                           <button
-                            onClick={() => { resolveDocument(d.id, false); toast.error('Documento rechazado'); }}
+                            onClick={() => { resolveKyc(tech!.id, false); toast.error('Verificación rechazada'); }}
                             className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-warning-ink"
                           >
-                            <X size={12} /> Marcar ilegible
+                            <X size={12} /> Rechazar
                           </button>
                         </div>
                       )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Layers, HardHat, Flame, Hexagon, Map as MapIcon } from 'lucide-react';
+import { toast } from './toast';
 
 /**
  * Mapa real de cobertura ZMG (Mapbox GL). Polígonos municipales aproximados
@@ -46,6 +47,9 @@ export const ZONE_POLYGONS: Record<string, [number, number][]> = {
 };
 
 const ZMG_CENTER: [number, number] = [-103.38, 20.63];
+
+// ponytail: ediciones de polígonos en localStorage; mover a backend cuando exista tabla de zonas.
+const POLYS_KEY = 'tumtto:zonas:poligonos';
 
 // Rampa de calor de marca — misma config de producción de la Lám. 08.
 const HEAT_PAINT = {
@@ -115,20 +119,48 @@ export function CoverageMap({
   selected,
   onSelect,
   height = 520,
+  editing = false,
+  onEditingChange,
 }: {
   zones: MapZone[];
   selected: string;
   onSelect: (id: string) => void;
   height?: number;
+  editing?: boolean;
+  onEditingChange?: (v: boolean) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   const selectedRef = useRef(selected);
+  const polysRef = useRef<Record<string, [number, number][]> | null>(null);
+  if (!polysRef.current) polysRef.current = structuredClone(ZONE_POLYGONS);
+  const backupRef = useRef<Record<string, [number, number][]>>({});
   const [ready, setReady] = useState(false);
   const [noToken, setNoToken] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ zonas: true, demanda: true, tecnicos: false });
   const [panelOpen, setPanelOpen] = useState(false);
+
+  const zonesGeojson = () => ({
+    type: 'FeatureCollection' as const,
+    features: zones.map(z => ({
+      type: 'Feature' as const,
+      id: z.id,
+      properties: { ...z, pct: Math.round((z.covered / z.colonias) * 100) },
+      geometry: { type: 'Polygon' as const, coordinates: [[...polysRef.current![z.id], polysRef.current![z.id][0]]] },
+    })),
+  });
+
+  function exitEdit(save: boolean) {
+    if (save) {
+      localStorage.setItem(POLYS_KEY, JSON.stringify(polysRef.current));
+      toast.success('Polígonos guardados');
+    } else {
+      polysRef.current = backupRef.current;
+      mapRef.current?.getSource('zonas')?.setData(zonesGeojson());
+    }
+    onEditingChange?.(false);
+  }
 
   /* init */
   useEffect(() => {
@@ -159,20 +191,9 @@ export function CoverageMap({
       const hoverPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 10, className: 'zmg-pop' });
 
       map.on('load', () => {
-        /* ── zonas ── */
-        map.addSource('zonas', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: zones.map(z => ({
-              type: 'Feature',
-              id: z.id,
-              properties: { ...z, pct: Math.round((z.covered / z.colonias) * 100) },
-              geometry: { type: 'Polygon', coordinates: [[...ZONE_POLYGONS[z.id], ZONE_POLYGONS[z.id][0]]] },
-            })),
-          },
-          promoteId: 'id',
-        });
+        /* ── zonas (con ediciones guardadas encima de los polígonos base) ── */
+        try { Object.assign(polysRef.current!, JSON.parse(localStorage.getItem(POLYS_KEY) ?? '{}')); } catch { /* JSON corrupto: usa base */ }
+        map.addSource('zonas', { type: 'geojson', data: zonesGeojson(), promoteId: 'id' });
         map.addLayer({
           id: 'zonas-fill', type: 'fill', source: 'zonas',
           paint: {
@@ -300,13 +321,69 @@ export function CoverageMap({
     if (prev !== selected) map.setFeatureState({ source: 'zonas', id: prev }, { selected: false });
     map.setFeatureState({ source: 'zonas', id: selected }, { selected: true });
     if (!flownOnce.current) { flownOnce.current = true; return; }
-    const poly = ZONE_POLYGONS[selected];
+    const poly = polysRef.current?.[selected];
     if (poly) {
       const lng = poly.reduce((s, p) => s + p[0], 0) / poly.length;
       const lat = poly.reduce((s, p) => s + p[1], 0) / poly.length;
       map.flyTo({ center: [lng, lat], zoom: 11.2, duration: 900, essential: false });
     }
   }, [selected, ready]);
+
+  /* modo edición: vértices arrastrables sobre los polígonos */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !editing) return;
+    backupRef.current = structuredClone(polysRef.current!);
+
+    const vertsData = () => ({
+      type: 'FeatureCollection',
+      features: Object.entries(polysRef.current!).flatMap(([zone, pts]) =>
+        pts.map((p, idx) => ({ type: 'Feature', properties: { zone, idx }, geometry: { type: 'Point', coordinates: p } }))),
+    });
+    map.addSource('verts', { type: 'geojson', data: vertsData() });
+    map.addLayer({
+      id: 'verts-pts', type: 'circle', source: 'verts',
+      paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#0A6BCF', 'circle-stroke-width': 2.5 },
+    });
+
+    let drag: { zone: string; idx: number } | null = null;
+    const onDown = (e: { features?: Array<{ properties?: { zone?: string; idx?: number } }>; preventDefault: () => void }) => {
+      const p = e.features?.[0]?.properties;
+      if (p?.zone === undefined || p.idx === undefined) return;
+      e.preventDefault(); // sin esto el mapa panea junto con el vértice
+      drag = { zone: p.zone, idx: p.idx };
+      map.getCanvas().style.cursor = 'grabbing';
+    };
+    const onMove = (e: { lngLat: { lng: number; lat: number } }) => {
+      if (!drag) return;
+      polysRef.current![drag.zone][drag.idx] = [e.lngLat.lng, e.lngLat.lat];
+      map.getSource('verts').setData(vertsData());
+      map.getSource('zonas').setData(zonesGeojson());
+    };
+    const onUp = () => { drag = null; map.getCanvas().style.cursor = ''; };
+    const onEnter = () => { if (!drag) map.getCanvas().style.cursor = 'move'; };
+    const onLeave = () => { if (!drag) map.getCanvas().style.cursor = ''; };
+    map.on('mousedown', 'verts-pts', onDown);
+    map.on('mousemove', onMove);
+    map.on('mouseup', onUp);
+    map.on('mouseenter', 'verts-pts', onEnter);
+    map.on('mouseleave', 'verts-pts', onLeave);
+
+    return () => {
+      // try: en unmount el mapa puede estar ya destruido por el cleanup del init
+      try {
+        map.off('mousedown', 'verts-pts', onDown);
+        map.off('mousemove', onMove);
+        map.off('mouseup', onUp);
+        map.off('mouseenter', 'verts-pts', onEnter);
+        map.off('mouseleave', 'verts-pts', onLeave);
+        if (map.getLayer('verts-pts')) map.removeLayer('verts-pts');
+        if (map.getSource('verts')) map.removeSource('verts');
+        map.getCanvas().style.cursor = '';
+      } catch { /* mapa destruido */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, ready]);
 
   /* toggles de capas */
   useEffect(() => {
@@ -336,6 +413,15 @@ export function CoverageMap({
     <div style={{ height }} className="relative w-full overflow-hidden rounded-xl border border-line">
       {/* Mapbox impone position:relative en el contenedor — dimensiona con h-full, no con inset. */}
       <div ref={host} className="h-full w-full" />
+
+      {/* barra de edición de polígonos */}
+      {editing && (
+        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-white/95 py-1.5 pl-4 pr-1.5 shadow-hover backdrop-blur">
+          <span className="text-[12.5px] font-medium text-navy">Arrastra los vértices para ajustar las zonas</span>
+          <button onClick={() => exitEdit(false)} className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-surface">Cancelar</button>
+          <button onClick={() => exitEdit(true)} className="rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-2">Guardar</button>
+        </div>
+      )}
 
       {/* capas: pill que abre/cierra el panel */}
       <div className="absolute right-3 top-3 flex flex-col items-end">

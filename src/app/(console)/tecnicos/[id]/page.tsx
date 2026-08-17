@@ -16,6 +16,7 @@ import {
   useTick, getTechnician, getProfile, getTechRates,
   getCategories, getKycSessions, getNotes, resolveKyc, rejectKyc,
   suspendTechnician, reactivateTechnician, addNote,
+  upsertTechRate, updateTechnicianBank,
 } from '@/lib/data/store';
 
 const initials = (name?: string | null) =>
@@ -63,10 +64,10 @@ export default function TecnicoDetailPage() {
   const kyc = suspended ? 'suspended' : tech.kyc_status;
 
   const cats = getCategories();
-  const rates = getTechRates(tech.id).map(r => {
-    const cat = cats.find(c => c.id === r.category_id);
-    return { id: r.id, cat: cat?.name ?? '—', sub: 'Tarifa de visita', price: r.visita_cents / 100 };
-  });
+  const rates = getTechRates(tech.id).map(r => ({
+    ...r,
+    cat: cats.find(c => c.id === r.category_id)?.name ?? '—',
+  }));
   const docs = getKycSessions(tech.id);
   const pendingDocs = docs.filter(d => d.status === 'in_review' || d.status === 'in_progress');
   const notes = getNotes(tech.id);
@@ -190,9 +191,28 @@ export default function TecnicoDetailPage() {
                     <div key={r.id} className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0">
                       <div className="flex items-center gap-2.5">
                         <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-navy">{r.cat}</span>
-                        <span className="text-[13px]">{r.sub}</span>
+                        <span className="text-[13px]">Tarifa de visita</span>
                       </div>
-                      <span className="font-display text-[13.5px] font-semibold">{peso(r.price)}</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[13px] text-muted">$</span>
+                        <input
+                          key={r.visita_cents}
+                          type="number"
+                          min={0}
+                          defaultValue={r.visita_cents / 100}
+                          aria-label={`Tarifa de visita · ${r.cat}`}
+                          onBlur={e => {
+                            const cents = Math.round(Number(e.target.value) * 100);
+                            if (!Number.isFinite(cents) || cents < 0 || cents === r.visita_cents) return;
+                            void upsertTechRate(tech!.id, r.category_id, {
+                              visita_cents: cents, hora_cents: r.hora_cents, minimo_cents: r.minimo_cents,
+                            }).then(ok => ok && toast.success(`Tarifa actualizada · ${r.cat}`));
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-right font-display text-[13.5px] font-semibold text-navy outline-none focus:border-primary"
+                        />
+                        <span className="text-[12px] text-muted">MXN</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -201,18 +221,7 @@ export default function TecnicoDetailPage() {
           </StaggerItem>
 
           <StaggerItem>
-            <Panel title="Datos bancarios" action={<Landmark size={15} className="text-primary" />}>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <KV label="CLABE interbancaria" value={fmtClabe(tech.clabe)} mono span={2} />
-                <KV label="Banco detectado" value="BBVA México" />
-                <div>
-                  <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Estado</div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
-                    <BadgeCheck size={11} /> Validada con SPEI prueba
-                  </span>
-                </div>
-              </div>
-            </Panel>
+            <BankPanel tech={tech} />
           </StaggerItem>
 
           {tech.bio && (
@@ -382,6 +391,74 @@ function RejectModal({ open, onClose, onConfirm, techName, email }: {
         </div>
       </div>
     </Modal>
+  );
+}
+
+function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician>> }) {
+  const [editing, setEditing] = useState(false);
+  const [clabe, setClabe] = useState(tech.clabe ?? '');
+  const [bank, setBank] = useState(tech.bank_name ?? '');
+
+  function onSave() {
+    if (clabe && !/^\d{18}$/.test(clabe)) { toast.error('La CLABE debe tener 18 dígitos'); return; }
+    void updateTechnicianBank(tech.id, bank.trim() || null, clabe || null)
+      .then(ok => { if (ok) { toast.success('Datos bancarios guardados'); setEditing(false); } });
+  }
+
+  return (
+    <Panel
+      title="Datos bancarios"
+      action={
+        editing ? (
+          <div className="flex gap-1.5">
+            <GhostButton onClick={() => { setClabe(tech.clabe ?? ''); setBank(tech.bank_name ?? ''); setEditing(false); }}>Cancelar</GhostButton>
+            <PrimaryButton onClick={onSave}>Guardar</PrimaryButton>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} aria-label="Editar datos bancarios" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-2">
+            <Landmark size={15} /> Editar
+          </button>
+        )
+      }
+    >
+      {editing ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">CLABE interbancaria</div>
+            <input
+              value={clabe}
+              onChange={e => setClabe(e.target.value.replace(/\D/g, '').slice(0, 18))}
+              placeholder="18 dígitos"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-[13.5px] text-navy outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Banco</div>
+            <input
+              value={bank}
+              onChange={e => setBank(e.target.value)}
+              placeholder="Nombre del banco"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] text-navy outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <KV label="CLABE interbancaria" value={fmtClabe(tech.clabe)} mono span={2} />
+          <KV label="Banco" value={tech.bank_name ?? '—'} />
+          <div>
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Estado</div>
+            {tech.clabe ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
+                <BadgeCheck size={11} /> CLABE registrada
+              </span>
+            ) : (
+              <span className="text-[13px] text-faint">Sin CLABE registrada</span>
+            )}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 

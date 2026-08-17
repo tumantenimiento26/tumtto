@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Download, Filter, ShieldAlert, Star, MapPin, UserPlus, Users } from 'lucide-react';
+import { Search, Download, Filter, ShieldAlert, Star, MapPin, UserPlus, Users, X } from 'lucide-react';
 import { PageHeading, Panel, StatCard, DataTable, exportCsv } from '@/components/admin';
+import { Popover } from '@/components/admin-shell';
 import type { Column } from '@/components/admin';
 import { GhostButton, Input, Chip, Avatar, Badge, Skeleton } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
@@ -39,6 +40,10 @@ const fmt = (n: number) => n.toLocaleString('es-MX');
 
 const FILTERS = ['Todos', 'Activos', 'Nuevos', 'Inactivos', 'Con disputas'] as const;
 
+// ponytail: vistas guardadas en localStorage; mover a backend si deben compartirse entre admins.
+type SavedView = { name: string; query: string; filter: (typeof FILTERS)[number] };
+const VIEWS_KEY = 'tumtto:clientes:vistas';
+
 const DAY_MS = 24 * 3600 * 1000;
 const relDays = (iso: string | null) => {
   if (!iso) return '—';
@@ -69,6 +74,19 @@ export default function ClientesPage() {
   const ready = useWorldReady();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Todos');
+  const [viewsOpen, setViewsOpen] = useState(false);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [viewName, setViewName] = useState('');
+  useEffect(() => {
+    try { setViews(JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '[]') as SavedView[]); } catch { /* JSON corrupto: empieza vacío */ }
+  }, []);
+  function persistViews(v: SavedView[]) { setViews(v); localStorage.setItem(VIEWS_KEY, JSON.stringify(v)); }
+  function saveCurrentView() {
+    const name = viewName.trim() || `${filter}${query ? ` · “${query}”` : ''}`;
+    persistViews([...views.filter(v => v.name !== name), { name, query, filter }]);
+    setViewName('');
+    toast.success(`Vista guardada · ${name}`);
+  }
 
   const rows = useMemo<ClientRow[]>(() => {
     const reqs = getAllRequests();
@@ -191,9 +209,36 @@ export default function ClientesPage() {
         sub="Base de usuarios finales de la plataforma · ZMG"
         actions={
           <div className="flex gap-2.5">
-            <GhostButton>
-              <span className="inline-flex items-center gap-2"><Filter size={14} /> Vistas guardadas</span>
-            </GhostButton>
+            <div className="relative">
+              <GhostButton onClick={() => setViewsOpen(o => !o)}>
+                <span className="inline-flex items-center gap-2"><Filter size={14} /> Vistas guardadas{views.length > 0 ? ` (${views.length})` : ''}</span>
+              </GhostButton>
+              {viewsOpen && (
+                <Popover onClose={() => setViewsOpen(false)} className="w-72">
+                  {views.length === 0 && <div className="px-3 py-2.5 text-[13px] text-muted">Sin vistas guardadas. Ajusta filtros y guarda la vista actual.</div>}
+                  {views.map(v => (
+                    <div key={v.name} className="flex items-center rounded-lg hover:bg-surface">
+                      <button onClick={() => { setQuery(v.query); setFilter(v.filter); setViewsOpen(false); }} className="min-w-0 flex-1 px-3 py-2.5 text-left">
+                        <div className="truncate text-[13px] font-medium text-navy">{v.name}</div>
+                        <div className="text-[11px] text-muted">{v.filter}{v.query ? ` · “${v.query}”` : ''}</div>
+                      </button>
+                      <button aria-label={`Eliminar vista ${v.name}`} onClick={() => persistViews(views.filter(x => x.name !== v.name))} className="mr-1.5 rounded-md p-1.5 text-faint hover:text-error">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center gap-2 border-t border-line px-2 pb-1 pt-2">
+                    <input
+                      value={viewName} onChange={e => setViewName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveCurrentView()}
+                      placeholder="Nombre de la vista…"
+                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] text-navy outline-none placeholder:text-faint"
+                    />
+                    <button onClick={saveCurrentView} className="flex-shrink-0 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-white">Guardar</button>
+                  </div>
+                </Popover>
+              )}
+            </div>
             <GhostButton onClick={onExport}>
               <span className="inline-flex items-center gap-2 text-cyan"><Download size={14} /> Exportar CSV</span>
             </GhostButton>

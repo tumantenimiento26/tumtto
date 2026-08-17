@@ -34,6 +34,7 @@ export default function RegionesPage() {
   useTick();
   const techs = getTechniciansWithProfile();
   const [selected, setSelected] = useState<string>('zap');
+  const [editingPolys, setEditingPolys] = useState(false);
 
   const totalColonias = ZONES.reduce((s, z) => s + z.colonias, 0);
   const totalCovered = ZONES.reduce((s, z) => s + z.covered, 0);
@@ -100,8 +101,12 @@ export default function RegionesPage() {
           <Panel
             title="Mapa de cobertura · ZMG"
             action={
-              <button className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-card hover:bg-primary-2">
-                <Pencil size={13} /> Editar polígonos
+              <button
+                onClick={() => setEditingPolys(true)}
+                disabled={editingPolys}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-card hover:bg-primary-2 disabled:opacity-50"
+              >
+                <Pencil size={13} /> {editingPolys ? 'Editando…' : 'Editar polígonos'}
               </button>
             }
           >
@@ -109,6 +114,8 @@ export default function RegionesPage() {
               zones={ZONES.map(({ id, name, status, techs, covered, colonias }) => ({ id, name, status, techs, covered, colonias }))}
               selected={selected}
               onSelect={setSelected}
+              editing={editingPolys}
+              onEditingChange={setEditingPolys}
             />
           </Panel>
         </FadeIn>

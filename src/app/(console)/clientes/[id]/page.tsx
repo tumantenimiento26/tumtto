@@ -7,18 +7,18 @@ import {
   ArrowLeft, Phone, Mail, Calendar, Activity, MapPin, MessageSquare, Ban,
   Award, ContactRound, BarChart3, CreditCard, Store, RotateCcw,
   Wallet, Home, Briefcase, Heart, BadgeCheck, ThumbsUp, ShieldAlert,
-  LayoutDashboard, Wrench, Send,
+  LayoutDashboard, Wrench, Send, Plus, Pencil, Trash2,
 } from 'lucide-react';
 import {
   Panel, StatCard, StatusPill, DataTable, Modal, type Column,
 } from '@/components/admin';
-import { Avatar, Stars, Badge, GhostButton, PrimaryButton, EmptyState, Field, Input, Textarea } from '@/components/ui';
+import { Avatar, Stars, Badge, GhostButton, PrimaryButton, EmptyState, Field, Input, Textarea, Toggle } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion, ProgressBar } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
   useTick, getProfile, getClientRequests, getAddresses, getCategories,
   getRating, getPayment, getAllDisputes, getNotes,
-  suspendUser, reactivateUser, addNote, createTicket,
+  suspendUser, reactivateUser, addNote, createTicket, saveAddress, deleteAddress,
 } from '@/lib/data/store';
 import type { ServiceRequest, Payment } from '@/lib/demo/world';
 
@@ -72,6 +72,8 @@ export default function ClientDetailPage() {
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [addrModal, setAddrModal] = useState<{ open: boolean; addr: AddressRow | null }>({ open: false, addr: null });
+  const [addrDeleting, setAddrDeleting] = useState<string | null>(null);
 
   const profile = getProfile(id);
   const requests = getClientRequests(id);
@@ -149,7 +151,17 @@ export default function ClientDetailPage() {
   );
 
   const addressCards = (
-    <Panel title="Direcciones guardadas" action={<span className="text-[12px] text-faint">{addresses.length} direcciones</span>}>
+    <Panel
+      title="Direcciones guardadas"
+      action={
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-faint">{addresses.length} direcciones</span>
+          <GhostButton onClick={() => setAddrModal({ open: true, addr: null })}>
+            <span className="inline-flex items-center gap-1.5"><Plus size={13} /> Agregar</span>
+          </GhostButton>
+        </div>
+      }
+    >
       <div className="flex flex-col gap-2.5">
         {addresses.map(a => {
           const PinIcon = a.label === 'Casa' ? Home : a.label === 'Oficina' ? Briefcase : Heart;
@@ -165,6 +177,23 @@ export default function ClientDetailPage() {
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-navy">{a.address_line}</div>
                 <div className="text-[12px] text-muted">{a.neighborhood}, {a.municipality}, {a.state} · {a.postal_code}</div>
+              </div>
+              <div className="flex flex-shrink-0 items-start gap-1">
+                <button aria-label="Editar dirección" onClick={() => setAddrModal({ open: true, addr: a })} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-primary">
+                  <Pencil size={14} />
+                </button>
+                {addrDeleting === a.id ? (
+                  <button
+                    onClick={() => { setAddrDeleting(null); void deleteAddress(a.id).then(ok => ok && toast.success('Dirección eliminada')); }}
+                    className="rounded-lg bg-error px-2 py-1 text-[11.5px] font-semibold text-white"
+                  >
+                    Confirmar
+                  </button>
+                ) : (
+                  <button aria-label="Eliminar dirección" onClick={() => setAddrDeleting(a.id)} className="rounded-lg p-1.5 text-muted hover:bg-error-soft hover:text-error">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -460,7 +489,88 @@ export default function ClientDetailPage() {
         clientId={id}
         clientName={name}
       />
+
+      <AddressModal
+        key={addrModal.addr?.id ?? 'new'}
+        open={addrModal.open}
+        onClose={() => setAddrModal({ open: false, addr: null })}
+        clientId={id}
+        addr={addrModal.addr}
+      />
     </div>
+  );
+}
+
+type AddressRow = ReturnType<typeof getAddresses>[number];
+
+function AddressModal({ open, onClose, clientId, addr }: {
+  open: boolean; onClose: () => void; clientId: string; addr: AddressRow | null;
+}) {
+  const [f, setF] = useState({
+    label: addr?.label ?? 'Casa',
+    address_line: addr?.address_line ?? '',
+    neighborhood: addr?.neighborhood ?? '',
+    municipality: addr?.municipality ?? 'Guadalajara',
+    state: addr?.state ?? 'Jalisco',
+    postal_code: addr?.postal_code ?? '',
+    is_default: addr?.is_default ?? false,
+  });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+
+  function submit() {
+    if (!f.address_line.trim()) return;
+    void saveAddress(clientId, { ...f, address_line: f.address_line.trim() }, addr?.id)
+      .then(ok => { if (ok) { toast.success(addr ? 'Dirección actualizada' : 'Dirección agregada'); onClose(); } });
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={addr ? 'Editar dirección' : 'Agregar dirección'}
+      icon={<MapPin size={15} />}
+      width={520}
+      footer={
+        <>
+          <GhostButton onClick={onClose}>Cancelar</GhostButton>
+          <PrimaryButton onClick={submit} disabled={!f.address_line.trim()}>
+            {addr ? 'Guardar cambios' : 'Agregar dirección'}
+          </PrimaryButton>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Etiqueta">
+            <Input value={f.label ?? ''} onChange={set('label')} placeholder="Casa, Oficina…" />
+          </Field>
+          <Field label="Código postal">
+            <Input value={f.postal_code ?? ''} onChange={set('postal_code')} placeholder="44100" />
+          </Field>
+        </div>
+        <Field label="Calle y número">
+          <Input value={f.address_line} onChange={set('address_line')} placeholder="Av. México 1234, int. 5" />
+        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label="Colonia">
+            <Input value={f.neighborhood ?? ''} onChange={set('neighborhood')} />
+          </Field>
+          <Field label="Municipio">
+            <Input value={f.municipality ?? ''} onChange={set('municipality')} />
+          </Field>
+          <Field label="Estado">
+            <Input value={f.state ?? ''} onChange={set('state')} />
+          </Field>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
+          <div>
+            <div className="text-[13px] font-semibold text-navy">Dirección principal</div>
+            <div className="text-[11.5px] text-muted">Se usa por defecto al crear servicios.</div>
+          </div>
+          <Toggle on={!!f.is_default} onChange={v => setF({ ...f, is_default: v })} />
+        </div>
+      </div>
+    </Modal>
   );
 }
 

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { TrendingUp, TrendingDown, ArrowUpRight, X, type LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, ProgressBar } from './motion';
+import { toast } from './toast';
 import { Sparkline } from './charts';
 import type { RequestStatus } from '@/lib/demo/world';
 
@@ -196,7 +197,7 @@ export function Modal({ open, onClose, title, sub, icon, children, footer, width
 
 // ── CSV export (client-side blob download) ───────────────────────────────────
 export function exportCsv(filename: string, rows: Record<string, string | number | null | undefined>[]) {
-  if (rows.length === 0) return;
+  if (rows.length === 0) { toast.error('Nada que exportar con los filtros actuales'); return; }
   const headers = Object.keys(rows[0]);
   const esc = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const csv = [headers.join(','), ...rows.map(r => headers.map(h => esc(r[h])).join(','))].join('\n');

@@ -5,11 +5,12 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Wrench, FolderTree, Map, Wallet, LifeBuoy,
   BarChart3, Settings, ChevronRight, ChevronDown, LogOut, Search, HelpCircle, Bell, Menu, X,
+  ShieldAlert, Scale,
   type LucideIcon,
 } from 'lucide-react';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
-import { getOpenSupportCount, loadWorld, setErrorNotifier, useTick } from '@/lib/data/store';
+import { getDisputes, getOpenSupportCount, getPendingKyc, getTickets, loadWorld, setErrorNotifier, useTick } from '@/lib/data/store';
 import { useAuth } from '@/lib/auth';
 import { toast } from './toast';
 
@@ -117,11 +118,32 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   );
 }
 
+/** Cierra al hacer click fuera vía scrim invisible; sin listeners globales. */
+export function Popover({ onClose, children, className = '' }: { onClose: () => void; children: React.ReactNode; className?: string }) {
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 z-40" />
+      <div className={`absolute right-0 top-full z-50 mt-2 rounded-xl border border-line bg-white p-1.5 shadow-overlay ${className}`}>{children}</div>
+    </>
+  );
+}
+
 function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { session, signOut } = useAuth();
   const USER = useAdminUser();
+  const [menu, setMenu] = useState<'notif' | 'user' | null>(null);
+  useTick();
   const base = '/' + (pathname.split('/')[1] ?? '');
   const crumbs = CRUMB[base] ?? CRUMB[pathname] ?? ['Inicio'];
+
+  const notifs = [
+    { icon: LifeBuoy, label: 'Tickets sin resolver', count: getTickets().filter(t => t.status !== 'resolved').length, href: '/soporte' },
+    { icon: Scale, label: 'Disputas abiertas', count: getDisputes().filter(d => d.status === 'open' || d.status === 'in_review').length, href: '/soporte' },
+    { icon: ShieldAlert, label: 'KYC pendiente de revisión', count: getPendingKyc().length, href: '/tecnicos' },
+  ].filter(n => n.count > 0);
+  const notifCount = notifs.reduce((s, n) => s + n.count, 0);
   return (
     <header className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-line bg-white px-4 md:gap-6 md:px-7">
       <button onClick={onMenu} aria-label="Abrir menú" className="-ml-1 grid flex-shrink-0 place-items-center rounded-[10px] border border-line p-2 hover:bg-surface lg:hidden">
@@ -144,17 +166,61 @@ function Header({ onMenu }: { onMenu: () => void }) {
       <div className="ml-auto flex flex-shrink-0 items-center gap-2.5">
         <button aria-label="Buscar" className="grid place-items-center rounded-[10px] border border-line p-2 hover:bg-surface md:hidden"><Search size={18} className="text-muted" /></button>
         <button aria-label="Ayuda" className="hidden place-items-center rounded-[10px] border border-line p-2 hover:bg-surface sm:grid"><HelpCircle size={18} className="text-muted" /></button>
-        <button aria-label="Notificaciones" className="relative grid place-items-center rounded-[10px] border border-line p-2 hover:bg-surface">
-          <Bell size={18} className="text-muted" />
-          <span className="absolute -right-1 -top-1 rounded-full border-2 border-white bg-error px-[5px] text-[10px] font-bold text-white">3</span>
-        </button>
-        <div className="flex cursor-pointer items-center gap-2.5 rounded-full border border-line bg-white p-1 xl:pr-3">
-          <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-primary/[0.12] text-[12px] font-semibold text-primary">{USER.initials}</span>
-          <div className="hidden leading-tight xl:block">
-            <div className="text-[13px] font-semibold text-navy">{USER.name}</div>
-            <div className="text-[11px] text-muted">{USER.role}</div>
-          </div>
-          <ChevronDown size={14} className="hidden text-faint xl:block" />
+        <div className="relative">
+          <button
+            aria-label="Notificaciones" aria-expanded={menu === 'notif'}
+            onClick={() => setMenu(m => m === 'notif' ? null : 'notif')}
+            className="relative grid place-items-center rounded-[10px] border border-line p-2 hover:bg-surface"
+          >
+            <Bell size={18} className="text-muted" />
+            {notifCount > 0 && <span className="absolute -right-1 -top-1 rounded-full border-2 border-white bg-error px-[5px] text-[10px] font-bold text-white">{notifCount}</span>}
+          </button>
+          {menu === 'notif' && (
+            <Popover onClose={() => setMenu(null)} className="w-72">
+              <div className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Notificaciones</div>
+              {notifs.length === 0 && <div className="px-3 pb-2.5 pt-1 text-[13px] text-muted">Sin pendientes. Todo en orden.</div>}
+              {notifs.map(n => (
+                <Link key={n.label} href={n.href} onClick={() => setMenu(null)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface">
+                  <n.icon size={16} className="flex-shrink-0 text-muted" />
+                  <span className="flex-1 text-[13px] text-navy">{n.label}</span>
+                  <span className="rounded-full bg-error/[0.12] px-2 py-px text-[11.5px] font-semibold text-error">{n.count}</span>
+                </Link>
+              ))}
+            </Popover>
+          )}
+        </div>
+        <div className="relative">
+          <button
+            aria-label="Menú de usuario" aria-expanded={menu === 'user'}
+            onClick={() => setMenu(m => m === 'user' ? null : 'user')}
+            className="flex items-center gap-2.5 rounded-full border border-line bg-white p-1 hover:bg-surface xl:pr-3"
+          >
+            <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-primary/[0.12] text-[12px] font-semibold text-primary">{USER.initials}</span>
+            <div className="hidden text-left leading-tight xl:block">
+              <div className="text-[13px] font-semibold text-navy">{USER.name}</div>
+              <div className="text-[11px] text-muted">{USER.role}</div>
+            </div>
+            <ChevronDown size={14} className={`hidden text-faint transition-transform xl:block ${menu === 'user' ? 'rotate-180' : ''}`} />
+          </button>
+          {menu === 'user' && (
+            <Popover onClose={() => setMenu(null)} className="w-60">
+              <div className="border-b border-line px-3 pb-2.5 pt-2">
+                <div className="text-[13px] font-semibold text-navy">{USER.name}</div>
+                <div className="truncate text-[12px] text-muted">{session?.user.email ?? USER.role}</div>
+              </div>
+              <Link href="/config" onClick={() => setMenu(null)} className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface">
+                <Settings size={16} className="text-muted" />
+                <span className="text-[13px] text-navy">Configuración</span>
+              </Link>
+              <button
+                onClick={() => void signOut().then(() => router.replace('/login'))}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-error/[0.06]"
+              >
+                <LogOut size={16} className="text-error" />
+                <span className="text-[13px] font-medium text-error">Cerrar sesión</span>
+              </button>
+            </Popover>
+          )}
         </div>
       </div>
     </header>

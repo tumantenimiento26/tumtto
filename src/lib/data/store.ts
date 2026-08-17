@@ -132,12 +132,24 @@ export function getSettingInt(key: string, fallback: number): number {
   const v = settings.find(s => s.key === key)?.value;
   return typeof v === 'number' ? v : fallback;
 }
-export async function saveSettingInt(key: string, value: number) {
+export function getSettingBool(key: string, fallback: boolean): boolean {
+  const v = settings.find(s => s.key === key)?.value;
+  return typeof v === 'boolean' ? v : fallback;
+}
+export function getSettingStr(key: string, fallback: string): string {
+  const v = settings.find(s => s.key === key)?.value;
+  return typeof v === 'string' ? v : fallback;
+}
+/** Guarda un lote de settings en una sola llamada (upsert: crea la key si no existe). */
+export async function saveSettings(entries: Record<string, number | string | boolean>) {
   return mutate(async () => {
-    const { error } = await supabase.from('platform_settings').update({ value }).eq('key', key);
+    const rows = Object.entries(entries).map(([key, value]) => ({ key, value }));
+    const { error } = await supabase.from('platform_settings').upsert(rows, { onConflict: 'key' });
     if (error) throw error;
+    return true;
   }, 'No se pudo guardar la configuración.');
 }
+export const saveSettingInt = (key: string, value: number) => saveSettings({ [key]: value });
 
 // ── Read selectors (unchanged API — they read the live snapshot) ─────────────
 export const getCategories = () => w().categories;
@@ -223,6 +235,14 @@ export function getMetrics() {
 
 // ── Mutators (write through to Supabase, then reload the snapshot) ───────────
 
+// PostGIS geography: los SELECT devuelven WKB hex (string, pasa tal cual al
+// insertar); un literal GeoJSON NO es aceptado — se convierte a EWKT.
+function toGeography(loc: unknown): string {
+  if (typeof loc === 'string') return loc;
+  const c = (loc as { coordinates?: [number, number] } | null)?.coordinates;
+  return `SRID=4326;POINT(${c?.[0] ?? -103.3773} ${c?.[1] ?? 20.7062})`;
+}
+
 export async function createRequest(
   input: Partial<OrderInsert> & { client_id: string; category_id: string },
 ): Promise<ServiceOrder | null> {
@@ -239,7 +259,7 @@ export async function createRequest(
       is_urgent: input.is_urgent ?? false,
       urgent_surcharge_bps: input.is_urgent ? getSettingInt('urgent_surcharge_bps', 2000) : 0,
       commission_bps: getSettingInt('commission_bps', 1500),
-      location: addr?.location ?? input.location ?? { type: 'Point', coordinates: [-103.3773, 20.7062] },
+      location: toGeography(addr?.location ?? input.location),
       place_name: addr?.place_name ?? null,
       address_line: addr?.address_line ?? input.address_line ?? null,
       neighborhood: addr?.neighborhood ?? null,
@@ -354,6 +374,57 @@ export async function reactivateUser(userId: string) {
       .update({ status: 'active' }).eq('id', userId);
     if (error) throw error;
   }, 'No se pudo reactivar al usuario.');
+}
+
+export async function upsertTechRate(
+  techId: string,
+  categoryId: string,
+  cents: { visita_cents: number; hora_cents: number; minimo_cents: number },
+) {
+  return mutate(async () => {
+    const { error } = await supabase.from('technician_rates')
+      .upsert({ technician_id: techId, category_id: categoryId, ...cents }, { onConflict: 'technician_id,category_id' });
+    if (error) throw error;
+    return true;
+  }, 'No se pudo guardar la tarifa.');
+}
+
+export async function updateTechnicianBank(techId: string, bank_name: string | null, clabe: string | null) {
+  return mutate(async () => {
+    const { error } = await supabase.from('technicians').update({ bank_name, clabe }).eq('id', techId);
+    if (error) throw error;
+    return true;
+  }, 'No se pudieron guardar los datos bancarios.');
+}
+
+// ── Direcciones del cliente ──────────────────────────────────────────────────
+type AddressFields = Pick<
+  Database['public']['Tables']['client_addresses']['Insert'],
+  'label' | 'address_line' | 'neighborhood' | 'municipality' | 'state' | 'postal_code' | 'is_default'
+>;
+
+/** Crea (sin addressId) o actualiza una dirección; si es principal, desmarca las demás. */
+export async function saveAddress(clientId: string, fields: AddressFields, addressId?: string) {
+  return mutate(async () => {
+    if (fields.is_default) {
+      const { error } = await supabase.from('client_addresses')
+        .update({ is_default: false }).eq('client_id', clientId).eq('is_default', true);
+      if (error) throw error;
+    }
+    const q = addressId
+      ? await supabase.from('client_addresses').update(fields).eq('id', addressId)
+      : await supabase.from('client_addresses').insert({ ...fields, client_id: clientId, location: toGeography(null) });
+    if (q.error) throw q.error;
+    return true;
+  }, 'No se pudo guardar la dirección.');
+}
+
+export async function deleteAddress(addressId: string) {
+  return mutate(async () => {
+    const { error } = await supabase.from('client_addresses').delete().eq('id', addressId);
+    if (error) throw error;
+    return true;
+  }, 'No se pudo eliminar la dirección (puede estar ligada a un servicio).');
 }
 
 // ── Catálogo (una sola capa: service_categories) ─────────────────────────────

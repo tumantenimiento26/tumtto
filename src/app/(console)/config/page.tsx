@@ -7,10 +7,13 @@ import {
   Users, Info, ArrowRight, History, AlarmClock, UserX, HardHat, UserMinus,
   TrendingUp, AlertTriangle, FolderTree, ArrowDownToLine, Check, type LucideIcon,
 } from 'lucide-react';
-import { PageHeading, Panel } from '@/components/admin';
+import { PageHeading, Panel, exportCsv } from '@/components/admin';
 import { PrimaryButton, GhostButton, Input, Toggle, Badge } from '@/components/ui';
 import { FadeIn, motion, AnimatePresence } from '@/components/motion';
-import { useTick, useWorldReady, getCategoriesWithCounts, getMetrics, getSettingInt, saveSettingInt } from '@/lib/data/store';
+import {
+  useTick, useWorldReady, getCategoriesWithCounts, getMetrics,
+  getSettingInt, getSettingBool, getSettingStr, saveSettings, toggleCategory,
+} from '@/lib/data/store';
 import { toast } from '@/components/toast';
 
 const peso = (n: number) => `$${n.toLocaleString('es-MX')}`;
@@ -36,6 +39,11 @@ const AUDIT = [
   { author: 'Javier Olvera', field: 'Ventana sin costo', from: '2 h', to: '4 h', time: '15/05 · 11:08', role: 'Super Admin' },
 ];
 
+// Comisión por método de pago → key de platform_settings (en bps).
+const FEE_KEY: Record<string, string> = {
+  'Tarjeta': 'card', 'OXXO Pay': 'oxxo', 'MP wallet': 'wallet', 'Efectivo': 'cash',
+};
+
 const TEAM = [
   { name: 'Javier Olvera', email: 'javier@tumtto.mx', role: 'Super Admin', super: true },
   { name: 'Sofía Martínez', email: 'sofia@tumtto.mx', role: 'Admin Soporte', super: false },
@@ -43,6 +51,11 @@ const TEAM = [
   { name: 'Mariana López', email: 'mariana@tumtto.mx', role: 'Finanzas', super: false },
   { name: 'Andrés Cano', email: 'andres@tumtto.mx', role: 'Solo lectura', super: false },
 ];
+
+function exportAudit() {
+  exportCsv('bitacora.csv', AUDIT.map(a => ({ Autor: a.author, Rol: a.role, Campo: a.field, De: a.from, A: a.to, Cuándo: a.time })));
+  toast.success(`Bitácora exportada · ${AUDIT.length} eventos`);
+}
 
 // ---------- small building blocks ----------
 
@@ -149,9 +162,9 @@ function AuditTrail() {
         <History size={15} className="text-cyan" />
         <span className="text-[13.5px] font-semibold text-navy">Últimos cambios en este módulo</span>
         <span className="font-mono text-[11px] text-faint">{AUDIT.length} eventos</span>
-        <a href="#" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-cyan">
+        <button onClick={exportAudit} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-cyan">
           Ver bitácora completa <ArrowRight size={11} />
-        </a>
+        </button>
       </div>
       <table className="w-full border-collapse">
         <thead>
@@ -214,32 +227,117 @@ export default function ConfigPage() {
   const [sla, setSla] = useState({ accept: 30, dispute: 4, reassign: true, firstResponse: 15 });
   const [cancel, setCancel] = useState({ window: 4, penalty: 15, autoCharge: true, maxTech: 3, wait: 20 });
   const [notif, setNotif] = useState({ push: true, email: true, sms: false, weekly: true, kyc: true });
-  const [catActive, setCatActive] = useState<Record<string, boolean>>(
-    Object.fromEntries(cats.map(c => [c.id, true]))
-  );
 
   // track dirty count loosely vs initial defaults (demo: count flips)
   const [dirty, setDirty] = useState(0);
   const touch = () => setDirty(d => d + 1);
 
-  // Valores reales desde platform_settings al cargar el snapshot.
-  // ponytail: solo commission_bps y request_ttl_minutes tienen backing real;
-  // el resto del formulario sigue siendo local hasta que existan sus keys.
+  // Todo el formulario se hidrata desde platform_settings (jsonb key/value);
+  // los porcentajes se guardan como bps siguiendo la convención del backend.
   const worldReady = useWorldReady();
-  useEffect(() => {
-    if (!worldReady) return;
+  function hydrate() {
+    setGeneral({
+      name: getSettingStr('platform_name', 'Tu Mantenimiento'),
+      email: getSettingStr('support_email', 'soporte@tumtto.mx'),
+      phone: getSettingStr('support_phone', '33 1234 5678'),
+      city: getSettingStr('base_city', 'Guadalajara, ZMG'),
+      maintenance: getSettingBool('maintenance_mode', false),
+      newSignups: getSettingBool('signups_enabled', true),
+    });
     setGlobalCommission(getSettingInt('commission_bps', 1500) / 100);
-    setSla(s => ({ ...s, accept: getSettingInt('request_ttl_minutes', 30) }));
+    setMethods(ms => ms.map(m => ({ ...m, pct: getSettingInt(`fee_${FEE_KEY[m.method]}_bps`, Math.round(m.pct * 100)) / 100 })));
+    setProgram({
+      on: getSettingBool('intro_program_enabled', true),
+      pct: getSettingInt('intro_commission_bps', 1000) / 100,
+      days: getSettingInt('intro_program_days', 90),
+    });
+    setSla({
+      accept: getSettingInt('request_ttl_minutes', 30),
+      dispute: getSettingInt('sla_dispute_hours', 4),
+      reassign: getSettingBool('auto_reassign_enabled', true),
+      firstResponse: getSettingInt('sla_first_response_minutes', 15),
+    });
+    setCancel({
+      window: getSettingInt('cancel_free_window_hours', 4),
+      penalty: getSettingInt('cancel_penalty_bps', 1500) / 100,
+      autoCharge: getSettingBool('cancel_auto_charge', true),
+      maxTech: getSettingInt('tech_max_cancellations_30d', 3),
+      wait: getSettingInt('noshow_wait_minutes', 20),
+    });
+    setNotif({
+      push: getSettingBool('notif_push', true),
+      email: getSettingBool('notif_email', true),
+      sms: getSettingBool('notif_sms', false),
+      weekly: getSettingBool('notif_weekly_summary', true),
+      kyc: getSettingBool('notif_kyc_alerts', true),
+    });
+  }
+  useEffect(() => {
+    if (worldReady) hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldReady]);
 
   async function persistSettings() {
-    await saveSettingInt('commission_bps', Math.round(globalCommission * 100));
-    await saveSettingInt('request_ttl_minutes', sla.accept);
-    toast.success('Configuración guardada');
+    const ok = await saveSettings({
+      platform_name: general.name,
+      support_email: general.email,
+      support_phone: general.phone,
+      base_city: general.city,
+      maintenance_mode: general.maintenance,
+      signups_enabled: general.newSignups,
+      commission_bps: Math.round(globalCommission * 100),
+      ...Object.fromEntries(methods.map(m => [`fee_${FEE_KEY[m.method]}_bps`, Math.round(m.pct * 100)])),
+      intro_program_enabled: program.on,
+      intro_commission_bps: Math.round(program.pct * 100),
+      intro_program_days: program.days,
+      request_ttl_minutes: sla.accept,
+      auto_reassign_enabled: sla.reassign,
+      sla_first_response_minutes: sla.firstResponse,
+      sla_dispute_hours: sla.dispute,
+      cancel_free_window_hours: cancel.window,
+      cancel_penalty_bps: Math.round(cancel.penalty * 100),
+      cancel_auto_charge: cancel.autoCharge,
+      tech_max_cancellations_30d: cancel.maxTech,
+      noshow_wait_minutes: cancel.wait,
+      notif_push: notif.push,
+      notif_email: notif.email,
+      notif_sms: notif.sms,
+      notif_weekly_summary: notif.weekly,
+      notif_kyc_alerts: notif.kyc,
+    });
+    if (ok) toast.success('Configuración guardada');
   }
 
   const [modal, setModal] = useState(false);
+
+  function onExportConfig() {
+    exportCsv('configuracion.csv', [
+      { Sección: 'General', Parámetro: 'Nombre comercial', Valor: general.name },
+      { Sección: 'General', Parámetro: 'Correo de soporte', Valor: general.email },
+      { Sección: 'General', Parámetro: 'Teléfono', Valor: general.phone },
+      { Sección: 'General', Parámetro: 'Ciudad base', Valor: general.city },
+      { Sección: 'General', Parámetro: 'Modo mantenimiento', Valor: general.maintenance ? 'Sí' : 'No' },
+      { Sección: 'General', Parámetro: 'Aceptar nuevos registros', Valor: general.newSignups ? 'Sí' : 'No' },
+      { Sección: 'Comisiones', Parámetro: 'Comisión global', Valor: `${globalCommission}%` },
+      ...methods.map(m => ({ Sección: 'Comisiones', Parámetro: `Método · ${m.method}`, Valor: `${m.pct}%` })),
+      { Sección: 'Comisiones', Parámetro: 'Programa comisión reducida', Valor: program.on ? `${program.pct}% · ${program.days} días` : 'Inactivo' },
+      { Sección: 'SLA', Parámetro: 'Ventana de aceptación', Valor: `${sla.accept} min` },
+      { Sección: 'SLA', Parámetro: 'Reasignación automática', Valor: sla.reassign ? 'Sí' : 'No' },
+      { Sección: 'SLA', Parámetro: 'Primera respuesta', Valor: `${sla.firstResponse} min` },
+      { Sección: 'SLA', Parámetro: 'Resolución de disputas', Valor: `${sla.dispute} h` },
+      { Sección: 'Cancelaciones', Parámetro: 'Ventana sin costo', Valor: `${cancel.window} h` },
+      { Sección: 'Cancelaciones', Parámetro: 'Penalización tardía', Valor: `${cancel.penalty}%` },
+      { Sección: 'Cancelaciones', Parámetro: 'Cobro automático', Valor: cancel.autoCharge ? 'Sí' : 'No' },
+      { Sección: 'Cancelaciones', Parámetro: 'Máx. cancelaciones técnico / 30 días', Valor: cancel.maxTech },
+      { Sección: 'Cancelaciones', Parámetro: 'Espera no-show', Valor: `${cancel.wait} min` },
+      { Sección: 'Notificaciones', Parámetro: 'Push', Valor: notif.push ? 'On' : 'Off' },
+      { Sección: 'Notificaciones', Parámetro: 'Email', Valor: notif.email ? 'On' : 'Off' },
+      { Sección: 'Notificaciones', Parámetro: 'SMS', Valor: notif.sms ? 'On' : 'Off' },
+      { Sección: 'Notificaciones', Parámetro: 'Resumen semanal', Valor: notif.weekly ? 'On' : 'Off' },
+      { Sección: 'Notificaciones', Parámetro: 'Alertas KYC', Valor: notif.kyc ? 'On' : 'Off' },
+    ]);
+    toast.success('Configuración exportada');
+  }
 
   const ActiveSection = SECTIONS.find(s => s.id === active)!;
 
@@ -250,8 +348,8 @@ export default function ConfigPage() {
         sub="Parámetros globales de la plataforma · solo Super Admin."
         actions={
           <div className="flex gap-2.5">
-            <GhostButton><span className="inline-flex items-center gap-2"><History size={14} /> Bitácora completa</span></GhostButton>
-            <GhostButton><span className="inline-flex items-center gap-2"><ArrowDownToLine size={14} /> Exportar config</span></GhostButton>
+            <GhostButton onClick={exportAudit}><span className="inline-flex items-center gap-2"><History size={14} /> Bitácora completa</span></GhostButton>
+            <GhostButton onClick={onExportConfig}><span className="inline-flex items-center gap-2"><ArrowDownToLine size={14} /> Exportar config</span></GhostButton>
           </div>
         }
       />
@@ -328,7 +426,8 @@ export default function ConfigPage() {
                           <div className="text-[13px] font-semibold text-navy">{c.name}</div>
                           <div className="font-mono text-[11px] text-faint">{c.services ?? 0} servicios</div>
                         </div>
-                        <Toggle on={catActive[c.id]} onChange={v => { setCatActive({ ...catActive, [c.id]: v }); touch(); }} />
+                        {/* Escribe directo a service_categories.is_active (misma fuente que Catálogo). */}
+                        <Toggle on={c.is_active} onChange={() => void toggleCategory(c.id)} />
                       </div>
                     ))}
                   </div>
@@ -580,7 +679,7 @@ export default function ConfigPage() {
               </div>
             </div>
             <div className="flex gap-2.5">
-              <GhostButton onClick={() => setDirty(0)}>Descartar</GhostButton>
+              <GhostButton onClick={() => { hydrate(); setDirty(0); }}>Descartar</GhostButton>
               <PrimaryButton onClick={() => setModal(true)}>
                 <span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> Guardar · requiere MFA</span>
               </PrimaryButton>

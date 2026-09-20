@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
@@ -16,6 +17,7 @@ import {
   StatCard,
   StatusPill,
   DataTable,
+  LoadFailed,
 } from '@/components/admin';
 import {
   CountUp,
@@ -29,6 +31,8 @@ import { Avatar, Skeleton } from '@/components/ui';
 import {
   useTick,
   useWorldReady,
+  useWorldFailed,
+  loadWorld,
   getMetrics,
   getAllRequests,
   getAllPayments,
@@ -118,6 +122,7 @@ export default function DashboardPage() {
   useTick();
   const router = useRouter();
   const ready = useWorldReady();
+  const failed = useWorldFailed();
   const m = getMetrics();
   const cats = getCategories();
   const catName = (id: string) => cats.find(c => c.id === id)?.name ?? '—';
@@ -280,6 +285,7 @@ export default function DashboardPage() {
     },
   ];
 
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
   if (!ready) return <SkeletonRows />;
 
   return (
@@ -380,12 +386,12 @@ export default function DashboardPage() {
           <Panel
             title="Servicios recientes"
             action={
-              <a
+              <Link
                 href="/servicios"
                 className="text-[12px] font-semibold text-primary hover:text-primary-2"
               >
                 Ver todos
-              </a>
+              </Link>
             }
           >
             {rows.length ? (

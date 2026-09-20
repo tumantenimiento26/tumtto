@@ -183,7 +183,7 @@ export default function ServicioDetailPage() {
     if (!note.trim()) return;
     addNote(req!.id, note.trim());
     setNote('');
-    toast.success('Nota guardada');
+    toast.local('Nota guardada');
   }
 
   function onOpenCase() {
@@ -195,7 +195,7 @@ export default function ServicioDetailPage() {
       order_id: req!.id,
     });
     setCaseTicketId(t.id);
-    toast.success(`Caso de soporte abierto · #${t.id}`);
+    toast.local(`Caso de soporte abierto · #${t.id}`);
   }
 
   return (
@@ -856,7 +856,7 @@ function ChatModal({
     if (!text) return;
     sendMessage(requestId, ADMIN_ID, text);
     setDraft('');
-    toast.success('Intervención enviada al chat');
+    toast.local('Intervención enviada al chat');
   }
 
   return (

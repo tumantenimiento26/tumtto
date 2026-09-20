@@ -97,13 +97,15 @@ export default function CatalogoPage() {
   }
   async function onDeleteCategory() {
     if (!active) return;
-    const ok = await deleteCategory(active.id);
+    const result = await deleteCategory(active.id);
     setDeleteCatOpen(false);
-    if (ok) {
+    if (result === 'ok') {
       toast.success(`Categoría eliminada · ${active.name}`);
       setActiveId(getCategoriesWithCounts()[0]?.id ?? '');
-    } else {
+    } else if (result === 'has-services') {
       toast.error('No puedes eliminar una categoría con servicios registrados');
+    } else {
+      toast.error('No se pudo eliminar la categoría. Reintenta.');
     }
   }
 

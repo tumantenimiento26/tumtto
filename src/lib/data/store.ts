@@ -13,6 +13,7 @@ import {
   type ServiceOrder,
   type ServiceCategory,
   type Note,
+  type DemoPayout,
   type Ticket,
 } from '@/lib/demo/world';
 
@@ -45,9 +46,14 @@ export const useData = create<DataState>(set => ({
 
 /** Subscribe to mutations: read `useTick()` in any component that shows world data. */
 export const useTick = () => useData(s => s.tick);
-/** True once the first snapshot loaded — replaces the demo's fake skeleton timers. */
-export const useWorldReady = () =>
-  useData(s => s.status === 'ready' || s.status === 'error');
+/**
+ * True sólo cuando el snapshot cargó de verdad. Antes incluía 'error', así que
+ * un fallo de red pintaba la consola entera como una plataforma vacía y sana
+ * ($0 de GMV, 0 servicios) en vez de decir que no pudo cargar.
+ */
+export const useWorldReady = () => useData(s => s.status === 'ready');
+/** El snapshot falló: la página debe ofrecer reintentar, no tablas vacías. */
+export const useWorldFailed = () => useData(s => s.status === 'error');
 
 // In-memory-only domains survive snapshot reloads (same array refs).
 const mem = emptyWorld();
@@ -249,8 +255,30 @@ export const getDisputes = (status?: string) =>
 export const getKycSessions = (techId: string) =>
   w().kycSessions.filter(s => s.technician_id === techId);
 export const getPayouts = (techId: string) =>
-  w().payouts.filter(p => p.technician_id === techId);
-export const getAllPayouts = () => w().payouts;
+  getAllPayouts().filter(p => p.technician_id === techId);
+
+/**
+ * Retiros reales. No hay tabla `payouts` desplegada: un retiro ES la entrada
+ * `payout` del ledger (negativa, a cargo del técnico) que escribe la app del
+ * técnico. Antes esto leía `w().payouts`, un arreglo en memoria que nunca se
+ * llenaba — el panel de retiros salía vacío para siempre.
+ * ponytail: sin cola de "pendientes" en el backend, toda entrada ya ocurrió.
+ */
+export const getAllPayouts = (): DemoPayout[] =>
+  w()
+    .ledger.filter(e => e.entry_type === 'payout')
+    .map(e => ({
+      id: e.id,
+      technician_id: e.technician_id,
+      amount_cents: Math.abs(e.amount_cents),
+      status: 'processed' as const,
+      clabe_snapshot: getTechnician(e.technician_id)?.clabe ?? null,
+      batch_id: null,
+      processed_at: e.created_at,
+      created_at: e.created_at,
+      updated_at: e.updated_at,
+    }))
+    .sort(byNewest);
 export const getLedger = (techId: string) =>
   w().ledger.filter(e => e.technician_id === techId);
 export const getAllLedger = () => w().ledger;
@@ -654,19 +682,28 @@ export async function updateCategory(
   }, 'No se pudo actualizar la categoría.');
 }
 
-/** Elimina la categoría; falla (false) si aún tiene servicios (FK). */
-export async function deleteCategory(catId: string): Promise<boolean> {
-  if (w().orders.some(r => r.category_id === catId)) return false;
+export type DeleteCategoryResult = 'ok' | 'has-services' | 'failed';
+
+/**
+ * Elimina la categoría. Distingue los dos fallos: antes ambos devolvían `false`
+ * y la página culpaba siempre a los servicios ligados, incluso cuando lo que
+ * había fallado era RLS o la red.
+ */
+export async function deleteCategory(
+  catId: string,
+): Promise<DeleteCategoryResult> {
+  if (w().orders.some(r => r.category_id === catId)) return 'has-services';
   try {
     const { error } = await supabase
       .from('service_categories')
       .delete()
       .eq('id', catId);
-    if (error) return false;
+    if (error) throw error;
     await refresh();
-    return true;
-  } catch {
-    return false;
+    return 'ok';
+  } catch (e) {
+    console.error('[data] deleteCategory failed', e);
+    return 'failed';
   }
 }
 
@@ -736,23 +773,6 @@ export function addNote(
   w().notes.unshift(note);
   bump();
   return note;
-}
-
-/** Marca los payouts pendientes como procesados. Devuelve conteo y total (cents). */
-export function processPayoutBatch() {
-  const pending = w().payouts.filter(p => p.status === 'pending');
-  const batch = `B-${new Date().toISOString().slice(0, 7)}`;
-  for (const p of pending) {
-    p.status = 'processed';
-    p.processed_at = now();
-    p.batch_id = batch;
-    p.updated_at = now();
-  }
-  bump();
-  return {
-    count: pending.length,
-    total: pending.reduce((s, p) => s + p.amount_cents, 0),
-  };
 }
 
 export function createTicket(input: {

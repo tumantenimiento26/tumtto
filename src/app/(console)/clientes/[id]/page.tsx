@@ -438,7 +438,7 @@ export default function ClientDetailPage() {
             if (!note.trim()) return;
             addNote(id, note.trim());
             setNote('');
-            toast.success('Nota guardada');
+            toast.local('Nota guardada');
           }}
           className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:bg-primary-2"
         >
@@ -1062,7 +1062,7 @@ function SendMessageModal({
       requester_id: clientId,
       content: body.trim(),
     });
-    toast.success(`Mensaje enviado · ticket #${t.id}`);
+    toast.local(`Mensaje enviado · ticket #${t.id}`);
     setSubject('');
     setBody('');
     onClose();

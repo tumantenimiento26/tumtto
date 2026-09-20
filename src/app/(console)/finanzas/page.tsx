@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Download,
   Settings,
@@ -12,9 +12,6 @@ import {
   Store,
   Banknote,
   ArrowRight,
-  TrendingUp,
-  Zap,
-  Check,
   BadgeCheck,
   AlertTriangle,
   ExternalLink,
@@ -28,10 +25,11 @@ import {
   DataTable,
   Modal,
   exportCsv,
+  LoadFailed,
   type Column,
 } from '@/components/admin';
 import { LineChart, VBars, HBars } from '@/components/charts';
-import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
+import { Avatar, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
@@ -44,9 +42,10 @@ import {
   getTechnician,
   getProfile,
   getRequest,
-  processPayoutBatch,
   useTick,
   useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 
 interface PayRow {
@@ -160,7 +159,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 export default function FinanzasPage() {
   const tick = useTick();
   const ready = useWorldReady();
-  const [loteOpen, setLoteOpen] = useState(false);
+  const failed = useWorldFailed();
   const [walletOpen, setWalletOpen] = useState(false);
   const m = getMetrics();
 
@@ -243,11 +242,6 @@ export default function FinanzasPage() {
       )
       .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
 
-  const pendingTotal = payouts
-    .filter(p => p.status === 'pending')
-    .reduce((s, p) => s + p.amount, 0);
-  const pendingCount = payouts.filter(p => p.status === 'pending').length;
-
   // GMV mensual real (últimos 6 meses) desde payments.paid_at.
   const monthlyGmv = useMemo(() => {
     const nowD = new Date();
@@ -288,12 +282,6 @@ export default function FinanzasPage() {
     toast.success(`CSV exportado · ${payments.length} transacciones`);
   }
 
-  function onProcessBatch() {
-    const { count, total } = processPayoutBatch();
-    setLoteOpen(false);
-    toast.success(`Lote procesado · ${count} retiros por ${mx(total)}`);
-  }
-
   // Desglose por método (a partir de los pagos cobrados + pendientes).
   const byMethod = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -306,6 +294,12 @@ export default function FinanzasPage() {
       color: METHOD_META[k]?.color,
     }));
   }, [payments]);
+
+  // Pagos aún sin liquidar — dato real de `payments`, no del arreglo de retiros.
+  const unpaid = payments.filter(
+    p => p.status === 'pending' || p.status === 'authorized',
+  );
+  const unpaidTotal = unpaid.reduce((s, p) => s + p.gross_amount, 0);
 
   const payColumns: Column<PayRow>[] = [
     {
@@ -387,6 +381,7 @@ export default function FinanzasPage() {
     },
   ];
 
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
   if (!ready) return <SkeletonRows />;
 
   return (
@@ -448,11 +443,11 @@ export default function FinanzasPage() {
           <StatCard
             index={3}
             label="Pagos pendientes"
-            value={mx(pendingTotal)}
+            value={mx(unpaidTotal)}
             suffix="MXN"
-            delta={`${pendingCount} retiros`}
+            delta={`${unpaid.length} pagos`}
             trend="down"
-            note="por procesar"
+            note="sin liquidar"
             icon={Hourglass}
           />
         </StaggerItem>
@@ -515,15 +510,10 @@ export default function FinanzasPage() {
           <Panel
             title="Solicitudes de retiro (payouts)"
             action={
-              <PrimaryButton
-                onClick={() => setLoteOpen(true)}
-                disabled={pendingCount === 0}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Zap size={14} />
-                  Procesar lote
-                </span>
-              </PrimaryButton>
+              <span className="text-[12px] text-muted">
+                Los retiros los registra la app del técnico; la dispersión se
+                hace fuera de la consola.
+              </span>
             }
           >
             <DataTable
@@ -599,7 +589,7 @@ export default function FinanzasPage() {
                 ] as Column<PayoutRow>[]
               }
               rows={payouts}
-              empty="Sin solicitudes de retiro"
+              empty="Sin retiros registrados"
             />
           </Panel>
         </FadeIn>
@@ -688,87 +678,6 @@ export default function FinanzasPage() {
         </Panel>
       </FadeIn>
 
-      {/* ── Modal: procesar lote (prototipo finanzas.jsx · ConfirmLoteModal) ── */}
-      <Modal
-        open={loteOpen}
-        onClose={() => setLoteOpen(false)}
-        title="Procesar lote de retiros"
-        sub="Revisa el resumen antes de confirmar. Esta acción genera SPEI inmediato a cada técnico."
-        icon={<Zap size={18} />}
-        width={620}
-        footer={
-          <>
-            <GhostButton onClick={() => setLoteOpen(false)}>
-              Cancelar
-            </GhostButton>
-            <PrimaryButton onClick={onProcessBatch}>
-              <span className="inline-flex items-center gap-2">
-                <Check size={14} />
-                Confirmar y procesar lote
-              </span>
-            </PrimaryButton>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <SummaryTile
-              label="Retiros a procesar"
-              value={String(pendingCount)}
-              sub="Solo estatus pendiente"
-            />
-            <SummaryTile
-              label="Monto total"
-              value={mx(pendingTotal)}
-              suffix="MXN"
-              sub="Sin contar en proceso"
-            />
-            <SummaryTile
-              label="Comisión bancaria"
-              value={mx(pendingCount * 10)}
-              suffix="MXN"
-              sub="$10 MXN por SPEI"
-            />
-            <SummaryTile
-              label="Cargo a Tumantenimiento"
-              value={mx(pendingTotal + pendingCount * 10)}
-              suffix="MXN"
-              sub="Saldo cuenta operativa: $4.2M"
-              primary
-            />
-          </div>
-          <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft p-3.5 text-[12.5px]">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
-            <div>
-              <b className="font-semibold text-warning-ink">
-                Los retiros en proceso quedarán fuera
-              </b>
-              <span className="text-muted">
-                {' '}
-                hasta que el banco confirme la transferencia anterior.
-              </span>
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface p-3.5">
-            <input
-              type="checkbox"
-              defaultChecked
-              className="mt-0.5 h-4 w-4 accent-primary"
-            />
-            <div>
-              <div className="text-[13.5px] font-medium text-navy">
-                Entiendo que esto genera {pendingCount} transferencia(s) SPEI no
-                reversibles.
-              </div>
-              <div className="mt-1 text-[12px] text-muted">
-                Quedará registro en la bitácora de auditoría a nombre de Sofía
-                Martínez (Admin Soporte).
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
       {/* ── Modal: historial de wallet ── */}
       <Modal
         open={walletOpen}
@@ -824,41 +733,6 @@ export default function FinanzasPage() {
           </div>
         )}
       </Modal>
-    </div>
-  );
-}
-
-function SummaryTile({
-  label,
-  value,
-  suffix,
-  sub,
-  primary,
-}: {
-  label: string;
-  value: string;
-  suffix?: string;
-  sub?: string;
-  primary?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-3.5 ${primary ? 'border-primary/25 bg-info-soft' : 'border-line bg-surface'}`}
-    >
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-faint">
-        {label}
-      </div>
-      <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span
-          className={`font-display text-[22px] font-bold tracking-tight ${primary ? 'text-primary' : 'text-navy'}`}
-        >
-          {value}
-        </span>
-        {suffix && (
-          <span className="font-mono text-[11px] text-faint">{suffix}</span>
-        )}
-      </div>
-      {sub && <div className="mt-1 text-[11.5px] text-muted">{sub}</div>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 import { create } from 'zustand';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from './motion';
 
 /**
@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from './motion';
 interface ToastItem {
   id: number;
   message: string;
-  variant: 'success' | 'error';
+  variant: 'success' | 'error' | 'local';
 }
 
 interface ToastState {
@@ -37,6 +37,13 @@ const useToasts = create<ToastState>(set => ({
 export const toast = {
   success: (message: string) => useToasts.getState().push(message, 'success'),
   error: (message: string) => useToasts.getState().push(message, 'error'),
+  /**
+   * Para dominios que todavía no tienen tabla en el backend (notas, tickets,
+   * mensajes): la escritura vive sólo en esta pestaña y se pierde al recargar.
+   * Un toast verde aquí haría creer al admin que el dato quedó guardado.
+   */
+  local: (message: string) =>
+    useToasts.getState().push(`${message} · solo en esta sesión`, 'local'),
 };
 
 export function Toasts() {
@@ -57,6 +64,8 @@ export function Toasts() {
           >
             {t.variant === 'success' ? (
               <CheckCircle2 size={16} className="shrink-0 text-success" />
+            ) : t.variant === 'local' ? (
+              <AlertTriangle size={16} className="shrink-0 text-warning" />
             ) : (
               <XCircle size={16} className="shrink-0 text-error" />
             )}

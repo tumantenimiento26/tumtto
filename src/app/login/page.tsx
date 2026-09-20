@@ -100,6 +100,20 @@ const STATS = [
   },
 ];
 
+/** Traduce el error de Supabase Auth; el genérico sólo cubre lo que no reconocemos. */
+function authMessage(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes('invalid login credentials'))
+    return 'Correo o contraseña incorrectos.';
+  if (m.includes('email not confirmed'))
+    return 'Tu correo aún no está confirmado. Revisa tu bandeja.';
+  if (m.includes('too many requests') || m.includes('rate limit'))
+    return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
+  if (m.includes('fetch') || m.includes('network'))
+    return 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.';
+  return 'No pudimos iniciar sesión. Inténtalo de nuevo.';
+}
+
 const EMAIL_RE = /\S+@\S+\.\S+/;
 
 export default function LoginPage() {
@@ -110,7 +124,7 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; pass?: string }>({});
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Con el dashboard precargado, el splash aterriza sin pantalla en blanco.
@@ -129,9 +143,10 @@ export default function LoginPage() {
     const { error } = await signIn(email.trim(), pass);
     if (error) {
       setLoading(false);
-      setAuthError(true);
+      setAuthError(authMessage(error));
       return;
     }
+    setAuthError(null);
     // ponytail: el splash es puramente presentacional — breve puente de marca
     setTimeout(() => router.push('/dashboard'), 900);
   }
@@ -272,7 +287,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={e => {
                     setEmail(e.target.value);
-                    setAuthError(false);
+                    setAuthError(null);
                     if (errors.email)
                       setErrors(er => ({ ...er, email: undefined }));
                   }}
@@ -317,7 +332,7 @@ export default function LoginPage() {
                   value={pass}
                   onChange={e => {
                     setPass(e.target.value);
-                    setAuthError(false);
+                    setAuthError(null);
                     if (errors.pass)
                       setErrors(er => ({ ...er, pass: undefined }));
                   }}
@@ -378,7 +393,7 @@ export default function LoginPage() {
                 role="alert"
                 className="rounded-xl bg-error-soft px-3.5 py-2.5 text-xs font-medium text-error"
               >
-                Correo o contraseña incorrectos.
+                {authError}
               </div>
             )}
 

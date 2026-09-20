@@ -19,6 +19,7 @@ import {
   StatCard,
   DataTable,
   exportCsv,
+  LoadFailed,
 } from '@/components/admin';
 import { Popover } from '@/components/admin-shell';
 import type { Column } from '@/components/admin';
@@ -35,6 +36,8 @@ import { toast } from '@/components/toast';
 import {
   useTick,
   useWorldReady,
+  useWorldFailed,
+  loadWorld,
   getClients,
   getAllRequests,
   getAllDisputes,
@@ -121,6 +124,7 @@ export default function ClientesPage() {
   const tick = useTick();
   const router = useRouter();
   const ready = useWorldReady();
+  const failed = useWorldFailed();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Todos');
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -307,6 +311,7 @@ export default function ClientesPage() {
     },
   ];
 
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
   if (!ready) return <SkeletonRows />;
 
   return (

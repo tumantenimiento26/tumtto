@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -21,6 +21,7 @@ import {
   StatCard,
   DataTable,
   exportCsv,
+  LoadFailed,
   type Column,
 } from '@/components/admin';
 import {
@@ -42,6 +43,8 @@ import {
   rejectKyc,
   useTick,
   useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 
 type Kyc = 'approved' | 'in_review' | 'declined' | 'suspended';
@@ -124,6 +127,7 @@ export default function TecnicosPage() {
   const tick = useTick();
   const router = useRouter();
   const ready = useWorldReady();
+  const failed = useWorldFailed();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('Todas');
   const [category, setCategory] = useState('Todas');
@@ -162,9 +166,11 @@ export default function TecnicosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const categoryNames = useMemo(
     () => ['Todas', ...getCategories().map(c => c.name)],
+    // `tick` es el disparador deliberado: getCategories() lee el snapshot del
+    // módulo, así que la lista se recalcula cuando el mundo se recarga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tick],
   );
 
@@ -339,6 +345,7 @@ export default function TecnicosPage() {
     },
   ];
 
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
   if (!ready) return <SkeletonRows />;
 
   return (

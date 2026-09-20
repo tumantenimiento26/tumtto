@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Settings,
   Building2,
@@ -33,7 +33,7 @@ import {
   Check,
   type LucideIcon,
 } from 'lucide-react';
-import { PageHeading, Panel, exportCsv } from '@/components/admin';
+import { PageHeading, exportCsv, LoadFailed } from '@/components/admin';
 import {
   PrimaryButton,
   GhostButton,
@@ -45,6 +45,8 @@ import { FadeIn, motion, AnimatePresence } from '@/components/motion';
 import {
   useTick,
   useWorldReady,
+  useWorldFailed,
+  loadWorld,
   getCategoriesWithCounts,
   getMetrics,
   getSettingInt,
@@ -486,6 +488,7 @@ export default function ConfigPage() {
   // Todo el formulario se hidrata desde platform_settings (jsonb key/value);
   // los porcentajes se guardan como bps siguiendo la convención del backend.
   const worldReady = useWorldReady();
+  const worldFailed = useWorldFailed();
   function hydrate() {
     setGeneral({
       name: getSettingStr('platform_name', 'Tu Mantenimiento'),
@@ -534,7 +537,6 @@ export default function ConfigPage() {
   }
   useEffect(() => {
     if (worldReady) hydrate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldReady]);
 
   async function persistSettings() {
@@ -691,6 +693,10 @@ export default function ConfigPage() {
   }
 
   const ActiveSection = SECTIONS.find(s => s.id === active)!;
+
+  // Sin snapshot, el formulario se hidrataría con los defaults del código y los
+  // mostraría como si fueran los valores guardados — y "Guardar" los escribiría.
+  if (worldFailed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
 
   return (
     <div className="pb-24">

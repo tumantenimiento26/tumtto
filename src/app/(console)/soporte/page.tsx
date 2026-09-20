@@ -75,14 +75,6 @@ import {
 } from '@/lib/data/store';
 import type { Ticket } from '@/lib/demo/world';
 
-const TYPE_LABEL: Record<string, string> = {
-  cobro: 'Cobro indebido',
-  cancelación: 'Cancelación',
-  cancelacion: 'Cancelación',
-  calidad: 'Calidad del servicio',
-  'no-show': 'No se presentó',
-};
-
 const TICKET_STATUS: Record<
   Ticket['status'],
   { label: string; tone: 'error' | 'warning' | 'success' }
@@ -736,7 +728,7 @@ function TicketConversation({
     if (!text) return;
     replyTicket(ticket.id, ADMIN_ID, text);
     setDraft('');
-    toast.success('Respuesta enviada');
+    toast.local('Respuesta enviada');
   }
 
   return (
@@ -924,7 +916,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
             className="w-full !min-h-[40px] !py-2"
             onClick={() => {
               resolveTicket(ticket.id);
-              toast.success(`Ticket resuelto · #${ticket.id}`);
+              toast.local(`Ticket resuelto · #${ticket.id}`);
             }}
           >
             <span className="inline-flex items-center gap-2">
@@ -967,7 +959,7 @@ function NewTicketModal({
       requester_id: requesterId,
       priority,
     });
-    toast.success('Ticket creado');
+    toast.local('Ticket creado');
     setSubject('');
     setRequesterId('');
     setPriority('media');

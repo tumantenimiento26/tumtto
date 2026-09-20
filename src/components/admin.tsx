@@ -388,3 +388,29 @@ export function exportCsv(
 }
 
 /** Horizontal category breakdown bars with values. */
+
+/**
+ * El snapshot de la consola no cargó. Se muestra en lugar de la página para que
+ * un fallo de red no se lea como "la plataforma está vacía".
+ */
+export function LoadFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-6 text-center shadow-card">
+        <h2 className="font-display text-lg font-semibold text-navy">
+          No pudimos cargar los datos
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          La consola no pudo leer el snapshot de Supabase. Revisa tu conexión y
+          reintenta.
+        </p>
+        <button
+          onClick={onRetry}
+          className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-2"
+        >
+          Reintentar
+        </button>
+      </div>
+    </div>
+  );
+}

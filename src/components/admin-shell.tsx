@@ -96,7 +96,9 @@ const CRUMB: Record<string, string[]> = {
   '/config': ['Configuración', 'General'],
 };
 
-function useActive(href: string, pathname: string) {
+// No es un hook: predicado puro sobre la ruta. Llamarlo `useActive` hacía que
+// react-hooks/rules-of-hooks lo marcara como violación dentro de los .map().
+function isActive(href: string, pathname: string) {
   return href === '/'
     ? pathname === '/'
     : pathname === href || pathname.startsWith(href + '/');
@@ -132,8 +134,8 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
       <nav className="flex-1 overflow-y-auto px-3 py-2">
         {NAV.map(it => {
-          const active = useActive(it.href, pathname);
-          const subOpen = it.sub?.some(s => useActive(s.href, pathname));
+          const active = isActive(it.href, pathname);
+          const subOpen = it.sub?.some(s => isActive(s.href, pathname));
           const Icon = it.icon;
           return (
             <div key={it.label}>
@@ -169,7 +171,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
               {it.sub && subOpen && (
                 <div className="mb-1.5 ml-[38px] mt-0.5">
                   {it.sub.map(s => {
-                    const sActive = useActive(s.href, pathname);
+                    const sActive = isActive(s.href, pathname);
                     return (
                       <Link
                         key={s.href}

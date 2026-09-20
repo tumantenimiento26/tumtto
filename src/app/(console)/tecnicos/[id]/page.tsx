@@ -59,7 +59,6 @@ const initials = (name?: string | null) =>
     .map(w => w[0])
     .join('')
     .toUpperCase();
-const peso = (n: number) => `$${n.toLocaleString('es-MX')} MXN`;
 const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString('es-MX', {
     day: '2-digit',
@@ -158,7 +157,7 @@ export default function TecnicoDetailPage() {
     if (!note.trim()) return;
     addNote(tech!.id, note.trim());
     setNote('');
-    toast.success('Nota guardada');
+    toast.local('Nota guardada');
   }
   function onApproveAllDocs() {
     resolveKyc(tech!.id, true);

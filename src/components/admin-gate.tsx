@@ -11,7 +11,15 @@ import { useAuth } from '@/lib/auth';
  */
 export function AdminGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { loading, session, usuario, usuarioError, isAdmin, signOut, retryUsuario } = useAuth();
+  const {
+    loading,
+    session,
+    usuario,
+    usuarioError,
+    isAdmin,
+    signOut,
+    retryUsuario,
+  } = useAuth();
 
   useEffect(() => {
     if (!loading && !session) router.replace('/login');
@@ -27,7 +35,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
       <Panel
         title="No pudimos cargar tu cuenta"
         body={usuarioError.message}
-        actionLabel={usuarioError.kind === 'transient' ? 'Reintentar' : 'Cerrar sesión'}
+        actionLabel={
+          usuarioError.kind === 'transient' ? 'Reintentar' : 'Cerrar sesión'
+        }
         onAction={() => {
           if (usuarioError.kind === 'transient') void retryUsuario();
           else void signOut().then(() => router.replace('/login'));
@@ -50,13 +60,23 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function Panel({ title, body, actionLabel, onAction }: {
-  title: string; body: string; actionLabel: string; onAction: () => void;
+function Panel({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  actionLabel: string;
+  onAction: () => void;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-app p-6">
       <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-6 text-center shadow-card">
-        <h1 className="font-display text-lg font-semibold text-navy">{title}</h1>
+        <h1 className="font-display text-lg font-semibold text-navy">
+          {title}
+        </h1>
         <p className="mt-2 text-sm text-muted">{body}</p>
         <button
           onClick={onAction}

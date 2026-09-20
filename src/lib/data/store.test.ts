@@ -25,7 +25,9 @@ describe('selectors over the world snapshot', () => {
   });
 
   it('counts services per category', () => {
-    const plumbing = store.getCategoriesWithCounts().find(c => c.slug === 'plumbing');
+    const plumbing = store
+      .getCategoriesWithCounts()
+      .find(c => c.slug === 'plumbing');
     expect(plumbing?.services).toBe(2);
   });
 
@@ -48,7 +50,11 @@ describe('session-local domains (sin tabla backend todavía)', () => {
   });
 
   it('ticket lifecycle: create → reply (admin) → resolve', () => {
-    const t = store.createTicket({ subject: 'Prueba', requester_id: 'demo-cliente', content: 'hola' });
+    const t = store.createTicket({
+      subject: 'Prueba',
+      requester_id: 'demo-cliente',
+      content: 'hola',
+    });
     store.replyTicket(t.id, store.ADMIN_ID, 'respuesta');
     expect(store.getTicket(t.id)?.status).toBe('pending');
     store.resolveTicket(t.id);

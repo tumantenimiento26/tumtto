@@ -26,7 +26,10 @@ const useToasts = create<ToastState>(set => ({
   push: (message, variant) => {
     const id = ++toastSeq;
     set(s => ({ toasts: [...s.toasts, { id, message, variant }] }));
-    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 2500);
+    setTimeout(
+      () => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
+      2500,
+    );
   },
   dismiss: id => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 }));
@@ -52,10 +55,14 @@ export function Toasts() {
             onClick={() => dismiss(t.id)}
             className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-line bg-white px-4 py-3 text-left shadow-hover"
           >
-            {t.variant === 'success'
-              ? <CheckCircle2 size={16} className="shrink-0 text-success" />
-              : <XCircle size={16} className="shrink-0 text-error" />}
-            <span className="text-[13px] font-medium text-navy">{t.message}</span>
+            {t.variant === 'success' ? (
+              <CheckCircle2 size={16} className="shrink-0 text-success" />
+            ) : (
+              <XCircle size={16} className="shrink-0 text-error" />
+            )}
+            <span className="text-[13px] font-medium text-navy">
+              {t.message}
+            </span>
           </motion.button>
         ))}
       </AnimatePresence>

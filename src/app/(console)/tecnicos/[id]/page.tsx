@@ -4,29 +4,75 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft, Phone, Mail, Calendar, MapPin, Check, X, Ban, RotateCcw,
-  ContactRound, Map as MapIcon, Landmark, Quote, FileCheck2, MessageSquareText,
-  Send, CheckCheck, BadgeCheck, AlertOctagon,
+  ArrowLeft,
+  Phone,
+  Mail,
+  Calendar,
+  MapPin,
+  Check,
+  X,
+  Ban,
+  RotateCcw,
+  ContactRound,
+  Map as MapIcon,
+  Landmark,
+  Quote,
+  FileCheck2,
+  MessageSquareText,
+  Send,
+  CheckCheck,
+  BadgeCheck,
+  AlertOctagon,
 } from 'lucide-react';
 import { PageHeading, Panel, Modal } from '@/components/admin';
-import { Avatar, Badge, GhostButton, PrimaryButton, Textarea } from '@/components/ui';
+import {
+  Avatar,
+  Badge,
+  GhostButton,
+  PrimaryButton,
+  Textarea,
+} from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  useTick, getTechnician, getProfile, getTechRates,
-  getCategories, getKycSessions, getNotes, resolveKyc, rejectKyc,
-  suspendTechnician, reactivateTechnician, addNote,
-  upsertTechRate, updateTechnicianBank,
+  useTick,
+  getTechnician,
+  getProfile,
+  getTechRates,
+  getCategories,
+  getKycSessions,
+  getNotes,
+  resolveKyc,
+  rejectKyc,
+  suspendTechnician,
+  reactivateTechnician,
+  addNote,
+  upsertTechRate,
+  updateTechnicianBank,
 } from '@/lib/data/store';
 
 const initials = (name?: string | null) =>
-  (name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  (name ?? '?')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase();
 const peso = (n: number) => `$${n.toLocaleString('es-MX')} MXN`;
 const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-const fmtClabe = (c?: string | null) => (c ? c.replace(/(\d{3})(\d{3})(\d{8})/, '$1 $2 •••• ') + c.slice(-4) : '—');
+  new Date(iso).toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+const fmtClabe = (c?: string | null) =>
+  c ? c.replace(/(\d{3})(\d{3})(\d{8})/, '$1 $2 •••• ') + c.slice(-4) : '—';
 
-const DOC_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'error' }> = {
+const DOC_STATUS: Record<
+  string,
+  { label: string; tone: 'success' | 'warning' | 'error' }
+> = {
   not_started: { label: 'Sin iniciar', tone: 'warning' },
   in_progress: { label: 'En curso', tone: 'warning' },
   pending: { label: 'Pendiente revisión', tone: 'warning' },
@@ -37,7 +83,12 @@ const DOC_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 
   resubmitted: { label: 'Reenviada', tone: 'warning' },
 };
 
-const REJECT_REASONS = ['Documentos ilegibles', 'Información inconsistente', 'Documento expirado', 'Otro'];
+const REJECT_REASONS = [
+  'Documentos ilegibles',
+  'Información inconsistente',
+  'Documento expirado',
+  'Otro',
+];
 
 export default function TecnicoDetailPage() {
   useTick();
@@ -51,7 +102,10 @@ export default function TecnicoDetailPage() {
   if (!tech || !profile) {
     return (
       <FadeIn>
-        <PageHeading title="Técnico no encontrado" sub={`No existe un técnico con id ${id}`} />
+        <PageHeading
+          title="Técnico no encontrado"
+          sub={`No existe un técnico con id ${id}`}
+        />
         <GhostButton href="/tecnicos">Volver a técnicos</GhostButton>
       </FadeIn>
     );
@@ -69,10 +123,15 @@ export default function TecnicoDetailPage() {
     cat: cats.find(c => c.id === r.category_id)?.name ?? '—',
   }));
   const docs = getKycSessions(tech.id);
-  const pendingDocs = docs.filter(d => d.status === 'in_review' || d.status === 'in_progress');
+  const pendingDocs = docs.filter(
+    d => d.status === 'in_review' || d.status === 'in_progress',
+  );
   const notes = getNotes(tech.id);
 
-  const KYC_BADGE: Record<string, { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }> = {
+  const KYC_BADGE: Record<
+    string,
+    { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }
+  > = {
     approved: { label: 'KYC aprobado', tone: 'success' },
     not_started: { label: 'KYC sin iniciar', tone: 'warning' },
     pending: { label: 'Pendiente de KYC', tone: 'warning' },
@@ -109,7 +168,10 @@ export default function TecnicoDetailPage() {
   return (
     <div className="flex flex-col gap-5 text-navy">
       <FadeIn>
-        <Link href="/tecnicos" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-primary">
+        <Link
+          href="/tecnicos"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-primary"
+        >
           <ArrowLeft size={15} /> Volver a técnicos
         </Link>
       </FadeIn>
@@ -120,7 +182,9 @@ export default function TecnicoDetailPage() {
           <Avatar initials={initials(name)} size={84} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display text-[26px] font-bold tracking-tight">{name}</h1>
+              <h1 className="font-display text-[26px] font-bold tracking-tight">
+                {name}
+              </h1>
               <Badge tone={KYC_BADGE[kyc].tone}>{KYC_BADGE[kyc].label}</Badge>
               {!suspended && (
                 <Badge tone={tech.is_available ? 'success' : 'neutral'}>
@@ -129,36 +193,60 @@ export default function TecnicoDetailPage() {
               )}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-muted">
-              <span className="inline-flex items-center gap-1.5"><Phone size={13} className="text-faint" />{profile.phone ?? '—'}</span>
-              <span className="inline-flex items-center gap-1.5"><Mail size={13} className="text-faint" />{email}</span>
-              <span className="inline-flex items-center gap-1.5"><Calendar size={13} className="text-faint" />Registrado {fecha(profile.created_at)}</span>
-              <span className="inline-flex items-center gap-1.5"><MapPin size={13} className="text-faint" />ZMG, Jalisco</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Phone size={13} className="text-faint" />
+                {profile.phone ?? '—'}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Mail size={13} className="text-faint" />
+                {email}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar size={13} className="text-faint" />
+                Registrado {fecha(profile.created_at)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin size={13} className="text-faint" />
+                ZMG, Jalisco
+              </span>
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2.5">
             {kyc === 'in_review' && (
               <>
-                <button onClick={() => setRejectOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
+                <button
+                  onClick={() => setRejectOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft"
+                >
                   <X size={14} /> Rechazar
                 </button>
                 <PrimaryButton onClick={onApprove}>
-                  <span className="inline-flex items-center gap-2"><Check size={14} /> Aprobar KYC</span>
+                  <span className="inline-flex items-center gap-2">
+                    <Check size={14} /> Aprobar KYC
+                  </span>
                 </PrimaryButton>
               </>
             )}
             {kyc === 'declined' && (
               <PrimaryButton onClick={onApprove}>
-                <span className="inline-flex items-center gap-2"><Check size={14} /> Aprobar KYC</span>
+                <span className="inline-flex items-center gap-2">
+                  <Check size={14} /> Aprobar KYC
+                </span>
               </PrimaryButton>
             )}
             {kyc === 'approved' && (
-              <button onClick={onSuspend} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
+              <button
+                onClick={onSuspend}
+                className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft"
+              >
                 <Ban size={14} /> Suspender
               </button>
             )}
             {kyc === 'suspended' && (
               <PrimaryButton onClick={onReactivate}>
-                <span className="inline-flex items-center gap-2"><RotateCcw size={14} /> Reactivar</span>
+                <span className="inline-flex items-center gap-2">
+                  <RotateCcw size={14} /> Reactivar
+                </span>
               </PrimaryButton>
             )}
           </div>
@@ -169,28 +257,51 @@ export default function TecnicoDetailPage() {
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.5fr_1fr]">
         <Stagger className="flex flex-col gap-5">
           <StaggerItem>
-            <Panel title="Datos personales" action={<ContactRound size={15} className="text-primary" />}>
+            <Panel
+              title="Datos personales"
+              action={<ContactRound size={15} className="text-primary" />}
+            >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <KV label="Nombre completo" value={name} />
                 <KV label="Teléfono" value={profile.phone ?? '—'} mono />
                 <KV label="Email" value={email} />
-                <KV label="Fecha de registro" value={fecha(profile.created_at)} />
-                <KV label="Estado de cuenta" value={suspended ? 'Suspendida' : 'Activa'} />
-                <KV label="Trabajos completados" value={String(tech.rating_count)} mono />
+                <KV
+                  label="Fecha de registro"
+                  value={fecha(profile.created_at)}
+                />
+                <KV
+                  label="Estado de cuenta"
+                  value={suspended ? 'Suspendida' : 'Activa'}
+                />
+                <KV
+                  label="Trabajos completados"
+                  value={String(tech.rating_count)}
+                  mono
+                />
               </div>
             </Panel>
           </StaggerItem>
 
           <StaggerItem>
-            <Panel title="Servicios y tarifas" action={<MapIcon size={15} className="text-primary" />}>
+            <Panel
+              title="Servicios y tarifas"
+              action={<MapIcon size={15} className="text-primary" />}
+            >
               {rates.length === 0 ? (
-                <p className="py-3 text-[13px] text-faint">Sin servicios capturados todavía.</p>
+                <p className="py-3 text-[13px] text-faint">
+                  Sin servicios capturados todavía.
+                </p>
               ) : (
                 <div className="flex flex-col">
                   {rates.map(r => (
-                    <div key={r.id} className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0">
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0"
+                    >
                       <div className="flex items-center gap-2.5">
-                        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-navy">{r.cat}</span>
+                        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-navy">
+                          {r.cat}
+                        </span>
                         <span className="text-[13px]">Tarifa de visita</span>
                       </div>
                       <div className="flex items-baseline gap-1.5">
@@ -202,13 +313,29 @@ export default function TecnicoDetailPage() {
                           defaultValue={r.visita_cents / 100}
                           aria-label={`Tarifa de visita · ${r.cat}`}
                           onBlur={e => {
-                            const cents = Math.round(Number(e.target.value) * 100);
-                            if (!Number.isFinite(cents) || cents < 0 || cents === r.visita_cents) return;
+                            const cents = Math.round(
+                              Number(e.target.value) * 100,
+                            );
+                            if (
+                              !Number.isFinite(cents) ||
+                              cents < 0 ||
+                              cents === r.visita_cents
+                            )
+                              return;
                             void upsertTechRate(tech!.id, r.category_id, {
-                              visita_cents: cents, hora_cents: r.hora_cents, minimo_cents: r.minimo_cents,
-                            }).then(ok => ok && toast.success(`Tarifa actualizada · ${r.cat}`));
+                              visita_cents: cents,
+                              hora_cents: r.hora_cents,
+                              minimo_cents: r.minimo_cents,
+                            }).then(
+                              ok =>
+                                ok &&
+                                toast.success(`Tarifa actualizada · ${r.cat}`),
+                            );
                           }}
-                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          onKeyDown={e =>
+                            e.key === 'Enter' &&
+                            (e.target as HTMLInputElement).blur()
+                          }
                           className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-right font-display text-[13.5px] font-semibold text-navy outline-none focus:border-primary"
                         />
                         <span className="text-[12px] text-muted">MXN</span>
@@ -226,9 +353,16 @@ export default function TecnicoDetailPage() {
 
           {tech.bio && (
             <StaggerItem>
-              <Panel title="Biografía profesional" action={<Quote size={15} className="text-primary" />}>
-                <p className="text-[14px] italic leading-relaxed">“{tech.bio}”</p>
-                <div className="mt-3 font-mono text-[11.5px] text-faint">capturada por el técnico al registrarse</div>
+              <Panel
+                title="Biografía profesional"
+                action={<Quote size={15} className="text-primary" />}
+              >
+                <p className="text-[14px] italic leading-relaxed">
+                  “{tech.bio}”
+                </p>
+                <div className="mt-3 font-mono text-[11.5px] text-faint">
+                  capturada por el técnico al registrarse
+                </div>
               </Panel>
             </StaggerItem>
           )}
@@ -241,26 +375,44 @@ export default function TecnicoDetailPage() {
               action={<FileCheck2 size={15} className="text-primary" />}
             >
               {docs.length === 0 ? (
-                <p className="py-3 text-[13px] text-faint">Sin documentos cargados aún.</p>
+                <p className="py-3 text-[13px] text-faint">
+                  Sin documentos cargados aún.
+                </p>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {docs.map(d => (
-                    <div key={d.id} className="rounded-xl border border-line bg-surface p-3">
+                    <div
+                      key={d.id}
+                      className="rounded-xl border border-line bg-surface p-3"
+                    >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-semibold leading-tight">Verificación Didit</span>
-                        <Badge tone={DOC_STATUS[d.status].tone}>{DOC_STATUS[d.status].label}</Badge>
+                        <span className="text-[13px] font-semibold leading-tight">
+                          Verificación Didit
+                        </span>
+                        <Badge tone={DOC_STATUS[d.status].tone}>
+                          {DOC_STATUS[d.status].label}
+                        </Badge>
                       </div>
-                      <div className="my-2 font-mono text-[11px] text-faint">{d.didit_session_id} · iniciada {fecha(d.created_at)}</div>
-                      {(d.status === 'in_review' || d.status === 'in_progress') && (
+                      <div className="my-2 font-mono text-[11px] text-faint">
+                        {d.didit_session_id} · iniciada {fecha(d.created_at)}
+                      </div>
+                      {(d.status === 'in_review' ||
+                        d.status === 'in_progress') && (
                         <div className="flex gap-1.5">
                           <button
-                            onClick={() => { resolveKyc(tech!.id, true); toast.success('Verificación aprobada'); }}
+                            onClick={() => {
+                              resolveKyc(tech!.id, true);
+                              toast.success('Verificación aprobada');
+                            }}
                             className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"
                           >
                             <Check size={12} /> Aprobar verificación
                           </button>
                           <button
-                            onClick={() => { resolveKyc(tech!.id, false); toast.error('Verificación rechazada'); }}
+                            onClick={() => {
+                              resolveKyc(tech!.id, false);
+                              toast.error('Verificación rechazada');
+                            }}
                             className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-warning-ink"
                           >
                             <X size={12} /> Rechazar
@@ -276,15 +428,22 @@ export default function TecnicoDetailPage() {
                   onClick={onApproveAllDocs}
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary/[0.06] px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft"
                 >
-                  <CheckCheck size={13} /> Aprobar los {pendingDocs.length} documentos pendientes
+                  <CheckCheck size={13} /> Aprobar los {pendingDocs.length}{' '}
+                  documentos pendientes
                 </button>
               )}
             </Panel>
           </StaggerItem>
 
           <StaggerItem>
-            <Panel title="Notas internas del admin" action={<MessageSquareText size={15} className="text-primary" />}>
-              <p className="mb-2.5 text-[12px] text-muted">Solo visibles para el equipo Tumantenimiento. El técnico no las ve.</p>
+            <Panel
+              title="Notas internas del admin"
+              action={<MessageSquareText size={15} className="text-primary" />}
+            >
+              <p className="mb-2.5 text-[12px] text-muted">
+                Solo visibles para el equipo Tumantenimiento. El técnico no las
+                ve.
+              </p>
               <Textarea
                 value={note}
                 onChange={e => setNote(e.target.value)}
@@ -293,22 +452,39 @@ export default function TecnicoDetailPage() {
               />
               <div className="mt-2 flex justify-end">
                 <GhostButton onClick={onSaveNote}>
-                  <span className="inline-flex items-center gap-2"><Send size={13} /> Guardar nota</span>
+                  <span className="inline-flex items-center gap-2">
+                    <Send size={13} /> Guardar nota
+                  </span>
                 </GhostButton>
               </div>
-              <div className="mb-2 mt-4 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">Historial</div>
+              <div className="mb-2 mt-4 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">
+                Historial
+              </div>
               {notes.length === 0 ? (
-                <p className="py-2 text-[12.5px] text-faint">Sin notas todavía.</p>
+                <p className="py-2 text-[12.5px] text-faint">
+                  Sin notas todavía.
+                </p>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {notes.map(n => (
-                    <FadeIn key={n.id} className="rounded-xl border border-line bg-surface-2 p-3">
+                    <FadeIn
+                      key={n.id}
+                      className="rounded-xl border border-line bg-surface-2 p-3"
+                    >
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[12px] font-semibold">{n.author}</span>
-                        <span className="rounded bg-surface px-1.5 py-px text-[10px] text-faint">Admin</span>
-                        <span className="ml-auto font-mono text-[10.5px] text-faint">{fecha(n.created_at)}</span>
+                        <span className="text-[12px] font-semibold">
+                          {n.author}
+                        </span>
+                        <span className="rounded bg-surface px-1.5 py-px text-[10px] text-faint">
+                          Admin
+                        </span>
+                        <span className="ml-auto font-mono text-[10.5px] text-faint">
+                          {fecha(n.created_at)}
+                        </span>
                       </div>
-                      <p className="mt-1.5 text-[12.5px] leading-snug">{n.text}</p>
+                      <p className="mt-1.5 text-[12.5px] leading-snug">
+                        {n.text}
+                      </p>
                     </FadeIn>
                   ))}
                 </div>
@@ -333,9 +509,18 @@ export default function TecnicoDetailPage() {
   );
 }
 
-function RejectModal({ open, onClose, onConfirm, techName, email }: {
-  open: boolean; onClose: () => void; onConfirm: (reason: string, comment: string) => void;
-  techName: string; email: string;
+function RejectModal({
+  open,
+  onClose,
+  onConfirm,
+  techName,
+  email,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string, comment: string) => void;
+  techName: string;
+  email: string;
 }) {
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [comment, setComment] = useState('');
@@ -362,7 +547,9 @@ function RejectModal({ open, onClose, onConfirm, techName, email }: {
     >
       <div className="flex flex-col gap-5">
         <div>
-          <div className="mb-2 text-[13px] font-medium text-navy">Motivo del rechazo</div>
+          <div className="mb-2 text-[13px] font-medium text-navy">
+            Motivo del rechazo
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {REJECT_REASONS.map(r => (
               <button
@@ -380,29 +567,46 @@ function RejectModal({ open, onClose, onConfirm, techName, email }: {
           </div>
         </div>
         <div>
-          <div className="mb-2 text-[13px] font-medium text-navy">Mensaje al técnico</div>
+          <div className="mb-2 text-[13px] font-medium text-navy">
+            Mensaje al técnico
+          </div>
           <Textarea
             value={comment}
             onChange={e => setComment(e.target.value)}
             rows={4}
             placeholder={`Explícale a ${techName.split(' ')[0]} qué debe corregir para retomar su solicitud…`}
           />
-          <div className="mt-1.5 text-[11.5px] text-muted">Se enviará por email a {email} y push en la app del técnico.</div>
+          <div className="mt-1.5 text-[11.5px] text-muted">
+            Se enviará por email a {email} y push en la app del técnico.
+          </div>
         </div>
       </div>
     </Modal>
   );
 }
 
-function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician>> }) {
+function BankPanel({
+  tech,
+}: {
+  tech: NonNullable<ReturnType<typeof getTechnician>>;
+}) {
   const [editing, setEditing] = useState(false);
   const [clabe, setClabe] = useState(tech.clabe ?? '');
   const [bank, setBank] = useState(tech.bank_name ?? '');
 
   function onSave() {
-    if (clabe && !/^\d{18}$/.test(clabe)) { toast.error('La CLABE debe tener 18 dígitos'); return; }
-    void updateTechnicianBank(tech.id, bank.trim() || null, clabe || null)
-      .then(ok => { if (ok) { toast.success('Datos bancarios guardados'); setEditing(false); } });
+    if (clabe && !/^\d{18}$/.test(clabe)) {
+      toast.error('La CLABE debe tener 18 dígitos');
+      return;
+    }
+    void updateTechnicianBank(tech.id, bank.trim() || null, clabe || null).then(
+      ok => {
+        if (ok) {
+          toast.success('Datos bancarios guardados');
+          setEditing(false);
+        }
+      },
+    );
   }
 
   return (
@@ -411,11 +615,23 @@ function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician
       action={
         editing ? (
           <div className="flex gap-1.5">
-            <GhostButton onClick={() => { setClabe(tech.clabe ?? ''); setBank(tech.bank_name ?? ''); setEditing(false); }}>Cancelar</GhostButton>
+            <GhostButton
+              onClick={() => {
+                setClabe(tech.clabe ?? '');
+                setBank(tech.bank_name ?? '');
+                setEditing(false);
+              }}
+            >
+              Cancelar
+            </GhostButton>
             <PrimaryButton onClick={onSave}>Guardar</PrimaryButton>
           </div>
         ) : (
-          <button onClick={() => setEditing(true)} aria-label="Editar datos bancarios" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-2">
+          <button
+            onClick={() => setEditing(true)}
+            aria-label="Editar datos bancarios"
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-2"
+          >
             <Landmark size={15} /> Editar
           </button>
         )
@@ -424,16 +640,22 @@ function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician
       {editing ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">CLABE interbancaria</div>
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">
+              CLABE interbancaria
+            </div>
             <input
               value={clabe}
-              onChange={e => setClabe(e.target.value.replace(/\D/g, '').slice(0, 18))}
+              onChange={e =>
+                setClabe(e.target.value.replace(/\D/g, '').slice(0, 18))
+              }
               placeholder="18 dígitos"
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-[13.5px] text-navy outline-none focus:border-primary"
             />
           </div>
           <div>
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Banco</div>
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">
+              Banco
+            </div>
             <input
               value={bank}
               onChange={e => setBank(e.target.value)}
@@ -444,16 +666,25 @@ function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <KV label="CLABE interbancaria" value={fmtClabe(tech.clabe)} mono span={2} />
+          <KV
+            label="CLABE interbancaria"
+            value={fmtClabe(tech.clabe)}
+            mono
+            span={2}
+          />
           <KV label="Banco" value={tech.bank_name ?? '—'} />
           <div>
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Estado</div>
+            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">
+              Estado
+            </div>
             {tech.clabe ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
                 <BadgeCheck size={11} /> CLABE registrada
               </span>
             ) : (
-              <span className="text-[13px] text-faint">Sin CLABE registrada</span>
+              <span className="text-[13px] text-faint">
+                Sin CLABE registrada
+              </span>
             )}
           </div>
         </div>
@@ -462,11 +693,27 @@ function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician
   );
 }
 
-function KV({ label, value, mono, span = 1 }: { label: string; value: string; mono?: boolean; span?: number }) {
+function KV({
+  label,
+  value,
+  mono,
+  span = 1,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  span?: number;
+}) {
   return (
     <div style={{ gridColumn: `span ${span}` }}>
-      <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">{label}</div>
-      <div className={`text-[14px] font-medium text-navy ${mono ? 'font-mono' : ''}`}>{value}</div>
+      <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">
+        {label}
+      </div>
+      <div
+        className={`text-[14px] font-medium text-navy ${mono ? 'font-mono' : ''}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }

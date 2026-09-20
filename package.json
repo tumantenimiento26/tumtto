@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "gen:types": "supabase gen types --lang=typescript --project-id begevdpvtyfkrvkslrgo --schema public > src/types/supabase.ts"
@@ -23,10 +23,14 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.25",
+    "prettier": "^3.9.8",
     "tailwindcss": "^4.1.13",
     "typescript": "^5",
     "vitest": "^4.1.10"

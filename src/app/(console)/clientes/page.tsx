@@ -2,14 +2,43 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Download, Filter, ShieldAlert, Star, MapPin, UserPlus, Users, X } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, exportCsv } from '@/components/admin';
+import {
+  Search,
+  Download,
+  Filter,
+  ShieldAlert,
+  Star,
+  MapPin,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
+import {
+  PageHeading,
+  Panel,
+  StatCard,
+  DataTable,
+  exportCsv,
+} from '@/components/admin';
 import { Popover } from '@/components/admin-shell';
 import type { Column } from '@/components/admin';
-import { GhostButton, Input, Chip, Avatar, Badge, Skeleton } from '@/components/ui';
+import {
+  GhostButton,
+  Input,
+  Chip,
+  Avatar,
+  Badge,
+  Skeleton,
+} from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
-import { useTick, useWorldReady, getClients, getAllRequests, getAllDisputes } from '@/lib/data/store';
+import {
+  useTick,
+  useWorldReady,
+  getClients,
+  getAllRequests,
+  getAllDisputes,
+} from '@/lib/data/store';
 
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
@@ -34,14 +63,30 @@ const STATUS: Record<ClientRow['status'], { label: string; tone: Tone }> = {
 };
 
 const initials = (n: string) =>
-  n.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+  n
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(s => s[0])
+    .join('')
+    .toUpperCase();
 
 const fmt = (n: number) => n.toLocaleString('es-MX');
 
-const FILTERS = ['Todos', 'Activos', 'Nuevos', 'Inactivos', 'Con disputas'] as const;
+const FILTERS = [
+  'Todos',
+  'Activos',
+  'Nuevos',
+  'Inactivos',
+  'Con disputas',
+] as const;
 
 // ponytail: vistas guardadas en localStorage; mover a backend si deben compartirse entre admins.
-type SavedView = { name: string; query: string; filter: (typeof FILTERS)[number] };
+type SavedView = {
+  name: string;
+  query: string;
+  filter: (typeof FILTERS)[number];
+};
 const VIEWS_KEY = 'tumtto:clientes:vistas';
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -59,10 +104,14 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full" />
+        ))}
       </div>
       <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        {Array.from({ length: rows }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     </div>
   );
@@ -78,12 +127,24 @@ export default function ClientesPage() {
   const [views, setViews] = useState<SavedView[]>([]);
   const [viewName, setViewName] = useState('');
   useEffect(() => {
-    try { setViews(JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '[]') as SavedView[]); } catch { /* JSON corrupto: empieza vacío */ }
+    try {
+      setViews(
+        JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '[]') as SavedView[],
+      );
+    } catch {
+      /* JSON corrupto: empieza vacío */
+    }
   }, []);
-  function persistViews(v: SavedView[]) { setViews(v); localStorage.setItem(VIEWS_KEY, JSON.stringify(v)); }
+  function persistViews(v: SavedView[]) {
+    setViews(v);
+    localStorage.setItem(VIEWS_KEY, JSON.stringify(v));
+  }
   function saveCurrentView() {
     const name = viewName.trim() || `${filter}${query ? ` · “${query}”` : ''}`;
-    persistViews([...views.filter(v => v.name !== name), { name, query, filter }]);
+    persistViews([
+      ...views.filter(v => v.name !== name),
+      { name, query, filter },
+    ]);
     setViewName('');
     toast.success(`Vista guardada · ${name}`);
   }
@@ -93,9 +154,12 @@ export default function ClientesPage() {
     const disputes = getAllDisputes();
     return getClients().map(p => {
       const myReqs = reqs.filter(r => r.client_id === p.id);
-      const gmv = myReqs.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
+      const gmv =
+        myReqs.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
       const lastReq = myReqs[0] ?? null; // getAllRequests ya viene ordenado por fecha
-      const recent = lastReq && Date.now() - new Date(lastReq.created_at).getTime() < 60 * DAY_MS;
+      const recent =
+        lastReq &&
+        Date.now() - new Date(lastReq.created_at).getTime() < 60 * DAY_MS;
       return {
         id: p.id,
         name: p.full_name ?? 'Cliente',
@@ -107,7 +171,11 @@ export default function ClientesPage() {
         rating: 0, // sin tabla de ratings por servicio todavía
         last: relDays(lastReq?.created_at ?? null),
         disputes: disputes.filter(d => d.opened_by === p.id).length,
-        status: (myReqs.length === 0 ? 'new' : recent ? 'active' : 'inactive') as ClientRow['status'],
+        status: (myReqs.length === 0
+          ? 'new'
+          : recent
+            ? 'active'
+            : 'inactive') as ClientRow['status'],
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,7 +185,10 @@ export default function ClientesPage() {
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
       const matchesQ =
-        !q || r.name.toLowerCase().includes(q) || r.phone.includes(q) || r.email.toLowerCase().includes(q);
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.phone.includes(q) ||
+        r.email.toLowerCase().includes(q);
       const matchesF =
         filter === 'Todos' ||
         (filter === 'Activos' && r.status === 'active') ||
@@ -134,10 +205,20 @@ export default function ClientesPage() {
   const conDisputas = rows.filter(r => r.disputes > 0).length;
 
   function onExport() {
-    exportCsv('clientes.csv', filtered.map(r => ({
-      ID: r.id, Nombre: r.name, Email: r.email, Teléfono: r.phone, Ciudad: r.city,
-      Servicios: r.services, GMV: r.gmv, Rating: r.rating || '', Estado: STATUS[r.status].label,
-    })));
+    exportCsv(
+      'clientes.csv',
+      filtered.map(r => ({
+        ID: r.id,
+        Nombre: r.name,
+        Email: r.email,
+        Teléfono: r.phone,
+        Ciudad: r.city,
+        Servicios: r.services,
+        GMV: r.gmv,
+        Rating: r.rating || '',
+        Estado: STATUS[r.status].label,
+      })),
+    );
     toast.success(`CSV exportado · ${filtered.length} clientes`);
   }
 
@@ -150,7 +231,9 @@ export default function ClientesPage() {
           <Avatar initials={initials(r.name)} size={36} />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[13.5px] font-semibold text-navy">{r.name}</span>
+              <span className="text-[13.5px] font-semibold text-navy">
+                {r.name}
+              </span>
               {r.disputes > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-bold text-error">
                   <ShieldAlert size={10} /> {r.disputes}
@@ -162,7 +245,13 @@ export default function ClientesPage() {
         </div>
       ),
     },
-    { key: 'phone', header: 'Teléfono', render: r => <span className="font-mono text-[12.5px] text-muted">{r.phone}</span> },
+    {
+      key: 'phone',
+      header: 'Teléfono',
+      render: r => (
+        <span className="font-mono text-[12.5px] text-muted">{r.phone}</span>
+      ),
+    },
     {
       key: 'city',
       header: 'Ciudad',
@@ -172,7 +261,13 @@ export default function ClientesPage() {
         </span>
       ),
     },
-    { key: 'services', header: 'Servicios', render: r => <span className="font-mono text-[13px] text-navy">{r.services}</span> },
+    {
+      key: 'services',
+      header: 'Servicios',
+      render: r => (
+        <span className="font-mono text-[13px] text-navy">{r.services}</span>
+      ),
+    },
     {
       key: 'gmv',
       header: 'GMV total',
@@ -190,14 +285,26 @@ export default function ClientesPage() {
         r.rating > 0 ? (
           <span className="inline-flex items-center gap-1.5">
             <Star size={13} className="text-warning" fill="currentColor" />
-            <span className="text-[13px] font-semibold text-navy">{r.rating.toFixed(1)}</span>
+            <span className="text-[13px] font-semibold text-navy">
+              {r.rating.toFixed(1)}
+            </span>
           </span>
         ) : (
           <span className="text-[13px] text-faint">—</span>
         ),
     },
-    { key: 'last', header: 'Último servicio', render: r => <span className="text-[12.5px] text-muted">{r.last}</span> },
-    { key: 'status', header: 'Estado', render: r => <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge> },
+    {
+      key: 'last',
+      header: 'Último servicio',
+      render: r => <span className="text-[12.5px] text-muted">{r.last}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: r => (
+        <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
+      ),
+    },
   ];
 
   if (!ready) return <SkeletonRows />;
@@ -211,53 +318,119 @@ export default function ClientesPage() {
           <div className="flex gap-2.5">
             <div className="relative">
               <GhostButton onClick={() => setViewsOpen(o => !o)}>
-                <span className="inline-flex items-center gap-2"><Filter size={14} /> Vistas guardadas{views.length > 0 ? ` (${views.length})` : ''}</span>
+                <span className="inline-flex items-center gap-2">
+                  <Filter size={14} /> Vistas guardadas
+                  {views.length > 0 ? ` (${views.length})` : ''}
+                </span>
               </GhostButton>
               {viewsOpen && (
                 <Popover onClose={() => setViewsOpen(false)} className="w-72">
-                  {views.length === 0 && <div className="px-3 py-2.5 text-[13px] text-muted">Sin vistas guardadas. Ajusta filtros y guarda la vista actual.</div>}
+                  {views.length === 0 && (
+                    <div className="px-3 py-2.5 text-[13px] text-muted">
+                      Sin vistas guardadas. Ajusta filtros y guarda la vista
+                      actual.
+                    </div>
+                  )}
                   {views.map(v => (
-                    <div key={v.name} className="flex items-center rounded-lg hover:bg-surface">
-                      <button onClick={() => { setQuery(v.query); setFilter(v.filter); setViewsOpen(false); }} className="min-w-0 flex-1 px-3 py-2.5 text-left">
-                        <div className="truncate text-[13px] font-medium text-navy">{v.name}</div>
-                        <div className="text-[11px] text-muted">{v.filter}{v.query ? ` · “${v.query}”` : ''}</div>
+                    <div
+                      key={v.name}
+                      className="flex items-center rounded-lg hover:bg-surface"
+                    >
+                      <button
+                        onClick={() => {
+                          setQuery(v.query);
+                          setFilter(v.filter);
+                          setViewsOpen(false);
+                        }}
+                        className="min-w-0 flex-1 px-3 py-2.5 text-left"
+                      >
+                        <div className="truncate text-[13px] font-medium text-navy">
+                          {v.name}
+                        </div>
+                        <div className="text-[11px] text-muted">
+                          {v.filter}
+                          {v.query ? ` · “${v.query}”` : ''}
+                        </div>
                       </button>
-                      <button aria-label={`Eliminar vista ${v.name}`} onClick={() => persistViews(views.filter(x => x.name !== v.name))} className="mr-1.5 rounded-md p-1.5 text-faint hover:text-error">
+                      <button
+                        aria-label={`Eliminar vista ${v.name}`}
+                        onClick={() =>
+                          persistViews(views.filter(x => x.name !== v.name))
+                        }
+                        className="mr-1.5 rounded-md p-1.5 text-faint hover:text-error"
+                      >
                         <X size={13} />
                       </button>
                     </div>
                   ))}
                   <div className="mt-1 flex items-center gap-2 border-t border-line px-2 pb-1 pt-2">
                     <input
-                      value={viewName} onChange={e => setViewName(e.target.value)}
+                      value={viewName}
+                      onChange={e => setViewName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && saveCurrentView()}
                       placeholder="Nombre de la vista…"
                       className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] text-navy outline-none placeholder:text-faint"
                     />
-                    <button onClick={saveCurrentView} className="flex-shrink-0 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-white">Guardar</button>
+                    <button
+                      onClick={saveCurrentView}
+                      className="flex-shrink-0 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-white"
+                    >
+                      Guardar
+                    </button>
                   </div>
                 </Popover>
               )}
             </div>
             <GhostButton onClick={onExport}>
-              <span className="inline-flex items-center gap-2 text-cyan"><Download size={14} /> Exportar CSV</span>
+              <span className="inline-flex items-center gap-2 text-cyan">
+                <Download size={14} /> Exportar CSV
+              </span>
             </GhostButton>
           </div>
         }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard index={0} label="Total clientes" value={fmt(total)} icon={Users} note="Base registrada en ZMG" />
-        <StatCard index={1} label="Nuevos este mes" value={fmt(nuevos)} trend="up" delta="+12%" icon={UserPlus} />
-        <StatCard index={2} label="Activos" value={fmt(activos)} note={`${Math.round((activos / total) * 100)}% de la base`} progress={activos / total} />
-        <StatCard index={3} label="Con disputas" value={fmt(conDisputas)} trend="down" icon={ShieldAlert} note="Requieren seguimiento" />
+        <StatCard
+          index={0}
+          label="Total clientes"
+          value={fmt(total)}
+          icon={Users}
+          note="Base registrada en ZMG"
+        />
+        <StatCard
+          index={1}
+          label="Nuevos este mes"
+          value={fmt(nuevos)}
+          trend="up"
+          delta="+12%"
+          icon={UserPlus}
+        />
+        <StatCard
+          index={2}
+          label="Activos"
+          value={fmt(activos)}
+          note={`${Math.round((activos / total) * 100)}% de la base`}
+          progress={activos / total}
+        />
+        <StatCard
+          index={3}
+          label="Con disputas"
+          value={fmt(conDisputas)}
+          trend="down"
+          icon={ShieldAlert}
+          note="Requieren seguimiento"
+        />
       </div>
 
       <FadeIn>
         <Panel>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-[320px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+              />
               <Input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
@@ -267,7 +440,11 @@ export default function ClientesPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {FILTERS.map(f => (
-                <Chip key={f} active={filter === f} onClick={() => setFilter(f)}>
+                <Chip
+                  key={f}
+                  active={filter === f}
+                  onClick={() => setFilter(f)}
+                >
                   {f}
                 </Chip>
               ))}
@@ -283,7 +460,8 @@ export default function ClientesPage() {
 
           <div className="mt-4 flex items-center justify-between border-t border-line pt-4 text-[12.5px] text-muted">
             <span>
-              Mostrando <b className="font-semibold text-navy">{filtered.length}</b> de{' '}
+              Mostrando{' '}
+              <b className="font-semibold text-navy">{filtered.length}</b> de{' '}
               <b className="font-semibold text-navy">{fmt(total)}</b> clientes
             </span>
           </div>

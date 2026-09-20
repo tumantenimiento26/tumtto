@@ -2,9 +2,22 @@
 
 import { useState } from 'react';
 import {
-  MapPin, HardHat, Hexagon, Users, AlertTriangle, CheckCircle2, Globe, Pencil,
+  MapPin,
+  HardHat,
+  Hexagon,
+  Users,
+  AlertTriangle,
+  CheckCircle2,
+  Globe,
+  Pencil,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, type Column } from '@/components/admin';
+import {
+  PageHeading,
+  Panel,
+  StatCard,
+  DataTable,
+  type Column,
+} from '@/components/admin';
 import { Chip, Badge, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem, ProgressBar } from '@/components/motion';
 import { CoverageMap } from '@/components/coverage-map';
@@ -22,13 +35,52 @@ type Zone = {
 };
 
 const ZONES: Zone[] = [
-  { id: 'zap', name: 'Zapopan', status: 'ok', colonias: 198, covered: 194, techs: 318, jobs: 1084, gaps: ['Loma Bonita Ejidal', 'Real de la Loma'] },
-  { id: 'gdl', name: 'Guadalajara', status: 'ok', colonias: 245, covered: 240, techs: 412, jobs: 1462, gaps: ['Oblatos', 'San Andrés'] },
-  { id: 'tlaq', name: 'Tlaquepaque', status: 'ok', colonias: 124, covered: 118, techs: 142, jobs: 612, gaps: ['Las Juntas', 'El Órgano'] },
-  { id: 'tlaj', name: 'Tlajomulco de Zúñiga', status: 'warn', colonias: 64, covered: 41, techs: 48, jobs: 188, gaps: ['Santa Fe', 'Chulavista', 'Hacienda Sta. Fe', 'El Zapote'] },
+  {
+    id: 'zap',
+    name: 'Zapopan',
+    status: 'ok',
+    colonias: 198,
+    covered: 194,
+    techs: 318,
+    jobs: 1084,
+    gaps: ['Loma Bonita Ejidal', 'Real de la Loma'],
+  },
+  {
+    id: 'gdl',
+    name: 'Guadalajara',
+    status: 'ok',
+    colonias: 245,
+    covered: 240,
+    techs: 412,
+    jobs: 1462,
+    gaps: ['Oblatos', 'San Andrés'],
+  },
+  {
+    id: 'tlaq',
+    name: 'Tlaquepaque',
+    status: 'ok',
+    colonias: 124,
+    covered: 118,
+    techs: 142,
+    jobs: 612,
+    gaps: ['Las Juntas', 'El Órgano'],
+  },
+  {
+    id: 'tlaj',
+    name: 'Tlajomulco de Zúñiga',
+    status: 'warn',
+    colonias: 64,
+    covered: 41,
+    techs: 48,
+    jobs: 188,
+    gaps: ['Santa Fe', 'Chulavista', 'Hacienda Sta. Fe', 'El Zapote'],
+  },
 ];
 
-const ZONE_STATUS: Record<Zone['status'], 'success' | 'warning'> = { ok: 'success', warn: 'warning' };
+const ZONE_STATUS: Record<Zone['status'], 'success' | 'warning'> = {
+  ok: 'success',
+  warn: 'warning',
+};
 
 export default function RegionesPage() {
   useTick();
@@ -41,7 +93,7 @@ export default function RegionesPage() {
   const totalTechs = ZONES.reduce((s, z) => s + z.techs, 0);
   const totalGaps = ZONES.reduce((s, z) => s + (z.colonias - z.covered), 0);
   const covPct = Math.round((totalCovered / totalColonias) * 100);
-  const active = ZONES.find((z) => z.id === selected) ?? ZONES[0];
+  const active = ZONES.find(z => z.id === selected) ?? ZONES[0];
 
   // ponytail: no hay tabla de cobertura por zona — se listan los técnicos
   // disponibles como aproximación de la región seleccionada.
@@ -51,26 +103,38 @@ export default function RegionesPage() {
     {
       key: 'tech',
       header: 'Técnico',
-      render: (r) => (
+      render: r => (
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-info-soft text-primary">
             <HardHat size={14} />
           </span>
-          <span className="font-medium text-navy">{r.profile?.full_name ?? r.tech.id}</span>
+          <span className="font-medium text-navy">
+            {r.profile?.full_name ?? r.tech.id}
+          </span>
         </div>
       ),
     },
-    { key: 'radius', header: 'Radio', render: () => <span className="font-mono text-[12px] text-muted">10 km</span> },
+    {
+      key: 'radius',
+      header: 'Radio',
+      render: () => (
+        <span className="font-mono text-[12px] text-muted">10 km</span>
+      ),
+    },
     {
       key: 'avail',
       header: 'Estado',
-      render: (r) => (
+      render: r => (
         <Badge tone={r.tech.is_available ? 'success' : 'neutral'}>
           {r.tech.is_available ? 'Disponible' : 'Inactivo'}
         </Badge>
       ),
     },
-    { key: 'zone', header: 'Zona base', render: () => <span className="text-muted">ZMG · Zapopan</span> },
+    {
+      key: 'zone',
+      header: 'Zona base',
+      render: () => <span className="text-muted">ZMG · Zapopan</span>,
+    },
   ];
 
   return (
@@ -88,10 +152,45 @@ export default function RegionesPage() {
 
       {/* Stat cards */}
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem><StatCard index={0} label="Cobertura ZMG" value={`${covPct}%`} progress={covPct / 100} note={`${totalCovered}/${totalColonias} colonias`} icon={Hexagon} /></StaggerItem>
-        <StaggerItem><StatCard index={1} label="Técnicos en operación" value={totalTechs.toLocaleString('es-MX')} delta="+24" trend="up" note="vs. mes anterior" icon={Users} /></StaggerItem>
-        <StaggerItem><StatCard index={2} label="Zonas activas" value={`${ZONES.filter((z) => z.status === 'ok').length}/${ZONES.length}`} note="1 zona parcial" icon={MapPin} /></StaggerItem>
-        <StaggerItem><StatCard index={3} label="Colonias con brecha" value={totalGaps} note="sin cobertura suficiente" icon={AlertTriangle} /></StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={0}
+            label="Cobertura ZMG"
+            value={`${covPct}%`}
+            progress={covPct / 100}
+            note={`${totalCovered}/${totalColonias} colonias`}
+            icon={Hexagon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={1}
+            label="Técnicos en operación"
+            value={totalTechs.toLocaleString('es-MX')}
+            delta="+24"
+            trend="up"
+            note="vs. mes anterior"
+            icon={Users}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={2}
+            label="Zonas activas"
+            value={`${ZONES.filter(z => z.status === 'ok').length}/${ZONES.length}`}
+            note="1 zona parcial"
+            icon={MapPin}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={3}
+            label="Colonias con brecha"
+            value={totalGaps}
+            note="sin cobertura suficiente"
+            icon={AlertTriangle}
+          />
+        </StaggerItem>
       </Stagger>
 
       {/* Map + zone list */}
@@ -106,12 +205,22 @@ export default function RegionesPage() {
                 disabled={editingPolys}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-card hover:bg-primary-2 disabled:opacity-50"
               >
-                <Pencil size={13} /> {editingPolys ? 'Editando…' : 'Editar polígonos'}
+                <Pencil size={13} />{' '}
+                {editingPolys ? 'Editando…' : 'Editar polígonos'}
               </button>
             }
           >
             <CoverageMap
-              zones={ZONES.map(({ id, name, status, techs, covered, colonias }) => ({ id, name, status, techs, covered, colonias }))}
+              zones={ZONES.map(
+                ({ id, name, status, techs, covered, colonias }) => ({
+                  id,
+                  name,
+                  status,
+                  techs,
+                  covered,
+                  colonias,
+                }),
+              )}
               selected={selected}
               onSelect={setSelected}
               editing={editingPolys}
@@ -124,7 +233,7 @@ export default function RegionesPage() {
         <FadeIn delay={0.05}>
           <Panel title="Zonas ZMG" action={<Chip>{ZONES.length} zonas</Chip>}>
             <div className="flex flex-col gap-2.5">
-              {ZONES.map((z) => {
+              {ZONES.map(z => {
                 const pct = Math.round((z.covered / z.colonias) * 100);
                 const sel = z.id === selected;
                 return (
@@ -132,22 +241,53 @@ export default function RegionesPage() {
                     key={z.id}
                     onClick={() => setSelected(z.id)}
                     className={`rounded-xl border p-3.5 text-left transition ${
-                      sel ? 'border-primary bg-info-soft' : 'border-line bg-white hover:bg-surface'
+                      sel
+                        ? 'border-primary bg-info-soft'
+                        : 'border-line bg-white hover:bg-surface'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <MapPin size={15} className={z.status === 'warn' ? 'text-warning' : 'text-primary'} />
-                        <span className="font-semibold text-navy">{z.name}</span>
+                        <MapPin
+                          size={15}
+                          className={
+                            z.status === 'warn'
+                              ? 'text-warning'
+                              : 'text-primary'
+                          }
+                        />
+                        <span className="font-semibold text-navy">
+                          {z.name}
+                        </span>
                       </div>
-                      <Badge tone={ZONE_STATUS[z.status]}>{z.status === 'ok' ? 'Activa' : 'Parcial'}</Badge>
+                      <Badge tone={ZONE_STATUS[z.status]}>
+                        {z.status === 'ok' ? 'Activa' : 'Parcial'}
+                      </Badge>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[12px] text-muted">
-                      <span><span className="font-mono text-navy">{z.techs}</span> técnicos</span>
-                      <span><span className="font-mono text-navy">{z.colonias}</span> colonias</span>
-                      <span className={pct < 80 ? 'text-warning' : 'text-success'}>{pct}% cobertura</span>
+                      <span>
+                        <span className="font-mono text-navy">{z.techs}</span>{' '}
+                        técnicos
+                      </span>
+                      <span>
+                        <span className="font-mono text-navy">
+                          {z.colonias}
+                        </span>{' '}
+                        colonias
+                      </span>
+                      <span
+                        className={pct < 80 ? 'text-warning' : 'text-success'}
+                      >
+                        {pct}% cobertura
+                      </span>
                     </div>
-                    <ProgressBar value={pct / 100} className="mt-2 !h-1.5" fillClassName={pct < 80 ? 'bg-warning' : 'bg-grad-progress'} />
+                    <ProgressBar
+                      value={pct / 100}
+                      className="mt-2 !h-1.5"
+                      fillClassName={
+                        pct < 80 ? 'bg-warning' : 'bg-grad-progress'
+                      }
+                    />
                   </button>
                 );
               })}
@@ -164,8 +304,11 @@ export default function RegionesPage() {
               Colonias sin técnicos suficientes para la demanda registrada.
             </p>
             <div className="flex flex-col gap-2">
-              {active.gaps.map((g) => (
-                <div key={g} className="flex items-center justify-between rounded-lg border border-line bg-surface px-3 py-2.5">
+              {active.gaps.map(g => (
+                <div
+                  key={g}
+                  className="flex items-center justify-between rounded-lg border border-line bg-surface px-3 py-2.5"
+                >
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={14} className="text-warning" />
                     <span className="text-[13px] text-navy">{g}</span>
@@ -180,13 +323,17 @@ export default function RegionesPage() {
               )}
             </div>
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-info-soft px-3 py-2.5 text-[12px] text-primary">
-              <Globe size={14} /> {active.covered}/{active.colonias} colonias cubiertas · {active.jobs.toLocaleString('es-MX')} servicios/sem
+              <Globe size={14} /> {active.covered}/{active.colonias} colonias
+              cubiertas · {active.jobs.toLocaleString('es-MX')} servicios/sem
             </div>
           </Panel>
         </FadeIn>
 
         <FadeIn delay={0.05}>
-          <Panel title={`Técnicos asignados · ${active.name}`} action={<Chip>{zoneTechs.length} en zona</Chip>}>
+          <Panel
+            title={`Técnicos asignados · ${active.name}`}
+            action={<Chip>{zoneTechs.length} en zona</Chip>}
+          >
             <DataTable
               columns={techCols}
               rows={zoneTechs}

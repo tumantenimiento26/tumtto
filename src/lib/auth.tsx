@@ -31,7 +31,10 @@ export type AuthState = {
 export type AuthContextValue = AuthState & {
   /** Consola = solo staff: sesión válida + profiles.role admin. */
   isAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   retryUsuario: () => Promise<void>;
 };
@@ -83,7 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState(s => ({ ...s, usuario, usuarioError: null }));
         return;
       } catch {
-        if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        if (attempt < MAX_ATTEMPTS)
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
       }
     }
     setState(s => ({
@@ -95,20 +99,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState(s => ({ ...s, session, loading: false, usuario: null, usuarioError: null }));
+      setState(s => ({
+        ...s,
+        session,
+        loading: false,
+        usuario: null,
+        usuarioError: null,
+      }));
       void refreshUsuario(session);
     });
     return () => sub.subscription.unsubscribe();
   }, [refreshUsuario]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     return { error: error ? error.message : null };
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    setState({ session: null, usuario: null, loading: false, usuarioError: null });
+    setState({
+      session: null,
+      usuario: null,
+      loading: false,
+      usuarioError: null,
+    });
   }, []);
 
   const retryUsuario = useCallback(
@@ -133,6 +151,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 /** App-wide auth — must be rendered inside `<AuthProvider>` (root layout). */
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth requiere <AuthProvider> (envuélvelo en el layout raíz).');
+  if (!ctx)
+    throw new Error(
+      'useAuth requiere <AuthProvider> (envuélvelo en el layout raíz).',
+    );
   return ctx;
 }

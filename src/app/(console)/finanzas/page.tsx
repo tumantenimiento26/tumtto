@@ -2,33 +2,80 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Download, Settings, DollarSign, Percent, Wallet, Hourglass,
-  CreditCard, Store, Banknote, ArrowRight, TrendingUp, Zap, Check,
-  BadgeCheck, AlertTriangle, ExternalLink, ArrowDownLeft, ArrowUpRight,
+  Download,
+  Settings,
+  DollarSign,
+  Percent,
+  Wallet,
+  Hourglass,
+  CreditCard,
+  Store,
+  Banknote,
+  ArrowRight,
+  TrendingUp,
+  Zap,
+  Check,
+  BadgeCheck,
+  AlertTriangle,
+  ExternalLink,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from 'lucide-react';
-import { PageHeading, Panel, StatCard, DataTable, Modal, exportCsv, type Column } from '@/components/admin';
+import {
+  PageHeading,
+  Panel,
+  StatCard,
+  DataTable,
+  Modal,
+  exportCsv,
+  type Column,
+} from '@/components/admin';
 import { LineChart, VBars, HBars } from '@/components/charts';
 import { Avatar, PrimaryButton, GhostButton, Skeleton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  getMetrics, getAllPayments, getAllPayouts, getLedger, getAllLedger, getWalletBalanceCents,
-  getTechnician, getProfile, getRequest, processPayoutBatch, useTick,
+  getMetrics,
+  getAllPayments,
+  getAllPayouts,
+  getLedger,
+  getAllLedger,
+  getWalletBalanceCents,
+  getTechnician,
+  getProfile,
+  getRequest,
+  processPayoutBatch,
+  useTick,
   useWorldReady,
 } from '@/lib/data/store';
 
 interface PayRow {
-  id: string; request_id: string; method: string; status: string;
-  gross_amount: number; platform_fee: number; technician_net: number; client: string;
+  id: string;
+  request_id: string;
+  method: string;
+  status: string;
+  gross_amount: number;
+  platform_fee: number;
+  technician_net: number;
+  client: string;
 }
 interface PayoutRow {
-  id: string; amount: number; status: string; clabe_snapshot: string | null;
-  name: string; initials: string; bank: string; kyc: 'ok' | 'review';
+  id: string;
+  amount: number;
+  status: string;
+  clabe_snapshot: string | null;
+  name: string;
+  initials: string;
+  bank: string;
+  kyc: 'ok' | 'review';
 }
 
 const mx = (n: number) => '$' + n.toLocaleString('es-MX');
 
-const METHOD_META: Record<string, { label: string; icon: typeof CreditCard; color: string }> = {
+const METHOD_META: Record<
+  string,
+  { label: string; icon: typeof CreditCard; color: string }
+> = {
   card: { label: 'Tarjeta', icon: CreditCard, color: '#0A6BCF' },
   tarjeta: { label: 'Tarjeta', icon: CreditCard, color: '#0A6BCF' },
   oxxo: { label: 'OXXO Pay', icon: Store, color: '#B45309' },
@@ -41,8 +88,16 @@ const METHOD_META: Record<string, { label: string; icon: typeof CreditCard; colo
 const DAY_MS = 24 * 3600 * 1000;
 
 /** GMV diario real (pesos) de los últimos 14 días, a partir de payments.paid_at. */
-function dailyGmv(payments: { status: string; paid_at: string | null; amount_cents: number; commission_cents: number }[]) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+function dailyGmv(
+  payments: {
+    status: string;
+    paid_at: string | null;
+    amount_cents: number;
+    commission_cents: number;
+  }[],
+) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return Array.from({ length: 14 }, (_, i) => {
     const from = today.getTime() - (13 - i) * DAY_MS;
     const inDay = payments.filter(p => {
@@ -53,7 +108,10 @@ function dailyGmv(payments: { status: string; paid_at: string | null; amount_cen
     const value = inDay.reduce((s, p) => s + p.amount_cents, 0) / 100;
     const fee = inDay.reduce((s, p) => s + p.commission_cents, 0) / 100;
     return {
-      label: new Date(from).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }),
+      label: new Date(from).toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: 'short',
+      }),
       value,
       meta: `comisión plataforma · $${Math.round(fee).toLocaleString('es-MX')}`,
     };
@@ -61,7 +119,11 @@ function dailyGmv(payments: { status: string; paid_at: string | null; amount_cen
 }
 
 // ponytail: banco detectado por prefijo de CLABE — solo presentacional.
-const BANK_BY_PREFIX: Record<string, string> = { '012': 'BBVA', '044': 'Santander', '014': 'Banorte' };
+const BANK_BY_PREFIX: Record<string, string> = {
+  '012': 'BBVA',
+  '044': 'Santander',
+  '014': 'Banorte',
+};
 
 const PAY_STATUS: Record<string, { label: string; cls: string }> = {
   paid: { label: 'Pagado', cls: 'bg-success-soft text-success' },
@@ -82,10 +144,14 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full" />
+        ))}
       </div>
       <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        {Array.from({ length: rows }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     </div>
   );
@@ -99,13 +165,20 @@ export default function FinanzasPage() {
   const m = getMetrics();
 
   const payments = useMemo<PayRow[]>(() => {
-    const live: PayRow[] = getAllPayments().map((p) => {
+    const live: PayRow[] = getAllPayments().map(p => {
       const req = getRequest(p.service_order_id);
-      const client = req ? getProfile(req.client_id)?.full_name ?? 'Cliente' : 'Cliente';
+      const client = req
+        ? (getProfile(req.client_id)?.full_name ?? 'Cliente')
+        : 'Cliente';
       return {
-        id: p.id, request_id: p.service_order_id, method: p.method, status: p.status,
-        gross_amount: p.amount_cents / 100, platform_fee: p.commission_cents / 100,
-        technician_net: (p.amount_cents - p.commission_cents) / 100, client,
+        id: p.id,
+        request_id: p.service_order_id,
+        method: p.method,
+        status: p.status,
+        gross_amount: p.amount_cents / 100,
+        platform_fee: p.commission_cents / 100,
+        technician_net: (p.amount_cents - p.commission_cents) / 100,
+        client,
       };
     });
     return live;
@@ -113,13 +186,22 @@ export default function FinanzasPage() {
   }, [tick]);
 
   const payouts = useMemo<PayoutRow[]>(() => {
-    return getAllPayouts().map((p) => {
+    return getAllPayouts().map(p => {
       const tech = getTechnician(p.technician_id);
       const name = (tech && getProfile(tech.id)?.full_name) ?? 'Técnico';
       return {
-        id: p.id, amount: p.amount_cents / 100, status: p.status, clabe_snapshot: p.clabe_snapshot,
+        id: p.id,
+        amount: p.amount_cents / 100,
+        status: p.status,
+        clabe_snapshot: p.clabe_snapshot,
         name,
-        initials: name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase(),
+        initials: name
+          .split(' ')
+          .filter(Boolean)
+          .slice(0, 2)
+          .map(w => w[0])
+          .join('')
+          .toUpperCase(),
         bank: BANK_BY_PREFIX[p.clabe_snapshot?.slice(0, 3) ?? ''] ?? 'BBVA',
         kyc: tech?.kyc_status === 'approved' ? 'ok' : 'review',
       };
@@ -130,24 +212,41 @@ export default function FinanzasPage() {
   // Wallet destacado: el técnico con más movimiento en el ledger.
   const walletTechId = useMemo(() => {
     const counts: Record<string, number> = {};
-    getAllLedger().forEach(e => { counts[e.technician_id] = (counts[e.technician_id] ?? 0) + 1; });
+    getAllLedger().forEach(e => {
+      counts[e.technician_id] = (counts[e.technician_id] ?? 0) + 1;
+    });
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const daily = useMemo(() => dailyGmv(getAllPayments()), [tick]);
-  const walletBalance = walletTechId ? getWalletBalanceCents(walletTechId) / 100 : 0;
+  const walletBalance = walletTechId
+    ? getWalletBalanceCents(walletTechId) / 100
+    : 0;
   const walletTxns = walletTechId ? getLedger(walletTechId) : [];
-  const walletName = (walletTechId && getProfile(walletTechId)?.full_name) ?? 'Técnico';
-  const walletWithdrawn30d = walletTxns
-    .filter(e => e.entry_type === 'payout' && Date.now() - new Date(e.created_at).getTime() < 30 * DAY_MS)
-    .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
-  const walletFees = walletTxns
-    .filter(e => e.entry_type === 'commission_collected' || e.entry_type === 'commission_owed')
-    .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
+  const walletName =
+    (walletTechId && getProfile(walletTechId)?.full_name) ?? 'Técnico';
+  const walletWithdrawn30d =
+    walletTxns
+      .filter(
+        e =>
+          e.entry_type === 'payout' &&
+          Date.now() - new Date(e.created_at).getTime() < 30 * DAY_MS,
+      )
+      .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
+  const walletFees =
+    walletTxns
+      .filter(
+        e =>
+          e.entry_type === 'commission_collected' ||
+          e.entry_type === 'commission_owed',
+      )
+      .reduce((s, e) => s + Math.abs(e.amount_cents), 0) / 100;
 
-  const pendingTotal = payouts.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
-  const pendingCount = payouts.filter((p) => p.status === 'pending').length;
+  const pendingTotal = payouts
+    .filter(p => p.status === 'pending')
+    .reduce((s, p) => s + p.amount, 0);
+  const pendingCount = payouts.filter(p => p.status === 'pending').length;
 
   // GMV mensual real (últimos 6 meses) desde payments.paid_at.
   const monthlyGmv = useMemo(() => {
@@ -155,11 +254,14 @@ export default function FinanzasPage() {
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(nowD.getFullYear(), nowD.getMonth() - (5 - i), 1);
       const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-      const value = getAllPayments().reduce((s, p) => {
-        if (p.status !== 'paid' || !p.paid_at) return s;
-        const t = new Date(p.paid_at).getTime();
-        return t >= d.getTime() && t < next.getTime() ? s + p.amount_cents : s;
-      }, 0) / 100;
+      const value =
+        getAllPayments().reduce((s, p) => {
+          if (p.status !== 'paid' || !p.paid_at) return s;
+          const t = new Date(p.paid_at).getTime();
+          return t >= d.getTime() && t < next.getTime()
+            ? s + p.amount_cents
+            : s;
+        }, 0) / 100;
       return {
         label: d.toLocaleDateString('es-MX', { month: 'short' }),
         value,
@@ -170,11 +272,19 @@ export default function FinanzasPage() {
   }, [tick]);
 
   function onExport() {
-    exportCsv('transacciones.csv', payments.map(p => ({
-      ID: p.id, Servicio: p.request_id, Cliente: p.client, Método: METHOD_META[p.method]?.label ?? p.method,
-      Bruto: p.gross_amount, Comisión: p.platform_fee, 'Neto técnico': p.technician_net,
-      Estado: PAY_STATUS[p.status]?.label ?? p.status,
-    })));
+    exportCsv(
+      'transacciones.csv',
+      payments.map(p => ({
+        ID: p.id,
+        Servicio: p.request_id,
+        Cliente: p.client,
+        Método: METHOD_META[p.method]?.label ?? p.method,
+        Bruto: p.gross_amount,
+        Comisión: p.platform_fee,
+        'Neto técnico': p.technician_net,
+        Estado: PAY_STATUS[p.status]?.label ?? p.status,
+      })),
+    );
     toast.success(`CSV exportado · ${payments.length} transacciones`);
   }
 
@@ -187,33 +297,92 @@ export default function FinanzasPage() {
   // Desglose por método (a partir de los pagos cobrados + pendientes).
   const byMethod = useMemo(() => {
     const acc: Record<string, number> = {};
-    payments.forEach((p) => { acc[p.method] = (acc[p.method] ?? 0) + p.gross_amount; });
+    payments.forEach(p => {
+      acc[p.method] = (acc[p.method] ?? 0) + p.gross_amount;
+    });
     return Object.entries(acc).map(([k, v]) => ({
-      name: METHOD_META[k]?.label ?? k, value: v, color: METHOD_META[k]?.color,
+      name: METHOD_META[k]?.label ?? k,
+      value: v,
+      color: METHOD_META[k]?.color,
     }));
   }, [payments]);
 
   const payColumns: Column<PayRow>[] = [
-    { key: 'id', header: 'ID', className: 'font-mono text-[12px]', render: (r) => <span className="text-primary">#{r.request_id}</span> },
-    { key: 'client', header: 'Cliente', render: (r) => <span className="font-medium text-navy">{r.client}</span> },
     {
-      key: 'method', header: 'Método', render: (r) => {
-        const meta = METHOD_META[r.method] ?? { label: r.method, icon: CreditCard, color: '#6B7280' };
+      key: 'id',
+      header: 'ID',
+      className: 'font-mono text-[12px]',
+      render: r => <span className="text-primary">#{r.request_id}</span>,
+    },
+    {
+      key: 'client',
+      header: 'Cliente',
+      render: r => <span className="font-medium text-navy">{r.client}</span>,
+    },
+    {
+      key: 'method',
+      header: 'Método',
+      render: r => {
+        const meta = METHOD_META[r.method] ?? {
+          label: r.method,
+          icon: CreditCard,
+          color: '#6B7280',
+        };
         const Icon = meta.icon;
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-semibold" style={{ background: `${meta.color}14`, color: meta.color }}>
-            <Icon size={12} />{meta.label}
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-semibold"
+            style={{ background: `${meta.color}14`, color: meta.color }}
+          >
+            <Icon size={12} />
+            {meta.label}
           </span>
         );
       },
     },
-    { key: 'gross', header: 'Bruto', className: 'text-right', render: (r) => <span className="font-mono font-semibold text-navy">{mx(r.gross_amount)}</span> },
-    { key: 'fee', header: 'Comisión', className: 'text-right', render: (r) => <span className="font-mono text-muted">{mx(r.platform_fee)}</span> },
-    { key: 'net', header: 'Neto técnico', className: 'text-right', render: (r) => <span className="font-mono font-semibold text-navy">{mx(r.technician_net)}</span> },
     {
-      key: 'status', header: 'Estado', render: (r) => {
-        const s = PAY_STATUS[r.status] ?? { label: r.status, cls: 'bg-surface-2 text-navy' };
-        return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>;
+      key: 'gross',
+      header: 'Bruto',
+      className: 'text-right',
+      render: r => (
+        <span className="font-mono font-semibold text-navy">
+          {mx(r.gross_amount)}
+        </span>
+      ),
+    },
+    {
+      key: 'fee',
+      header: 'Comisión',
+      className: 'text-right',
+      render: r => (
+        <span className="font-mono text-muted">{mx(r.platform_fee)}</span>
+      ),
+    },
+    {
+      key: 'net',
+      header: 'Neto técnico',
+      className: 'text-right',
+      render: r => (
+        <span className="font-mono font-semibold text-navy">
+          {mx(r.technician_net)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: r => {
+        const s = PAY_STATUS[r.status] ?? {
+          label: r.status,
+          cls: 'bg-surface-2 text-navy',
+        };
+        return (
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}
+          >
+            {s.label}
+          </span>
+        );
       },
     },
   ];
@@ -227,38 +396,116 @@ export default function FinanzasPage() {
         sub="Conciliación de pagos, comisiones y retiros a técnicos."
         actions={
           <div className="flex gap-2.5">
-            <GhostButton onClick={onExport}><span className="inline-flex items-center gap-2"><Download size={14} />Exportar</span></GhostButton>
-            <GhostButton><span className="inline-flex items-center gap-2"><Settings size={14} />Configurar reglas</span></GhostButton>
+            <GhostButton onClick={onExport}>
+              <span className="inline-flex items-center gap-2">
+                <Download size={14} />
+                Exportar
+              </span>
+            </GhostButton>
+            <GhostButton>
+              <span className="inline-flex items-center gap-2">
+                <Settings size={14} />
+                Configurar reglas
+              </span>
+            </GhostButton>
           </div>
         }
       />
 
       {/* KPIs */}
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem><StatCard index={0} label="GMV del periodo" value={mx(m.gmv / 100)} suffix="MXN" note="pagos cobrados" icon={DollarSign} /></StaggerItem>
-        <StaggerItem><StatCard index={1} label="Comisión plataforma" value={mx(m.platformFee / 100)} suffix="MXN" note="sobre pagos cobrados" icon={Percent} /></StaggerItem>
-        <StaggerItem><StatCard index={2} label="Neto a técnicos" value={mx(m.techNet / 100)} suffix="MXN" note="después de comisión" icon={Wallet} /></StaggerItem>
-        <StaggerItem><StatCard index={3} label="Pagos pendientes" value={mx(pendingTotal)} suffix="MXN" delta={`${pendingCount} retiros`} trend="down" note="por procesar" icon={Hourglass} /></StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={0}
+            label="GMV del periodo"
+            value={mx(m.gmv / 100)}
+            suffix="MXN"
+            note="pagos cobrados"
+            icon={DollarSign}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={1}
+            label="Comisión plataforma"
+            value={mx(m.platformFee / 100)}
+            suffix="MXN"
+            note="sobre pagos cobrados"
+            icon={Percent}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={2}
+            label="Neto a técnicos"
+            value={mx(m.techNet / 100)}
+            suffix="MXN"
+            note="después de comisión"
+            icon={Wallet}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            index={3}
+            label="Pagos pendientes"
+            value={mx(pendingTotal)}
+            suffix="MXN"
+            delta={`${pendingCount} retiros`}
+            trend="down"
+            note="por procesar"
+            icon={Hourglass}
+          />
+        </StaggerItem>
       </Stagger>
 
       {/* Gráfica de ingresos + desglose por método */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <FadeIn>
-          <Panel title="Ingresos diarios · últimos 14 días" action={<span className="text-[12.5px] text-muted">Total {mx(daily.reduce((s, d) => s + d.value, 0))} MXN</span>}>
-            <LineChart data={daily} height={220} format={mx} controls={{ avg: true }} />
+          <Panel
+            title="Ingresos diarios · últimos 14 días"
+            action={
+              <span className="text-[12.5px] text-muted">
+                Total {mx(daily.reduce((s, d) => s + d.value, 0))} MXN
+              </span>
+            }
+          >
+            <LineChart
+              data={daily}
+              height={220}
+              format={mx}
+              controls={{ avg: true }}
+            />
           </Panel>
         </FadeIn>
         <FadeIn>
           <Panel title="Desglose por método · este periodo">
-            <HBars rows={byMethod.map(b => ({ label: b.name, value: b.value }))} showPct format={mx} />
+            <HBars
+              rows={byMethod.map(b => ({ label: b.name, value: b.value }))}
+              showPct
+              format={mx}
+            />
           </Panel>
         </FadeIn>
       </div>
 
       {/* Tabla de transacciones */}
       <FadeIn>
-        <Panel title="Transacciones / pagos" action={<a className="inline-flex items-center gap-1 text-[12.5px] font-medium text-primary" href="#">Ver todo <ArrowRight size={12} /></a>}>
-          <DataTable columns={payColumns} rows={payments} empty="Sin transacciones" />
+        <Panel
+          title="Transacciones / pagos"
+          action={
+            <a
+              className="inline-flex items-center gap-1 text-[12.5px] font-medium text-primary"
+              href="#"
+            >
+              Ver todo <ArrowRight size={12} />
+            </a>
+          }
+        >
+          <DataTable
+            columns={payColumns}
+            rows={payments}
+            empty="Sin transacciones"
+          />
         </Panel>
       </FadeIn>
 
@@ -268,38 +515,89 @@ export default function FinanzasPage() {
           <Panel
             title="Solicitudes de retiro (payouts)"
             action={
-              <PrimaryButton onClick={() => setLoteOpen(true)} disabled={pendingCount === 0}>
-                <span className="inline-flex items-center gap-2"><Zap size={14} />Procesar lote</span>
+              <PrimaryButton
+                onClick={() => setLoteOpen(true)}
+                disabled={pendingCount === 0}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Zap size={14} />
+                  Procesar lote
+                </span>
               </PrimaryButton>
             }
           >
             <DataTable
-              columns={[
-                {
-                  key: 'tech', header: 'Técnico · CLABE', render: (r) => (
-                    <div className="flex items-center gap-2.5">
-                      <Avatar initials={r.initials} size={32} />
-                      <div>
-                        <div className="text-[13px] font-semibold text-navy">{r.name}</div>
-                        <div className="font-mono text-[11px] text-muted">{r.clabe_snapshot}</div>
+              columns={
+                [
+                  {
+                    key: 'tech',
+                    header: 'Técnico · CLABE',
+                    render: r => (
+                      <div className="flex items-center gap-2.5">
+                        <Avatar initials={r.initials} size={32} />
+                        <div>
+                          <div className="text-[13px] font-semibold text-navy">
+                            {r.name}
+                          </div>
+                          <div className="font-mono text-[11px] text-muted">
+                            {r.clabe_snapshot}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ),
-                },
-                { key: 'bank', header: 'Banco', render: (r) => <span className="text-[12.5px] text-navy">{r.bank}</span> },
-                { key: 'amount', header: 'Monto', className: 'text-right', render: (r) => <span className="font-mono font-bold text-navy">{mx(r.amount)}</span> },
-                {
-                  key: 'kyc', header: 'KYC', render: (r) => r.kyc === 'ok'
-                    ? <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success"><BadgeCheck size={11} />Verde</span>
-                    : <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning-ink"><AlertTriangle size={11} />Revisión</span>,
-                },
-                {
-                  key: 'status', header: 'Estado', render: (r) => {
-                    const s = PAYOUT_STATUS[r.status] ?? { label: r.status, cls: 'bg-surface-2 text-navy' };
-                    return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>;
+                    ),
                   },
-                },
-              ] as Column<PayoutRow>[]}
+                  {
+                    key: 'bank',
+                    header: 'Banco',
+                    render: r => (
+                      <span className="text-[12.5px] text-navy">{r.bank}</span>
+                    ),
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Monto',
+                    className: 'text-right',
+                    render: r => (
+                      <span className="font-mono font-bold text-navy">
+                        {mx(r.amount)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'kyc',
+                    header: 'KYC',
+                    render: r =>
+                      r.kyc === 'ok' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">
+                          <BadgeCheck size={11} />
+                          Verde
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning-ink">
+                          <AlertTriangle size={11} />
+                          Revisión
+                        </span>
+                      ),
+                  },
+                  {
+                    key: 'status',
+                    header: 'Estado',
+                    render: r => {
+                      const s = PAYOUT_STATUS[r.status] ?? {
+                        label: r.status,
+                        cls: 'bg-surface-2 text-navy',
+                      };
+                      return (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}
+                        >
+                          {s.label}
+                        </span>
+                      );
+                    },
+                  },
+                ] as Column<PayoutRow>[]
+              }
               rows={payouts}
               empty="Sin solicitudes de retiro"
             />
@@ -311,34 +609,69 @@ export default function FinanzasPage() {
             <div className="flex flex-col gap-4">
               <div className="rounded-xl bg-grad-brand p-5 text-white">
                 <div className="flex items-center gap-2.5">
-                  <Avatar initials={walletName.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'T'} size={36} />
+                  <Avatar
+                    initials={
+                      walletName
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map(w => w[0])
+                        .join('')
+                        .toUpperCase() || 'T'
+                    }
+                    size={36}
+                  />
                   <div>
-                    <div className="text-[13px] font-semibold">{walletName}</div>
-                    <div className="text-[11px] text-white/80">Mayor movimiento en el ledger</div>
+                    <div className="text-[13px] font-semibold">
+                      {walletName}
+                    </div>
+                    <div className="text-[11px] text-white/80">
+                      Mayor movimiento en el ledger
+                    </div>
                   </div>
                 </div>
-                <div className="mt-4 text-[11px] text-white/80">Saldo disponible</div>
+                <div className="mt-4 text-[11px] text-white/80">
+                  Saldo disponible
+                </div>
                 <div className="font-display text-[30px] font-bold leading-tight">
-                  {mx(walletBalance)}<span className="ml-1 font-mono text-[12px] font-medium text-white/70">MXN</span>
+                  {mx(walletBalance)}
+                  <span className="ml-1 font-mono text-[12px] font-medium text-white/70">
+                    MXN
+                  </span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
-                  <span className="text-[12.5px] text-muted">Retirado (30 d)</span>
-                  <span className="font-mono font-semibold text-navy">{mx(walletWithdrawn30d)}</span>
+                  <span className="text-[12.5px] text-muted">
+                    Retirado (30 d)
+                  </span>
+                  <span className="font-mono font-semibold text-navy">
+                    {mx(walletWithdrawn30d)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
                   <span className="text-[12.5px] text-muted">Movimientos</span>
-                  <span className="font-mono font-semibold text-navy">{walletTxns.length}</span>
+                  <span className="font-mono font-semibold text-navy">
+                    {walletTxns.length}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-line bg-surface px-3.5 py-3">
-                  <span className="text-[12.5px] text-muted">Comisión retenida</span>
-                  <span className="font-mono font-semibold text-navy">{mx(walletFees)}</span>
+                  <span className="text-[12.5px] text-muted">
+                    Comisión retenida
+                  </span>
+                  <span className="font-mono font-semibold text-navy">
+                    {mx(walletFees)}
+                  </span>
                 </div>
               </div>
 
-              <GhostButton onClick={() => setWalletOpen(true)}><span className="inline-flex items-center gap-2"><ExternalLink size={14} />Ver historial de wallet</span></GhostButton>
+              <GhostButton onClick={() => setWalletOpen(true)}>
+                <span className="inline-flex items-center gap-2">
+                  <ExternalLink size={14} />
+                  Ver historial de wallet
+                </span>
+              </GhostButton>
             </div>
           </Panel>
         </FadeIn>
@@ -346,7 +679,12 @@ export default function FinanzasPage() {
 
       <FadeIn>
         <Panel title="Resumen mensual · últimos 6 meses">
-          <VBars data={monthlyGmv} height={200} format={mx} controls={{ avg: true }} />
+          <VBars
+            data={monthlyGmv}
+            height={200}
+            format={mx}
+            controls={{ avg: true }}
+          />
         </Panel>
       </FadeIn>
 
@@ -360,32 +698,72 @@ export default function FinanzasPage() {
         width={620}
         footer={
           <>
-            <GhostButton onClick={() => setLoteOpen(false)}>Cancelar</GhostButton>
+            <GhostButton onClick={() => setLoteOpen(false)}>
+              Cancelar
+            </GhostButton>
             <PrimaryButton onClick={onProcessBatch}>
-              <span className="inline-flex items-center gap-2"><Check size={14} />Confirmar y procesar lote</span>
+              <span className="inline-flex items-center gap-2">
+                <Check size={14} />
+                Confirmar y procesar lote
+              </span>
             </PrimaryButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <SummaryTile label="Retiros a procesar" value={String(pendingCount)} sub="Solo estatus pendiente" />
-            <SummaryTile label="Monto total" value={mx(pendingTotal)} suffix="MXN" sub="Sin contar en proceso" />
-            <SummaryTile label="Comisión bancaria" value={mx(pendingCount * 10)} suffix="MXN" sub="$10 MXN por SPEI" />
-            <SummaryTile label="Cargo a Tumantenimiento" value={mx(pendingTotal + pendingCount * 10)} suffix="MXN" sub="Saldo cuenta operativa: $4.2M" primary />
+            <SummaryTile
+              label="Retiros a procesar"
+              value={String(pendingCount)}
+              sub="Solo estatus pendiente"
+            />
+            <SummaryTile
+              label="Monto total"
+              value={mx(pendingTotal)}
+              suffix="MXN"
+              sub="Sin contar en proceso"
+            />
+            <SummaryTile
+              label="Comisión bancaria"
+              value={mx(pendingCount * 10)}
+              suffix="MXN"
+              sub="$10 MXN por SPEI"
+            />
+            <SummaryTile
+              label="Cargo a Tumantenimiento"
+              value={mx(pendingTotal + pendingCount * 10)}
+              suffix="MXN"
+              sub="Saldo cuenta operativa: $4.2M"
+              primary
+            />
           </div>
           <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft p-3.5 text-[12.5px]">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
             <div>
-              <b className="font-semibold text-warning-ink">Los retiros en proceso quedarán fuera</b>
-              <span className="text-muted"> hasta que el banco confirme la transferencia anterior.</span>
+              <b className="font-semibold text-warning-ink">
+                Los retiros en proceso quedarán fuera
+              </b>
+              <span className="text-muted">
+                {' '}
+                hasta que el banco confirme la transferencia anterior.
+              </span>
             </div>
           </div>
           <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface p-3.5">
-            <input type="checkbox" defaultChecked className="mt-0.5 h-4 w-4 accent-primary" />
+            <input
+              type="checkbox"
+              defaultChecked
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
             <div>
-              <div className="text-[13.5px] font-medium text-navy">Entiendo que esto genera {pendingCount} transferencia(s) SPEI no reversibles.</div>
-              <div className="mt-1 text-[12px] text-muted">Quedará registro en la bitácora de auditoría a nombre de Sofía Martínez (Admin Soporte).</div>
+              <div className="text-[13.5px] font-medium text-navy">
+                Entiendo que esto genera {pendingCount} transferencia(s) SPEI no
+                reversibles.
+              </div>
+              <div className="mt-1 text-[12px] text-muted">
+                Quedará registro en la bitácora de auditoría a nombre de Sofía
+                Martínez (Admin Soporte).
+              </div>
             </div>
           </div>
         </div>
@@ -401,22 +779,44 @@ export default function FinanzasPage() {
         width={480}
       >
         {walletTxns.length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-faint">Sin movimientos registrados.</p>
+          <p className="py-6 text-center text-[13px] text-faint">
+            Sin movimientos registrados.
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {walletTxns.map(t => {
               const credit = t.amount_cents > 0;
               return (
-                <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3">
-                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${credit ? 'bg-success-soft text-success' : 'bg-error-soft text-error'}`}>
-                    {credit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3"
+                >
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${credit ? 'bg-success-soft text-success' : 'bg-error-soft text-error'}`}
+                  >
+                    {credit ? (
+                      <ArrowDownLeft size={16} />
+                    ) : (
+                      <ArrowUpRight size={16} />
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-navy">{t.description ?? (credit ? 'Abono' : 'Cargo')}</div>
-                    <div className="mt-0.5 font-mono text-[11.5px] text-muted">{t.service_order_id ?? '—'} · {new Date(t.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</div>
+                    <div className="text-[13px] font-semibold text-navy">
+                      {t.description ?? (credit ? 'Abono' : 'Cargo')}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[11.5px] text-muted">
+                      {t.service_order_id ?? '—'} ·{' '}
+                      {new Date(t.created_at).toLocaleDateString('es-MX', {
+                        day: '2-digit',
+                        month: 'short',
+                      })}
+                    </div>
                   </div>
-                  <span className={`font-mono text-[13.5px] font-bold ${credit ? 'text-success' : 'text-error'}`}>
-                    {credit ? '+' : '−'}{mx(Math.abs(t.amount_cents) / 100)}
+                  <span
+                    className={`font-mono text-[13.5px] font-bold ${credit ? 'text-success' : 'text-error'}`}
+                  >
+                    {credit ? '+' : '−'}
+                    {mx(Math.abs(t.amount_cents) / 100)}
                   </span>
                 </div>
               );
@@ -428,15 +828,35 @@ export default function FinanzasPage() {
   );
 }
 
-function SummaryTile({ label, value, suffix, sub, primary }: {
-  label: string; value: string; suffix?: string; sub?: string; primary?: boolean;
+function SummaryTile({
+  label,
+  value,
+  suffix,
+  sub,
+  primary,
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+  sub?: string;
+  primary?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border p-3.5 ${primary ? 'border-primary/25 bg-info-soft' : 'border-line bg-surface'}`}>
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-faint">{label}</div>
+    <div
+      className={`rounded-xl border p-3.5 ${primary ? 'border-primary/25 bg-info-soft' : 'border-line bg-surface'}`}
+    >
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-faint">
+        {label}
+      </div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className={`font-display text-[22px] font-bold tracking-tight ${primary ? 'text-primary' : 'text-navy'}`}>{value}</span>
-        {suffix && <span className="font-mono text-[11px] text-faint">{suffix}</span>}
+        <span
+          className={`font-display text-[22px] font-bold tracking-tight ${primary ? 'text-primary' : 'text-navy'}`}
+        >
+          {value}
+        </span>
+        {suffix && (
+          <span className="font-mono text-[11px] text-faint">{suffix}</span>
+        )}
       </div>
       {sub && <div className="mt-1 text-[11.5px] text-muted">{sub}</div>}
     </div>

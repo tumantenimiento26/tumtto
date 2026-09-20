@@ -46,7 +46,8 @@ export const useData = create<DataState>(set => ({
 /** Subscribe to mutations: read `useTick()` in any component that shows world data. */
 export const useTick = () => useData(s => s.tick);
 /** True once the first snapshot loaded — replaces the demo's fake skeleton timers. */
-export const useWorldReady = () => useData(s => s.status === 'ready' || s.status === 'error');
+export const useWorldReady = () =>
+  useData(s => s.status === 'ready' || s.status === 'error');
 
 // In-memory-only domains survive snapshot reloads (same array refs).
 const mem = emptyWorld();
@@ -57,13 +58,17 @@ let lastFetched = 0;
 // Error surface: la consola registra toast.error aqui (admin-shell) — el store
 // no importa componentes para poder correr en tests de node.
 let notifyError: (msg: string) => void = msg => console.error('[data]', msg);
-export function setErrorNotifier(fn: (msg: string) => void) { notifyError = fn; }
+export function setErrorNotifier(fn: (msg: string) => void) {
+  notifyError = fn;
+}
 
 const w = () => world;
 const bump = () => useData.getState().bump();
 const now = () => new Date().toISOString();
 
-async function fetchAll<K extends keyof Database['public']['Tables']>(table: K) {
+async function fetchAll<K extends keyof Database['public']['Tables']>(
+  table: K,
+) {
   const { data, error } = await supabase.from(table).select('*');
   if (error) throw error;
   return (data ?? []) as unknown as Database['public']['Tables'][K]['Row'][];
@@ -75,25 +80,65 @@ let inflight: Promise<void> | null = null;
 export function loadWorld(force = false): Promise<void> {
   if (inflight) return inflight;
   if (!force && Date.now() - lastFetched < 15_000) return Promise.resolve();
-  useData.setState(s => (s.status === 'ready' ? s : { ...s, status: 'loading' }));
+  useData.setState(s =>
+    s.status === 'ready' ? s : { ...s, status: 'loading' },
+  );
   inflight = (async () => {
     try {
       const [
-        profiles, categories, technicians, technicianCategories, rates, addresses,
-        orders, quotes, quoteItems, events, payments, ledger, kycSessions, disputes, platformSettings,
+        profiles,
+        categories,
+        technicians,
+        technicianCategories,
+        rates,
+        addresses,
+        orders,
+        quotes,
+        quoteItems,
+        events,
+        payments,
+        ledger,
+        kycSessions,
+        disputes,
+        platformSettings,
       ] = await Promise.all([
-        fetchAll('profiles'), fetchAll('service_categories'), fetchAll('technicians'),
-        fetchAll('technician_categories'), fetchAll('technician_rates'), fetchAll('client_addresses'),
-        fetchAll('service_orders'), fetchAll('service_quotes'), fetchAll('service_quote_items'),
-        fetchAll('service_order_status_events'), fetchAll('payments'), fetchAll('ledger_entries'),
-        fetchAll('kyc_sessions'), fetchAll('disputes'), fetchAll('platform_settings'),
+        fetchAll('profiles'),
+        fetchAll('service_categories'),
+        fetchAll('technicians'),
+        fetchAll('technician_categories'),
+        fetchAll('technician_rates'),
+        fetchAll('client_addresses'),
+        fetchAll('service_orders'),
+        fetchAll('service_quotes'),
+        fetchAll('service_quote_items'),
+        fetchAll('service_order_status_events'),
+        fetchAll('payments'),
+        fetchAll('ledger_entries'),
+        fetchAll('kyc_sessions'),
+        fetchAll('disputes'),
+        fetchAll('platform_settings'),
       ]);
       world = {
-        profiles, categories, technicians, technicianCategories, rates, addresses,
-        orders, quotes, quoteItems, events, payments, ledger, kycSessions, disputes,
+        profiles,
+        categories,
+        technicians,
+        technicianCategories,
+        rates,
+        addresses,
+        orders,
+        quotes,
+        quoteItems,
+        events,
+        payments,
+        ledger,
+        kycSessions,
+        disputes,
         // session-local domains keep their refs across reloads
-        messages: mem.messages, ratings: mem.ratings, payouts: mem.payouts,
-        notes: mem.notes, tickets: mem.tickets,
+        messages: mem.messages,
+        ratings: mem.ratings,
+        payouts: mem.payouts,
+        notes: mem.notes,
+        tickets: mem.tickets,
       };
       settings = platformSettings;
       lastFetched = Date.now();
@@ -114,7 +159,10 @@ export function loadWorld(force = false): Promise<void> {
 const refresh = () => loadWorld(true);
 
 /** Wrap a backend write: on error toast + null, on success reload the snapshot. */
-async function mutate<R>(fn: () => Promise<R>, errMsg: string): Promise<R | null> {
+async function mutate<R>(
+  fn: () => Promise<R>,
+  errMsg: string,
+): Promise<R | null> {
   try {
     const r = await fn();
     await refresh();
@@ -141,59 +189,90 @@ export function getSettingStr(key: string, fallback: string): string {
   return typeof v === 'string' ? v : fallback;
 }
 /** Guarda un lote de settings en una sola llamada (upsert: crea la key si no existe). */
-export async function saveSettings(entries: Record<string, number | string | boolean>) {
+export async function saveSettings(
+  entries: Record<string, number | string | boolean>,
+) {
   return mutate(async () => {
-    const rows = Object.entries(entries).map(([key, value]) => ({ key, value }));
-    const { error } = await supabase.from('platform_settings').upsert(rows, { onConflict: 'key' });
+    const rows = Object.entries(entries).map(([key, value]) => ({
+      key,
+      value,
+    }));
+    const { error } = await supabase
+      .from('platform_settings')
+      .upsert(rows, { onConflict: 'key' });
     if (error) throw error;
     return true;
   }, 'No se pudo guardar la configuración.');
 }
-export const saveSettingInt = (key: string, value: number) => saveSettings({ [key]: value });
+export const saveSettingInt = (key: string, value: number) =>
+  saveSettings({ [key]: value });
 
 // ── Read selectors (unchanged API — they read the live snapshot) ─────────────
 export const getCategories = () => w().categories;
 export const getTechnicians = () => w().technicians;
-export const getProfile = (userId: string) => w().profiles.find(p => p.id === userId) ?? null;
-export const getTechByUser = (userId: string) => w().technicians.find(t => t.id === userId) ?? null;
-export const getAddresses = (userId = CLIENT_ID) => w().addresses.filter(a => a.client_id === userId);
+export const getProfile = (userId: string) =>
+  w().profiles.find(p => p.id === userId) ?? null;
+export const getTechByUser = (userId: string) =>
+  w().technicians.find(t => t.id === userId) ?? null;
+export const getAddresses = (userId = CLIENT_ID) =>
+  w().addresses.filter(a => a.client_id === userId);
 
 export const getClientRequests = (clientId = CLIENT_ID) =>
-  w().orders.filter(r => r.client_id === clientId).sort(byNewest);
+  w()
+    .orders.filter(r => r.client_id === clientId)
+    .sort(byNewest);
 export const getTechRequests = (techUserId = TECH_USER_ID) =>
-  w().orders.filter(r => r.technician_id === techUserId).sort(byNewest);
-export const getRequest = (id: string) => w().orders.find(r => r.id === id) ?? null;
+  w()
+    .orders.filter(r => r.technician_id === techUserId)
+    .sort(byNewest);
+export const getRequest = (id: string) =>
+  w().orders.find(r => r.id === id) ?? null;
 export const getQuote = (orderId: string) =>
   w().quotes.find(q => q.service_order_id === orderId) ?? null;
-export const getQuoteItems = (quoteId: string) => w().quoteItems.filter(i => i.quote_id === quoteId);
+export const getQuoteItems = (quoteId: string) =>
+  w().quoteItems.filter(i => i.quote_id === quoteId);
 export const getMessages = (orderId: string) =>
-  w().messages.filter(m => m.order_id === orderId).sort((a, b) => a.created_at.localeCompare(b.created_at));
-export const getPayment = (orderId: string) => w().payments.find(p => p.service_order_id === orderId) ?? null;
-export const getRating = (orderId: string) => w().ratings.find(r => r.order_id === orderId) ?? null;
+  w()
+    .messages.filter(m => m.order_id === orderId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+export const getPayment = (orderId: string) =>
+  w().payments.find(p => p.service_order_id === orderId) ?? null;
+export const getRating = (orderId: string) =>
+  w().ratings.find(r => r.order_id === orderId) ?? null;
 
 export const getPendingKyc = () =>
-  w().technicians.filter(t => t.kyc_status === 'in_review' || t.kyc_status === 'pending');
+  w().technicians.filter(
+    t => t.kyc_status === 'in_review' || t.kyc_status === 'pending',
+  );
 export const getDisputes = (status?: string) =>
   status ? w().disputes.filter(d => d.status === status) : w().disputes;
-export const getKycSessions = (techId: string) => w().kycSessions.filter(s => s.technician_id === techId);
-export const getPayouts = (techId: string) => w().payouts.filter(p => p.technician_id === techId);
+export const getKycSessions = (techId: string) =>
+  w().kycSessions.filter(s => s.technician_id === techId);
+export const getPayouts = (techId: string) =>
+  w().payouts.filter(p => p.technician_id === techId);
 export const getAllPayouts = () => w().payouts;
-export const getLedger = (techId: string) => w().ledger.filter(e => e.technician_id === techId);
+export const getLedger = (techId: string) =>
+  w().ledger.filter(e => e.technician_id === techId);
 export const getAllLedger = () => w().ledger;
 export const getWalletBalanceCents = (techId: string) =>
   getLedger(techId).reduce((s, e) => s + e.amount_cents, 0);
-export const getTechnician = (techId: string) => w().technicians.find(t => t.id === techId) ?? null;
+export const getTechnician = (techId: string) =>
+  w().technicians.find(t => t.id === techId) ?? null;
 export const getTechCategories = (techId: string) =>
   w().technicianCategories.filter(tc => tc.technician_id === techId);
-export const getTechRates = (techId: string) => w().rates.filter(r => r.technician_id === techId);
+export const getTechRates = (techId: string) =>
+  w().rates.filter(r => r.technician_id === techId);
 export const getNotes = (entityId: string) =>
-  w().notes.filter(n => n.entity_id === entityId).sort(byNewest);
+  w()
+    .notes.filter(n => n.entity_id === entityId)
+    .sort(byNewest);
 export const getTickets = () => [...w().tickets].sort(byNewest);
-export const getTicket = (id: string) => w().tickets.find(t => t.id === id) ?? null;
+export const getTicket = (id: string) =>
+  w().tickets.find(t => t.id === id) ?? null;
 /** Badge del sidebar: disputas no resueltas + tickets sin resolver. */
 export const getOpenSupportCount = () =>
-  w().disputes.filter(d => d.status === 'open' || d.status === 'in_review').length +
-  w().tickets.filter(t => t.status !== 'resolved').length;
+  w().disputes.filter(d => d.status === 'open' || d.status === 'in_review')
+    .length + w().tickets.filter(t => t.status !== 'resolved').length;
 
 function byNewest(a: { created_at: string }, b: { created_at: string }) {
   return b.created_at.localeCompare(a.created_at);
@@ -206,7 +285,9 @@ export const getAllProfiles = () => w().profiles;
 export const getClients = () => w().profiles.filter(p => p.role === 'client');
 export const getAllDisputes = () => w().disputes;
 export const getOrderEvents = (orderId: string) =>
-  w().events.filter(e => e.service_order_id === orderId).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  w()
+    .events.filter(e => e.service_order_id === orderId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 export const getCategoriesWithCounts = () =>
   w().categories.map(c => ({
     ...c,
@@ -219,18 +300,42 @@ export const getTechniciansWithProfile = () =>
 export function getMetrics() {
   const reqs = w().orders;
   const pays = w().payments.filter(p => p.status === 'paid');
-  const ACTIVE: OrderStatus[] = ['accepted', 'enroute', 'onsite', 'quote', 'working', 'closing'];
+  const ACTIVE: OrderStatus[] = [
+    'accepted',
+    'enroute',
+    'onsite',
+    'quote',
+    'working',
+    'closing',
+  ];
   const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
   const active = reqs.filter(r => ACTIVE.includes(r.status)).length;
   const completedToday = reqs.filter(r => DONE.includes(r.status)).length;
   const gmv = pays.reduce((s, p) => s + p.amount_cents, 0);
   const platformFee = pays.reduce((s, p) => s + p.commission_cents, 0);
-  const techNet = pays.reduce((s, p) => s + (p.amount_cents - p.commission_cents), 0);
+  const techNet = pays.reduce(
+    (s, p) => s + (p.amount_cents - p.commission_cents),
+    0,
+  );
   const activeTechs = w().technicians.filter(t => t.is_available).length;
   const totalTechs = w().technicians.length;
   const byCategory = getCategoriesWithCounts().filter(c => c.services > 0);
-  const byStatus = reqs.reduce<Record<string, number>>((m, r) => ((m[r.status] = (m[r.status] ?? 0) + 1), m), {});
-  return { active, completedToday, gmv, platformFee, techNet, activeTechs, totalTechs, byCategory, byStatus, totalRequests: reqs.length };
+  const byStatus = reqs.reduce<Record<string, number>>(
+    (m, r) => ((m[r.status] = (m[r.status] ?? 0) + 1), m),
+    {},
+  );
+  return {
+    active,
+    completedToday,
+    gmv,
+    platformFee,
+    techNet,
+    activeTechs,
+    totalTechs,
+    byCategory,
+    byStatus,
+    totalRequests: reqs.length,
+  };
 }
 
 // ── Mutators (write through to Supabase, then reload the snapshot) ───────────
@@ -257,7 +362,9 @@ export async function createRequest(
       title: input.title ?? null,
       description: input.description ?? null,
       is_urgent: input.is_urgent ?? false,
-      urgent_surcharge_bps: input.is_urgent ? getSettingInt('urgent_surcharge_bps', 2000) : 0,
+      urgent_surcharge_bps: input.is_urgent
+        ? getSettingInt('urgent_surcharge_bps', 2000)
+        : 0,
       commission_bps: getSettingInt('commission_bps', 1500),
       location: toGeography(addr?.location ?? input.location),
       place_name: addr?.place_name ?? null,
@@ -268,20 +375,33 @@ export async function createRequest(
       postal_code: addr?.postal_code ?? null,
       expires_at: new Date(Date.now() + ttlMin * 60_000).toISOString(),
     };
-    const { data, error } = await supabase.from('service_orders').insert(insert).select().single();
+    const { data, error } = await supabase
+      .from('service_orders')
+      .insert(insert)
+      .select()
+      .single();
     if (error) throw error;
     await supabase.from('service_order_status_events').insert({
-      service_order_id: data.id, from_status: null, to_status: 'requested',
-      actor_id: input.client_id, note: 'Creado por admin desde la consola',
+      service_order_id: data.id,
+      from_status: null,
+      to_status: 'requested',
+      actor_id: input.client_id,
+      note: 'Creado por admin desde la consola',
     });
     return data;
   }, 'No se pudo crear el servicio.');
 }
 
-export async function setStatus(orderId: string, status: OrderStatus, note: string | null = null) {
+export async function setStatus(
+  orderId: string,
+  status: OrderStatus,
+  note: string | null = null,
+) {
   return mutate(async () => {
     const { error } = await supabase.rpc('transition_service_order', {
-      p_order_id: orderId, p_to_status: status, p_note: note ?? undefined,
+      p_order_id: orderId,
+      p_to_status: status,
+      p_note: note ?? undefined,
     });
     if (error) throw error;
   }, 'No se pudo cambiar el estado.');
@@ -290,14 +410,19 @@ export async function setStatus(orderId: string, status: OrderStatus, note: stri
 export async function reassignRequest(orderId: string, techUserId: string) {
   return mutate(async () => {
     const req = getRequest(orderId);
-    const { error } = await supabase.from('service_orders')
-      .update({ technician_id: techUserId }).eq('id', orderId);
+    const { error } = await supabase
+      .from('service_orders')
+      .update({ technician_id: techUserId })
+      .eq('id', orderId);
     if (error) throw error;
     const name = getProfile(techUserId)?.full_name ?? techUserId;
     if (req) {
       await supabase.from('service_order_status_events').insert({
-        service_order_id: orderId, from_status: req.status, to_status: req.status,
-        actor_id: techUserId, note: `Reasignado a ${name} por admin`,
+        service_order_id: orderId,
+        from_status: req.status,
+        to_status: req.status,
+        actor_id: techUserId,
+        note: `Reasignado a ${name} por admin`,
       });
     }
   }, 'No se pudo reasignar el servicio.');
@@ -309,11 +434,15 @@ export async function refundPayment(orderId: string) {
   const pay = getPayment(orderId);
   if (!pay || pay.status !== 'paid') return null;
   return mutate(async () => {
-    const { error } = await supabase.from('payments')
-      .update({ status: 'refunded' }).eq('id', pay.id);
+    const { error } = await supabase
+      .from('payments')
+      .update({ status: 'refunded' })
+      .eq('id', pay.id);
     if (error) throw error;
     const { error: e2 } = await supabase.rpc('transition_service_order', {
-      p_order_id: orderId, p_to_status: 'cancelled', p_note: 'Reembolso emitido al cliente',
+      p_order_id: orderId,
+      p_to_status: 'cancelled',
+      p_note: 'Reembolso emitido al cliente',
     });
     if (e2) throw e2;
     return pay;
@@ -323,12 +452,15 @@ export async function refundPayment(orderId: string) {
 export async function resolveKyc(techId: string, approve: boolean) {
   return mutate(async () => {
     const status = approve ? 'approved' : 'declined';
-    const { error } = await supabase.from('technicians')
-      .update({ kyc_status: status }).eq('id', techId);
+    const { error } = await supabase
+      .from('technicians')
+      .update({ kyc_status: status })
+      .eq('id', techId);
     if (error) throw error;
     // Keep the latest KYC session in sync when one exists.
     const s = getKycSessions(techId).sort(byNewest)[0];
-    if (s) await supabase.from('kyc_sessions').update({ status }).eq('id', s.id);
+    if (s)
+      await supabase.from('kyc_sessions').update({ status }).eq('id', s.id);
   }, 'No se pudo actualizar el KYC.');
 }
 
@@ -342,36 +474,48 @@ export async function rejectKyc(techId: string, reason: string) {
 // (technicians.id === profiles.id).
 export async function suspendTechnician(techId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('technicians')
-      .update({ is_available: false }).eq('id', techId);
+    const { error } = await supabase
+      .from('technicians')
+      .update({ is_available: false })
+      .eq('id', techId);
     if (error) throw error;
-    const { error: e2 } = await supabase.from('profiles')
-      .update({ status: 'suspended' }).eq('id', techId);
+    const { error: e2 } = await supabase
+      .from('profiles')
+      .update({ status: 'suspended' })
+      .eq('id', techId);
     if (e2) throw e2;
   }, 'No se pudo suspender al técnico.');
 }
 export async function reactivateTechnician(techId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('technicians')
-      .update({ is_available: true }).eq('id', techId);
+    const { error } = await supabase
+      .from('technicians')
+      .update({ is_available: true })
+      .eq('id', techId);
     if (error) throw error;
-    const { error: e2 } = await supabase.from('profiles')
-      .update({ status: 'active' }).eq('id', techId);
+    const { error: e2 } = await supabase
+      .from('profiles')
+      .update({ status: 'active' })
+      .eq('id', techId);
     if (e2) throw e2;
   }, 'No se pudo reactivar al técnico.');
 }
 
 export async function suspendUser(userId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('profiles')
-      .update({ status: 'suspended' }).eq('id', userId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: 'suspended' })
+      .eq('id', userId);
     if (error) throw error;
   }, 'No se pudo suspender al usuario.');
 }
 export async function reactivateUser(userId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('profiles')
-      .update({ status: 'active' }).eq('id', userId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: 'active' })
+      .eq('id', userId);
     if (error) throw error;
   }, 'No se pudo reactivar al usuario.');
 }
@@ -382,16 +526,27 @@ export async function upsertTechRate(
   cents: { visita_cents: number; hora_cents: number; minimo_cents: number },
 ) {
   return mutate(async () => {
-    const { error } = await supabase.from('technician_rates')
-      .upsert({ technician_id: techId, category_id: categoryId, ...cents }, { onConflict: 'technician_id,category_id' });
+    const { error } = await supabase
+      .from('technician_rates')
+      .upsert(
+        { technician_id: techId, category_id: categoryId, ...cents },
+        { onConflict: 'technician_id,category_id' },
+      );
     if (error) throw error;
     return true;
   }, 'No se pudo guardar la tarifa.');
 }
 
-export async function updateTechnicianBank(techId: string, bank_name: string | null, clabe: string | null) {
+export async function updateTechnicianBank(
+  techId: string,
+  bank_name: string | null,
+  clabe: string | null,
+) {
   return mutate(async () => {
-    const { error } = await supabase.from('technicians').update({ bank_name, clabe }).eq('id', techId);
+    const { error } = await supabase
+      .from('technicians')
+      .update({ bank_name, clabe })
+      .eq('id', techId);
     if (error) throw error;
     return true;
   }, 'No se pudieron guardar los datos bancarios.');
@@ -400,20 +555,42 @@ export async function updateTechnicianBank(techId: string, bank_name: string | n
 // ── Direcciones del cliente ──────────────────────────────────────────────────
 type AddressFields = Pick<
   Database['public']['Tables']['client_addresses']['Insert'],
-  'label' | 'address_line' | 'neighborhood' | 'municipality' | 'state' | 'postal_code' | 'is_default'
+  | 'label'
+  | 'address_line'
+  | 'neighborhood'
+  | 'municipality'
+  | 'state'
+  | 'postal_code'
+  | 'is_default'
 >;
 
 /** Crea (sin addressId) o actualiza una dirección; si es principal, desmarca las demás. */
-export async function saveAddress(clientId: string, fields: AddressFields, addressId?: string) {
+export async function saveAddress(
+  clientId: string,
+  fields: AddressFields,
+  addressId?: string,
+) {
   return mutate(async () => {
     if (fields.is_default) {
-      const { error } = await supabase.from('client_addresses')
-        .update({ is_default: false }).eq('client_id', clientId).eq('is_default', true);
+      const { error } = await supabase
+        .from('client_addresses')
+        .update({ is_default: false })
+        .eq('client_id', clientId)
+        .eq('is_default', true);
       if (error) throw error;
     }
     const q = addressId
-      ? await supabase.from('client_addresses').update(fields).eq('id', addressId)
-      : await supabase.from('client_addresses').insert({ ...fields, client_id: clientId, location: toGeography(null) });
+      ? await supabase
+          .from('client_addresses')
+          .update(fields)
+          .eq('id', addressId)
+      : await supabase
+          .from('client_addresses')
+          .insert({
+            ...fields,
+            client_id: clientId,
+            location: toGeography(null),
+          });
     if (q.error) throw q.error;
     return true;
   }, 'No se pudo guardar la dirección.');
@@ -421,7 +598,10 @@ export async function saveAddress(clientId: string, fields: AddressFields, addre
 
 export async function deleteAddress(addressId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('client_addresses').delete().eq('id', addressId);
+    const { error } = await supabase
+      .from('client_addresses')
+      .delete()
+      .eq('id', addressId);
     if (error) throw error;
     return true;
   }, 'No se pudo eliminar la dirección (puede estar ligada a un servicio).');
@@ -432,26 +612,44 @@ export async function toggleCategory(catId: string) {
   const c = w().categories.find(x => x.id === catId);
   if (!c) return;
   return mutate(async () => {
-    const { error } = await supabase.from('service_categories')
-      .update({ is_active: !c.is_active }).eq('id', catId);
+    const { error } = await supabase
+      .from('service_categories')
+      .update({ is_active: !c.is_active })
+      .eq('id', catId);
     if (error) throw error;
   }, 'No se pudo actualizar la categoría.');
 }
 
-export async function createCategory(name: string, icon = 'wrench'): Promise<ServiceCategory | null> {
+export async function createCategory(
+  name: string,
+  icon = 'wrench',
+): Promise<ServiceCategory | null> {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return mutate(async () => {
-    const { data, error } = await supabase.from('service_categories')
-      .insert({ slug, name, icon, sort_order: (w().categories.length + 1) * 10 })
-      .select().single();
+    const { data, error } = await supabase
+      .from('service_categories')
+      .insert({
+        slug,
+        name,
+        icon,
+        sort_order: (w().categories.length + 1) * 10,
+      })
+      .select()
+      .single();
     if (error) throw error;
     return data;
   }, 'No se pudo crear la categoría.');
 }
 
-export async function updateCategory(catId: string, input: Partial<ServiceCategory>) {
+export async function updateCategory(
+  catId: string,
+  input: Partial<ServiceCategory>,
+) {
   return mutate(async () => {
-    const { error } = await supabase.from('service_categories').update(input).eq('id', catId);
+    const { error } = await supabase
+      .from('service_categories')
+      .update(input)
+      .eq('id', catId);
     if (error) throw error;
   }, 'No se pudo actualizar la categoría.');
 }
@@ -460,7 +658,10 @@ export async function updateCategory(catId: string, input: Partial<ServiceCatego
 export async function deleteCategory(catId: string): Promise<boolean> {
   if (w().orders.some(r => r.category_id === catId)) return false;
   try {
-    const { error } = await supabase.from('service_categories').delete().eq('id', catId);
+    const { error } = await supabase
+      .from('service_categories')
+      .delete()
+      .eq('id', catId);
     if (error) return false;
     await refresh();
     return true;
@@ -473,10 +674,15 @@ export async function deleteCategory(catId: string): Promise<boolean> {
 export async function resolveDispute(disputeId: string, resolution: string) {
   return mutate(async () => {
     const { data: session } = await supabase.auth.getSession();
-    const { error } = await supabase.from('disputes').update({
-      status: 'resolved', resolution_notes: resolution,
-      resolved_by: session?.session?.user.id ?? null, resolved_at: now(),
-    }).eq('id', disputeId);
+    const { error } = await supabase
+      .from('disputes')
+      .update({
+        status: 'resolved',
+        resolution_notes: resolution,
+        resolved_by: session?.session?.user.id ?? null,
+        resolved_at: now(),
+      })
+      .eq('id', disputeId);
     if (error) throw error;
   }, 'No se pudo resolver la disputa.');
 }
@@ -484,9 +690,13 @@ export async function resolveDispute(disputeId: string, resolution: string) {
 /** Escala la disputa a nivel 2: sigue abierta (in_review), con nota. */
 export async function escalateDispute(disputeId: string) {
   return mutate(async () => {
-    const { error } = await supabase.from('disputes').update({
-      status: 'in_review', resolution_notes: 'Escalado a nivel 2 — pendiente de revisión',
-    }).eq('id', disputeId);
+    const { error } = await supabase
+      .from('disputes')
+      .update({
+        status: 'in_review',
+        resolution_notes: 'Escalado a nivel 2 — pendiente de revisión',
+      })
+      .eq('id', disputeId);
     if (error) throw error;
   }, 'No se pudo escalar la disputa.');
 }
@@ -496,13 +706,33 @@ export async function escalateDispute(disputeId: string) {
 // viven en memoria de la sesión de la consola. Migraciones pendientes en
 // tumtto-backend; al existir, estos mutators pasan a supabase.from(...).
 
-export function sendMessage(orderId: string, senderId: string, content: string) {
-  w().messages.push({ id: nextId('m'), order_id: orderId, sender_id: senderId, content, created_at: now() });
+export function sendMessage(
+  orderId: string,
+  senderId: string,
+  content: string,
+) {
+  w().messages.push({
+    id: nextId('m'),
+    order_id: orderId,
+    sender_id: senderId,
+    content,
+    created_at: now(),
+  });
   bump();
 }
 
-export function addNote(entityId: string, text: string, author = 'Admin'): Note {
-  const note: Note = { id: nextId('n'), entity_id: entityId, author, text, created_at: now() };
+export function addNote(
+  entityId: string,
+  text: string,
+  author = 'Admin',
+): Note {
+  const note: Note = {
+    id: nextId('n'),
+    entity_id: entityId,
+    author,
+    text,
+    created_at: now(),
+  };
   w().notes.unshift(note);
   bump();
   return note;
@@ -519,7 +749,10 @@ export function processPayoutBatch() {
     p.updated_at = now();
   }
   bump();
-  return { count: pending.length, total: pending.reduce((s, p) => s + p.amount_cents, 0) };
+  return {
+    count: pending.length,
+    total: pending.reduce((s, p) => s + p.amount_cents, 0),
+  };
 }
 
 export function createTicket(input: {
@@ -530,7 +763,11 @@ export function createTicket(input: {
   order_id?: string | null;
   content?: string;
 }): Ticket {
-  const role = input.role ?? (getProfile(input.requester_id)?.role === 'technician' ? 'tecnico' : 'cliente');
+  const role =
+    input.role ??
+    (getProfile(input.requester_id)?.role === 'technician'
+      ? 'tecnico'
+      : 'cliente');
   const ticket: Ticket = {
     id: nextId('TK'),
     subject: input.subject,
@@ -543,24 +780,43 @@ export function createTicket(input: {
     messages: [],
   };
   if (input.content) {
-    ticket.messages.push({ id: nextId('tm'), ticket_id: ticket.id, sender_id: ADMIN_ID, content: input.content, created_at: now() });
+    ticket.messages.push({
+      id: nextId('tm'),
+      ticket_id: ticket.id,
+      sender_id: ADMIN_ID,
+      content: input.content,
+      created_at: now(),
+    });
   }
   w().tickets.unshift(ticket);
   bump();
   return ticket;
 }
 
-export function replyTicket(ticketId: string, senderId: string, content: string) {
+export function replyTicket(
+  ticketId: string,
+  senderId: string,
+  content: string,
+) {
   const t = getTicket(ticketId);
   if (!t) return;
-  t.messages.push({ id: nextId('tm'), ticket_id: ticketId, sender_id: senderId, content, created_at: now() });
+  t.messages.push({
+    id: nextId('tm'),
+    ticket_id: ticketId,
+    sender_id: senderId,
+    content,
+    created_at: now(),
+  });
   if (senderId === ADMIN_ID && t.status === 'open') t.status = 'pending';
   bump();
 }
 
 export function resolveTicket(ticketId: string) {
   const t = getTicket(ticketId);
-  if (t) { t.status = 'resolved'; bump(); }
+  if (t) {
+    t.status = 'resolved';
+    bump();
+  }
 }
 
 /** Test hook: inject a world snapshot (see store.test.ts). */

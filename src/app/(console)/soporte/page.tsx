@@ -2,44 +2,118 @@
 
 import { useMemo, useState } from 'react';
 import {
-  ShieldAlert, Inbox, FileBadge, Users, ArrowLeftRight, Check, X, Plus,
-  FileText, Clock, MessageSquare, CheckCircle2, ArrowUpRight, Camera,
-  Search, Send, Wrench, UserRound, ArrowLeft, ArrowRight, LifeBuoy,
+  ShieldAlert,
+  Inbox,
+  FileBadge,
+  Users,
+  ArrowLeftRight,
+  Check,
+  X,
+  Plus,
+  FileText,
+  Clock,
+  MessageSquare,
+  CheckCircle2,
+  ArrowUpRight,
+  Camera,
+  Search,
+  Send,
+  Wrench,
+  UserRound,
+  ArrowLeft,
+  ArrowRight,
+  LifeBuoy,
 } from 'lucide-react';
 import Link from 'next/link';
-import { PageHeading, Panel, StatCard, StatusPill, Modal } from '@/components/admin';
-import { Avatar, Badge, Chip, GhostButton, PrimaryButton, EmptyState, Input, Textarea, Field } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion } from '@/components/motion';
+import {
+  PageHeading,
+  Panel,
+  StatCard,
+  StatusPill,
+  Modal,
+} from '@/components/admin';
+import {
+  Avatar,
+  Badge,
+  Chip,
+  GhostButton,
+  PrimaryButton,
+  EmptyState,
+  Input,
+  Textarea,
+  Field,
+} from '@/components/ui';
+import {
+  FadeIn,
+  Stagger,
+  StaggerItem,
+  AnimatePresence,
+  motion,
+} from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
-  getAllDisputes, getDisputes, getPendingKyc, getKycSessions, getProfile, getRequest,
-  getTickets, getTicket, getAllProfiles, getClientRequests, getTechRequests,
-  resolveDispute, escalateDispute, resolveKyc, rejectKyc, createTicket, replyTicket,
-  resolveTicket, useTick, ADMIN_ID,
+  getAllDisputes,
+  getDisputes,
+  getPendingKyc,
+  getKycSessions,
+  getProfile,
+  getRequest,
+  getTickets,
+  getTicket,
+  getAllProfiles,
+  getClientRequests,
+  getTechRequests,
+  resolveDispute,
+  escalateDispute,
+  resolveKyc,
+  rejectKyc,
+  createTicket,
+  replyTicket,
+  resolveTicket,
+  useTick,
+  ADMIN_ID,
 } from '@/lib/data/store';
 import type { Ticket } from '@/lib/demo/world';
 
 const TYPE_LABEL: Record<string, string> = {
   cobro: 'Cobro indebido',
-  'cancelación': 'Cancelación',
+  cancelación: 'Cancelación',
   cancelacion: 'Cancelación',
   calidad: 'Calidad del servicio',
   'no-show': 'No se presentó',
 };
 
-const TICKET_STATUS: Record<Ticket['status'], { label: string; tone: 'error' | 'warning' | 'success' }> = {
+const TICKET_STATUS: Record<
+  Ticket['status'],
+  { label: string; tone: 'error' | 'warning' | 'success' }
+> = {
   open: { label: 'Abierto', tone: 'error' },
   pending: { label: 'En espera', tone: 'warning' },
   resolved: { label: 'Resuelto', tone: 'success' },
 };
-const PRIORITY_TONE: Record<Ticket['priority'], 'error' | 'warning' | 'neutral'> = {
-  alta: 'error', media: 'warning', baja: 'neutral',
+const PRIORITY_TONE: Record<
+  Ticket['priority'],
+  'error' | 'warning' | 'neutral'
+> = {
+  alta: 'error',
+  media: 'warning',
+  baja: 'neutral',
 };
 
 const initials = (name?: string | null) =>
-  (name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  (name ?? '?')
+    .split(' ')
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase();
 const hora = (iso: string) =>
-  new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(iso).toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 export default function SoportePage() {
   useTick();
@@ -48,7 +122,9 @@ export default function SoportePage() {
 
   // ── Live data ──────────────────────────────────────────────────────────────
   const allDisputes = getAllDisputes();
-  const activeDisputes = allDisputes.filter(d => d.status === 'open' || d.status === 'in_review');
+  const activeDisputes = allDisputes.filter(
+    d => d.status === 'open' || d.status === 'in_review',
+  );
   const pendingKyc = getPendingKyc();
   const tickets = getTickets();
   const openTickets = tickets.filter(t => t.status !== 'resolved');
@@ -56,8 +132,11 @@ export default function SoportePage() {
   const openCount = activeDisputes.length;
   const kycCount = pendingKyc.length;
   const resolvedToday =
-    allDisputes.filter(d => d.resolved_at && new Date(d.resolved_at).toDateString() === new Date().toDateString()).length +
-    tickets.filter(t => t.status === 'resolved').length;
+    allDisputes.filter(
+      d =>
+        d.resolved_at &&
+        new Date(d.resolved_at).toDateString() === new Date().toDateString(),
+    ).length + tickets.filter(t => t.status === 'resolved').length;
 
   return (
     <div className="space-y-6">
@@ -68,7 +147,9 @@ export default function SoportePage() {
           <div className="flex items-center gap-2">
             <GhostButton>Plantillas</GhostButton>
             <PrimaryButton onClick={() => setNewTicketOpen(true)}>
-              <span className="inline-flex items-center gap-2"><Plus size={14} /> Nuevo ticket</span>
+              <span className="inline-flex items-center gap-2">
+                <Plus size={14} /> Nuevo ticket
+              </span>
             </PrimaryButton>
           </div>
         }
@@ -77,20 +158,42 @@ export default function SoportePage() {
       {/* Stat cards */}
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
-          <StatCard label="Tickets abiertos" value={openTickets.length} icon={Inbox} index={0}
-            note="Bandeja general · SLA 98%" />
+          <StatCard
+            label="Tickets abiertos"
+            value={openTickets.length}
+            icon={Inbox}
+            index={0}
+            note="Bandeja general · SLA 98%"
+          />
         </StaggerItem>
         <StaggerItem>
-          <StatCard label="Disputas activas" value={openCount} icon={ShieldAlert} index={1}
-            trend={openCount > 1 ? 'up' : 'down'} delta={`${allDisputes.length} total`} />
+          <StatCard
+            label="Disputas activas"
+            value={openCount}
+            icon={ShieldAlert}
+            index={1}
+            trend={openCount > 1 ? 'up' : 'down'}
+            delta={`${allDisputes.length} total`}
+          />
         </StaggerItem>
         <StaggerItem>
-          <StatCard label="KYC pendientes" value={kycCount} icon={FileBadge} index={2}
-            note="Esperando revisión" />
+          <StatCard
+            label="KYC pendientes"
+            value={kycCount}
+            icon={FileBadge}
+            index={2}
+            note="Esperando revisión"
+          />
         </StaggerItem>
         <StaggerItem>
-          <StatCard label="Resueltos" value={resolvedToday} suffix="" icon={CheckCircle2} index={3}
-            note="Disputas y tickets resueltos" />
+          <StatCard
+            label="Resueltos"
+            value={resolvedToday}
+            suffix=""
+            icon={CheckCircle2}
+            index={3}
+            note="Disputas y tickets resueltos"
+          />
         </StaggerItem>
       </Stagger>
 
@@ -115,11 +218,21 @@ export default function SoportePage() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.22, ease: [0.2, 0.7, 0.3, 1] }}
         >
-          {tab === 'disputas' ? <DisputesPanel /> : tab === 'kyc' ? <KycPanel /> : <TicketsPanel />}
+          {tab === 'disputas' ? (
+            <DisputesPanel />
+          ) : tab === 'kyc' ? (
+            <KycPanel />
+          ) : (
+            <TicketsPanel />
+          )}
         </motion.div>
       </AnimatePresence>
 
-      <NewTicketModal open={newTicketOpen} onClose={() => setNewTicketOpen(false)} onCreated={() => setTab('tickets')} />
+      <NewTicketModal
+        open={newTicketOpen}
+        onClose={() => setNewTicketOpen(false)}
+        onCreated={() => setTab('tickets')}
+      />
     </div>
   );
 }
@@ -129,13 +242,19 @@ export default function SoportePage() {
 // ============================================================================
 function DisputesPanel() {
   useTick();
-  const disputes = getAllDisputes().filter(d => d.status === 'open' || d.status === 'in_review');
+  const disputes = getAllDisputes().filter(
+    d => d.status === 'open' || d.status === 'in_review',
+  );
 
   return (
     <FadeIn>
       <Panel
         title="Disputas activas"
-        action={<span className="text-xs text-muted">Resolver acredita y notifica a ambas partes.</span>}
+        action={
+          <span className="text-xs text-muted">
+            Resolver acredita y notifica a ambas partes.
+          </span>
+        }
       >
         {disputes.length === 0 ? (
           <EmptyState
@@ -146,7 +265,7 @@ function DisputesPanel() {
         ) : (
           <div className="grid grid-cols-1 gap-4">
             <AnimatePresence mode="popLayout">
-              {disputes.map((d) => (
+              {disputes.map(d => (
                 <DisputeCard key={d.id} dispute={d} />
               ))}
             </AnimatePresence>
@@ -157,10 +276,16 @@ function DisputesPanel() {
   );
 }
 
-function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[number] }) {
+function DisputeCard({
+  dispute,
+}: {
+  dispute: ReturnType<typeof getDisputes>[number];
+}) {
   const req = getRequest(dispute.service_order_id);
   const opener = dispute.opened_by ? getProfile(dispute.opened_by) : null;
-  const counterparty = req?.technician_id ? getProfile(req.technician_id) : null;
+  const counterparty = req?.technician_id
+    ? getProfile(req.technician_id)
+    : null;
   const typeLabel = dispute.reason;
   const escalated = dispute.status === 'in_review';
 
@@ -174,8 +299,12 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
       className="rounded-2xl border border-line bg-surface shadow-card overflow-hidden"
     >
       {/* Red banner */}
-      <div className="flex items-center gap-3 bg-grad-brand px-5 py-3"
-        style={{ background: 'linear-gradient(135deg, var(--color-error), #991B1B)' }}>
+      <div
+        className="flex items-center gap-3 bg-grad-brand px-5 py-3"
+        style={{
+          background: 'linear-gradient(135deg, var(--color-error), #991B1B)',
+        }}
+      >
         <div className="grid place-items-center w-8 h-8 rounded-lg bg-white/15">
           <ShieldAlert size={16} className="text-white" />
         </div>
@@ -205,7 +334,9 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
           <div className="rounded-xl border border-line bg-info-soft p-4">
             <div className="flex items-center gap-2 mb-3">
               <Users size={14} className="text-error" />
-              <span className="text-sm font-semibold text-navy">Partes involucradas</span>
+              <span className="text-sm font-semibold text-navy">
+                Partes involucradas
+              </span>
               <Badge tone="error">2 partes</Badge>
             </div>
             <div className="space-y-3">
@@ -213,9 +344,15 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
               {counterparty && (
                 <>
                   <div className="flex items-center justify-center">
-                    <span className="font-mono text-[10px] uppercase tracking-wide text-error bg-surface border border-line rounded-full px-2 py-0.5">vs</span>
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-error bg-surface border border-line rounded-full px-2 py-0.5">
+                      vs
+                    </span>
                   </div>
-                  <PartyRow name={counterparty.full_name} role="Técnico" verified />
+                  <PartyRow
+                    name={counterparty.full_name}
+                    role="Técnico"
+                    verified
+                  />
                 </>
               )}
             </div>
@@ -225,11 +362,16 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Camera size={13} className="text-cyan" />
-              <span className="text-xs font-medium text-muted">Evidencia adjunta · 4 fotos</span>
+              <span className="text-xs font-medium text-muted">
+                Evidencia adjunta · 4 fotos
+              </span>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="aspect-square rounded-lg bg-grad-progress grid place-items-center">
+              {[0, 1, 2, 3].map(i => (
+                <div
+                  key={i}
+                  className="aspect-square rounded-lg bg-grad-progress grid place-items-center"
+                >
                   <Camera size={14} className="text-white/90" />
                 </div>
               ))}
@@ -242,7 +384,9 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
           {req && (
             <div className="rounded-xl border border-line bg-canvas p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-sm text-cyan font-medium">#{req.id}</span>
+                <span className="font-mono text-sm text-cyan font-medium">
+                  #{req.id}
+                </span>
                 <StatusPill status={req.status} />
               </div>
               <KVBlock label="Cliente" value={opener?.full_name ?? '—'} />
@@ -257,21 +401,31 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
           )}
 
           <div className="space-y-2">
-            <PrimaryButton className="w-full" onClick={() => { resolveDispute(dispute.id, 'resuelto'); toast.success(`Disputa resuelta · #${dispute.id}`); }}>
+            <PrimaryButton
+              className="w-full"
+              onClick={() => {
+                resolveDispute(dispute.id, 'resuelto');
+                toast.success(`Disputa resuelta · #${dispute.id}`);
+              }}
+            >
               <span className="inline-flex items-center justify-center gap-2">
                 <Check size={14} /> Resolver
               </span>
             </PrimaryButton>
             {!escalated && (
-              <GhostButton className="w-full" onClick={() => { escalateDispute(dispute.id); toast.success(`Disputa escalada a nivel 2 · #${dispute.id}`); }}>
+              <GhostButton
+                className="w-full"
+                onClick={() => {
+                  escalateDispute(dispute.id);
+                  toast.success(`Disputa escalada a nivel 2 · #${dispute.id}`);
+                }}
+              >
                 <span className="inline-flex items-center justify-center gap-2">
                   <ArrowUpRight size={14} /> Escalar
                 </span>
               </GhostButton>
             )}
-            <button
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface py-2 text-sm text-muted hover:bg-surface-2"
-            >
+            <button className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface py-2 text-sm text-muted hover:bg-surface-2">
               <ArrowLeftRight size={14} /> Ver ambas versiones
             </button>
           </div>
@@ -281,13 +435,23 @@ function DisputeCard({ dispute }: { dispute: ReturnType<typeof getDisputes>[numb
   );
 }
 
-function PartyRow({ name, role, verified }: { name?: string | null; role: string; verified?: boolean }) {
+function PartyRow({
+  name,
+  role,
+  verified,
+}: {
+  name?: string | null;
+  role: string;
+  verified?: boolean;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2">
       <Avatar initials={initials(name)} size={36} />
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-navy truncate">{name ?? 'Usuario'}</span>
+          <span className="text-sm font-semibold text-navy truncate">
+            {name ?? 'Usuario'}
+          </span>
           {verified && <CheckCircle2 size={12} className="text-success" />}
         </div>
         <div className="text-xs text-muted">{role}</div>
@@ -299,7 +463,9 @@ function PartyRow({ name, role, verified }: { name?: string | null; role: string
 function KVBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-wide text-faint mb-0.5">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-wide text-faint mb-0.5">
+        {label}
+      </div>
       <div className="text-sm font-medium text-navy">{value}</div>
     </div>
   );
@@ -316,7 +482,11 @@ function KycPanel() {
     <FadeIn>
       <Panel
         title="Cola de verificación KYC"
-        action={<span className="text-xs text-muted">{pending.length} técnico(s) esperando revisión.</span>}
+        action={
+          <span className="text-xs text-muted">
+            {pending.length} técnico(s) esperando revisión.
+          </span>
+        }
       >
         {pending.length === 0 ? (
           <EmptyState
@@ -327,7 +497,7 @@ function KycPanel() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <AnimatePresence mode="popLayout">
-              {pending.map((t) => (
+              {pending.map(t => (
                 <KycCard key={t.id} techId={t.id} userId={t.id} />
               ))}
             </AnimatePresence>
@@ -354,7 +524,9 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
       <div className="flex items-center gap-3">
         <Avatar initials={initials(profile?.full_name)} size={44} />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-navy truncate">{profile?.full_name ?? 'Técnico'}</div>
+          <div className="text-sm font-semibold text-navy truncate">
+            {profile?.full_name ?? 'Técnico'}
+          </div>
           <div className="text-xs text-muted">{profile?.phone ?? '—'}</div>
         </div>
         <Badge tone="warning">Pendiente</Badge>
@@ -364,7 +536,9 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <FileText size={13} className="text-cyan" />
-          <span className="text-xs font-medium text-muted">Documentos ({docs.length})</span>
+          <span className="text-xs font-medium text-muted">
+            Documentos ({docs.length})
+          </span>
         </div>
         {docs.length === 0 ? (
           <div className="text-xs text-faint italic flex items-center gap-1.5">
@@ -372,13 +546,21 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-1.5">
-            {docs.map((d) => (
-              <div key={d.id} className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
+            {docs.map(d => (
+              <div
+                key={d.id}
+                className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2"
+              >
                 <div className="grid place-items-center w-8 h-8 rounded-md bg-grad-progress">
                   <FileText size={14} className="text-white" />
                 </div>
-                <span className="text-sm text-navy flex-1 truncate">Verificación Didit · {d.status}</span>
-                <Link href={`/tecnicos/${techId}`} className="text-xs text-cyan font-medium inline-flex items-center gap-1">
+                <span className="text-sm text-navy flex-1 truncate">
+                  Verificación Didit · {d.status}
+                </span>
+                <Link
+                  href={`/tecnicos/${techId}`}
+                  className="text-xs text-cyan font-medium inline-flex items-center gap-1"
+                >
                   Ver <MessageSquare size={11} />
                 </Link>
               </div>
@@ -388,13 +570,22 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <PrimaryButton className="flex-1" onClick={() => { resolveKyc(techId, true); toast.success(`Técnico aprobado · ${profile?.full_name ?? techId}`); }}>
+        <PrimaryButton
+          className="flex-1"
+          onClick={() => {
+            resolveKyc(techId, true);
+            toast.success(`Técnico aprobado · ${profile?.full_name ?? techId}`);
+          }}
+        >
           <span className="inline-flex items-center justify-center gap-2">
             <Check size={14} /> Aprobar
           </span>
         </PrimaryButton>
         <button
-          onClick={() => { rejectKyc(techId, 'Rechazo desde cola KYC'); toast.success(`KYC rechazado · ${profile?.full_name ?? techId}`); }}
+          onClick={() => {
+            rejectKyc(techId, 'Rechazo desde cola KYC');
+            toast.success(`KYC rechazado · ${profile?.full_name ?? techId}`);
+          }}
           className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface py-2 text-sm font-medium text-error hover:bg-surface-2"
         >
           <X size={14} /> Rechazar
@@ -431,11 +622,18 @@ function TicketsPanel() {
           «volver»). Desde xl las tres columnas conviven. */}
       <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-line bg-white shadow-card xl:h-[680px] xl:grid-cols-[300px_minmax(0,1fr)_300px]">
         {/* LEFT — bandeja */}
-        <aside className={`max-h-[70vh] min-h-0 flex-col border-line xl:flex xl:max-h-none xl:border-r ${ticket ? 'hidden' : 'flex'}`}>
+        <aside
+          className={`max-h-[70vh] min-h-0 flex-col border-line xl:flex xl:max-h-none xl:border-r ${ticket ? 'hidden' : 'flex'}`}
+        >
           <div className="border-b border-line/70 p-4">
-            <h2 className="mb-3 font-display text-[17px] font-bold text-navy">Bandeja</h2>
+            <h2 className="mb-3 font-display text-[17px] font-bold text-navy">
+              Bandeja
+            </h2>
             <div className="relative">
-              <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+              />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
@@ -446,7 +644,9 @@ function TicketsPanel() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {filtered.length === 0 && (
-              <p className="px-4 py-8 text-center text-[12.5px] text-faint">Sin tickets que coincidan.</p>
+              <p className="px-4 py-8 text-center text-[12.5px] text-faint">
+                Sin tickets que coincidan.
+              </p>
             )}
             {filtered.map(t => {
               const requester = getProfile(t.requester_id);
@@ -459,19 +659,32 @@ function TicketsPanel() {
                   onClick={() => setSelectedId(t.id)}
                   className={`relative flex w-full items-start gap-2.5 border-b border-line/60 px-4 py-3.5 text-left transition-colors ${active ? 'bg-primary/[0.06]' : 'hover:bg-surface'}`}
                 >
-                  {active && <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded bg-primary" />}
+                  {active && (
+                    <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded bg-primary" />
+                  )}
                   <Avatar initials={initials(requester?.full_name)} size={34} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[12.5px] font-semibold text-navy">{requester?.full_name ?? 'Usuario'}</span>
-                      <span className="shrink-0 text-[10.5px] text-faint">{hora(t.created_at)}</span>
+                      <span className="truncate text-[12.5px] font-semibold text-navy">
+                        {requester?.full_name ?? 'Usuario'}
+                      </span>
+                      <span className="shrink-0 text-[10.5px] text-faint">
+                        {hora(t.created_at)}
+                      </span>
                     </div>
                     <div className="my-1 flex items-center gap-1.5">
                       <Badge tone={st.tone}>{st.label}</Badge>
-                      <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge>
-                      <span className="font-mono text-[10px] text-faint">#{t.id}</span>
+                      <Badge tone={PRIORITY_TONE[t.priority]}>
+                        {t.priority}
+                      </Badge>
+                      <span className="font-mono text-[10px] text-faint">
+                        #{t.id}
+                      </span>
                     </div>
-                    <div className="line-clamp-2 text-[11.5px] leading-snug text-muted">{t.subject}{last?.content ? ` — ${last.content}` : ''}</div>
+                    <div className="line-clamp-2 text-[11.5px] leading-snug text-muted">
+                      {t.subject}
+                      {last?.content ? ` — ${last.content}` : ''}
+                    </div>
                   </div>
                 </button>
               );
@@ -481,7 +694,11 @@ function TicketsPanel() {
 
         {/* CENTER — conversación */}
         {ticket ? (
-          <TicketConversation key={ticket.id} ticket={ticket} onBack={() => setSelectedId(null)} />
+          <TicketConversation
+            key={ticket.id}
+            ticket={ticket}
+            onBack={() => setSelectedId(null)}
+          />
         ) : (
           <div className="hidden place-items-center bg-surface xl:grid">
             <EmptyState
@@ -503,7 +720,13 @@ function TicketsPanel() {
   );
 }
 
-function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => void }) {
+function TicketConversation({
+  ticket,
+  onBack,
+}: {
+  ticket: Ticket;
+  onBack: () => void;
+}) {
   const [draft, setDraft] = useState('');
   const requester = getProfile(ticket.requester_id);
   const st = TICKET_STATUS[ticket.status];
@@ -530,7 +753,9 @@ function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => 
         <Avatar initials={initials(requester?.full_name)} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] font-bold text-navy">{requester?.full_name ?? 'Usuario'}</span>
+            <span className="text-[15px] font-bold text-navy">
+              {requester?.full_name ?? 'Usuario'}
+            </span>
             <Badge tone={st.tone}>{st.label}</Badge>
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[12px] text-muted">
@@ -549,24 +774,36 @@ function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => 
           const isAdmin = m.sender_id === ADMIN_ID;
           const sender = getProfile(m.sender_id);
           return (
-            <FadeIn key={m.id} className={`mb-3.5 flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex max-w-[78%] flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
-                <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed text-navy ${
-                  isAdmin
-                    ? 'rounded-tr-sm border border-primary/[0.22] bg-primary/[0.10]'
-                    : 'rounded-tl-sm border border-line bg-white'
-                }`}>
+            <FadeIn
+              key={m.id}
+              className={`mb-3.5 flex ${isAdmin ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`flex max-w-[78%] flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+              >
+                <div
+                  className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed text-navy ${
+                    isAdmin
+                      ? 'rounded-tr-sm border border-primary/[0.22] bg-primary/[0.10]'
+                      : 'rounded-tl-sm border border-line bg-white'
+                  }`}
+                >
                   {m.content}
                 </div>
                 <span className="mt-1 font-mono text-[10.5px] text-faint">
-                  {isAdmin ? 'Sofía M. (admin)' : sender?.full_name ?? 'Usuario'} · {hora(m.created_at)}
+                  {isAdmin
+                    ? 'Sofía M. (admin)'
+                    : (sender?.full_name ?? 'Usuario')}{' '}
+                  · {hora(m.created_at)}
                 </span>
               </div>
             </FadeIn>
           );
         })}
         {ticket.messages.length === 0 && (
-          <p className="py-8 text-center text-[12.5px] text-faint">Sin mensajes en este ticket.</p>
+          <p className="py-8 text-center text-[12.5px] text-faint">
+            Sin mensajes en este ticket.
+          </p>
         )}
       </div>
 
@@ -576,12 +813,24 @@ function TicketConversation({ ticket, onBack }: { ticket: Ticket; onBack: () => 
           value={draft}
           onChange={e => setDraft(e.target.value)}
           rows={3}
-          placeholder={ticket.status === 'resolved' ? 'Ticket resuelto — puedes reabrir la conversación respondiendo.' : 'Escribe una respuesta pública…'}
+          placeholder={
+            ticket.status === 'resolved'
+              ? 'Ticket resuelto — puedes reabrir la conversación respondiendo.'
+              : 'Escribe una respuesta pública…'
+          }
         />
         <div className="mt-2.5 flex items-center justify-between">
-          <span className="font-mono text-[11px] text-faint">{draft.length} / 1000</span>
-          <PrimaryButton onClick={send} disabled={!draft.trim()} className="!min-h-[40px] !py-2">
-            <span className="inline-flex items-center gap-2"><Send size={13} /> Enviar respuesta</span>
+          <span className="font-mono text-[11px] text-faint">
+            {draft.length} / 1000
+          </span>
+          <PrimaryButton
+            onClick={send}
+            disabled={!draft.trim()}
+            className="!min-h-[40px] !py-2"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Send size={13} /> Enviar respuesta
+            </span>
           </PrimaryButton>
         </div>
       </div>
@@ -593,7 +842,9 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
   const requester = getProfile(ticket.requester_id);
   const req = ticket.order_id ? getRequest(ticket.order_id) : null;
   const services = requester
-    ? (ticket.role === 'tecnico' ? getTechRequests(requester.id) : getClientRequests(requester.id))
+    ? ticket.role === 'tecnico'
+      ? getTechRequests(requester.id)
+      : getClientRequests(requester.id)
     : [];
 
   return (
@@ -601,27 +852,39 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
       {/* Requester */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold text-navy">
-          <UserRound size={13} className="text-primary" /> Información del usuario
+          <UserRound size={13} className="text-primary" /> Información del
+          usuario
         </div>
         <div className="flex items-center gap-3">
           <Avatar initials={initials(requester?.full_name)} size={38} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13.5px] font-semibold text-navy">{requester?.full_name ?? 'Usuario'}</div>
-            <div className="text-[11.5px] capitalize text-muted">{ticket.role} · {requester?.phone ?? '—'}</div>
+            <div className="truncate text-[13.5px] font-semibold text-navy">
+              {requester?.full_name ?? 'Usuario'}
+            </div>
+            <div className="text-[11.5px] capitalize text-muted">
+              {ticket.role} · {requester?.phone ?? '—'}
+            </div>
           </div>
         </div>
         <div className="mt-3 flex gap-4 rounded-lg border border-line bg-white px-3 py-2.5">
           <div>
-            <div className="font-display text-[15px] font-bold text-navy">{services.length}</div>
+            <div className="font-display text-[15px] font-bold text-navy">
+              {services.length}
+            </div>
             <div className="text-[10.5px] text-faint">Servicios</div>
           </div>
           <div>
-            <div className="font-display text-[15px] font-bold capitalize text-navy">{ticket.priority}</div>
+            <div className="font-display text-[15px] font-bold capitalize text-navy">
+              {ticket.priority}
+            </div>
             <div className="text-[10.5px] text-faint">Prioridad</div>
           </div>
         </div>
         {requester && ticket.role === 'cliente' && (
-          <Link href={`/clientes/${requester.id}`} className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-primary">
+          <Link
+            href={`/clientes/${requester.id}`}
+            className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-primary"
+          >
             Ver perfil completo <ArrowRight size={11} />
           </Link>
         )}
@@ -634,11 +897,18 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
             <Wrench size={13} className="text-primary" /> Servicio relacionado
           </div>
           <div className="mb-2.5 flex items-center justify-between">
-            <span className="font-mono text-[12.5px] font-medium text-primary">#{req.id}</span>
+            <span className="font-mono text-[12.5px] font-medium text-primary">
+              #{req.id}
+            </span>
             <StatusPill status={req.status} />
           </div>
-          <p className="line-clamp-2 text-[12px] text-muted">{req.description ?? '—'}</p>
-          <Link href={`/servicios/${req.id}`} className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-primary">
+          <p className="line-clamp-2 text-[12px] text-muted">
+            {req.description ?? '—'}
+          </p>
+          <Link
+            href={`/servicios/${req.id}`}
+            className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-primary"
+          >
             Ver servicio completo <ArrowRight size={11} />
           </Link>
         </div>
@@ -652,30 +922,51 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
         {ticket.status !== 'resolved' ? (
           <PrimaryButton
             className="w-full !min-h-[40px] !py-2"
-            onClick={() => { resolveTicket(ticket.id); toast.success(`Ticket resuelto · #${ticket.id}`); }}
+            onClick={() => {
+              resolveTicket(ticket.id);
+              toast.success(`Ticket resuelto · #${ticket.id}`);
+            }}
           >
-            <span className="inline-flex items-center gap-2"><Check size={13} /> Resolver ticket</span>
+            <span className="inline-flex items-center gap-2">
+              <Check size={13} /> Resolver ticket
+            </span>
           </PrimaryButton>
         ) : (
           <div className="flex items-center justify-center gap-2 rounded-xl bg-success-soft py-2.5 text-[12.5px] font-semibold text-success">
             <CheckCircle2 size={14} /> Resuelto
           </div>
         )}
-        <div className="mt-2 text-center text-[11px] text-faint">Resolver notifica al usuario por email y push.</div>
+        <div className="mt-2 text-center text-[11px] text-faint">
+          Resolver notifica al usuario por email y push.
+        </div>
       </div>
     </aside>
   );
 }
 
-function NewTicketModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+function NewTicketModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [subject, setSubject] = useState('');
   const [requesterId, setRequesterId] = useState('');
   const [priority, setPriority] = useState<Ticket['priority']>('media');
-  const people = getAllProfiles().filter(p => p.role === 'client' || p.role === 'technician');
+  const people = getAllProfiles().filter(
+    p => p.role === 'client' || p.role === 'technician',
+  );
 
   function submit() {
     if (!subject.trim() || !requesterId) return;
-    createTicket({ subject: subject.trim(), requester_id: requesterId, priority });
+    createTicket({
+      subject: subject.trim(),
+      requester_id: requesterId,
+      priority,
+    });
     toast.success('Ticket creado');
     setSubject('');
     setRequesterId('');
@@ -695,13 +986,22 @@ function NewTicketModal({ open, onClose, onCreated }: { open: boolean; onClose: 
       footer={
         <>
           <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!subject.trim() || !requesterId}>Crear ticket</PrimaryButton>
+          <PrimaryButton
+            onClick={submit}
+            disabled={!subject.trim() || !requesterId}
+          >
+            Crear ticket
+          </PrimaryButton>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <Field label="Asunto">
-          <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ej. Cobro duplicado en tarjeta" />
+          <Input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            placeholder="Ej. Cobro duplicado en tarjeta"
+          />
         </Field>
         <Field label="Usuario">
           <select
@@ -711,14 +1011,20 @@ function NewTicketModal({ open, onClose, onCreated }: { open: boolean; onClose: 
           >
             <option value="">Selecciona un usuario…</option>
             {people.map(p => (
-              <option key={p.id} value={p.id}>{p.full_name} · {p.role}</option>
+              <option key={p.id} value={p.id}>
+                {p.full_name} · {p.role}
+              </option>
             ))}
           </select>
         </Field>
         <Field label="Prioridad">
           <div className="flex gap-2">
             {(['alta', 'media', 'baja'] as const).map(p => (
-              <Chip key={p} active={priority === p} onClick={() => setPriority(p)}>
+              <Chip
+                key={p}
+                active={priority === p}
+                onClick={() => setPriority(p)}
+              >
                 <span className="capitalize">{p}</span>
               </Chip>
             ))}

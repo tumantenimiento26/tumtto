@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, FolderTree, Download, Plus, Activity, TrendingUp } from 'lucide-react';
+import {
+  Search,
+  FolderTree,
+  Download,
+  Plus,
+  Activity,
+  TrendingUp,
+} from 'lucide-react';
 import {
   PageHeading,
   Panel,
@@ -13,7 +20,16 @@ import {
   exportCsv,
   type Column,
 } from '@/components/admin';
-import { PrimaryButton, GhostButton, Chip, Avatar, Input, Skeleton, Field, Textarea } from '@/components/ui';
+import {
+  PrimaryButton,
+  GhostButton,
+  Chip,
+  Avatar,
+  Input,
+  Skeleton,
+  Field,
+  Textarea,
+} from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
 import {
@@ -47,15 +63,30 @@ const STATUS_LABELS: Record<string, string> = {
 const fmtMoney = (n: number | null) =>
   n == null
     ? '—'
-    : new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n);
+    : new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        maximumFractionDigits: 0,
+      }).format(n);
 
 const fmtDate = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? new Date(iso).toLocaleString('es-MX', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : '—';
 
 const initials = (name: string) =>
-  name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(s => s[0])
+    .join('')
+    .toUpperCase();
 
 interface Row {
   req: ServiceRequest;
@@ -69,10 +100,14 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
     <div className="flex flex-col gap-6">
       <Skeleton className="h-10 w-72" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full" />
+        ))}
       </div>
       <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        {Array.from({ length: rows }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     </div>
   );
@@ -101,19 +136,25 @@ export default function ServiciosPage() {
     return getAllRequests().map(req => ({
       req,
       clientName: getProfile(req.client_id)?.full_name ?? 'Cliente',
-      techName: req.technician_id ? getProfile(req.technician_id)?.full_name ?? null : null,
+      techName: req.technician_id
+        ? (getProfile(req.technician_id)?.full_name ?? null)
+        : null,
       categoryName: subToCategory[req.category_id] ?? '—',
     }));
   }, [subToCategory]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], [tick]);
+  const categoryNames = useMemo(
+    () => ['Todas', ...getCategories().map(c => c.name)],
+    [tick],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
       if (statusFilter && r.req.status !== statusFilter) return false;
-      if (categoryFilter !== 'Todas' && r.categoryName !== categoryFilter) return false;
+      if (categoryFilter !== 'Todas' && r.categoryName !== categoryFilter)
+        return false;
       if (!q) return true;
       return (
         r.req.id.toLowerCase().includes(q) ||
@@ -125,12 +166,21 @@ export default function ServiciosPage() {
   }, [rows, query, statusFilter, categoryFilter]);
 
   function onExport() {
-    exportCsv('servicios.csv', filtered.map(r => ({
-      ID: r.req.id, Cliente: r.clientName, Técnico: r.techName ?? '',
-      Categoría: r.categoryName, Estado: STATUS_LABELS[r.req.status] ?? r.req.status,
-      Programado: r.req.accepted_at ?? r.req.created_at,
-      Total: r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : '',
-    })));
+    exportCsv(
+      'servicios.csv',
+      filtered.map(r => ({
+        ID: r.req.id,
+        Cliente: r.clientName,
+        Técnico: r.techName ?? '',
+        Categoría: r.categoryName,
+        Estado: STATUS_LABELS[r.req.status] ?? r.req.status,
+        Programado: r.req.accepted_at ?? r.req.created_at,
+        Total:
+          r.req.quoted_total_cents != null
+            ? r.req.quoted_total_cents / 100
+            : '',
+      })),
+    );
     toast.success(`CSV exportado · ${filtered.length} servicios`);
   }
 
@@ -141,7 +191,11 @@ export default function ServiciosPage() {
     {
       key: 'id',
       header: 'ID',
-      render: r => <span className="font-mono text-[12.5px] font-medium text-primary">#{r.req.id}</span>,
+      render: r => (
+        <span className="font-mono text-[12.5px] font-medium text-primary">
+          #{r.req.id}
+        </span>
+      ),
     },
     {
       key: 'cliente',
@@ -169,7 +223,9 @@ export default function ServiciosPage() {
     {
       key: 'categoria',
       header: 'Categoría',
-      render: r => <span className="text-[12.5px] text-navy">{r.categoryName}</span>,
+      render: r => (
+        <span className="text-[12.5px] text-navy">{r.categoryName}</span>
+      ),
     },
     {
       key: 'estado',
@@ -179,7 +235,11 @@ export default function ServiciosPage() {
     {
       key: 'fecha',
       header: 'Programado',
-      render: r => <span className="font-mono text-[12px] text-muted">{fmtDate(r.req.accepted_at ?? r.req.created_at)}</span>,
+      render: r => (
+        <span className="font-mono text-[12px] text-muted">
+          {fmtDate(r.req.accepted_at ?? r.req.created_at)}
+        </span>
+      ),
     },
     {
       key: 'total',
@@ -187,7 +247,11 @@ export default function ServiciosPage() {
       className: 'text-right',
       render: r => (
         <span className="font-mono text-[13px] font-semibold text-navy">
-          {fmtMoney(r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : null)}
+          {fmtMoney(
+            r.req.quoted_total_cents != null
+              ? r.req.quoted_total_cents / 100
+              : null,
+          )}
         </span>
       ),
     },
@@ -242,7 +306,11 @@ export default function ServiciosPage() {
               Todos · {metrics.totalRequests}
             </Chip>
             {statusOrder.map(s => (
-              <Chip key={s} active={statusFilter === s} onClick={() => setStatusFilter(s)}>
+              <Chip
+                key={s}
+                active={statusFilter === s}
+                onClick={() => setStatusFilter(s)}
+              >
                 {STATUS_LABELS[s]} · {byStatus[s]}
               </Chip>
             ))}
@@ -254,7 +322,11 @@ export default function ServiciosPage() {
                 onChange={e => setCategoryFilter(e.target.value)}
                 className="bg-transparent text-[12.5px] font-medium text-navy outline-none"
               >
-                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                {categoryNames.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </span>
           </div>
@@ -262,7 +334,8 @@ export default function ServiciosPage() {
           <div className="mb-4 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-xl border border-primary/20 bg-info-soft px-4 py-2.5">
             <Activity size={14} className="text-success" />
             <span className="text-[13px] text-navy">
-              <b className="font-bold">{metrics.active}</b> servicios en curso ahora mismo
+              <b className="font-bold">{metrics.active}</b> servicios en curso
+              ahora mismo
             </span>
             <span className="flex items-center gap-1 text-[12.5px] text-muted">
               <TrendingUp size={12} className="text-success" />
@@ -291,8 +364,14 @@ export default function ServiciosPage() {
   );
 }
 
-function CreateServiceModal({ open, onClose, onCreated }: {
-  open: boolean; onClose: () => void; onCreated: (id: string) => void;
+function CreateServiceModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (id: string) => void;
 }) {
   const cats = getCategories();
   const clients = getClients();
@@ -332,7 +411,10 @@ function CreateServiceModal({ open, onClose, onCreated }: {
       footer={
         <>
           <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!subId || !clientId || saving}>
+          <PrimaryButton
+            onClick={submit}
+            disabled={!subId || !clientId || saving}
+          >
             {saving ? 'Creando…' : 'Crear servicio'}
           </PrimaryButton>
         </>
@@ -342,12 +424,17 @@ function CreateServiceModal({ open, onClose, onCreated }: {
         <Field label="Cliente">
           <select
             value={clientId}
-            onChange={e => { setClientId(e.target.value); setAddressId(''); }}
+            onChange={e => {
+              setClientId(e.target.value);
+              setAddressId('');
+            }}
             className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
           >
             <option value="">Selecciona un cliente…</option>
             {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.full_name ?? c.id}</option>
+              <option key={c.id} value={c.id}>
+                {c.full_name ?? c.id}
+              </option>
             ))}
           </select>
         </Field>
@@ -359,12 +446,19 @@ function CreateServiceModal({ open, onClose, onCreated }: {
           >
             <option value="">Selecciona un servicio…</option>
             {cats.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
         </Field>
         <Field label="Descripción del problema">
-          <Textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="¿Qué reporta el cliente?" />
+          <Textarea
+            rows={3}
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="¿Qué reporta el cliente?"
+          />
         </Field>
         <Field label="Dirección">
           <select
@@ -372,9 +466,15 @@ function CreateServiceModal({ open, onClose, onCreated }: {
             onChange={e => setAddressId(e.target.value)}
             className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
           >
-            <option value="">{addresses.length ? 'Selecciona una dirección…' : 'El cliente no tiene direcciones guardadas'}</option>
+            <option value="">
+              {addresses.length
+                ? 'Selecciona una dirección…'
+                : 'El cliente no tiene direcciones guardadas'}
+            </option>
             {addresses.map(a => (
-              <option key={a.id} value={a.id}>{a.label} · {a.address_line}</option>
+              <option key={a.id} value={a.id}>
+                {a.label} · {a.address_line}
+              </option>
             ))}
           </select>
         </Field>

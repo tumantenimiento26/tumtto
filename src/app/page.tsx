@@ -629,7 +629,7 @@ const FAQS: [string, string][] = [
   ],
   [
     '¿Qué necesito para registrarme como técnico?',
-    'INE vigente, comprobante de domicilio, CLABE para tus cobros y — según tu especialidad — certificación de oficio. Descargas la app, subes tus documentos y nuestro equipo revisa tu perfil para activarlo.',
+    'INE vigente, carta de antecedentes no penales (con vigencia no mayor a 3 meses), CLABE para tus cobros y — según tu especialidad — certificación de oficio. El comprobante de domicilio es opcional. Creas tu cuenta aquí, subes tus documentos desde la app y nuestro equipo revisa tu perfil para activarlo.',
   ],
 ];
 
@@ -1320,12 +1320,12 @@ export default function LandingPage() {
                       ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
+                      <Link
+                        href="/registro-tecnico"
                         className="inline-flex min-h-[50px] cursor-pointer items-center justify-center rounded-[13px] bg-white px-[26px] text-[14.5px] font-bold text-navy shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-colors hover:bg-info-soft"
                       >
                         Regístrate como técnico
-                      </button>
+                      </Link>
                       <a
                         href="#faq"
                         className="inline-flex min-h-[50px] items-center justify-center rounded-[13px] border border-white/40 bg-white/[0.08] px-[22px] text-[14.5px] font-semibold text-white transition-colors hover:bg-white/[0.18]"

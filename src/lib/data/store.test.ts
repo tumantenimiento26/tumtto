@@ -97,3 +97,13 @@ describe('session-local domains (sin tabla backend todavía)', () => {
     expect(store.getMessages('SVC-2835')).toHaveLength(0);
   });
 });
+
+describe('slugify', () => {
+  it('quita acentos y ñ en vez de romper el slug', () => {
+    expect(store.slugify('Plomería')).toBe('plomeria');
+    expect(store.slugify('  Cerrajería y Señalización ')).toBe(
+      'cerrajeria-y-senalizacion',
+    );
+    expect(store.slugify('¡¡!!')).toBe('');
+  });
+});

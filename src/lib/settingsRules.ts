@@ -9,12 +9,26 @@ type Rule = { min: number; max: number; label: string };
 
 const INT_RULES: Record<string, Rule> = {
   request_ttl_minutes: { min: 1, max: 1440, label: 'La ventana de aceptación' },
-  sla_first_response_minutes: { min: 1, max: 1440, label: 'La primera respuesta' },
+  sla_first_response_minutes: {
+    min: 1,
+    max: 1440,
+    label: 'La primera respuesta',
+  },
   sla_dispute_hours: { min: 1, max: 720, label: 'La resolución de disputas' },
   intro_program_days: { min: 1, max: 3650, label: 'La duración del programa' },
   cancel_free_window_hours: { min: 0, max: 720, label: 'La ventana sin costo' },
-  tech_max_cancellations_30d: { min: 0, max: 100, label: 'El máximo de cancelaciones' },
+  tech_max_cancellations_30d: {
+    min: 0,
+    max: 100,
+    label: 'El máximo de cancelaciones',
+  },
   noshow_wait_minutes: { min: 1, max: 240, label: 'El tiempo de espera' },
+  quiet_start_hours: {
+    min: 0,
+    max: 23,
+    label: 'El inicio del horario silencioso',
+  },
+  quiet_end_hours: { min: 0, max: 23, label: 'El fin del horario silencioso' },
 };
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -28,8 +42,14 @@ export function validateSettings(s: Settings): Record<string, string> {
         errs[key] = 'Debe ser un porcentaje entre 0 y 100 (máx. 2 decimales).';
     } else if (INT_RULES[key]) {
       const r = INT_RULES[key];
-      if (typeof v !== 'number' || !Number.isInteger(v) || v < r.min || v > r.max)
-        errs[key] = `${r.label} debe ser un número entero entre ${r.min} y ${r.max}.`;
+      if (
+        typeof v !== 'number' ||
+        !Number.isInteger(v) ||
+        v < r.min ||
+        v > r.max
+      )
+        errs[key] =
+          `${r.label} debe ser un número entero entre ${r.min} y ${r.max}.`;
     }
   }
   if ('platform_name' in s && !String(s.platform_name).trim())

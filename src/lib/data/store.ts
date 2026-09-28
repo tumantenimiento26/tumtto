@@ -916,6 +916,109 @@ export function resolveTicket(ticketId: string) {
   }
 }
 
+// ── consola-d (catálogo / reportes / soporte / config) — bloque aditivo ─────
+/** Tablas que el Catálogo necesita para derivar técnicos y rango por categoría. */
+export const getCatalogData = () => ({
+  techCategories: w().technicianCategories,
+  rates: w().rates,
+  orders: w().orders,
+});
+
+/** Órdenes, eventos y técnicos para Reportes (se filtran por periodo en lib). */
+export const getReportData = () => ({
+  orders: w().orders,
+  events: w().events,
+  technicians: w().technicians,
+});
+
+// Las RPC admin_report_* no están en los tipos generados de este repo todavía
+// (regenerar con gen:types tras el deploy); llamada sin tipar y null si falla,
+// para que la pantalla caiga al cálculo desde el snapshot sin mentir.
+type LooseRpc = (
+  fn: string,
+  args: Record<string, unknown>,
+) => Promise<{ data: unknown; error: unknown }>;
+async function reportRpc<T>(
+  fn: string,
+  from: Date,
+  to: Date,
+): Promise<T | null> {
+  try {
+    const { data, error } = await (supabase.rpc as unknown as LooseRpc)(fn, {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+    });
+    if (error) {
+      console.warn('[data]', fn, error);
+      return null;
+    }
+    return data as T;
+  } catch (e) {
+    console.warn('[data]', fn, e);
+    return null;
+  }
+}
+export type ReportKpis = {
+  current: {
+    orders: number;
+    paid_orders: number;
+    gmv_cents: number;
+    avg_arrival_seconds: number;
+  };
+  previous: {
+    orders: number;
+    paid_orders: number;
+    gmv_cents: number;
+    avg_arrival_seconds: number;
+  };
+};
+export const fetchReportKpis = (from: Date, to: Date) =>
+  reportRpc<ReportKpis>('admin_report_kpis', from, to);
+export const fetchTicketByCategory = (from: Date, to: Date) =>
+  reportRpc<
+    {
+      category_id: string;
+      category_name: string;
+      paid_orders: number;
+      avg_ticket_cents: number;
+    }[]
+  >('admin_report_ticket_by_category', from, to);
+export const fetchColdZones = (from: Date, to: Date) =>
+  reportRpc<{ zone_id: string; zone_name: string; order_count: number }[]>(
+    'admin_report_cold_zones',
+    from,
+    to,
+  );
+
+/** Reabre un ticket (Deshacer de "Marcar resuelto"). Tickets: solo sesión. */
+export function reopenTicket(ticketId: string) {
+  const t = getTicket(ticketId);
+  if (t && t.status === 'resolved') {
+    t.status = 'pending';
+    bump();
+  }
+}
+
+/**
+ * ¿La sesión actual tiene un factor TOTP verificado? Supabase solo expone los
+ * factores propios (listFactors), no los de otros admins. null = no se pudo leer.
+ */
+export async function getMyMfaVerified(): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) return null;
+    return (data?.totp ?? []).some(f => f.status === 'verified');
+  } catch {
+    return null;
+  }
+}
+/** Id del usuario con sesión (para marcar "Tú" en Equipo). */
+export async function getSessionUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+// ── fin consola-d ────────────────────────────────────────────────────────────
+
 /** Test hook: inject a world snapshot (see store.test.ts). */
 export function __setWorldForTests(next: World) {
   world = next;

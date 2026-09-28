@@ -1,0 +1,19 @@
+/**
+ * Código corto y estable de una orden para la UI (handoff: "SVC-2851").
+ * ponytail: derivado del uuid (no hay columna de folio); puede chocar entre
+ * órdenes (1 en 9,000) — sólo es una etiqueta, la navegación usa el uuid.
+ * Si se necesita folio único, columna `folio` con secuencia en el backend.
+ */
+export function orderCode(id: string): string {
+  // Hash FNV-1a de todo el uuid: los ids del seed (y de prod) comparten
+  // prefijo, así que tomar los primeros dígitos daba el mismo código a todas.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `SVC-${(h % 9000) + 1000}`;
+}
+
+/** ¿El texto parece un código SVC? (para buscar por código). */
+export const isOrderCode = (q: string) => /^svc-?\d{1,4}$/i.test(q.trim());

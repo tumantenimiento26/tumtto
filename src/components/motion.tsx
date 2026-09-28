@@ -10,7 +10,12 @@ export const EASE = [0.2, 0.7, 0.3, 1] as const;
 
 export { motion, AnimatePresence };
 
-export function FadeIn({ delay = 0, y = 8, children, ...rest }: HTMLMotionProps<'div'> & { delay?: number; y?: number }) {
+export function FadeIn({
+  delay = 0,
+  y = 8,
+  children,
+  ...rest
+}: HTMLMotionProps<'div'> & { delay?: number; y?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y }}
@@ -24,7 +29,15 @@ export function FadeIn({ delay = 0, y = 8, children, ...rest }: HTMLMotionProps<
 }
 
 /** Stagger a list of children in. Wrap items in <StaggerItem>. */
-export function Stagger({ children, className, gap = 0.06 }: { children: React.ReactNode; className?: string; gap?: number }) {
+export function Stagger({
+  children,
+  className,
+  gap = 0.06,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  gap?: number;
+}) {
   return (
     <motion.div
       className={className}
@@ -37,7 +50,13 @@ export function Stagger({ children, className, gap = 0.06 }: { children: React.R
   );
 }
 
-export function StaggerItem({ children, className }: { children: React.ReactNode; className?: string }) {
+export function StaggerItem({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <motion.div
       className={className}
@@ -50,7 +69,13 @@ export function StaggerItem({ children, className }: { children: React.ReactNode
 }
 
 /** Reveal a timeline/progress step when it becomes active. */
-export function Reveal({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Reveal({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <motion.div
       className={className}
@@ -86,11 +111,19 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 }
 
 /** Animated progress bar fill (wizard, execution). value 0..1. */
-export function ProgressBar({ value, className = '', fillClassName = 'bg-grad-progress' }: {
-  value: number; className?: string; fillClassName?: string;
+export function ProgressBar({
+  value,
+  className = '',
+  fillClassName = 'bg-grad-progress',
+}: {
+  value: number;
+  className?: string;
+  fillClassName?: string;
 }) {
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full bg-surface-2 ${className}`}>
+    <div
+      className={`h-2 w-full overflow-hidden rounded-full bg-surface-2 ${className}`}
+    >
       <motion.div
         className={`h-full rounded-full ${fillClassName}`}
         initial={false}

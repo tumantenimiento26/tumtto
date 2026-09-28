@@ -5,28 +5,68 @@
  * `src/theme` palette and the HTML prototypes' Design System. Tailwind v4
  * CSS-first config: tokens below become `bg-primary`, `text-navy`, etc.
  */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @theme {
-  --color-primary: #0a6bcf;
+  /* ── Consola / registro — claro (handoff web, README "Design Tokens") ──
+     Los mismos nombres cambian de valor en [data-theme='dark'] (abajo), así
+     que `bg-card text-navy border-line` ya funciona en ambos temas. */
+  --color-primary: #0a6bcf; /* acento, links, activo del sidebar */
+  --color-primary-hover: #095fb8;
+  --color-primary-pressed: #0853a3;
   --color-primary-2: #0894ea;
-  --color-navy: #0e2c56;
+  --color-navy: #0e2c56; /* texto principal */
+  --color-action: #0e2c56; /* fondo del botón primario */
+  --color-action-hover: #1a3f73;
+  --color-action-pressed: #0a2245;
+  --color-deep: #061b3a; /* sidebar, banda del dashboard, tooltips, snackbar */
+  --color-sidebar: #061b3a;
   --color-cyan: #18c1ff;
 
-  --color-success: #18a66a;
-  --color-warning: #f59e0b;
-  --color-error: #dc2626;
+  --color-approve: #1e6b4b;
+  --color-approve-hover: #237a56;
+  --color-approve-pressed: #185a3f;
+  --color-success: #0f7a4d; /* texto de éxito */
+  --color-success-soft: #e5f7ee;
+  --color-success-ring: #9bd8ba;
+  --color-warning: #f59e0b; /* ícono */
+  --color-warning-ink: #b45309;
+  --color-warning-soft: #fef3dc;
+  --color-warning-ring: #f5d08a;
+  --color-error: #b42318;
+  --color-error-soft: #fef3f2;
+  --color-error-line: #f4c7c3;
   --color-info: #18c1ff;
+  --color-info-soft: #e0f0ff;
+  --color-info-ring: #9dc8f2;
+  --color-tint: #f0f7ff;
 
-  --color-canvas: #f4f6fa;
-  --color-surface: #f8fbff;
-  --color-surface-2: #eef3f8;
+  --color-page: #f5f8fc; /* fondo de la consola */
+  --color-canvas: #f5f8fc; /* alias legacy */
+  --color-card: #ffffff; /* tarjetas */
+  --color-panel: #f5f8fc; /* header de tabla, hover de fila */
+  --color-surface: #f5f8fc; /* alias legacy */
+  --color-surface-2: #ebeff5; /* alias legacy → segmentado */
+  --color-segment: #ebeff5;
+  --color-chip: #f1f5fa;
+  --color-line: #e1e8f0;
+  --color-divider: #eef2f8;
+  --color-line-strong: #d6dee8; /* borde de botón secundario */
+  --color-body: #374151;
   --color-muted: #6b7280;
   --color-faint: #9ca3af;
-  --color-line: #e1e8f0;
-  --color-success-soft: #e5f7ee;
-  --color-warning-soft: #fef3dc;
-  --color-error-soft: #fce9e9;
-  --color-info-soft: #e0f6ff;
-  --color-warning-ink: #b45309;
+  --color-bar-idle: #c9ddf3;
+  --color-tooltip: #061b3a;
+
+  /* ── Landing (tema azul, fijo: no cambia con data-theme) ── */
+  --color-lp-page: #050f22;
+  --color-lp-card: rgb(13 33 63 / 0.72);
+  --color-lp-line: rgb(90 176 255 / 0.14);
+  --color-lp-band: rgb(8 24 50 / 0.5);
+  --color-lp-footer: #040c1c;
+  --color-lp-text: #e8eef7;
+  --color-lp-body: #9fb0c8;
+  --color-lp-muted: #8fa0b8;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-manrope), var(--font-inter), sans-serif;
@@ -34,10 +74,18 @@
 
   --radius-xl: 12px;
   --radius-2xl: 16px;
+  --radius-box: 12px; /* tarjetas */
+  --radius-btn: 10px; /* botones / inputs */
+  --radius-modal: 14px;
 
   --shadow-card: 0 1px 3px rgba(14, 44, 86, 0.06), 0 1px 2px rgba(14, 44, 86, 0.04);
   --shadow-hover: 0 6px 16px rgba(14, 44, 86, 0.08), 0 2px 4px rgba(14, 44, 86, 0.04);
   --shadow-overlay: 0 18px 40px rgba(14, 44, 86, 0.1), 0 4px 10px rgba(14, 44, 86, 0.05);
+  --shadow-float: 0 18px 40px -16px rgba(6, 27, 58, 0.45);
+  --shadow-modal: 0 30px 60px -20px rgba(6, 27, 58, 0.6);
+  --shadow-sheet: -30px 0 60px -30px rgba(6, 27, 58, 0.6);
+  --shadow-kpi: 0 18px 40px -22px rgba(6, 27, 58, 0.45);
+  --shadow-focus: 0 0 0 4px rgba(10, 107, 207, 0.15);
 
   /* All micro-interactions + loaders ported from the HTML prototypes. */
   --animate-spin-slow: spin 0.9s linear infinite;
@@ -46,6 +94,99 @@
   --animate-caret: caret 1s step-end infinite;
   --animate-bounce-dot: bounce-dot 1.2s ease-in-out infinite;
   --animate-typing: typing 1.2s ease-in-out infinite;
+  --animate-up: up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pop: pop 0.3s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  --animate-shake: shake 0.4s ease-in-out;
+  --animate-indet: indet 1.2s ease-in-out infinite;
+}
+
+/* ── Consola oscura (handoff: Web Consola Admin Dark) ── */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-primary: #5ab0ff; /* links / acento sobre oscuro */
+  --color-primary-hover: #7cc0ff;
+  --color-primary-pressed: #3f9cf0;
+  --color-navy: #e8eef7;
+  --color-action: #0a6bcf;
+  --color-action-hover: #095fb8;
+  --color-action-pressed: #0853a3;
+  --color-deep: #060e1c;
+  --color-sidebar: #060e1c;
+  --color-success: #5fd39b;
+  --color-success-soft: #0f3a2b;
+  --color-success-ring: #1f6b4b;
+  --color-warning-ink: #f5b94a;
+  --color-warning-soft: #3a2c0e;
+  --color-warning-ring: #6b5218;
+  --color-error: #f87171;
+  --color-error-soft: #2a1418;
+  --color-error-line: #5a2a30;
+  --color-info-soft: #12325a;
+  --color-info-ring: #1f4d80;
+  --color-tint: #12325a;
+  --color-page: #0a1628;
+  --color-canvas: #0a1628;
+  --color-card: #13223a;
+  --color-panel: #0f1d33;
+  --color-surface: #0f1d33;
+  --color-surface-2: #0b1729;
+  --color-segment: #0b1729;
+  --color-chip: #1b2b45;
+  --color-line: #22344f;
+  --color-divider: #1b2b45;
+  --color-line-strong: #2a3c58;
+  --color-body: #b8c4d6;
+  --color-muted: #8fa0b8;
+  --color-faint: #6f819b;
+  --color-bar-idle: #22344f;
+  --color-tooltip: #22344f;
+}
+
+@keyframes up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shake {
+  0%, 100% { transform: none; }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@keyframes indet {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+@keyframes shim {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@keyframes tbar {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Números alineados en KPIs/tablas. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Skeleton con shimmer 1.2 s (handoff: navegación → skeleton). */
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-segment) 0%,
+    var(--color-divider) 40%,
+    var(--color-segment) 80%
+  );
+  background-size: 800px 100%;
+  animation: shim 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 @keyframes pulse-ring {
@@ -105,7 +246,7 @@ html { scroll-behavior: smooth; }
 }
 
 html, body {
-  background: var(--color-canvas);
+  background: var(--color-page);
   color: var(--color-navy);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -114,3 +255,40 @@ html, body {
 /* Brand gradient helpers used by avatars / progress bars in the prototypes. */
 .bg-grad-brand { background-image: linear-gradient(135deg, var(--color-primary), var(--color-cyan)); }
 .bg-grad-progress { background-image: linear-gradient(90deg, var(--color-primary), var(--color-cyan)); }
+
+/* Entradas de overlays (handoff: modal 320 ms, sheet 320 ms, popover 150–200 ms). */
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+@keyframes pop-panel {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes snack-in {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.anim-modal { animation: modal-in 0.32s cubic-bezier(0.3, 1, 0.4, 1) both; }
+.anim-sheet { animation: sheet-in 0.32s cubic-bezier(0.3, 1, 0.4, 1) both; }
+.anim-pop { animation: pop-panel 0.18s ease-out both; }
+.anim-snack { animation: snack-in 0.3s cubic-bezier(0.3, 1, 0.4, 1) both; }
+.anim-toast { animation: toast-in 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.anim-fade { animation: fade-in 0.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-modal, .anim-sheet, .anim-pop, .anim-snack, .anim-toast, .anim-fade {
+    animation: none;
+  }
+}

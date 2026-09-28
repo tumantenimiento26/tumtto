@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./image-slot.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F5F8FC; color: #0E2C56; font-family: Inter, ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #0A6BCF; text-decoration: none; }
+  a:hover { color: #1A3F73; }
+  input, button, select { font-family: inherit; }
+  @keyframes drift1 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(8vw, 6vh) scale(1.12); } }
+  @keyframes drift2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-10vw, 8vh) scale(.92); } }
+  @keyframes float1 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+</style>
+</helmet>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="tm-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0E2C56"></stop><stop offset="0.55" stop-color="#0A6BCF"></stop><stop offset="1" stop-color="#18C1FF"></stop></linearGradient>
+    <mask id="tm-cut"><rect width="512" height="512" fill="#000"></rect><path d="M256 118 L398 246 L398 402 L114 402 L114 246 Z" fill="#fff" stroke="#fff" stroke-width="44" stroke-linejoin="round" stroke-linecap="round"></path><g transform="translate(258 300) rotate(-36) scale(0.72) translate(0 -40)"><path d="M-44 -118 Q-62 -112 -62 -80 L-60 -30 Q-58 -4 -38 6 Q-22 14 -22 32 L-22 176 Q-22 198 0 198 Q22 198 22 176 L22 32 Q22 14 38 6 Q58 -4 60 -30 L62 -80 Q62 -112 44 -118 L30 -74 Q26 -60 16 -52 Q0 -44 -16 -52 Q-26 -60 -30 -74 Z" fill="#000"></path></g></mask>
+  </defs>
+</svg>
+
+<div style="display: grid; grid-template-columns: {{ splitCols }}; min-height: 100vh; background: #fff;">
+  <aside data-screen-label="Panel visual" style="position: {{ asidePos }}; top: 0; height: {{ asideH }}; overflow: hidden; background: #050F22; color: #fff; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 32px clamp(24px, 4vw, 56px); min-height: {{ leftMinH }}; box-sizing: border-box;">
+    <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(5,15,34,0.6));"></div>
+    <div aria-hidden="true" style="position: absolute; top: -20%; left: -20%; width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(10,107,207,0.5), transparent 62%); filter: blur(40px); pointer-events: none; animation: drift1 26s ease-in-out infinite;"></div>
+    <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(90,176,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(90,176,255,0.06) 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(180deg, #000, transparent 70%); -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%);"></div>
+    <a href="Web Landing.dc.html" style="position: relative; display: flex; align-items: center; gap: 10px; color: #fff; pointer-events: auto;"><svg width="34" height="34" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg><span style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 17px;">Tumantenimiento</span></a>
+    <div style="position: relative; max-width: 460px; pointer-events: none; animation: up .6s ease both;">
+      <p style="margin: 0 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: #18C1FF;">Para técnicos · ZMG</p>
+      <h2 style="margin: 0 0 14px; font-family: Manrope, sans-serif; font-weight: 800; font-size: clamp(30px, 3.4vw, 44px); line-height: 1.05; letter-spacing: -1.2px; text-wrap: balance;">Tu oficio. Tu agenda. Tus ingresos.</h2>
+      <p style="margin: 0 0 22px; font-size: 16px; line-height: 1.6; color: #B8C4D6;">Crea tu cuenta aquí y termina tu alta desde la app. Revisamos tu perfil en menos de 24 h hábiles.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px;"><div style="display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: #E8EEF7;"><span style="width: 24px; height: 24px; border-radius: 7px; background: rgba(24,193,255,0.16); color: #18C1FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>Sin cuota de inscripción</div><div style="display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: #E8EEF7;"><span style="width: 24px; height: 24px; border-radius: 7px; background: rgba(24,193,255,0.16); color: #18C1FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>Cobras directo a tu CLABE</div><div style="display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: #E8EEF7;"><span style="width: 24px; height: 24px; border-radius: 7px; background: rgba(24,193,255,0.16); color: #18C1FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>Tú eliges zona, horario y servicios</div></div>
+    </div>
+    <div style="position: relative; width: 100%; max-width: 460px; height: 190px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(90,176,255,0.2); background: repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 10px, rgba(255,255,255,0.06) 10px 20px);">
+      <image-slot id="registro-hero" shape="rect" placeholder="Foto: técnico trabajando" style="position: absolute; inset: 0;"></image-slot>
+      <span style="position: absolute; left: 10px; top: 10px; width: 14px; height: 14px; border-left: 2px solid #18C1FF; border-top: 2px solid #18C1FF; pointer-events: none;"></span><span style="position: absolute; right: 10px; bottom: 10px; width: 14px; height: 14px; border-right: 2px solid #18C1FF; border-bottom: 2px solid #18C1FF; pointer-events: none;"></span>
+    </div>
+    <div style="width: 100%; max-width: 460px; position: relative; display: flex; gap: 8px; animation: up .6s ease both;">
+      <sc-for list="{{ pasos }}" as="p" hint-placeholder-count="3">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+          <span style="height: 3px; border-radius: 2px; background: {{ p.bg }}; transition: background .4s;"></span>
+          <span style="display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: {{ p.fg }};">{{ p.n }}</span>
+          <span style="font-size: 13px; font-weight: 600; color: #E8EEF7;">{{ p.t }}</span>
+          <span style="font-size: 12px; line-height: 1.45; color: #8FA0B8;">{{ p.b }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </aside>
+  <div style="position: relative; min-height: 100vh; background: #fff; display: flex; flex-direction: column;">
+  
+  <header style="position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 20px clamp(20px, 4vw, 40px);">
+    <a href="Web Landing.dc.html#unete" style="display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 6px; border-radius: 10px; border: 1px solid #E1E8F0; color: #374151; font-size: 13.5px; font-weight: 600;" style-hover="background: #F5F8FC; color: #0E2C56;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Volver al sitio</a>
+  </header>
+  
+
+  
+  <main data-screen-label="Registro · Formulario" style="position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 12px 20px 48px;">
+    
+    <div style="position: relative; width: 100%; max-width: 460px; animation: up .5s cubic-bezier(.2,.8,.2,1) both;">
+      <div style="width: 100%; max-width: 460px; box-sizing: border-box; background: #fff; color: #0E2C56; border-radius: 16px; padding: 0;  position: relative;">
+      
+
+      <sc-if value="{{ isForm }}" hint-placeholder-val="{{ true }}">
+        <h2 style="margin: 0 0 6px; font-family: Manrope, sans-serif; font-weight: 800; font-size: 27px; letter-spacing: -.6px;">Regístrate como técnico</h2>
+        <p style="margin: 0 0 24px; font-size: 14.5px; color: #6B7280;">Crea tu cuenta y termina tu alta desde la app.</p>
+        <div style="display: flex; gap: 6px; margin: -6px 0 22px;"><sc-for list="{{ wiz }}" as="w" hint-placeholder-count="3"><div style="flex: 1; display: flex; flex-direction: column; gap: 6px;"><span style="height: 4px; border-radius: 2px; background: {{ w.bg }}; transition: background .35s;"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .08em; color: {{ w.fg }};">{{ w.t }}</span></div></sc-for></div>
+        <sc-if value="{{ hasInvite }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 10px; margin: -8px 0 20px; padding: 10px 12px; border-radius: 10px; background: #E5F7EE; color: #0F7A4D; font-size: 13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            <span>Registro con invitación · código <b style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ invite }}</b></span>
+          </div>
+        </sc-if>
+
+        <div style="display: flex; flex-direction: column; gap: 16px; animation: {{ shakeAnim }};">
+          <sc-if value="{{ st1 }}" hint-placeholder-val="{{ true }}">
+          <label style="display: flex; flex-direction: column; gap: 7px;">
+            <span style="font-size: 13px; font-weight: 600;">Nombre completo</span>
+            <input value="{{ name }}" onChange="{{ setName }}" autoComplete="name" placeholder="Ramón Hernández García" style="height: 50px; box-sizing: border-box; border: 1px solid {{ errName.border }}; border-radius: 10px; padding: 0 14px; font-size: 15px; color: #0E2C56; background: #fff; outline: none; transition: box-shadow .15s, border-color .15s;" style-focus="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+            <sc-if value="{{ errName.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318;">{{ errName.msg }}</span></sc-if>
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 7px;">
+            <span style="font-size: 13px; font-weight: 600;">Correo electrónico</span>
+            <input type="email" value="{{ email }}" onChange="{{ setEmail }}" autoComplete="email" placeholder="tu@correo.com" style="height: 50px; box-sizing: border-box; border: 1px solid {{ errEmail.border }}; border-radius: 10px; padding: 0 14px; font-size: 15px; color: #0E2C56; background: #fff; outline: none; transition: box-shadow .15s, border-color .15s;" style-focus="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+            <sc-if value="{{ errEmail.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318;">{{ errEmail.msg }}</span></sc-if>
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 7px;">
+            <span style="font-size: 13px; font-weight: 600;">Número de celular</span>
+            <div style="display: flex; height: 50px; box-sizing: border-box; border: 1px solid {{ errPhone.border }}; border-radius: 10px; background: #fff; overflow: hidden; transition: box-shadow .15s, border-color .15s;" style-focus-within="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+              <span style="display: flex; align-items: center; gap: 6px; padding: 0 12px; border-right: 1px solid #E1E8F0; background: #F5F8FC; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: #374151;">MX +52</span>
+              <input type="tel" value="{{ phoneFmt }}" onChange="{{ setPhone }}" autoComplete="tel-national" placeholder="33 0000 0000" style="flex: 1; min-width: 0; border: none; padding: 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 15px; letter-spacing: .04em; color: #0E2C56; background: transparent; outline: none;">
+            </div>
+            <sc-if value="{{ errPhone.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318;">{{ errPhone.msg }}</span></sc-if>
+          </label>
+          </sc-if>
+          <sc-if value="{{ st2 }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 13px; font-weight: 600;">¿Qué servicios realizas?</span><div style="display: flex; flex-wrap: wrap; gap: 6px;"><sc-for list="{{ catChips }}" as="c" hint-placeholder-count="7"><button onClick="{{ c.go }}" style="display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ c.bd }}; background: {{ c.bg }}; color: {{ c.fg }}; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;">{{ c.mark }}{{ c.l }}</button></sc-for></div><sc-if value="{{ errCats.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318;">{{ errCats.msg }}</span></sc-if></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 13px; font-weight: 600;">Municipio donde trabajas</span><div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px;"><sc-for list="{{ zonaOpts }}" as="z" hint-placeholder-count="5"><button onClick="{{ z.go }}" style="height: 40px; border-radius: 10px; border: 1px solid {{ z.bd }}; background: {{ z.bg }}; color: {{ z.fg }}; font-size: 13px; font-weight: 600; cursor: pointer;">{{ z.l }}</button></sc-for></div></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><span style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600;">Años de experiencia<b style="font-family: Manrope, sans-serif;">{{ expLbl }}</b></span><input type="range" min="0" max="30" value="{{ exp }}" onChange="{{ setExp }}" style="width: 100%; accent-color: #0A6BCF; cursor: pointer;"></div>
+          </sc-if>
+          <sc-if value="{{ st3 }}" hint-placeholder-val="{{ false }}">
+          <label style="display: flex; flex-direction: column; gap: 7px;">
+            <span style="font-size: 13px; font-weight: 600;">Contraseña</span>
+            <div style="display: flex; height: 50px; box-sizing: border-box; border: 1px solid {{ errPass.border }}; border-radius: 10px; background: #fff; overflow: hidden; transition: box-shadow .15s, border-color .15s;" style-focus-within="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+              <input type="{{ passType }}" value="{{ pass }}" onChange="{{ setPass }}" autoComplete="new-password" placeholder="Mínimo 8 caracteres" style="flex: 1; min-width: 0; border: none; padding: 0 14px; font-size: 15px; color: #0E2C56; background: transparent; outline: none;">
+              <button onClick="{{ togglePass }}" style="border: none; background: transparent; padding: 0 14px; font-size: 13px; font-weight: 600; color: #0A6BCF; cursor: pointer;">{{ passToggleLabel }}</button>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <sc-for list="{{ strength }}" as="s" hint-placeholder-count="4"><span style="flex: 1; height: 4px; border-radius: 2px; background: {{ s.c }};"></span></sc-for>
+            </div>
+            <sc-if value="{{ errPass.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318;">{{ errPass.msg }}</span></sc-if>
+          </label>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button onClick="{{ toggleTerms }}" style="display: flex; align-items: flex-start; gap: 10px; border: none; background: transparent; padding: 0; text-align: left; cursor: pointer; font-size: 13.5px; line-height: 1.5; color: #374151;">
+              <span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 6px; border: 1.5px solid {{ termsBox.border }}; background: {{ termsBox.bg }}; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; transition: background .15s, border-color .15s;">
+                <sc-if value="{{ terms }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+              </span>
+              <span>Acepto los <a style="font-weight: 600;">Términos</a> y el <a style="font-weight: 600;">Aviso de Privacidad</a> de Tumantenimiento.</span>
+            </button>
+            <sc-if value="{{ errTerms.on }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12.5px; color: #B42318; padding-left: 30px;">{{ errTerms.msg }}</span></sc-if>
+          </div>
+
+          </sc-if>
+          <sc-if value="{{ hasAuthError }}" hint-placeholder-val="{{ false }}">
+            <div role="alert" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: #FEF3F2; border: 1px solid #F4C7C3; color: #B42318; font-size: 13px; line-height: 1.5;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>
+              <span>{{ authError }}</span>
+            </div>
+          </sc-if>
+
+          <div style="display: flex; gap: 10px; margin-top: 4px;"><sc-if value="{{ canBack }}" hint-placeholder-val="{{ false }}"><button onClick="{{ back }}" style="height: 54px; padding: 0 20px; border-radius: 10px; border: 1px solid #D6DEE8; background: #fff; color: #0E2C56; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;" style-hover="background: #F5F8FC;">Atrás</button></sc-if>
+          <button onClick="{{ submit }}" disabled="{{ loading }}" style="height: 54px; border: none; border-radius: 10px; background: #0E2C56; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15.5px; letter-spacing: -.1px; cursor: pointer; display: flex; flex: 1; align-items: center; justify-content: center; gap: 10px; transition: background .15s, transform .1s;" style-hover="background: #1A3F73;" style-active="background: #0A2245; transform: scale(.985);">
+            <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><span style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: spin .8s linear infinite;"></span></sc-if>
+            {{ submitLabel }}
+          </button></div>
+          <p style="margin: 0; text-align: center; font-size: 13.5px; color: #6B7280;">¿Ya tienes cuenta? <a href="Web Login.dc.html" style="font-weight: 600;">Inicia sesión</a></p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div data-screen-label="Registro · Cuenta creada" style="display: flex; flex-direction: column; gap: 20px;">
+          <span style="width: 56px; height: 56px; border-radius: 12px; background: #E5F7EE; color: #0F7A4D; display: flex; align-items: center; justify-content: center; animation: pop .65s cubic-bezier(.2,1.2,.4,1) both;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+          <div>
+            <h2 style="margin: 0 0 8px; font-family: Manrope, sans-serif; font-weight: 800; font-size: 27px; letter-spacing: -.6px;">¡Cuenta creada!</h2>
+            <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #6B7280;">Te enviamos un correo a <b style="color: #0E2C56;">{{ sentTo }}</b> para confirmar tu cuenta. Después descarga la app, inicia sesión y completa tu alta.</p>
+          </div>
+          <div style="background: #fff; border: 1px solid #E1E8F0; border-radius: 12px; overflow: hidden;">
+            <p style="margin: 0; padding: 14px 16px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #6B7280;">Ten a la mano en la app</p>
+            <sc-for list="{{ docs }}" as="d" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border-top: 1px solid #EEF2F8;">
+                <span style="width: 32px; height: 32px; border-radius: 8px; background: #E0F0FF; color: #0A6BCF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; flex-shrink: 0;">{{ d.n }}</span>
+                <span style="flex: 1; font-size: 14px; font-weight: 500;">{{ d.t }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button style="flex: 1; min-width: 150px; height: 52px; border: none; border-radius: 10px; background: #0E2C56; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;" style-hover="background: #1A3F73;" style-active="background: #0A2245; transform: scale(.985);">Descargar la app</button>
+            <button onClick="{{ reset }}" style="flex: 1; min-width: 150px; height: 52px; border: 1px solid #D6DEE8; border-radius: 10px; background: #fff; color: #0E2C56; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;" style-hover="background: #F5F8FC;">Volver al inicio</button>
+          </div>
+          <p style="margin: 0; font-size: 13px; color: #6B7280;">¿No llegó el correo? Revisa spam o <a style="font-weight: 600; cursor: pointer;" onClick="{{ resend }}">{{ resendLabel }}</a>.</p>
+        </div>
+      </sc-if>
+    </div>
+    </div>
+      
+  </main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;codigoInvitacion&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Registro&quot;}}">
+class Component extends DCLogic {
+  state = { wide: typeof window === 'undefined' || window.innerWidth >= 760, wstep: 1, cats: [], zona: 'Guadalajara', exp: 5, name: '', email: '', phone: '', pass: '', showPass: false, terms: false, errors: {}, tried: false, loading: false, authError: null, sentTo: typeof location !== 'undefined' && location.hash === '#done' ? 'ramon.hernandez@gmail.com' : null, shake: 0, resent: false };
+  validate(s) {
+    const e = {};
+    if (s.name.trim().length < 3) e.name = 'Ingresa tu nombre completo.';
+    if (!/\S+@\S+\.\S+/.test(s.email)) e.email = 'Ingresa un correo válido.';
+    if (s.phone.length !== 10) e.phone = 'Ingresa un celular de 10 dígitos.';
+    if (s.pass.length < 8) e.pass = 'Mínimo 8 caracteres.';
+    else if (!/[a-z]/i.test(s.pass) || !/\d/.test(s.pass)) e.pass = 'Incluye al menos una letra y un número.';
+    if (!s.terms) e.terms = 'Debes aceptar los términos para continuar.';
+    if (!s.cats.length) e.cats = 'Elige al menos una especialidad.';
+    return e;
+  }
+  upd(patch) { this.setState(s => { const n = { ...s, ...patch }; return { ...patch, errors: s.tried ? this.validate(n) : {}, authError: null }; }); }
+  submit() {
+    const KEYS = { 1: ['name', 'email', 'phone'], 2: ['cats'], 3: ['pass', 'terms'] }, st = this.state.wstep, all = this.validate(this.state), errs = {};
+    KEYS[st].forEach(k => { if (all[k]) errs[k] = all[k]; });
+    if (Object.keys(errs).length) { this.setState({ errors: errs, tried: true, shake: this.state.shake + 1 }); return; }
+    if (st < 3) { this.setState({ wstep: st + 1, errors: {}, tried: false }); return; }
+    const errors = all;
+    if (Object.keys(errors).length) { this.setState({ errors, tried: true, shake: this.state.shake + 1 }); return; }
+    this.setState({ loading: true, errors: {}, authError: null });
+    const taken = this.state.email.trim().toLowerCase() === 'ramon@correo.com';
+    this._t = setTimeout(() => {
+      if (taken) this.setState({ loading: false, authError: 'Ese correo ya tiene una cuenta. Inicia sesión desde la app o recupera tu contraseña.' });
+      else this.setState({ loading: false, sentTo: this.state.email.trim() });
+    }, 1100);
+  }
+  componentDidMount() { this._rs = () => this.setState({ wide: window.innerWidth >= 760 }); window.addEventListener('resize', this._rs); }
+  componentWillUnmount() { clearTimeout(this._t); window.removeEventListener('resize', this._rs); }
+  renderVals() {
+    const s = this.state, e = s.errors;
+    const f = k => ({ on: !!e[k], msg: e[k] || '', border: e[k] ? '#B42318' : '#E1E8F0' });
+    const p = s.phone;
+    const phoneFmt = [p.slice(0, 2), p.slice(2, 6), p.slice(6, 10)].filter(Boolean).join(' ');
+    const score = !s.pass ? 0 : Math.min(4, (s.pass.length >= 8) + /[a-z]/i.test(s.pass) + /\d/.test(s.pass) + (/[^a-z0-9]/i.test(s.pass) || s.pass.length >= 12));
+    const sc = ['#E1E8F0', '#B42318', '#F59E0B', '#0A6BCF', '#1E6B4B'][score];
+    const invite = this.props.codigoInvitacion ?? '';
+    const pasoActual = s.sentTo ? 1 : 0;
+    return {
+      wide: s.wide, leftMinH: s.wide ? '100vh' : '260px', asidePos: s.wide ? 'sticky' : 'relative', asideH: s.wide ? '100vh' : 'auto', splitCols: s.wide ? 'minmax(0, 1.05fr) minmax(0, 0.95fr)' : 'minmax(0, 1fr)',
+      pasos: [['Crea tu cuenta', 'Nombre, correo, celular y contraseña. Toma un minuto.'], ['Completa tu alta en la app', 'INE, carta de antecedentes no penales y comprobante de domicilio.'], ['Recibe solicitudes', 'Al aprobarte, configuras tarifas y zona y empiezas a trabajar.']].map(([t, b], i) => ({
+        n: i < pasoActual ? '✓' : '0' + (i + 1), t, b,
+        bg: i <= pasoActual ? '#18C1FF' : 'rgba(255,255,255,0.14)', fg: i <= pasoActual ? '#18C1FF' : '#6F819B',
+        line: i === 2 ? 'transparent' : 'rgba(255,255,255,0.12)',
+      })),
+      isForm: !s.sentTo, isDone: !!s.sentTo, sentTo: s.sentTo,
+      hasInvite: !!invite, invite,
+      name: s.name, email: s.email, pass: s.pass, phoneFmt,
+      setName: ev => this.upd({ name: ev.target.value }),
+      setEmail: ev => this.upd({ email: ev.target.value }),
+      setPhone: ev => this.upd({ phone: ev.target.value.replace(/\D/g, '').slice(0, 10) }),
+      setPass: ev => this.upd({ pass: ev.target.value }),
+      passType: s.showPass ? 'text' : 'password', passToggleLabel: s.showPass ? 'Ocultar' : 'Mostrar',
+      togglePass: ev => { ev.preventDefault(); this.setState({ showPass: !s.showPass }); },
+      strength: [1, 2, 3, 4].map(i => ({ c: i <= score ? sc : '#E1E8F0' })),
+      terms: s.terms, toggleTerms: () => this.upd({ terms: !s.terms }),
+      termsBox: { bg: s.terms ? '#0E2C56' : '#fff', border: s.terms ? '#0E2C56' : (e.terms ? '#B42318' : '#D6DEE8') },
+      errName: f('name'), errEmail: f('email'), errPhone: f('phone'), errPass: f('pass'), errTerms: f('terms'),
+      hasAuthError: !!s.authError, authError: s.authError,
+      shakeAnim: s.shake ? `shake .4s ease ${s.shake % 2 ? '' : 'both'}` : 'none',
+      loading: s.loading, submitLabel: s.loading ? 'Creando tu cuenta…' : s.wstep < 3 ? 'Continuar' : 'Crear cuenta de técnico',
+      st1: s.wstep === 1, st2: s.wstep === 2, st3: s.wstep === 3, canBack: s.wstep > 1, back: () => this.setState({ wstep: s.wstep - 1, errors: {}, tried: false }),
+      wiz: ['01 · Tus datos', '02 · Tu oficio', '03 · Seguridad'].map((t, i) => ({ t, bg: i < s.wstep ? '#0A6BCF' : '#E1E8F0', fg: i + 1 === s.wstep ? '#0A6BCF' : i < s.wstep ? '#0E2C56' : '#9CA3AF' })),
+      catChips: ['Plomería', 'Electricidad', 'Gas', 'Aire acondicionado', 'Línea blanca', 'Cerrajería', 'Herrería', 'Pintura'].map(l => { const on = s.cats.includes(l); return { l, mark: on ? '✓ ' : '', go: () => this.setState(x => ({ cats: on ? x.cats.filter(c => c !== l) : [...x.cats, l], errors: { ...x.errors, cats: '' } })), bg: on ? '#0E2C56' : '#fff', fg: on ? '#fff' : '#374151', bd: on ? '#0E2C56' : '#E1E8F0' }; }),
+      errCats: { on: !!e.cats, msg: e.cats || '' },
+      zonaOpts: ['Guadalajara', 'Zapopan', 'Tlaquepaque', 'Tonalá', 'Tlajomulco'].map(l => { const on = s.zona === l; return { l, go: () => this.setState({ zona: l }), bg: on ? '#F0F7FF' : '#fff', fg: on ? '#0A6BCF' : '#374151', bd: on ? '#0A6BCF' : '#E1E8F0' }; }),
+      exp: s.exp, expLbl: s.exp + (s.exp === 1 ? ' año' : ' años'), setExp: ev => this.setState({ exp: +ev.target.value }),
+      submit: () => this.submit(),
+      docs: ['INE vigente por ambos lados', 'Carta de antecedentes no penales', 'Comprobante de domicilio', 'CLABE para tus cobros'].map((t, i) => ({ t, n: '0' + (i + 1) })),
+      resendLabel: s.resent ? 'correo reenviado' : 'reenvíalo',
+      resend: () => this.setState({ resent: true }),
+      reset: () => this.setState({ wstep: 1, cats: [], name: '', email: '', phone: '', pass: '', terms: false, tried: false, errors: {}, sentTo: null, resent: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>

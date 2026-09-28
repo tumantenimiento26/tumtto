@@ -1,493 +1,473 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import {
-  ArrowLeft, Phone, Mail, Calendar, Activity, MapPin, MessageSquare, Ban,
-  Award, ContactRound, BarChart3, CreditCard, Store, RotateCcw,
-  Wallet, Home, Briefcase, Heart, BadgeCheck, ThumbsUp, ShieldAlert,
-  LayoutDashboard, Wrench, Send, Plus, Pencil, Trash2,
+  Ban,
+  ChevronLeft,
+  MapPin,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Send,
+  Star,
+  Trash2,
 } from 'lucide-react';
 import {
-  Panel, StatCard, StatusPill, DataTable, Modal, type Column,
-} from '@/components/admin';
-import { Avatar, Stars, Badge, GhostButton, PrimaryButton, EmptyState, Field, Input, Textarea, Toggle } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem, AnimatePresence, motion, ProgressBar } from '@/components/motion';
-import { toast } from '@/components/toast';
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorPage,
+  Field,
+  Input,
+  Kicker,
+  Modal,
+  ScreenSkeleton,
+  Tabs,
+  Textarea,
+  Toggle,
+  snackbar,
+  toast,
+} from '@/components/ds';
+import { useAction } from '@/components/use-action';
 import {
-  useTick, getProfile, getClientRequests, getAddresses, getCategories,
-  getRating, getPayment, getAllDisputes, getNotes,
-  suspendUser, reactivateUser, addNote, createTicket, saveAddress, deleteAddress,
+  addNote,
+  createTicket,
+  deleteAddress,
+  getAddresses,
+  getAllDisputes,
+  getCategories,
+  getClientRequests,
+  getNotes,
+  getPayment,
+  getProfile,
+  getRating,
+  loadWorld,
+  reactivateUser,
+  removeNote,
+  restoreNote,
+  saveAddress,
+  suspendUser,
+  useTick,
+  useWorldFailed,
+  useWorldReady,
 } from '@/lib/data/store';
-import type { ServiceRequest, Payment } from '@/lib/demo/world';
+import type { Payment, ServiceRequest } from '@/lib/demo/world';
+import { orderCode } from '@/lib/orderCode';
+import { formatPhone } from '@/lib/phone';
+import {
+  Avatar,
+  CategoryTile,
+  METHOD_LABEL,
+  STATUS,
+  money,
+  timeAgo,
+} from '../../servicios/_components/shared';
+import { ClientFormSheet } from '../_components/ClientFormSheet';
 
-const peso = (n: number) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n);
-const initialsOf = (name: string) =>
-  name.replace(/\(.*?\)/g, '').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+type TabId = 'historial' | 'direcciones' | 'pagos' | 'disputas' | 'notas';
+type AddressRow = ReturnType<typeof getAddresses>[number];
 
-// ponytail: métodos de pago y reputación no existen en el esquema demo — presentacional.
-const PAYMENT_METHODS = [
-  { kind: 'card', brand: 'Visa •••• 4821', detail: 'Tarjeta de crédito', exp: 'Exp. 09/27', primary: true, verified: true },
-  { kind: 'card', brand: 'Mastercard •••• 1130', detail: 'Tarjeta de débito', exp: 'Exp. 02/26', primary: false, verified: true },
-  { kind: 'oxxo', brand: 'OXXO Pay', detail: 'Pago en efectivo', exp: '', primary: false, verified: false },
-];
-
-const REPUTATION = {
-  rating: 4.8,
-  reviews: 12,
-  breakdown: [{ stars: 5, n: 10 }, { stars: 4, n: 1 }, { stars: 3, n: 1 }, { stars: 2, n: 0 }, { stars: 1, n: 0 }],
-  tags: [
-    { label: 'Buena comunicación', n: 8 },
-    { label: 'Acceso fácil', n: 6 },
-    { label: 'Pago puntual', n: 5 },
-    { label: 'Amable', n: 4 },
-  ],
-};
-
-const TABS = [
-  { id: 'resumen', label: 'Resumen', icon: LayoutDashboard },
-  { id: 'services', label: 'Servicios', icon: Wrench },
-  { id: 'payments', label: 'Pagos', icon: CreditCard },
-  { id: 'addresses', label: 'Direcciones', icon: MapPin },
-  { id: 'disputes', label: 'Disputas y soporte', icon: ShieldAlert },
-  { id: 'notes', label: 'Notas internas', icon: MessageSquare },
-] as const;
-
-const PAY_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'error' }> = {
-  paid: { label: 'Pagado', tone: 'success' },
-  pending: { label: 'Pendiente', tone: 'warning' },
-  refunded: { label: 'Reembolsado', tone: 'error' },
-  failed: { label: 'Fallido', tone: 'error' },
-};
+const since = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' });
 
 export default function ClientDetailPage() {
   useTick();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [tab, setTab] = useState<string>('resumen');
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
+  const { busy, run } = useAction();
+  const [tab, setTab] = useState<TabId>('historial');
+  const [editOpen, setEditOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
+  const [addrModal, setAddrModal] = useState<{ open: boolean; addr: AddressRow | null }>({
+    open: false,
+    addr: null,
+  });
+  const [addrDelete, setAddrDelete] = useState<AddressRow | null>(null);
   const [note, setNote] = useState('');
-  const [addrModal, setAddrModal] = useState<{ open: boolean; addr: AddressRow | null }>({ open: false, addr: null });
-  const [addrDeleting, setAddrDeleting] = useState<string | null>(null);
 
-  const profile = getProfile(id);
-  const requests = getClientRequests(id);
-  const addresses = getAddresses(id);
-  const notes = getNotes(id);
-
-  const catName = useMemo(() => {
-    const cats = getCategories();
-    return (catId: string) => cats.find(c => c.id === catId)?.name ?? '—';
-  }, []);
-
-  if (!profile) {
+  if (failed)
     return (
-      <div>
-        <Link href="/clientes" className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary hover:text-primary-2">
-          <ArrowLeft size={15} /> Clientes
-        </Link>
-        <Panel><p className="py-8 text-center text-[14px] text-muted">Cliente no encontrado.</p></Panel>
-      </div>
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
     );
-  }
+  if (!ready) return <ScreenSkeleton kind="detail" />;
+  const profile = getProfile(id);
+  if (!profile)
+    return (
+      <ErrorPage kind="404" primary={{ label: 'Volver a clientes', href: '/clientes' }} />
+    );
 
-  const phone = profile.phone ?? '—';
   const name = profile.full_name ?? 'Cliente';
   const suspended = profile.status === 'suspended';
-  // ponytail: el email vive en auth.users, no en profiles — sin columna que mostrar.
-  const email = '—';
-  const city =
-    addresses.find(a => a.is_default)?.municipality ?? addresses[0]?.municipality ?? 'Guadalajara';
-
-  const totalGasto = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
-  const completados = requests.filter(r => ['completed', 'paid', 'closed'].includes(r.status)).length;
-
+  const requests = [...getClientRequests(id)].sort(
+    (a, b) => +new Date(b.created_at) - +new Date(a.created_at),
+  );
+  const addresses = getAddresses(id);
+  const notes = getNotes(id);
+  const cats = getCategories();
+  const catOf = (cid: string) => cats.find(c => c.id === cid);
   const payments = requests
     .map(r => ({ req: r, pay: getPayment(r.id) }))
     .filter((x): x is { req: ServiceRequest; pay: Payment } => x.pay != null);
-
   const disputes = getAllDisputes().filter(
     d => d.opened_by === id || requests.some(r => r.id === d.service_order_id),
   );
+  const spentCents = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0);
+  const ticketCents = requests.length ? Math.round(spentCents / requests.length) : null;
+  const ratings = requests.map(r => getRating(r.id)).filter(Boolean) as { stars: number }[];
+  const avgRating = ratings.length
+    ? ratings.reduce((s, r) => s + r.stars, 0) / ratings.length
+    : null;
 
-  const tableRows = [...requests].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
-  const columns: Column<ServiceRequest>[] = [
-    { key: 'id', header: 'Folio', render: r => <span className="font-mono text-[12px] text-muted">#{r.id}</span> },
-    {
-      key: 'cat', header: 'Servicio', render: r => (
-        <div>
-          <div className="font-semibold text-navy">{catName(r.category_id)}</div>
-          <div className="text-[12px] text-muted">{r.title ?? '—'}</div>
-        </div>
-      ),
-    },
-    { key: 'date', header: 'Fecha', render: r => <span className="text-[13px] text-muted">{fechaCorta(r.created_at)}</span> },
-    { key: 'status', header: 'Estado', render: r => <StatusPill status={r.status} /> },
-    {
-      key: 'rating', header: 'Calificación', render: r => {
-        const rt = getRating(r.id);
-        return rt ? <Stars value={rt.stars} /> : <span className="text-[12px] text-faint">—</span>;
+  function saveNote() {
+    const text = note.trim();
+    if (!text) return;
+    const n = addNote(id, text);
+    setNote('');
+    snackbar.show('Nota agregada', {
+      undo: () => {
+        removeNote(n.id);
+        setNote(text);
       },
-    },
-    {
-      key: 'total', header: 'Total', className: 'text-right',
-      render: r => (
-        <span className="font-mono font-semibold text-navy">
-          {r.quoted_total_cents != null ? peso(r.quoted_total_cents / 100) : '—'}
-        </span>
-      ),
-    },
+    });
+  }
+
+  const tabs: { value: TabId; label: string; count?: number }[] = [
+    { value: 'historial', label: 'Historial', count: requests.length },
+    { value: 'direcciones', label: 'Direcciones', count: addresses.length },
+    { value: 'pagos', label: 'Pagos', count: payments.length },
+    { value: 'disputas', label: 'Disputas', count: disputes.length },
+    { value: 'notas', label: 'Notas', count: notes.length },
   ];
 
-  const historyTable = (
-    <Panel title="Historial de servicios" action={<span className="text-[12px] text-faint">{requests.length} servicios</span>}>
-      <DataTable columns={columns} rows={tableRows} onRowClick={r => router.push(`/servicios/${r.id}`)} empty="Sin servicios registrados" />
-    </Panel>
-  );
-
-  const addressCards = (
-    <Panel
-      title="Direcciones guardadas"
-      action={
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] text-faint">{addresses.length} direcciones</span>
-          <GhostButton onClick={() => setAddrModal({ open: true, addr: null })}>
-            <span className="inline-flex items-center gap-1.5"><Plus size={13} /> Agregar</span>
-          </GhostButton>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-2.5">
-        {addresses.map(a => {
-          const PinIcon = a.label === 'Casa' ? Home : a.label === 'Oficina' ? Briefcase : Heart;
-          return (
-            <div key={a.id} className={`flex gap-3 rounded-xl border p-3 ${a.is_default ? 'border-primary/30 bg-info-soft/40' : 'border-line bg-surface'}`}>
-              <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-white ${a.is_default ? 'bg-primary' : 'bg-faint'}`}>
-                <PinIcon size={13} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13.5px] font-semibold text-navy">{a.label}</span>
-                  {a.is_default && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">Principal</span>}
-                </div>
-                <div className="mt-0.5 text-[12.5px] text-navy">{a.address_line}</div>
-                <div className="text-[12px] text-muted">{a.neighborhood}, {a.municipality}, {a.state} · {a.postal_code}</div>
-              </div>
-              <div className="flex flex-shrink-0 items-start gap-1">
-                <button aria-label="Editar dirección" onClick={() => setAddrModal({ open: true, addr: a })} className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-primary">
-                  <Pencil size={14} />
-                </button>
-                {addrDeleting === a.id ? (
-                  <button
-                    onClick={() => { setAddrDeleting(null); void deleteAddress(a.id).then(ok => ok && toast.success('Dirección eliminada')); }}
-                    className="rounded-lg bg-error px-2 py-1 text-[11.5px] font-semibold text-white"
-                  >
-                    Confirmar
-                  </button>
-                ) : (
-                  <button aria-label="Eliminar dirección" onClick={() => setAddrDeleting(a.id)} className="rounded-lg p-1.5 text-muted hover:bg-error-soft hover:text-error">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {addresses.length === 0 && <p className="py-4 text-center text-[13px] text-faint">Sin direcciones guardadas.</p>}
-      </div>
-    </Panel>
-  );
-
-  const notesPanel = (
-    <Panel title="Notas internas">
-      <div className="space-y-3">
-        {notes.map(n => (
-          <FadeIn key={n.id} className="rounded-xl border border-line bg-surface p-3">
-            <div className="flex items-center gap-2 text-[12px] text-muted">
-              <ContactRound size={13} className="text-primary" /> {n.author} · {fechaCorta(n.created_at)}
-            </div>
-            <p className="mt-1.5 text-[13px] text-navy">{n.text}</p>
-          </FadeIn>
-        ))}
-        {notes.length === 0 && <p className="py-2 text-[12.5px] text-faint">Sin notas todavía.</p>}
-        <Textarea
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          placeholder="Agregar una nota interna sobre este cliente…"
-          rows={3}
-        />
-        <button
-          onClick={() => {
-            if (!note.trim()) return;
-            addNote(id, note.trim());
-            setNote('');
-            toast.success('Nota guardada');
-          }}
-          className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:bg-primary-2"
-        >
-          Guardar nota
-        </button>
-      </div>
-    </Panel>
-  );
-
   return (
-    <div>
-      <Link href="/clientes" className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary hover:text-primary-2">
-        <ArrowLeft size={15} /> Clientes
+    <div className="flex flex-col gap-4">
+      <Link
+        href="/clientes"
+        className="inline-flex w-fit items-center gap-1 font-display text-[14px] font-bold text-primary hover:underline"
+      >
+        <ChevronLeft size={16} /> Clientes
       </Link>
 
-      {/* Profile header */}
-      <FadeIn>
-        <div className="mb-6 flex items-center gap-5">
-          <Avatar initials={initialsOf(name)} size={84} />
+      <Card padded className="animate-up">
+        <div className="flex flex-wrap items-center gap-4">
+          <Avatar name={name} size={58} />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="font-display text-[26px] font-bold tracking-tight text-navy">{name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-display text-[24px] font-extrabold tracking-[-0.5px] text-navy">
+                {name}
+              </h1>
               {suspended ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-error-soft px-2.5 py-1 text-[12px] font-semibold text-error">
-                  <Ban size={11} /> Cuenta suspendida
-                </span>
+                <Badge tone="danger" dot>
+                  Suspendido
+                </Badge>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[12px] font-semibold text-success">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success" /> Cliente activo
-                </span>
+                <Badge tone="success" dot>
+                  Activo
+                </Badge>
               )}
-              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[12px] font-semibold text-cyan">
-                <Award size={11} /> Recurrente · top 10%
-              </span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-muted">
-              <span className="inline-flex items-center gap-1.5"><Phone size={13} className="text-faint" />{phone}</span>
-              <span className="inline-flex items-center gap-1.5"><Mail size={13} className="text-faint" />{email}</span>
-              <span className="inline-flex items-center gap-1.5"><Calendar size={13} className="text-faint" />Registrada {fechaCorta(profile.created_at)}</span>
-              <span className="inline-flex items-center gap-1.5"><Activity size={13} className="text-faint" />Activa hace 2 días</span>
-              <span className="inline-flex items-center gap-1.5"><MapPin size={13} className="text-faint" />{city}, Jalisco</span>
-            </div>
-          </div>
-          <div className="flex flex-shrink-0 items-center gap-2.5">
-            <button onClick={() => setMessageOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-primary bg-white px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft">
-              <MessageSquare size={14} /> Enviar mensaje
-            </button>
-            {suspended ? (
-              <button
-                onClick={() => { reactivateUser(id); toast.success(`Cuenta reactivada · ${name}`); }}
-                className="inline-flex items-center gap-2 rounded-xl border border-success bg-white px-3.5 py-2.5 text-[13px] font-semibold text-success hover:bg-success-soft"
-              >
-                <RotateCcw size={14} /> Reactivar
-              </button>
-            ) : (
-              <button onClick={() => setSuspendOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
-                <Ban size={14} /> Suspender
-              </button>
-            )}
+            <p className="mt-1 text-[13.5px] text-muted">
+              {formatPhone(profile.phone) || 'Sin celular'} · Cliente desde{' '}
+              {since(profile.created_at)}
+            </p>
           </div>
         </div>
-      </FadeIn>
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          <Button variant="secondary" icon={Pencil} onClick={() => setEditOpen(true)}>
+            Editar
+          </Button>
+          <Button variant="secondary" icon={Send} onClick={() => setMessageOpen(true)}>
+            Enviar mensaje
+          </Button>
+          {suspended ? (
+            <Button
+              variant="approve"
+              icon={RotateCcw}
+              loading={busy === 'reactivate'}
+              onClick={() =>
+                void run('reactivate', () => reactivateUser(id), `Cuenta reactivada · ${name}`)
+              }
+            >
+              Reactivar cuenta
+            </Button>
+          ) : (
+            <Button variant="destructive" icon={Ban} onClick={() => setSuspendOpen(true)}>
+              Suspender cuenta
+            </Button>
+          )}
+        </div>
+      </Card>
 
-      {/* Stat cards */}
-      <Stagger className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem><StatCard index={0} label="Servicios totales" value={requests.length} icon={Wrench} note={`${completados} completados`} delta={`${completados}`} trend="up" /></StaggerItem>
-        <StaggerItem><StatCard index={1} label="Gasto total" value={peso(totalGasto)} icon={CreditCard} note="histórico" /></StaggerItem>
-        <StaggerItem><StatCard index={2} label="Ticket promedio" value={peso(requests.length ? Math.round(totalGasto / requests.length) : 0)} icon={BarChart3} /></StaggerItem>
-        <StaggerItem><StatCard index={3} label="Reputación" value={REPUTATION.rating.toFixed(1)} suffix="/ 5" icon={ThumbsUp} note={`${REPUTATION.reviews} reseñas`} /></StaggerItem>
-      </Stagger>
-
-      {/* Tabs */}
-      <div className="mb-6 flex gap-6 overflow-x-auto border-b border-line">
-        {TABS.map(t => {
-          const active = t.id === tab;
-          const Icon = t.icon;
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap pb-3.5 pt-3 text-[13.5px] ${active ? 'font-semibold text-primary' : 'font-medium text-muted hover:text-navy'}`}>
-              <Icon size={14} /> {t.label}
-              {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded bg-primary" />}
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi label="Servicios" value={String(requests.length)} />
+        <Kpi label="Gasto total" value={money(spentCents)} />
+        <Kpi label="Ticket medio" value={money(ticketCents)} />
+        <Kpi
+          label="Calificación que da"
+          value={avgRating != null ? avgRating.toFixed(1) : '—'}
+          star={avgRating != null}
+        />
       </div>
 
-      {/* Body — gated per tab */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={tab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.22, ease: [0.2, 0.7, 0.3, 1] }}
-        >
-          {tab === 'resumen' && (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
-              <div className="flex flex-col gap-5">
-                <Panel title="Información personal">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <KV label="Nombre completo" value={name} />
-                    <KV label="Email" value={email} />
-                    <KV label="Teléfono" value={phone} mono />
-                    <KV label="Región principal" value={`${city}, Jalisco`} />
-                    <KV label="Fecha de registro" value={fechaCorta(profile.created_at)} />
-                    <KV label="Método preferido de pago" value="Visa •••• 4821" />
-                  </div>
-                </Panel>
-                {addressCards}
-              </div>
-
-              <div className="flex flex-col gap-5">
-                <Panel title="Métodos de pago">
-                  <div className="flex flex-col gap-2.5">
-                    {PAYMENT_METHODS.map((pm, i) => {
-                      const Icon = pm.kind === 'card' ? CreditCard : pm.kind === 'oxxo' ? Store : Wallet;
-                      return (
-                        <div key={i} className="flex gap-3 rounded-xl border border-line bg-surface p-3">
-                          <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-info-soft text-primary"><Icon size={16} /></div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-[13.5px] font-semibold text-navy">{pm.brand}</span>
-                              {pm.primary && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">Principal</span>}
-                              {pm.verified && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[10.5px] font-semibold text-success">
-                                  <BadgeCheck size={10} /> Verificado
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-0.5 text-[12px] text-muted">{pm.detail}{pm.exp ? ` · ${pm.exp}` : ''}</div>
-                          </div>
+      <Card className="overflow-hidden">
+        <Tabs className="px-5" tabs={tabs} value={tab} onChange={setTab} />
+        <div className="p-5">
+          {tab === 'historial' &&
+            (requests.length === 0 ? (
+              <EmptyState compact kind="first-use" title="Sin servicios todavía" />
+            ) : (
+              <ul className="-my-1 divide-y divide-divider">
+                {requests.map(r => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/servicios/${r.id}`)}
+                      className="flex w-full items-center gap-3 rounded-btn px-2 py-3 text-left hover:bg-panel"
+                    >
+                      <CategoryTile slug={catOf(r.category_id)?.slug} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[14px] text-navy">
+                          <span className="font-display font-bold">
+                            {catOf(r.category_id)?.name ?? 'Servicio'}
+                          </span>
+                          {r.technician_id && (
+                            <span className="text-muted">
+                              {' '}
+                              · {getProfile(r.technician_id)?.full_name ?? 'Técnico'}
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </Panel>
-
-                <Panel title="Reputación del cliente">
-                  <div className="flex items-center gap-5">
-                    <div>
-                      <div className="font-display text-[36px] font-bold leading-none tracking-tight text-navy">{REPUTATION.rating.toFixed(1)}</div>
-                      <div className="mt-1.5"><Stars value={Math.round(REPUTATION.rating)} /></div>
-                      <div className="mt-1 text-[11.5px] text-faint">{REPUTATION.reviews} reseñas</div>
-                    </div>
-                    <div className="flex-1">
-                      {REPUTATION.breakdown.map(b => (
-                        <div key={b.stars} className="mb-1 flex items-center gap-2">
-                          <span className="w-5 text-[11px] text-muted">{b.stars}★</span>
-                          <ProgressBar value={b.n / REPUTATION.reviews} className="!h-1.5 flex-1" fillClassName="bg-warning" />
-                          <span className="w-5 text-right text-[11px] text-muted">{b.n}</span>
+                        <div className="font-mono text-[11.5px] text-muted">
+                          {orderCode(r.id)} · {timeAgo(r.created_at)}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mb-2.5 mt-4 font-mono text-[11px] uppercase tracking-wider text-faint">Etiquetas frecuentes</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {REPUTATION.tags.map(t => (
-                      <span key={t.label} className="inline-flex items-center rounded-full bg-info-soft px-2.5 py-1 text-[12px] font-medium text-cyan">
-                        {t.label}<span className="ml-1.5 font-mono text-[11px] text-cyan/70">×{t.n}</span>
+                      </div>
+                      <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
+                      <span className="w-[84px] text-right font-mono text-[13px] font-semibold text-navy tabular">
+                        {money(r.quoted_total_cents)}
                       </span>
-                    ))}
-                  </div>
-                </Panel>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ))}
+
+          {tab === 'direcciones' && (
+            <div className="flex flex-col gap-2.5">
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={Plus}
+                  onClick={() => setAddrModal({ open: true, addr: null })}
+                >
+                  Agregar dirección
+                </Button>
               </div>
+              {addresses.length === 0 && (
+                <EmptyState compact kind="first-use" title="Sin direcciones guardadas" />
+              )}
+              {addresses.map(a => (
+                <div
+                  key={a.id}
+                  className={`flex items-start gap-3 rounded-box border p-3.5 ${a.is_default ? 'border-primary/40 bg-tint' : 'border-line'}`}
+                >
+                  <MapPin size={18} className={a.is_default ? 'text-primary' : 'text-muted'} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display text-[14px] font-bold text-navy">
+                        {a.label ?? 'Dirección'}
+                      </span>
+                      {a.is_default && <Badge tone="info">Principal</Badge>}
+                    </div>
+                    <div className="text-[13px] text-body">{a.address_line}</div>
+                    <div className="text-[12.5px] text-muted">
+                      {[a.neighborhood, a.municipality, a.state, a.postal_code]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={Pencil}
+                    onClick={() => setAddrModal({ open: true, addr: a })}
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={Trash2}
+                    onClick={() => setAddrDelete(a)}
+                  >
+                    Eliminar
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
 
-          {tab === 'services' && historyTable}
-
-          {tab === 'payments' && (
-            <Panel title="Pagos del cliente" action={<span className="text-[12px] text-faint">{payments.length} pagos</span>}>
-              <DataTable
-                columns={[
-                  { key: 'id', header: 'ID pago', render: x => <span className="font-mono text-[12px] text-muted">{x.pay.id}</span> },
-                  { key: 'svc', header: 'Servicio', render: x => <span className="font-mono text-[12.5px] text-primary">#{x.req.id}</span> },
-                  { key: 'method', header: 'Método', render: x => <span className="text-[13px] capitalize text-navy">{x.pay.method}</span> },
-                  {
-                    key: 'status', header: 'Estado', render: x => {
-                      const s = PAY_STATUS[x.pay.status] ?? { label: x.pay.status, tone: 'warning' as const };
-                      return <Badge tone={s.tone}>{s.label}</Badge>;
-                    },
-                  },
-                  { key: 'date', header: 'Fecha', render: x => <span className="text-[12.5px] text-muted">{x.pay.paid_at ? fechaCorta(x.pay.paid_at) : '—'}</span> },
-                  { key: 'amount', header: 'Monto', className: 'text-right', render: x => <span className="font-mono font-semibold text-navy">{peso(x.pay.amount_cents / 100)}</span> },
-                ] as Column<{ req: ServiceRequest; pay: Payment }>[]}
-                rows={payments}
-                onRowClick={x => router.push(`/servicios/${x.req.id}`)}
-                empty="Sin pagos registrados"
-              />
-            </Panel>
-          )}
-
-          {tab === 'addresses' && addressCards}
-
-          {tab === 'disputes' && (
-            <Panel title="Disputas y soporte" action={<span className="text-[12px] text-faint">{disputes.length} casos</span>}>
-              {disputes.length === 0 ? (
-                <EmptyState icon={ShieldAlert} title="Sin disputas" body="Este cliente no tiene disputas ni casos de soporte abiertos." />
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {disputes.map(d => (
-                    <div key={d.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3.5">
-                      <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-error-soft text-error"><ShieldAlert size={16} /></div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[12.5px] font-semibold text-navy">#{d.id}</span>
-                          <span className="text-[13px] text-navy">{d.reason}</span>
-                        </div>
-                        <div className="mt-0.5 text-[12px] text-muted">
-                          Servicio #{d.service_order_id} · {d.resolution_notes ?? 'Sin resolución todavía'}
-                        </div>
+          {tab === 'pagos' &&
+            (payments.length === 0 ? (
+              <EmptyState compact kind="first-use" title="Sin pagos registrados" />
+            ) : (
+              <ul className="divide-y divide-divider">
+                {payments.map(({ req, pay }) => (
+                  <li key={pay.id} className="flex items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-[14px] font-bold text-navy">
+                        {METHOD_LABEL[pay.method] ?? pay.method}
                       </div>
-                      <Badge tone={d.status === 'resolved' ? 'success' : d.status === 'in_review' ? 'warning' : 'error'}>
-                        {d.status === 'resolved' ? 'Resuelta' : d.status === 'in_review' ? 'Escalada' : 'Abierta'}
-                      </Badge>
+                      <div className="font-mono text-[11.5px] text-muted">
+                        {orderCode(req.id)} · {timeAgo(pay.paid_at ?? pay.created_at)}
+                      </div>
                     </div>
-                  ))}
+                    <Badge
+                      tone={pay.status === 'paid' ? 'success' : pay.status === 'refunded' ? 'danger' : 'warning'}
+                    >
+                      {pay.status === 'paid'
+                        ? 'Pagado'
+                        : pay.status === 'refunded'
+                          ? 'Reembolsado'
+                          : pay.status === 'failed'
+                            ? 'Fallido'
+                            : 'Pendiente'}
+                    </Badge>
+                    <span className="w-[90px] text-right font-mono text-[13px] font-semibold text-navy tabular">
+                      {money(pay.amount_cents)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ))}
+
+          {tab === 'disputas' &&
+            (disputes.length === 0 ? (
+              <EmptyState compact kind="all-clear" title="Sin disputas" />
+            ) : (
+              <ul className="divide-y divide-divider">
+                {disputes.map(d => (
+                  <li key={d.id} className="flex items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-[14px] font-bold text-navy">
+                        {orderCode(d.service_order_id)}
+                      </div>
+                      <div className="truncate text-[12.5px] text-muted">{d.reason}</div>
+                    </div>
+                    <Badge tone={d.status === 'resolved' ? 'success' : 'warning'}>
+                      {d.status === 'resolved' ? 'Resuelta' : d.status === 'rejected' ? 'Rechazada' : 'Abierta'}
+                    </Badge>
+                    <Link href="/soporte" className="text-[13px] font-semibold text-primary hover:underline">
+                      Ver en soporte
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ))}
+
+          {tab === 'notas' && (
+            <div className="flex flex-col gap-3">
+              <Textarea
+                rows={3}
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Agregar una nota interna sobre este cliente…"
+              />
+              <div className="flex justify-end">
+                <Button size="sm" onClick={saveNote} disabled={!note.trim()}>
+                  Guardar nota
+                </Button>
+              </div>
+              {notes.map(n => (
+                <div key={n.id} className="group rounded-box border border-line bg-panel p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-[13px] font-bold text-navy">{n.author}</span>
+                    <span className="font-mono text-[11px] text-muted">{timeAgo(n.created_at)}</span>
+                    <button
+                      type="button"
+                      aria-label="Eliminar nota"
+                      onClick={() => {
+                        const r = removeNote(n.id);
+                        if (r) snackbar.show('Nota eliminada', { undo: () => restoreNote(r) });
+                      }}
+                      className="ml-auto rounded p-1 text-faint opacity-0 hover:text-error group-hover:opacity-100 focus:opacity-100"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[13.5px] text-body">{n.text}</p>
                 </div>
-              )}
-            </Panel>
+              ))}
+              {/* ponytail: notas en memoria de la sesión (sin tabla en el backend). */}
+            </div>
           )}
+        </div>
+      </Card>
 
-          {tab === 'notes' && notesPanel}
-        </motion.div>
-      </AnimatePresence>
+      <ClientFormSheet open={editOpen} clientId={id} onClose={() => setEditOpen(false)} />
 
-      {/* Confirm suspend */}
       <Modal
         open={suspendOpen}
-        onClose={() => setSuspendOpen(false)}
+        onClose={() => busy === null && setSuspendOpen(false)}
+        dismissible={busy === null}
         title="Suspender cuenta"
-        sub="El cliente no podrá solicitar servicios mientras la cuenta esté suspendida."
-        icon={<Ban size={16} className="text-error" />}
-        width={460}
+        icon={Ban}
+        tone="danger"
+        description={`${name} no podrá solicitar servicios mientras la cuenta esté suspendida. Puedes reactivarla cuando quieras.`}
         footer={
           <>
-            <GhostButton onClick={() => setSuspendOpen(false)}>Cancelar</GhostButton>
-            <button
-              onClick={() => {
-                suspendUser(id);
-                setSuspendOpen(false);
-                toast.success(`Cuenta suspendida · ${name}`);
+            <Button variant="secondary" onClick={() => setSuspendOpen(false)} disabled={busy !== null}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              loading={busy === 'suspend'}
+              onClick={async () => {
+                const ok = await run('suspend', () => suspendUser(id), `Cuenta suspendida · ${name}`);
+                if (ok) setSuspendOpen(false);
               }}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
             >
-              <Ban size={14} /> Suspender cuenta
-            </button>
+              Suspender cuenta
+            </Button>
           </>
         }
-      >
-        <p className="text-[13px] leading-relaxed text-muted">
-          ¿Confirmas la suspensión de <b className="font-semibold text-navy">{name}</b>? Podrás reactivar la cuenta en cualquier momento desde este perfil.
-        </p>
-      </Modal>
+      />
 
-      {/* Send message → ticket */}
-      <SendMessageModal
-        open={messageOpen}
-        onClose={() => setMessageOpen(false)}
-        clientId={id}
-        clientName={name}
+      <Modal
+        open={addrDelete !== null}
+        onClose={() => busy === null && setAddrDelete(null)}
+        dismissible={busy === null}
+        title="Eliminar dirección"
+        icon={Trash2}
+        tone="danger"
+        description={addrDelete ? `${addrDelete.label ?? 'Dirección'} · ${addrDelete.address_line ?? ''}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAddrDelete(null)} disabled={busy !== null}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              loading={busy === 'del-addr'}
+              onClick={async () => {
+                if (!addrDelete) return;
+                const ok = await run('del-addr', () => deleteAddress(addrDelete.id), 'Dirección eliminada');
+                if (ok) setAddrDelete(null);
+              }}
+            >
+              Eliminar
+            </Button>
+          </>
+        }
       />
 
       <AddressModal
@@ -497,14 +477,39 @@ export default function ClientDetailPage() {
         clientId={id}
         addr={addrModal.addr}
       />
+
+      <SendMessageModal
+        open={messageOpen}
+        onClose={() => setMessageOpen(false)}
+        clientId={id}
+        clientName={name}
+      />
     </div>
   );
 }
 
-type AddressRow = ReturnType<typeof getAddresses>[number];
+function Kpi({ label, value, star }: { label: string; value: string; star?: boolean }) {
+  return (
+    <Card padded hover>
+      <Kicker>{label}</Kicker>
+      <div className="mt-2 flex items-center gap-1.5 font-display text-[26px] font-extrabold text-navy tabular">
+        {value}
+        {star && <Star size={20} className="text-navy" fill="currentColor" />}
+      </div>
+    </Card>
+  );
+}
 
-function AddressModal({ open, onClose, clientId, addr }: {
-  open: boolean; onClose: () => void; clientId: string; addr: AddressRow | null;
+function AddressModal({
+  open,
+  onClose,
+  clientId,
+  addr,
+}: {
+  open: boolean;
+  onClose: () => void;
+  clientId: string;
+  addr: AddressRow | null;
 }) {
   const [f, setF] = useState({
     label: addr?.label ?? 'Casa',
@@ -515,67 +520,104 @@ function AddressModal({ open, onClose, clientId, addr }: {
     postal_code: addr?.postal_code ?? '',
     is_default: addr?.is_default ?? false,
   });
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const { busy, run } = useAction();
+  const cpInvalid = !!f.postal_code && !/^\d{5}$/.test(f.postal_code.trim());
+  const set =
+    (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setF({ ...f, [k]: e.target.value });
 
-  function submit() {
-    if (!f.address_line.trim()) return;
-    void saveAddress(clientId, { ...f, address_line: f.address_line.trim() }, addr?.id)
-      .then(ok => { if (ok) { toast.success(addr ? 'Dirección actualizada' : 'Dirección agregada'); onClose(); } });
+  async function submit() {
+    if (!f.address_line.trim() || cpInvalid) return;
+    const ok = await run(
+      'save',
+      () =>
+        saveAddress(
+          clientId,
+          {
+            ...f,
+            address_line: f.address_line.trim(),
+            postal_code: f.postal_code?.trim() || null,
+          },
+          addr?.id,
+        ),
+      addr ? 'Dirección actualizada' : 'Dirección agregada',
+    );
+    if (ok) onClose();
   }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => !busy && onClose()}
+      dismissible={!busy}
       title={addr ? 'Editar dirección' : 'Agregar dirección'}
-      icon={<MapPin size={15} />}
+      icon={MapPin}
       width={520}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!f.address_line.trim()}>
+          <Button variant="secondary" onClick={onClose} disabled={!!busy}>
+            Cancelar
+          </Button>
+          <Button
+            loading={!!busy}
+            disabled={!f.address_line.trim() || cpInvalid}
+            onClick={() => void submit()}
+          >
             {addr ? 'Guardar cambios' : 'Agregar dirección'}
-          </PrimaryButton>
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Etiqueta">
-            <Input value={f.label ?? ''} onChange={set('label')} placeholder="Casa, Oficina…" />
-          </Field>
-          <Field label="Código postal">
-            <Input value={f.postal_code ?? ''} onChange={set('postal_code')} placeholder="44100" />
-          </Field>
+          <Input label="Etiqueta" value={f.label ?? ''} onChange={set('label')} placeholder="Casa, Oficina…" />
+          <Input
+            label="Código postal"
+            value={f.postal_code ?? ''}
+            onChange={set('postal_code')}
+            placeholder="44100"
+            inputMode="numeric"
+            error={cpInvalid ? 'El código postal son 5 dígitos.' : null}
+          />
         </div>
-        <Field label="Calle y número">
-          <Input value={f.address_line} onChange={set('address_line')} placeholder="Av. México 1234, int. 5" />
-        </Field>
+        <Input
+          label="Calle y número"
+          required
+          value={f.address_line}
+          onChange={set('address_line')}
+          placeholder="Av. México 1234, int. 5"
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Colonia">
-            <Input value={f.neighborhood ?? ''} onChange={set('neighborhood')} />
-          </Field>
-          <Field label="Municipio">
-            <Input value={f.municipality ?? ''} onChange={set('municipality')} />
-          </Field>
-          <Field label="Estado">
-            <Input value={f.state ?? ''} onChange={set('state')} />
-          </Field>
+          <Input label="Colonia" value={f.neighborhood ?? ''} onChange={set('neighborhood')} />
+          <Input label="Municipio" value={f.municipality ?? ''} onChange={set('municipality')} />
+          <Input label="Estado" value={f.state ?? ''} onChange={set('state')} />
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
+        <div className="flex items-center justify-between rounded-box border border-line bg-panel px-4 py-3">
           <div>
-            <div className="text-[13px] font-semibold text-navy">Dirección principal</div>
-            <div className="text-[11.5px] text-muted">Se usa por defecto al crear servicios.</div>
+            <div className="font-display text-[14px] font-bold text-navy">Dirección principal</div>
+            <div className="text-[12.5px] text-muted">Se usa por defecto al crear servicios.</div>
           </div>
-          <Toggle on={!!f.is_default} onChange={v => setF({ ...f, is_default: v })} />
+          <Toggle
+            checked={!!f.is_default}
+            onChange={v => setF({ ...f, is_default: v })}
+            aria-label="Dirección principal"
+          />
         </div>
       </div>
     </Modal>
   );
 }
 
-function SendMessageModal({ open, onClose, clientId, clientName }: {
-  open: boolean; onClose: () => void; clientId: string; clientName: string;
+function SendMessageModal({
+  open,
+  onClose,
+  clientId,
+  clientName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  clientId: string;
+  clientName: string;
 }) {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -583,7 +625,7 @@ function SendMessageModal({ open, onClose, clientId, clientName }: {
   function submit() {
     if (!subject.trim() || !body.trim()) return;
     const t = createTicket({ subject: subject.trim(), requester_id: clientId, content: body.trim() });
-    toast.success(`Mensaje enviado · ticket #${t.id}`);
+    toast.local(`Mensaje registrado · ticket #${t.id}`);
     setSubject('');
     setBody('');
     onClose();
@@ -594,33 +636,38 @@ function SendMessageModal({ open, onClose, clientId, clientName }: {
       open={open}
       onClose={onClose}
       title={`Enviar mensaje a ${clientName.split(' ')[0]}`}
-      sub="Se abre un ticket de soporte y el cliente recibe notificación push + email."
-      icon={<Send size={15} />}
+      description="Se abre un ticket de soporte con este mensaje."
+      icon={Send}
       width={480}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!subject.trim() || !body.trim()}>Enviar mensaje</PrimaryButton>
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={!subject.trim() || !body.trim()}>
+            Enviar
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Asunto">
-          <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ej. Seguimiento a tu último servicio" />
-        </Field>
+        <Input
+          label="Asunto"
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          placeholder="Ej. Seguimiento a tu último servicio"
+        />
         <Field label="Mensaje">
-          <Textarea rows={4} value={body} onChange={e => setBody(e.target.value)} placeholder="Escribe el mensaje para el cliente…" />
+          <Textarea
+            rows={4}
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder="Escribe el mensaje para el cliente…"
+          />
         </Field>
+        {/* ponytail: tickets en memoria de la sesión; sin envío real de push/email. */}
       </div>
     </Modal>
   );
 }
 
-function KV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">{label}</div>
-      <div className={`text-[14px] font-medium text-navy ${mono ? 'font-mono' : ''}`}>{value}</div>
-    </div>
-  );
-}

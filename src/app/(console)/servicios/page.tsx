@@ -1,155 +1,250 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, FolderTree, Download, Plus, Activity, TrendingUp } from 'lucide-react';
 import {
-  PageHeading,
-  Panel,
-  StatCard,
-  StatusPill,
+  Ban,
+  Copy,
+  Download,
+  Eye,
+  Pencil,
+  Plus,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
   DataTable,
-  Modal,
-  exportCsv,
-  type Column,
-} from '@/components/admin';
-import { PrimaryButton, GhostButton, Chip, Avatar, Input, Skeleton, Field, Textarea } from '@/components/ui';
-import { FadeIn } from '@/components/motion';
-import { toast } from '@/components/toast';
+  DateRangePicker,
+  EmptyState,
+  ErrorPage,
+  Input,
+  PageHeader,
+  ScreenSkeleton,
+  Tabs,
+  snackbar,
+  toast,
+  type DataColumn,
+} from '@/components/ds';
 import {
   useTick,
   useWorldReady,
-  getMetrics,
+  useWorldFailed,
+  loadWorld,
   getAllRequests,
-  getProfile,
+  getAllPayments,
   getCategories,
-  getAddresses,
-  getClients,
-  createRequest,
+  getProfile,
+  getRequest,
+  setStatus,
 } from '@/lib/data/store';
-import type { ServiceRequest } from '@/lib/demo/world';
+import { orderCode } from '@/lib/orderCode';
+import {
+  EMPTY_SERVICE_FILTERS,
+  SERVICE_TABS,
+  activeSheetFilters,
+  filterServices,
+  tabCounts,
+  toCsv,
+  type ServiceFilters,
+  type ServiceRow,
+} from '@/lib/serviciosFilter';
+import {
+  CategoryTile,
+  METHOD_LABEL,
+  STATUS,
+  downloadCsv,
+  money,
+  timeAgo,
+  useDeferredCommit,
+} from './_components/shared';
+import { ServiceFormSheet } from './_components/ServiceFormSheet';
+import { ServiceFiltersSheet } from './_components/ServiceFiltersSheet';
 
-const STATUS_LABELS: Record<string, string> = {
-  requested: 'Solicitados',
-  accepted: 'Aceptados',
-  enroute: 'En camino',
-  onsite: 'En sitio',
-  quote: 'Cotización',
-  working: 'En ejecución',
-  closing: 'Por cerrar',
-  completed: 'Completados',
-  paid: 'Pagados',
-  closed: 'Cerrados',
-  expired: 'Expirados',
-  cancelled: 'Cancelados',
-};
-
-const fmtMoney = (n: number | null) =>
-  n == null
-    ? '—'
-    : new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n);
-
-const fmtDate = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-    : '—';
-
-const initials = (name: string) =>
-  name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
-
-interface Row {
-  req: ServiceRequest;
-  clientName: string;
-  techName: string | null;
-  categoryName: string;
-}
-
-function SkeletonRows({ rows = 6 }: { rows?: number }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
-      </div>
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-      </div>
-    </div>
-  );
-}
+const CANCELLABLE = new Set([
+  'requested',
+  'accepted',
+  'enroute',
+  'onsite',
+  'quote',
+  'working',
+]);
 
 export default function ServiciosPage() {
   const tick = useTick();
   const router = useRouter();
   const ready = useWorldReady();
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState('Todas');
-  const [createOpen, setCreateOpen] = useState(false);
+  const failed = useWorldFailed();
+  const [f, setF] = useState<ServiceFilters>(EMPTY_SERVICE_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [form, setForm] = useState<{ open: boolean; id: string | null }>({
+    open: false,
+    id: null,
+  });
+  // Servicios con cancelación pendiente (en espera de "Deshacer").
+  const [pendingCancel, setPendingCancel] = useState<Set<string>>(new Set());
+  const deferred = useDeferredCommit();
 
-  const metrics = getMetrics();
-  const byStatus = metrics.byStatus;
-
-  const subToCategory = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const cat of getCategories()) map[cat.id] = cat.name;
-    return map;
+  const cats = useMemo(
+    () => getCategories(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
-
-  const rows: Row[] = useMemo(() => {
-    return getAllRequests().map(req => ({
-      req,
-      clientName: getProfile(req.client_id)?.full_name ?? 'Cliente',
-      techName: req.technician_id ? getProfile(req.technician_id)?.full_name ?? null : null,
-      categoryName: subToCategory[req.category_id] ?? '—',
+    [tick],
+  );
+  const rows: ServiceRow[] = useMemo(() => {
+    const payByOrder = new Map(
+      getAllPayments().map(p => [p.service_order_id, p]),
+    );
+    const catName = new Map(cats.map(c => [c.id, c.name]));
+    return getAllRequests().map(r => ({
+      id: r.id,
+      status: r.status,
+      is_disputed: r.is_disputed,
+      is_urgent: r.is_urgent,
+      categoryId: r.category_id,
+      categoryName: catName.get(r.category_id) ?? 'Servicio',
+      clientName: getProfile(r.client_id)?.full_name ?? 'Cliente',
+      techName: r.technician_id
+        ? (getProfile(r.technician_id)?.full_name ?? null)
+        : null,
+      zone: r.municipality ?? '—',
+      totalCents: r.quoted_total_cents,
+      method: payByOrder.get(r.id)?.method ?? null,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }));
-  }, [subToCategory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, cats]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const categoryNames = useMemo(() => ['Todas', ...getCategories().map(c => c.name)], [tick]);
+  const visible = useMemo(
+    () =>
+      filterServices(rows, f).map(r =>
+        pendingCancel.has(r.id) ? { ...r, status: 'cancelled' as const } : r,
+      ),
+    [rows, f, pendingCancel],
+  );
+  const counts = useMemo(() => tabCounts(rows, f), [rows, f]);
+  const sheetCount = activeSheetFilters(f);
+  const slugOf = (catId: string) =>
+    cats.find(c => c.id === catId)?.slug ?? catId;
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter(r => {
-      if (statusFilter && r.req.status !== statusFilter) return false;
-      if (categoryFilter !== 'Todas' && r.categoryName !== categoryFilter) return false;
-      if (!q) return true;
-      return (
-        r.req.id.toLowerCase().includes(q) ||
-        r.clientName.toLowerCase().includes(q) ||
-        (r.techName ?? '').toLowerCase().includes(q) ||
-        r.categoryName.toLowerCase().includes(q)
-      );
-    });
-  }, [rows, query, statusFilter, categoryFilter]);
-
-  function onExport() {
-    exportCsv('servicios.csv', filtered.map(r => ({
-      ID: r.req.id, Cliente: r.clientName, Técnico: r.techName ?? '',
-      Categoría: r.categoryName, Estado: STATUS_LABELS[r.req.status] ?? r.req.status,
-      Programado: r.req.accepted_at ?? r.req.created_at,
-      Total: r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : '',
-    })));
-    toast.success(`CSV exportado · ${filtered.length} servicios`);
+  function exportRows(list: ServiceRow[], name = 'servicios.csv') {
+    downloadCsv(
+      name,
+      toCsv(
+        list.map(r => ({
+          Servicio: orderCode(r.id),
+          ID: r.id,
+          Cliente: r.clientName,
+          Técnico: r.techName ?? '',
+          Categoría: r.categoryName,
+          Zona: r.zone,
+          Estado: STATUS[r.status].label,
+          Urgente: r.is_urgent ? 'Sí' : 'No',
+          Disputa: r.is_disputed ? 'Sí' : 'No',
+          Método: r.method ? (METHOD_LABEL[r.method] ?? r.method) : '',
+          Total: r.totalCents != null ? r.totalCents / 100 : '',
+          Creado: r.createdAt,
+          Actualizado: r.updatedAt,
+        })),
+      ),
+    );
+    toast.success('CSV exportado', `${list.length} servicios`);
   }
 
-  const statusOrder = Object.keys(STATUS_LABELS).filter(s => byStatus[s] > 0);
-  const topStatuses = statusOrder.slice(0, 4);
+  /** Cancela con "Deshacer": la escritura ocurre al vencer el snackbar. */
+  function cancelWithUndo(ids: string[]) {
+    const target = ids.filter(id => {
+      const o = getRequest(id);
+      return o && CANCELLABLE.has(o.status);
+    });
+    if (!target.length) {
+      toast.info('Nada que cancelar', 'Los servicios elegidos ya terminaron.');
+      return;
+    }
+    setPendingCancel(s => new Set([...s, ...target]));
+    const release = () =>
+      setPendingCancel(s => {
+        const n = new Set(s);
+        target.forEach(id => n.delete(id));
+        return n;
+      });
+    deferred(
+      target.length === 1
+        ? `${orderCode(target[0])} cancelado`
+        : `${target.length} servicios cancelados`,
+      async () => {
+        let failedN = 0;
+        for (const id of target) {
+          const r = await setStatus(
+            id,
+            'cancelled',
+            'Cancelado por admin desde la consola',
+          );
+          if (r === null) failedN++;
+        }
+        release();
+        if (failedN)
+          toast.error(
+            `No se cancelaron ${failedN} de ${target.length}`,
+            'Revisa su estado en el detalle.',
+          );
+      },
+      release,
+    );
+  }
 
-  const columns: Column<Row>[] = [
+  function clearSheetFilters() {
+    const prev = f;
+    setF(s => ({
+      ...s,
+      zones: [],
+      method: null,
+      minPesos: null,
+      maxPesos: null,
+      urgentOnly: false,
+      disputeOnly: false,
+    }));
+    setFiltersOpen(false);
+    if (activeSheetFilters(prev))
+      snackbar.show('Filtros limpiados', { undo: () => setF(prev) });
+  }
+
+  const columns: DataColumn<ServiceRow>[] = [
     {
-      key: 'id',
-      header: 'ID',
-      render: r => <span className="font-mono text-[12.5px] font-medium text-primary">#{r.req.id}</span>,
+      key: 'servicio',
+      header: 'Servicio',
+      sortValue: r => r.createdAt,
+      render: r => (
+        <div className="flex flex-col items-start gap-1">
+          <span className="font-mono text-[12.5px] font-medium text-primary">
+            {orderCode(r.id)}
+          </span>
+          {r.is_urgent && (
+            <Badge tone="warning" mono>
+              Urgente
+            </Badge>
+          )}
+        </div>
+      ),
     },
     {
       key: 'cliente',
       header: 'Cliente',
+      sortValue: r => r.clientName,
       render: r => (
-        <div className="flex items-center gap-2.5">
-          <Avatar initials={initials(r.clientName)} size={28} />
-          <span className="font-medium text-navy">{r.clientName}</span>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <CategoryTile slug={slugOf(r.categoryId)} size={30} />
+          <div className="min-w-0">
+            <div className="truncate font-display text-[13.5px] font-bold text-navy">
+              {r.clientName}
+            </div>
+            <div className="truncate text-[12px] text-muted">
+              {r.categoryName}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -158,227 +253,305 @@ export default function ServiciosPage() {
       header: 'Técnico',
       render: r =>
         r.techName ? (
-          <div className="flex items-center gap-2.5">
-            <Avatar initials={initials(r.techName)} size={28} />
-            <span className="font-medium text-navy">{r.techName}</span>
-          </div>
+          <span className="text-[13.5px] text-body">{r.techName}</span>
         ) : (
-          <span className="text-[12.5px] italic text-faint">— sin asignar</span>
+          <span className="text-[13.5px] text-faint">Sin asignar</span>
         ),
     },
     {
-      key: 'categoria',
-      header: 'Categoría',
-      render: r => <span className="text-[12.5px] text-navy">{r.categoryName}</span>,
+      key: 'zona',
+      header: 'Zona',
+      render: r => <span className="text-[13.5px] text-muted">{r.zone}</span>,
     },
     {
       key: 'estado',
       header: 'Estado',
-      render: r => <StatusPill status={r.req.status} />,
-    },
-    {
-      key: 'fecha',
-      header: 'Programado',
-      render: r => <span className="font-mono text-[12px] text-muted">{fmtDate(r.req.accepted_at ?? r.req.created_at)}</span>,
+      render: r => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <Badge tone={STATUS[r.status].tone} dot>
+            {STATUS[r.status].label}
+          </Badge>
+          {r.is_disputed && <Badge tone="danger">Disputa</Badge>}
+        </span>
+      ),
     },
     {
       key: 'total',
       header: 'Total',
-      className: 'text-right',
+      align: 'right',
+      sortValue: r => r.totalCents,
       render: r => (
-        <span className="font-mono text-[13px] font-semibold text-navy">
-          {fmtMoney(r.req.quoted_total_cents != null ? r.req.quoted_total_cents / 100 : null)}
+        <span className="font-mono text-[13px] font-semibold text-navy tabular">
+          {money(r.totalCents)}
+        </span>
+      ),
+    },
+    {
+      key: 'actualizado',
+      header: 'Actualizado',
+      sortValue: r => r.updatedAt,
+      render: r => (
+        <span className="whitespace-nowrap text-[12.5px] text-muted">
+          {timeAgo(r.updatedAt)}
         </span>
       ),
     },
   ];
 
-  if (!ready) return <SkeletonRows />;
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready) return <ScreenSkeleton kind="list" />;
+
+  const activeChips: { key: string; label: string; remove: () => void }[] = [
+    ...f.zones.map(z => ({
+      key: `z-${z}`,
+      label: z,
+      remove: () => setF(s => ({ ...s, zones: s.zones.filter(x => x !== z) })),
+    })),
+    ...(f.method
+      ? [
+          {
+            key: 'm',
+            label: METHOD_LABEL[f.method] ?? f.method,
+            remove: () => setF(s => ({ ...s, method: null })),
+          },
+        ]
+      : []),
+    ...(f.minPesos != null || f.maxPesos != null
+      ? [
+          {
+            key: 'amt',
+            label: `${f.minPesos != null ? `$${f.minPesos.toLocaleString('es-MX')}` : '$0'} – ${f.maxPesos != null ? `$${f.maxPesos.toLocaleString('es-MX')}` : 'sin límite'}`,
+            remove: () => setF(s => ({ ...s, minPesos: null, maxPesos: null })),
+          },
+        ]
+      : []),
+    ...(f.urgentOnly
+      ? [
+          {
+            key: 'u',
+            label: 'Urgentes',
+            remove: () => setF(s => ({ ...s, urgentOnly: false })),
+          },
+        ]
+      : []),
+    ...(f.disputeOnly
+      ? [
+          {
+            key: 'd',
+            label: 'Con disputa',
+            remove: () => setF(s => ({ ...s, disputeOnly: false })),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeading
+    <div className="flex flex-col gap-5">
+      <PageHeader
         title="Servicios"
-        sub="Operación en tiempo real y histórico completo · ZMG"
+        description="Cada orden, de la solicitud al pago. Toca una fila para ver su detalle."
         actions={
-          <div className="flex gap-2.5">
-            <GhostButton onClick={onExport}>
-              <Download size={14} className="mr-2" />
+          <>
+            <Button
+              variant="secondary"
+              icon={Download}
+              onClick={() => exportRows(visible)}
+              disabled={!visible.length}
+            >
               Exportar
-            </GhostButton>
-            <PrimaryButton onClick={() => setCreateOpen(true)}>
-              <Plus size={14} className="mr-2" />
+            </Button>
+            <Button icon={Plus} onClick={() => setForm({ open: true, id: null })}>
               Crear servicio
-            </PrimaryButton>
-          </div>
+            </Button>
+          </>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {topStatuses.map((s, i) => (
-          <StatCard
-            key={s}
-            index={i}
-            label={STATUS_LABELS[s]}
-            value={byStatus[s].toLocaleString('es-MX')}
-            note={`${((byStatus[s] / metrics.totalRequests) * 100).toFixed(0)}% del total`}
-          />
-        ))}
-      </div>
+      <Card className="overflow-hidden">
+        <Tabs
+          className="px-5"
+          tabs={SERVICE_TABS.map(t => ({ ...t, count: counts[t.value] }))}
+          value={f.tab}
+          onChange={tab => setF(s => ({ ...s, tab }))}
+        />
 
-      <FadeIn>
-        <Panel>
-          <div className="mb-4 flex flex-wrap items-center gap-2.5">
-            <div className="flex h-9 w-full min-w-[220px] flex-1 items-center rounded-lg border border-line bg-surface px-3 sm:w-auto sm:max-w-[300px]">
-              <Search size={14} className="text-faint" />
-              <Input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="ID servicio, cliente o técnico"
-                className="h-full flex-1 border-none bg-transparent px-2.5 text-[13px] shadow-none focus:ring-0"
-              />
-            </div>
-            <Chip active={!statusFilter} onClick={() => setStatusFilter(null)}>
-              Todos · {metrics.totalRequests}
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Input
+              icon={Search}
+              value={f.query}
+              onChange={e => setF(s => ({ ...s, query: e.target.value }))}
+              placeholder="ID, cliente, técnico o zona"
+              aria-label="Buscar servicios"
+              wrapperClassName="min-w-[220px] flex-1 sm:max-w-[360px]"
+            />
+            <Button
+              variant="secondary"
+              icon={SlidersHorizontal}
+              onClick={() => setFiltersOpen(true)}
+            >
+              Filtros
+              {sheetCount > 0 && (
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                  {sheetCount}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Categoría">
+            <Chip
+              active={!f.categoryId}
+              onClick={() => setF(s => ({ ...s, categoryId: null }))}
+            >
+              Todas
             </Chip>
-            {statusOrder.map(s => (
-              <Chip key={s} active={statusFilter === s} onClick={() => setStatusFilter(s)}>
-                {STATUS_LABELS[s]} · {byStatus[s]}
+            {cats.map(c => (
+              <Chip
+                key={c.id}
+                active={f.categoryId === c.id}
+                onClick={() =>
+                  setF(s => ({
+                    ...s,
+                    categoryId: s.categoryId === c.id ? null : c.id,
+                  }))
+                }
+              >
+                {c.name}
               </Chip>
             ))}
-            <span className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-navy sm:ml-auto">
-              <FolderTree size={14} className="text-primary" />
-              <span className="text-muted">Categoría:</span>
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                className="bg-transparent text-[12.5px] font-medium text-navy outline-none"
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <DateRangePicker
+              value={f.range}
+              onChange={range => setF(s => ({ ...s, range }))}
+            />
+            {activeChips.map(c => (
+              <Chip key={c.key} active onRemove={c.remove}>
+                {c.label}
+              </Chip>
+            ))}
+            <span className="ml-auto font-mono text-[12px] text-muted">
+              {visible.length} resultado{visible.length === 1 ? '' : 's'}
+            </span>
+          </div>
+        </div>
+
+        <DataTable
+          rows={visible}
+          columns={columns}
+          rowKey={r => r.id}
+          onRowClick={r => router.push(`/servicios/${r.id}`)}
+          selectable
+          initialSort={{ key: 'actualizado', dir: 'desc' }}
+          pageSize={8}
+          minWidth={980}
+          bulkActions={(selected, clear) => (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={Download}
+                onClick={() => exportRows(selected, 'servicios-seleccion.csv')}
               >
-                {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </span>
-          </div>
+                Exportar
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                icon={Ban}
+                onClick={() => {
+                  cancelWithUndo(selected.map(r => r.id));
+                  clear();
+                }}
+              >
+                Cancelar
+              </Button>
+            </>
+          )}
+          rowMenu={r => [
+            {
+              label: 'Ver detalle',
+              icon: Eye,
+              onSelect: () => router.push(`/servicios/${r.id}`),
+            },
+            {
+              label: 'Editar',
+              icon: Pencil,
+              onSelect: () => setForm({ open: true, id: r.id }),
+            },
+            {
+              label: 'Copiar ID',
+              icon: Copy,
+              onSelect: () => {
+                void navigator.clipboard.writeText(r.id).then(
+                  () => toast.success('ID copiado', orderCode(r.id)),
+                  () => toast.error('No se pudo copiar el ID'),
+                );
+              },
+            },
+            'divider',
+            {
+              label: 'Cancelar servicio',
+              icon: Ban,
+              destructive: true,
+              disabled: !CANCELLABLE.has(r.status),
+              onSelect: () => cancelWithUndo([r.id]),
+            },
+          ]}
+          empty={
+            rows.length === 0 ? (
+              <EmptyState
+                kind="first-use"
+                title="Aún no hay servicios"
+                description="Cuando los clientes soliciten servicios aparecerán aquí."
+                action={
+                  <Button icon={Plus} onClick={() => setForm({ open: true, id: null })}>
+                    Crear servicio
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                kind="no-results"
+                title="Sin resultados"
+                description="Ningún servicio coincide con la búsqueda y los filtros."
+                action={
+                  <Button
+                    variant="secondary"
+                    onClick={() => setF(EMPTY_SERVICE_FILTERS)}
+                  >
+                    Quitar filtros
+                  </Button>
+                }
+              />
+            )
+          }
+        />
+      </Card>
 
-          <div className="mb-4 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-xl border border-primary/20 bg-info-soft px-4 py-2.5">
-            <Activity size={14} className="text-success" />
-            <span className="text-[13px] text-navy">
-              <b className="font-bold">{metrics.active}</b> servicios en curso ahora mismo
-            </span>
-            <span className="flex items-center gap-1 text-[12.5px] text-muted">
-              <TrendingUp size={12} className="text-success" />
-              +18% vs ayer
-            </span>
-            <span className="font-mono text-[11.5px] text-faint sm:ml-auto">
-              Mostrando {filtered.length} de {metrics.totalRequests}
-            </span>
-          </div>
+      <ServiceFiltersSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        value={f}
+        onApply={v => setF(s => ({ ...s, ...v }))}
+        onClear={clearSheetFilters}
+        resultCount={d => filterServices(rows, { ...f, ...d }).length}
+      />
 
-          <DataTable
-            columns={columns}
-            rows={filtered}
-            onRowClick={r => router.push(`/servicios/${r.req.id}`)}
-            empty="Sin servicios para los filtros seleccionados"
-          />
-        </Panel>
-      </FadeIn>
-
-      <CreateServiceModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+      <ServiceFormSheet
+        open={form.open}
+        order={form.id ? getRequest(form.id) : null}
+        onClose={() => setForm({ open: false, id: null })}
         onCreated={id => router.push(`/servicios/${id}`)}
       />
     </div>
-  );
-}
-
-function CreateServiceModal({ open, onClose, onCreated }: {
-  open: boolean; onClose: () => void; onCreated: (id: string) => void;
-}) {
-  const cats = getCategories();
-  const clients = getClients();
-  const [clientId, setClientId] = useState('');
-  const addresses = getAddresses(clientId);
-  const [subId, setSubId] = useState('');
-  const [description, setDescription] = useState('');
-  const [addressId, setAddressId] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function submit() {
-    if (!subId || !clientId) return;
-    setSaving(true);
-    const req = await createRequest({
-      client_id: clientId,
-      category_id: subId,
-      description: description.trim() || null,
-      client_address_id: addresses.find(a => a.id === addressId)?.id ?? null,
-    });
-    setSaving(false);
-    if (!req) return;
-    toast.success(`Servicio creado · #${req.id.slice(0, 8)}`);
-    setSubId('');
-    setDescription('');
-    onClose();
-    onCreated(req.id);
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Crear servicio"
-      sub="Alta manual a nombre de un cliente (soporte telefónico)."
-      icon={<Plus size={16} />}
-      width={480}
-      footer={
-        <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!subId || !clientId || saving}>
-            {saving ? 'Creando…' : 'Crear servicio'}
-          </PrimaryButton>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <Field label="Cliente">
-          <select
-            value={clientId}
-            onChange={e => { setClientId(e.target.value); setAddressId(''); }}
-            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
-          >
-            <option value="">Selecciona un cliente…</option>
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.full_name ?? c.id}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Categoría">
-          <select
-            value={subId}
-            onChange={e => setSubId(e.target.value)}
-            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
-          >
-            <option value="">Selecciona un servicio…</option>
-            {cats.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Descripción del problema">
-          <Textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="¿Qué reporta el cliente?" />
-        </Field>
-        <Field label="Dirección">
-          <select
-            value={addressId}
-            onChange={e => setAddressId(e.target.value)}
-            className="min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none focus:border-primary"
-          >
-            <option value="">{addresses.length ? 'Selecciona una dirección…' : 'El cliente no tiene direcciones guardadas'}</option>
-            {addresses.map(a => (
-              <option key={a.id} value={a.id}>{a.label} · {a.address_line}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-    </Modal>
   );
 }

@@ -1,0 +1,7 @@
+# Generado por `pnpm gen:types`.
+src/types/supabase.ts
+
+node_modules/
+.next/
+out/
+pnpm-lock.yaml

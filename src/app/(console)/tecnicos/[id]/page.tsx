@@ -1,472 +1,497 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import {
-  ArrowLeft, Phone, Mail, Calendar, MapPin, Check, X, Ban, RotateCcw,
-  ContactRound, Map as MapIcon, Landmark, Quote, FileCheck2, MessageSquareText,
-  Send, CheckCheck, BadgeCheck, AlertOctagon,
+  ChevronLeft,
+  Clock,
+  Pencil,
+  Wallet,
+  Ban,
+  RotateCcw,
+  Check,
+  Star,
+  Briefcase,
+  TrendingUp,
+  MapPin,
 } from 'lucide-react';
-import { PageHeading, Panel, Modal } from '@/components/admin';
-import { Avatar, Badge, GhostButton, PrimaryButton, Textarea } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
-import { toast } from '@/components/toast';
 import {
-  useTick, getTechnician, getProfile, getTechRates,
-  getCategories, getKycSessions, getNotes, resolveKyc, rejectKyc,
-  suspendTechnician, reactivateTechnician, addNote,
-  upsertTechRate, updateTechnicianBank,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorPage,
+  Modal,
+  ScreenSkeleton,
+  toast,
+} from '@/components/ds';
+import { useAction } from '@/components/use-action';
+import {
+  getAllPayments,
+  getAllRequests,
+  getCategories,
+  getKycSessions,
+  getLedger,
+  getNotes,
+  getProfile,
+  getTechCategories,
+  getTechDocuments,
+  getTechMunicipality,
+  getTechRadiusKm,
+  getTechRates,
+  getTechRatings,
+  getTechnician,
+  getWallet,
+  loadExtras,
+  loadWorld,
+  reactivateTechnician,
+  rejectKyc,
+  resolveKyc,
+  suspendTechnician,
+  useExtras,
+  useTick,
+  useWorldFailed,
+  useWorldReady,
 } from '@/lib/data/store';
+import { formatPhone } from '@/lib/phone';
+import { orderCode } from '@/lib/orderCode';
+import {
+  KYC_GROUP_META,
+  ORDER_STATUS,
+  ago,
+  diditChecks,
+  initials,
+  kycGroup,
+  slaLabel,
+  slaRemainingHours,
+} from '@/lib/techConsole';
+import {
+  BankCard,
+  CardHead,
+  CheckRow,
+  DocTile,
+  EditProfileSheet,
+  IneTile,
+  KV,
+  NotesCard,
+  RatesCard,
+  RejectModal,
+  fecha,
+} from '../_components/detail-parts';
 
-const initials = (name?: string | null) =>
-  (name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-const peso = (n: number) => `$${n.toLocaleString('es-MX')} MXN`;
-const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-const fmtClabe = (c?: string | null) => (c ? c.replace(/(\d{3})(\d{3})(\d{8})/, '$1 $2 •••• ') + c.slice(-4) : '—');
-
-const DOC_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'error' }> = {
-  not_started: { label: 'Sin iniciar', tone: 'warning' },
-  in_progress: { label: 'En curso', tone: 'warning' },
-  pending: { label: 'Pendiente revisión', tone: 'warning' },
-  in_review: { label: 'En revisión', tone: 'warning' },
-  approved: { label: 'Aprobada', tone: 'success' },
-  declined: { label: 'Rechazada', tone: 'error' },
-  abandoned: { label: 'Abandonada', tone: 'error' },
-  resubmitted: { label: 'Reenviada', tone: 'warning' },
-};
-
-const REJECT_REASONS = ['Documentos ilegibles', 'Información inconsistente', 'Documento expirado', 'Otro'];
+const DONE = new Set(['completed', 'paid', 'closed']);
+const money = (c: number) => `$${Math.round(c / 100).toLocaleString('es-MX')}`;
 
 export default function TecnicoDetailPage() {
   useTick();
+  const extras = useExtras();
   const { id } = useParams<{ id: string }>();
-  const [note, setNote] = useState('');
+  const router = useRouter();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
+  const { busy, run } = useAction();
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [suspendOpen, setSuspendOpen] = useState(false);
+
+  useEffect(() => {
+    void loadExtras();
+  }, []);
 
   const tech = getTechnician(id);
   const profile = tech ? getProfile(tech.id) : null;
 
-  if (!tech || !profile) {
-    return (
-      <FadeIn>
-        <PageHeading title="Técnico no encontrado" sub={`No existe un técnico con id ${id}`} />
-        <GhostButton href="/tecnicos">Volver a técnicos</GhostButton>
-      </FadeIn>
+  const data = useMemo(() => {
+    if (!tech) return null;
+    const cats = getCategories();
+    const orders = getAllRequests().filter(o => o.technician_id === tech.id);
+    const done = orders.filter(o => DONE.has(o.status));
+    const since30 = Date.now() - 30 * 864e5;
+    const pays = getAllPayments().filter(
+      p =>
+        p.status === 'paid' &&
+        orders.some(o => o.id === p.service_order_id) &&
+        new Date(p.paid_at ?? p.created_at).getTime() >= since30,
     );
-  }
+    const wallet = getWallet(tech.id);
+    return {
+      catNames: getTechCategories(tech.id)
+        .map(tc => cats.find(c => c.id === tc.category_id)?.name)
+        .filter((n): n is string => !!n),
+      rates: getTechRates(tech.id).map(r => ({
+        category_id: r.category_id,
+        cat: cats.find(c => c.id === r.category_id)?.name ?? '—',
+        visita_cents: r.visita_cents,
+        hora_cents: r.hora_cents,
+        minimo_cents: r.minimo_cents,
+      })),
+      recent: orders.slice(0, 5),
+      jobs: done.length,
+      income30: pays.reduce((s, p) => s + p.amount_cents - p.commission_cents, 0),
+      balance:
+        wallet?.available_cents ??
+        getLedger(tech.id).reduce((s, e) => s + e.amount_cents, 0),
+      sessions: getKycSessions(tech.id).sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      ),
+      docs: getTechDocuments(tech.id),
+      ratings: getTechRatings(tech.id).slice(0, 4),
+      zone: getTechMunicipality(tech.id),
+      radius: getTechRadiusKm(tech.id),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tech, extras]);
 
-  const name = profile.full_name ?? 'Técnico';
-  // ponytail: el email vive en auth.users, no en profiles — sin columna que mostrar.
-  const email = '—';
-  const suspended = profile.status === 'suspended';
-  const kyc = suspended ? 'suspended' : tech.kyc_status;
+  if (failed)
+    return (
+      <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />
+    );
+  if (!ready) return <ScreenSkeleton kind="detail" />;
+  if (!tech || !profile || !data)
+    return (
+      <ErrorPage
+        kind="404"
+        primary={{ label: 'Volver a técnicos', href: '/tecnicos' }}
+      />
+    );
 
-  const cats = getCategories();
-  const rates = getTechRates(tech.id).map(r => ({
-    ...r,
-    cat: cats.find(c => c.id === r.category_id)?.name ?? '—',
-  }));
-  const docs = getKycSessions(tech.id);
-  const pendingDocs = docs.filter(d => d.status === 'in_review' || d.status === 'in_progress');
-  const notes = getNotes(tech.id);
+  const name = profile.full_name ?? tech.display_name ?? 'Técnico';
+  const group = kycGroup(tech.kyc_status, profile.status);
+  const meta = KYC_GROUP_META[group];
+  const reviewing = group === 'in_review' || group === 'declined';
+  const latest = data.sessions[0] ?? null;
+  const submittedAt = data.docs[0]?.created_at ?? latest?.created_at ?? null;
+  const sla = slaLabel(slaRemainingHours(submittedAt));
+  const rejectNote =
+    group === 'declined'
+      ? getNotes(tech.id).find(n => n.text.startsWith('KYC rechazado'))?.text.replace('KYC rechazado — ', '')
+      : null;
+  const docsMissing = extras.unavailable.docs;
 
-  const KYC_BADGE: Record<string, { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }> = {
-    approved: { label: 'KYC aprobado', tone: 'success' },
-    not_started: { label: 'KYC sin iniciar', tone: 'warning' },
-    pending: { label: 'Pendiente de KYC', tone: 'warning' },
-    in_review: { label: 'Pendiente de KYC', tone: 'warning' },
-    declined: { label: 'KYC rechazado', tone: 'error' },
-    abandoned: { label: 'KYC abandonado', tone: 'error' },
-    resubmitted: { label: 'KYC reenviado', tone: 'warning' },
-    suspended: { label: 'Suspendido', tone: 'neutral' },
-  };
-
-  function onApprove() {
-    resolveKyc(tech!.id, true);
-    toast.success(`Técnico aprobado · ${name}`);
-  }
-  function onSuspend() {
-    suspendTechnician(tech!.id);
-    toast.success(`Técnico suspendido · ${name}`);
-  }
-  function onReactivate() {
-    reactivateTechnician(tech!.id);
-    toast.success(`Técnico reactivado · ${name}`);
-  }
-  function onSaveNote() {
-    if (!note.trim()) return;
-    addNote(tech!.id, note.trim());
-    setNote('');
-    toast.success('Nota guardada');
-  }
-  function onApproveAllDocs() {
-    resolveKyc(tech!.id, true);
-    toast.success('Verificación aprobada');
-  }
+  const approve = () =>
+    void run('approve', () => resolveKyc(tech.id, true), `Técnico aprobado · ${name}`);
 
   return (
-    <div className="flex flex-col gap-5 text-navy">
-      <FadeIn>
-        <Link href="/tecnicos" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-primary">
-          <ArrowLeft size={15} /> Volver a técnicos
-        </Link>
-      </FadeIn>
+    <div className="flex flex-col gap-4">
+      <Link
+        href="/tecnicos"
+        className="inline-flex w-fit items-center gap-1 font-sans text-[13.5px] font-semibold text-primary hover:underline"
+      >
+        <ChevronLeft size={16} /> Técnicos
+      </Link>
 
-      {/* Header */}
-      <FadeIn>
-        <div className="flex flex-wrap items-center gap-5 border-b border-line pb-5">
-          <Avatar initials={initials(name)} size={84} />
+      {/* Encabezado */}
+      <Card padded className="animate-up">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-full bg-action font-display text-[18px] font-bold text-white">
+            {initials(name)}
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display text-[26px] font-bold tracking-tight">{name}</h1>
-              <Badge tone={KYC_BADGE[kyc].tone}>{KYC_BADGE[kyc].label}</Badge>
-              {!suspended && (
-                <Badge tone={tech.is_available ? 'success' : 'neutral'}>
-                  {tech.is_available ? 'Disponible' : 'Inactivo'}
+            <h1 className="font-display text-[24px] font-extrabold tracking-[-0.5px] text-navy">
+              {name}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge tone={meta.tone}>{meta.label}</Badge>
+              {data.catNames.length > 0 && <Badge>{data.catNames.join(' · ')}</Badge>}
+              {data.zone && <Badge>{data.zone}</Badge>}
+              {group === 'approved' && (
+                <Badge tone={tech.is_available ? 'success' : 'neutral'} dot>
+                  {tech.is_available ? 'Disponible' : 'No disponible'}
                 </Badge>
               )}
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-muted">
-              <span className="inline-flex items-center gap-1.5"><Phone size={13} className="text-faint" />{profile.phone ?? '—'}</span>
-              <span className="inline-flex items-center gap-1.5"><Mail size={13} className="text-faint" />{email}</span>
-              <span className="inline-flex items-center gap-1.5"><Calendar size={13} className="text-faint" />Registrado {fecha(profile.created_at)}</span>
-              <span className="inline-flex items-center gap-1.5"><MapPin size={13} className="text-faint" />ZMG, Jalisco</span>
-            </div>
+            {group === 'in_review' && (
+              <div className="mt-2">
+                <Badge tone={sla.tone}>
+                  <Clock size={12} className="mr-1" />
+                  {sla.text}
+                </Badge>
+              </div>
+            )}
+            {rejectNote && (
+              <p className="mt-2 font-sans text-[13px] text-error">
+                <b>Motivo:</b> {rejectNote}
+              </p>
+            )}
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2.5">
-            {kyc === 'in_review' && (
+          <div className="flex flex-wrap gap-2">
+            {group === 'in_review' && (
               <>
-                <button onClick={() => setRejectOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
-                  <X size={14} /> Rechazar
-                </button>
-                <PrimaryButton onClick={onApprove}>
-                  <span className="inline-flex items-center gap-2"><Check size={14} /> Aprobar KYC</span>
-                </PrimaryButton>
+                <Button variant="destructive" disabled={!!busy} onClick={() => setRejectOpen(true)}>
+                  Rechazar
+                </Button>
+                <Button variant="approve" loading={busy === 'approve'} disabled={!!busy} onClick={approve}>
+                  Aprobar técnico
+                </Button>
               </>
             )}
-            {kyc === 'declined' && (
-              <PrimaryButton onClick={onApprove}>
-                <span className="inline-flex items-center gap-2"><Check size={14} /> Aprobar KYC</span>
-              </PrimaryButton>
+            {group === 'declined' && (
+              <Button variant="approve" icon={Check} loading={busy === 'approve'} disabled={!!busy} onClick={approve}>
+                Aprobar técnico
+              </Button>
             )}
-            {kyc === 'approved' && (
-              <button onClick={onSuspend} className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft">
-                <Ban size={14} /> Suspender
-              </button>
+            {group === 'approved' && (
+              <>
+                <Button variant="secondary" icon={Pencil} onClick={() => setEditOpen(true)}>
+                  Editar perfil
+                </Button>
+                {/* ponytail: no hay RPC de ajuste de cartera (ledger_entries es de
+                    solo lectura por API); habilitar cuando exista admin_adjust_wallet. */}
+                <Button
+                  variant="secondary"
+                  icon={Wallet}
+                  disabled
+                  title="Próximamente: el backend aún no permite ajustes manuales de cartera"
+                >
+                  Ajustar cartera
+                </Button>
+                <Button variant="destructive" icon={Ban} disabled={!!busy} onClick={() => setSuspendOpen(true)}>
+                  Suspender
+                </Button>
+              </>
             )}
-            {kyc === 'suspended' && (
-              <PrimaryButton onClick={onReactivate}>
-                <span className="inline-flex items-center gap-2"><RotateCcw size={14} /> Reactivar</span>
-              </PrimaryButton>
+            {group === 'suspended' && (
+              <Button
+                icon={RotateCcw}
+                loading={busy === 'reactivate'}
+                disabled={!!busy}
+                onClick={() =>
+                  void run('reactivate', () => reactivateTechnician(tech.id), `Técnico reactivado · ${name}`)
+                }
+              >
+                Reactivar técnico
+              </Button>
             )}
           </div>
         </div>
-      </FadeIn>
+      </Card>
 
-      {/* Two-column body */}
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.5fr_1fr]">
-        <Stagger className="flex flex-col gap-5">
-          <StaggerItem>
-            <Panel title="Datos personales" action={<ContactRound size={15} className="text-primary" />}>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <KV label="Nombre completo" value={name} />
-                <KV label="Teléfono" value={profile.phone ?? '—'} mono />
-                <KV label="Email" value={email} />
-                <KV label="Fecha de registro" value={fecha(profile.created_at)} />
-                <KV label="Estado de cuenta" value={suspended ? 'Suspendida' : 'Activa'} />
-                <KV label="Trabajos completados" value={String(tech.rating_count)} mono />
-              </div>
-            </Panel>
-          </StaggerItem>
+      {reviewing ? (
+        <>
+          {/* Documentos */}
+          <Card padded className="animate-up">
+            <CardHead title={`Documentos · enviado ${ago(submittedAt)}`} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <IneTile status={latest?.status ?? null} />
+              {data.docs.map(d => (
+                <DocTile key={d.id} doc={d} />
+              ))}
+            </div>
+            {docsMissing ? (
+              <p className="mt-3 font-sans text-[12.5px] text-muted">
+                Los documentos adicionales (antecedentes, domicilio) aún no están disponibles en
+                este entorno.
+              </p>
+            ) : (
+              data.docs.length === 0 && (
+                <p className="mt-3 font-sans text-[12.5px] text-muted">
+                  El técnico no ha subido antecedentes no penales ni comprobante de domicilio.
+                </p>
+              )
+            )}
+          </Card>
 
-          <StaggerItem>
-            <Panel title="Servicios y tarifas" action={<MapIcon size={15} className="text-primary" />}>
-              {rates.length === 0 ? (
-                <p className="py-3 text-[13px] text-faint">Sin servicios capturados todavía.</p>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card padded className="animate-up">
+              <CardHead title="Datos personales" />
+              <KV label="Teléfono" value={formatPhone(profile.phone) || '—'} mono />
+              <KV label="CURP" value={tech.curp ?? '—'} mono />
+              <KV label="RFC" value={tech.rfc ?? '—'} mono />
+              <KV label="Domicilio" value={tech.home_address ?? '—'} />
+              <KV label="Registro" value={fecha(profile.created_at)} />
+            </Card>
+            <Card padded className="animate-up">
+              <CardHead title="Verificaciones automáticas · Didit" />
+              {latest ? (
+                <>
+                  {diditChecks(latest.raw_decision).map(c => (
+                    <CheckRow key={c.label} label={c.label} ok={c.ok} />
+                  ))}
+                  <KV label="Sesión" value={latest.didit_session_id.slice(0, 12)} mono />
+                  <KV
+                    label="Estado"
+                    value={
+                      <Badge tone={latest.status === 'approved' ? 'success' : latest.status === 'declined' ? 'danger' : 'warning'}>
+                        {latest.status}
+                      </Badge>
+                    }
+                  />
+                  <KV label="Iniciada" value={fecha(latest.created_at)} />
+                </>
               ) : (
-                <div className="flex flex-col">
-                  {rates.map(r => (
-                    <div key={r.id} className="flex items-center justify-between border-b border-line/60 py-2.5 last:border-0">
-                      <div className="flex items-center gap-2.5">
-                        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-navy">{r.cat}</span>
-                        <span className="text-[13px]">Tarifa de visita</span>
-                      </div>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-[13px] text-muted">$</span>
-                        <input
-                          key={r.visita_cents}
-                          type="number"
-                          min={0}
-                          defaultValue={r.visita_cents / 100}
-                          aria-label={`Tarifa de visita · ${r.cat}`}
-                          onBlur={e => {
-                            const cents = Math.round(Number(e.target.value) * 100);
-                            if (!Number.isFinite(cents) || cents < 0 || cents === r.visita_cents) return;
-                            void upsertTechRate(tech!.id, r.category_id, {
-                              visita_cents: cents, hora_cents: r.hora_cents, minimo_cents: r.minimo_cents,
-                            }).then(ok => ok && toast.success(`Tarifa actualizada · ${r.cat}`));
-                          }}
-                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                          className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-right font-display text-[13.5px] font-semibold text-navy outline-none focus:border-primary"
-                        />
-                        <span className="text-[12px] text-muted">MXN</span>
-                      </div>
-                    </div>
+                <p className="font-sans text-[13px] text-muted">
+                  El técnico todavía no inicia la verificación de identidad.
+                </p>
+              )}
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card padded className="animate-up">
+              <CardHead title="Servicios que realiza" />
+              {data.catNames.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {data.catNames.map(c => (
+                    <Badge key={c} tone="info">
+                      {c}
+                    </Badge>
                   ))}
                 </div>
-              )}
-            </Panel>
-          </StaggerItem>
-
-          <StaggerItem>
-            <BankPanel tech={tech} />
-          </StaggerItem>
-
-          {tech.bio && (
-            <StaggerItem>
-              <Panel title="Biografía profesional" action={<Quote size={15} className="text-primary" />}>
-                <p className="text-[14px] italic leading-relaxed">“{tech.bio}”</p>
-                <div className="mt-3 font-mono text-[11.5px] text-faint">capturada por el técnico al registrarse</div>
-              </Panel>
-            </StaggerItem>
-          )}
-        </Stagger>
-
-        <Stagger className="flex flex-col gap-5">
-          <StaggerItem>
-            <Panel
-              title="Documentos KYC"
-              action={<FileCheck2 size={15} className="text-primary" />}
-            >
-              {docs.length === 0 ? (
-                <p className="py-3 text-[13px] text-faint">Sin documentos cargados aún.</p>
               ) : (
-                <div className="flex flex-col gap-2.5">
-                  {docs.map(d => (
-                    <div key={d.id} className="rounded-xl border border-line bg-surface p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-semibold leading-tight">Verificación Didit</span>
-                        <Badge tone={DOC_STATUS[d.status].tone}>{DOC_STATUS[d.status].label}</Badge>
-                      </div>
-                      <div className="my-2 font-mono text-[11px] text-faint">{d.didit_session_id} · iniciada {fecha(d.created_at)}</div>
-                      {(d.status === 'in_review' || d.status === 'in_progress') && (
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => { resolveKyc(tech!.id, true); toast.success('Verificación aprobada'); }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"
-                          >
-                            <Check size={12} /> Aprobar verificación
-                          </button>
-                          <button
-                            onClick={() => { resolveKyc(tech!.id, false); toast.error('Verificación rechazada'); }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-warning-ink"
-                          >
-                            <X size={12} /> Rechazar
-                          </button>
+                <p className="font-sans text-[13px] text-muted">Sin categorías capturadas.</p>
+              )}
+              <p className="mt-3 inline-flex items-center gap-1.5 font-sans text-[12.5px] text-muted">
+                <MapPin size={13} /> Radio de servicio: {data.radius} km
+              </p>
+            </Card>
+            <BankCard tech={tech} />
+          </div>
+          <NotesCard techId={tech.id} />
+        </>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              { l: 'Trabajos completados', v: String(data.jobs), i: Briefcase },
+              {
+                l: 'Rating',
+                v: tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : '—',
+                sub: `${tech.rating_count} reseñas`,
+                i: Star,
+              },
+              { l: 'Ingresos netos · 30 d', v: money(data.income30), i: TrendingUp },
+              { l: 'Saldo en cartera', v: money(data.balance), i: Wallet },
+            ].map(k => (
+              <Card key={k.l} padded hover className="animate-up">
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
+                    {k.l}
+                  </span>
+                  <k.i size={16} className="text-primary" />
+                </div>
+                <div className="mt-2 font-display text-[24px] font-extrabold text-navy tabular">
+                  {k.v}
+                </div>
+                {k.sub && <div className="font-sans text-[12px] text-muted">{k.sub}</div>}
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
+            <div className="flex flex-col gap-4">
+              <RatesCard techId={tech.id} rates={data.rates} />
+              <Card padded>
+                <CardHead title="Servicios recientes" />
+                {data.recent.length === 0 ? (
+                  <p className="font-sans text-[13px] text-muted">Aún no tiene servicios.</p>
+                ) : (
+                  data.recent.map(o => {
+                    const st = ORDER_STATUS[o.status] ?? { label: o.status, tone: 'neutral' as const };
+                    const client = getProfile(o.client_id)?.full_name ?? 'Cliente';
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => router.push(`/servicios/${o.id}`)}
+                        className="flex w-full items-center justify-between gap-3 border-t border-divider py-2.5 text-left first:border-t-0 hover:bg-panel"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-mono text-[12px] font-semibold text-primary">{orderCode(o.id)}</div>
+                          <div className="truncate font-sans text-[13px] text-body">
+                            {client}
+                            {o.municipality ? ` · ${o.municipality}` : ''}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {pendingDocs.length > 0 && (
-                <button
-                  onClick={onApproveAllDocs}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary/[0.06] px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft"
-                >
-                  <CheckCheck size={13} /> Aprobar los {pendingDocs.length} documentos pendientes
-                </button>
-              )}
-            </Panel>
-          </StaggerItem>
-
-          <StaggerItem>
-            <Panel title="Notas internas del admin" action={<MessageSquareText size={15} className="text-primary" />}>
-              <p className="mb-2.5 text-[12px] text-muted">Solo visibles para el equipo Tumantenimiento. El técnico no las ve.</p>
-              <Textarea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder="Anota lo que verifiques, dudas, observaciones…"
-                rows={3}
-              />
-              <div className="mt-2 flex justify-end">
-                <GhostButton onClick={onSaveNote}>
-                  <span className="inline-flex items-center gap-2"><Send size={13} /> Guardar nota</span>
-                </GhostButton>
-              </div>
-              <div className="mb-2 mt-4 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">Historial</div>
-              {notes.length === 0 ? (
-                <p className="py-2 text-[12.5px] text-faint">Sin notas todavía.</p>
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {notes.map(n => (
-                    <FadeIn key={n.id} className="rounded-xl border border-line bg-surface-2 p-3">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[12px] font-semibold">{n.author}</span>
-                        <span className="rounded bg-surface px-1.5 py-px text-[10px] text-faint">Admin</span>
-                        <span className="ml-auto font-mono text-[10.5px] text-faint">{fecha(n.created_at)}</span>
+                        <Badge tone={st.tone}>{st.label}</Badge>
+                      </button>
+                    );
+                  })
+                )}
+              </Card>
+            </div>
+            <div className="flex flex-col gap-4">
+              <Card padded>
+                <CardHead title="Reseñas recientes" />
+                {extras.unavailable.ratings ? (
+                  <p className="font-sans text-[13px] text-muted">
+                    Las reseñas por servicio aún no están disponibles en este entorno.
+                  </p>
+                ) : data.ratings.length === 0 ? (
+                  <EmptyState kind="first-use" title="Sin reseñas" description="Aparecerán cuando los clientes califiquen sus servicios." compact />
+                ) : (
+                  data.ratings.map(r => (
+                    <div key={r.id} className="border-t border-divider py-2.5 first:border-t-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-sans text-[13px] font-semibold text-navy">
+                          {getProfile(r.reviewer_id)?.full_name ?? 'Cliente'}
+                        </span>
+                        <span className="inline-flex items-center gap-0.5 text-warning" aria-label={`${r.score} de 5`}>
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <Star key={i} size={12} className={i < r.score ? 'fill-current' : 'opacity-30'} />
+                          ))}
+                        </span>
                       </div>
-                      <p className="mt-1.5 text-[12.5px] leading-snug">{n.text}</p>
-                    </FadeIn>
-                  ))}
-                </div>
-              )}
-            </Panel>
-          </StaggerItem>
-        </Stagger>
-      </div>
+                      {r.comment && <p className="mt-1 font-sans text-[13px] text-body">{r.comment}</p>}
+                      <p className="mt-0.5 font-mono text-[11px] text-faint">{fecha(r.created_at)}</p>
+                    </div>
+                  ))
+                )}
+              </Card>
+              <BankCard tech={tech} />
+              <NotesCard techId={tech.id} />
+            </div>
+          </div>
+        </>
+      )}
 
       <RejectModal
         open={rejectOpen}
         onClose={() => setRejectOpen(false)}
         techName={name}
-        email={email}
-        onConfirm={(reason, comment) => {
-          rejectKyc(tech.id, comment ? `${reason} — ${comment}` : reason);
-          setRejectOpen(false);
-          toast.success(`KYC rechazado · ${name}`);
+        busy={busy === 'reject'}
+        onConfirm={async (reason, comment) => {
+          const ok = await run(
+            'reject',
+            () => rejectKyc(tech.id, comment ? `${reason} — ${comment}` : reason),
+            `KYC rechazado · ${name}`,
+          );
+          if (ok) setRejectOpen(false);
         }}
       />
-    </div>
-  );
-}
-
-function RejectModal({ open, onClose, onConfirm, techName, email }: {
-  open: boolean; onClose: () => void; onConfirm: (reason: string, comment: string) => void;
-  techName: string; email: string;
-}) {
-  const [reason, setReason] = useState(REJECT_REASONS[0]);
-  const [comment, setComment] = useState('');
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Rechazar verificación KYC"
-      sub="Esta acción notifica al técnico por email y push. No es reversible automáticamente."
-      icon={<AlertOctagon size={17} className="text-error" />}
-      width={580}
-      footer={
-        <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <button
-            onClick={() => onConfirm(reason, comment.trim())}
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
-          >
-            <X size={14} /> Confirmar rechazo
-          </button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-5">
-        <div>
-          <div className="mb-2 text-[13px] font-medium text-navy">Motivo del rechazo</div>
-          <div className="flex flex-wrap gap-1.5">
-            {REJECT_REASONS.map(r => (
-              <button
-                key={r}
-                onClick={() => setReason(r)}
-                className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                  reason === r
-                    ? 'border-error/30 bg-error-soft font-semibold text-error'
-                    : 'border-line bg-surface text-muted hover:bg-surface-2'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="mb-2 text-[13px] font-medium text-navy">Mensaje al técnico</div>
-          <Textarea
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            rows={4}
-            placeholder={`Explícale a ${techName.split(' ')[0]} qué debe corregir para retomar su solicitud…`}
-          />
-          <div className="mt-1.5 text-[11.5px] text-muted">Se enviará por email a {email} y push en la app del técnico.</div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function BankPanel({ tech }: { tech: NonNullable<ReturnType<typeof getTechnician>> }) {
-  const [editing, setEditing] = useState(false);
-  const [clabe, setClabe] = useState(tech.clabe ?? '');
-  const [bank, setBank] = useState(tech.bank_name ?? '');
-
-  function onSave() {
-    if (clabe && !/^\d{18}$/.test(clabe)) { toast.error('La CLABE debe tener 18 dígitos'); return; }
-    void updateTechnicianBank(tech.id, bank.trim() || null, clabe || null)
-      .then(ok => { if (ok) { toast.success('Datos bancarios guardados'); setEditing(false); } });
-  }
-
-  return (
-    <Panel
-      title="Datos bancarios"
-      action={
-        editing ? (
-          <div className="flex gap-1.5">
-            <GhostButton onClick={() => { setClabe(tech.clabe ?? ''); setBank(tech.bank_name ?? ''); setEditing(false); }}>Cancelar</GhostButton>
-            <PrimaryButton onClick={onSave}>Guardar</PrimaryButton>
-          </div>
-        ) : (
-          <button onClick={() => setEditing(true)} aria-label="Editar datos bancarios" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-2">
-            <Landmark size={15} /> Editar
-          </button>
-        )
-      }
-    >
-      {editing ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">CLABE interbancaria</div>
-            <input
-              value={clabe}
-              onChange={e => setClabe(e.target.value.replace(/\D/g, '').slice(0, 18))}
-              placeholder="18 dígitos"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-[13.5px] text-navy outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Banco</div>
-            <input
-              value={bank}
-              onChange={e => setBank(e.target.value)}
-              placeholder="Nombre del banco"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] text-navy outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <KV label="CLABE interbancaria" value={fmtClabe(tech.clabe)} mono span={2} />
-          <KV label="Banco" value={tech.bank_name ?? '—'} />
-          <div>
-            <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">Estado</div>
-            {tech.clabe ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
-                <BadgeCheck size={11} /> CLABE registrada
-              </span>
-            ) : (
-              <span className="text-[13px] text-faint">Sin CLABE registrada</span>
-            )}
-          </div>
-        </div>
+      {editOpen && (
+        <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} tech={tech} fullName={name} />
       )}
-    </Panel>
-  );
-}
-
-function KV({ label, value, mono, span = 1 }: { label: string; value: string; mono?: boolean; span?: number }) {
-  return (
-    <div style={{ gridColumn: `span ${span}` }}>
-      <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-faint">{label}</div>
-      <div className={`text-[14px] font-medium text-navy ${mono ? 'font-mono' : ''}`}>{value}</div>
+      <Modal
+        open={suspendOpen}
+        onClose={() => !busy && setSuspendOpen(false)}
+        dismissible={!busy}
+        tone="danger"
+        icon={Ban}
+        title={`¿Suspender a ${name.split(' ')[0]}?`}
+        description="Dejará de recibir solicitudes y no podrá iniciar sesión hasta que lo reactives."
+        footer={
+          <>
+            <Button variant="secondary" disabled={!!busy} onClick={() => setSuspendOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              loading={busy === 'suspend'}
+              onClick={async () => {
+                const ok = await run('suspend', () => suspendTechnician(tech.id), `Técnico suspendido · ${name}`);
+                if (ok) {
+                  setSuspendOpen(false);
+                  toast.info('Puedes reactivarlo desde este mismo perfil.');
+                }
+              }}
+            >
+              Suspender
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

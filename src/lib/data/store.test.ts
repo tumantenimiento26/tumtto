@@ -25,7 +25,9 @@ describe('selectors over the world snapshot', () => {
   });
 
   it('counts services per category', () => {
-    const plumbing = store.getCategoriesWithCounts().find(c => c.slug === 'plumbing');
+    const plumbing = store
+      .getCategoriesWithCounts()
+      .find(c => c.slug === 'plumbing');
     expect(plumbing?.services).toBe(2);
   });
 
@@ -39,6 +41,35 @@ describe('selectors over the world snapshot', () => {
   });
 });
 
+describe('retiros derivados del ledger', () => {
+  // El bug: getAllPayouts leía un arreglo en memoria que en producción SIEMPRE
+  // estaba vacío, así que el panel de retiros nunca mostraba nada aunque el
+  // ledger tuviera entradas `payout` reales escritas por la app del técnico.
+  it('convierte las entradas payout del ledger en retiros, en positivo', () => {
+    const world = demoWorld();
+    world.ledger.push({
+      ...world.ledger[0],
+      id: 'led-payout-1',
+      technician_id: 'demo-tecnico',
+      entry_type: 'payout',
+      amount_cents: -80000,
+      description: 'Retiro a CLABE',
+    });
+    store.__setWorldForTests(world);
+
+    const payouts = store.getAllPayouts();
+    expect(payouts).toHaveLength(1);
+    expect(payouts[0].amount_cents).toBe(80000);
+    expect(payouts[0].technician_id).toBe('demo-tecnico');
+    expect(store.getPayouts('demo-tecnico')).toHaveLength(1);
+    expect(store.getPayouts('u-ag')).toHaveLength(0);
+  });
+
+  it('sin entradas payout el panel queda vacío (no inventa filas)', () => {
+    expect(store.getAllPayouts()).toHaveLength(0);
+  });
+});
+
 describe('session-local domains (sin tabla backend todavía)', () => {
   it('notes attach to an entity, newest first', () => {
     store.addNote('SVC-2851', 'Segunda nota');
@@ -48,18 +79,15 @@ describe('session-local domains (sin tabla backend todavía)', () => {
   });
 
   it('ticket lifecycle: create → reply (admin) → resolve', () => {
-    const t = store.createTicket({ subject: 'Prueba', requester_id: 'demo-cliente', content: 'hola' });
+    const t = store.createTicket({
+      subject: 'Prueba',
+      requester_id: 'demo-cliente',
+      content: 'hola',
+    });
     store.replyTicket(t.id, store.ADMIN_ID, 'respuesta');
     expect(store.getTicket(t.id)?.status).toBe('pending');
     store.resolveTicket(t.id);
     expect(store.getTicket(t.id)?.status).toBe('resolved');
-  });
-
-  it('payout batch processes only pending payouts and totals them', () => {
-    const { count, total } = store.processPayoutBatch();
-    expect(count).toBe(2);
-    expect(total).toBe(542000 + 318000);
-    expect(store.getAllPayouts().every(p => p.status !== 'pending')).toBe(true);
   });
 
   it('order chat is scoped and chronological', () => {
@@ -67,5 +95,15 @@ describe('session-local domains (sin tabla backend todavía)', () => {
     const msgs = store.getMessages('SVC-2851');
     expect(msgs.at(-1)?.content).toBe('mensaje admin');
     expect(store.getMessages('SVC-2835')).toHaveLength(0);
+  });
+});
+
+describe('slugify', () => {
+  it('quita acentos y ñ en vez de romper el slug', () => {
+    expect(store.slugify('Plomería')).toBe('plomeria');
+    expect(store.slugify('  Cerrajería y Señalización ')).toBe(
+      'cerrajeria-y-senalizacion',
+    );
+    expect(store.slugify('¡¡!!')).toBe('');
   });
 });

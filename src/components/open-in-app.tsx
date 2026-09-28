@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { Smartphone } from 'lucide-react';
-import { BrandMark } from '@/components/ui';
+import { Button } from '@/components/ds';
+import { AuthShell } from '@/components/auth-shell';
 import { appPath, intentUrl, schemeUrl } from '@/lib/appLinks';
 
 /**
@@ -39,31 +39,39 @@ export function OpenInApp({
   }, [fallbackUrl]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#081A33] p-4">
-      <div className="w-full max-w-[420px] rounded-[20px] bg-surface p-8 text-center shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-        <BrandMark size={44} className="mx-auto mb-5 rounded-xl" />
-        <h1 className="mb-2 font-display text-2xl font-semibold text-navy">
+    <AuthShell aside={APP_ASIDE}>
+      <div className="animate-up text-center">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-box bg-info-soft text-primary">
+          <Smartphone size={28} aria-hidden />
+        </span>
+        <h1 className="mt-5 font-display text-[27px] font-extrabold tracking-[-0.6px] text-navy">
           {title}
         </h1>
-        <p className="mb-7 text-sm text-muted">{body}</p>
-        <div className="flex flex-col gap-3">
+        <p className="mx-auto mt-2 max-w-[360px] text-[14.5px] leading-relaxed text-muted">
+          {body}
+        </p>
+        <div className="mt-7 flex flex-col gap-3">
           {appHref && (
-            <a
-              href={appHref}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-white transition-all hover:bg-primary-2"
-            >
-              <Smartphone size={17} />
+            <Button size="lg" full icon={Smartphone} href={appHref}>
               Abrir en la app
-            </a>
+            </Button>
           )}
-          <Link
-            href={fallbackUrl}
-            className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-line px-4 py-3 text-sm font-semibold text-navy transition-colors hover:bg-surface-2"
-          >
+          <Button size="lg" full variant="secondary" href={fallbackUrl}>
             {fallbackLabel}
-          </Link>
+          </Button>
         </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }
+
+const APP_ASIDE = {
+  kicker: 'Servicios a domicilio · ZMG',
+  title: 'Tu casa en buenas manos.',
+  lead: 'Solicita, sigue y paga tus servicios desde la app. Técnicos verificados en toda la ZMG.',
+  bullets: [
+    'Técnicos verificados uno por uno',
+    'Pago protegido al terminar',
+    'Garantía de 30 días por escrito',
+  ],
+};

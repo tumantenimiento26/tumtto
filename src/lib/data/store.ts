@@ -1035,3 +1035,278 @@ export async function listOrderEvidence(
   );
 }
 // ── fin consola-b ────────────────────────────────────────────────────────────
+
+// ══ consola-c · extras (técnicos / regiones / finanzas) ═════════════════════
+// Tablas que el snapshot principal no carga y que el tipado generado aún no
+// incluye (technician_documents, payout_requests, coverage_zones,
+// order_ratings, technician_wallet_summaries, technician_locations). Cada
+// dominio carga por separado: si una tabla no existe en el entorno (p. ej.
+// producción sin las migraciones del PR #4) solo ese bloque queda
+// "no disponible" y el resto de la consola sigue funcionando.
+// ponytail: tablas sin tipos generados → consulta sin tipar y cast a la fila
+// local; regenerar supabase.ts (gen:types) al desplegar y quitar RawQuery.
+
+type RawResult = { data: unknown; error: unknown };
+interface RawQuery extends PromiseLike<RawResult> {
+  select(columns?: string): RawQuery;
+  eq(column: string, value: unknown): RawQuery;
+  in(column: string, values: unknown[]): RawQuery;
+  order(column: string, opts?: { ascending?: boolean }): RawQuery;
+  update(values: Record<string, unknown>): RawQuery;
+}
+const rawFrom = (table: string) =>
+  (supabase as unknown as { from: (t: string) => RawQuery }).from(table);
+
+export interface TechDocument {
+  id: string;
+  technician_id: string;
+  kind: 'criminal_record' | 'proof_of_address' | 'bank_statement';
+  bucket_id: string;
+  storage_path: string;
+  issued_on: string | null;
+  review_status: 'pending' | 'approved' | 'rejected';
+  review_notes: string | null;
+  created_at: string;
+}
+export interface PayoutRequest {
+  id: string;
+  technician_id: string;
+  amount_cents: number;
+  status:
+    | 'pending'
+    | 'approved'
+    | 'processing'
+    | 'paid'
+    | 'failed'
+    | 'cancelled'
+    | 'held';
+  stripe_account_id: string | null;
+  failure_reason: string | null;
+  approved_at: string | null;
+  created_at: string;
+}
+export interface CoverageZone {
+  id: string;
+  slug: string;
+  name: string;
+  is_active: boolean;
+}
+export interface OrderRating {
+  id: string;
+  service_order_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  score: number;
+  comment: string | null;
+  created_at: string;
+}
+export interface WalletSummary {
+  technician_id: string;
+  balance_cents: number;
+  held_cents: number;
+  paid_out_cents: number;
+  available_cents: number;
+}
+export type TechLocation = Database['public']['Tables']['technician_locations']['Row'];
+
+type ExtraKey = 'docs' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations';
+interface ExtrasState {
+  docs: TechDocument[];
+  payouts: PayoutRequest[];
+  zones: CoverageZone[];
+  ratings: OrderRating[];
+  wallets: WalletSummary[];
+  locations: TechLocation[];
+  /** Dominios que no se pudieron leer (tabla ausente o sin permiso). */
+  unavailable: Partial<Record<ExtraKey, boolean>>;
+  loaded: boolean;
+}
+
+export const useExtras = create<ExtrasState>(() => ({
+  docs: [],
+  payouts: [],
+  zones: [],
+  ratings: [],
+  wallets: [],
+  locations: [],
+  unavailable: {},
+  loaded: false,
+}));
+
+const EXTRA_QUERIES: Record<ExtraKey, () => PromiseLike<RawResult>> = {
+  docs: () =>
+    rawFrom('technician_documents')
+      .select(
+        'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,created_at',
+      )
+      .order('created_at', { ascending: false }),
+  payouts: () =>
+    rawFrom('payout_requests')
+      .select(
+        'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,approved_at,created_at',
+      )
+      .order('created_at', { ascending: false }),
+  // geom (PostGIS) no se pide: solo lo que la consola muestra.
+  zones: () => rawFrom('coverage_zones').select('id,slug,name,is_active'),
+  ratings: () =>
+    rawFrom('order_ratings')
+      .select('id,service_order_id,reviewer_id,reviewee_id,score,comment,created_at')
+      .order('created_at', { ascending: false }),
+  wallets: () => rawFrom('technician_wallet_summaries').select('*'),
+  locations: () => rawFrom('technician_locations').select('*'),
+};
+
+let extrasInflight: Promise<void> | null = null;
+
+/** Carga (o recarga) las tablas extra; cada una falla por separado. */
+export function loadExtras(force = false): Promise<void> {
+  if (extrasInflight) return extrasInflight;
+  if (!force && useExtras.getState().loaded) return Promise.resolve();
+  extrasInflight = (async () => {
+    const keys = Object.keys(EXTRA_QUERIES) as ExtraKey[];
+    const results = await Promise.all(
+      keys.map(async k => {
+        try {
+          const { data, error } = await EXTRA_QUERIES[k]();
+          if (error) throw error;
+          return [k, (data ?? []) as unknown[], false] as const;
+        } catch (e) {
+          console.warn(`[data] extras.${k} no disponible`, e);
+          return [k, [] as unknown[], true] as const;
+        }
+      }),
+    );
+    const next: Partial<ExtrasState> = { unavailable: {}, loaded: true };
+    for (const [k, rows, missing] of results) {
+      (next as Record<string, unknown>)[k] = rows;
+      if (missing) next.unavailable![k] = true;
+    }
+    useExtras.setState(next);
+  })().finally(() => {
+    extrasInflight = null;
+  });
+  return extrasInflight;
+}
+
+export const getTechDocuments = (techId: string) =>
+  useExtras.getState().docs.filter(d => d.technician_id === techId);
+export const getTechLocation = (techId: string) =>
+  useExtras.getState().locations.find(l => l.technician_id === techId) ?? null;
+export const getTechRatings = (techId: string) =>
+  useExtras.getState().ratings.filter(r => r.reviewee_id === techId);
+export const getWallet = (techId: string) =>
+  useExtras.getState().wallets.find(x => x.technician_id === techId) ?? null;
+
+/** Radio de servicio del técnico en km (columna del PR #4; default del setting). */
+export function getTechRadiusKm(techId: string): number {
+  const t = getTechnician(techId) as
+    | (ReturnType<typeof getTechnician> & { service_radius_m?: number | null })
+    | null;
+  const m =
+    t?.service_radius_m ?? getSettingInt('default_match_radius_m', 15000);
+  return Math.round(m / 100) / 10;
+}
+
+/** Municipio base: zona asignada (technicians.zone_id) o ubicación registrada. */
+export function getTechMunicipality(techId: string): string | null {
+  const t = getTechnician(techId) as
+    | (ReturnType<typeof getTechnician> & { zone_id?: string | null })
+    | null;
+  const zone = t?.zone_id
+    ? useExtras.getState().zones.find(z => z.id === t.zone_id)
+    : null;
+  return zone?.name ?? getTechLocation(techId)?.municipality ?? null;
+}
+
+/** URL firmada (10 min) de un documento KYC para abrirlo en otra pestaña. */
+export async function getDocumentUrl(doc: TechDocument): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(doc.bucket_id)
+    .createSignedUrl(doc.storage_path, 600);
+  if (error || !data?.signedUrl) {
+    notifyError('No se pudo abrir el documento.');
+    return null;
+  }
+  return data.signedUrl;
+}
+
+/** Tras escribir: recarga snapshot + extras. */
+async function mutateExtras<R>(
+  fn: () => Promise<R>,
+  errMsg: string | ((e: unknown) => string),
+): Promise<R | null> {
+  const r = await mutate(fn, errMsg);
+  if (r !== null) await loadExtras(true);
+  return r;
+}
+
+/** Aprueba un retiro pendiente (admin; RLS payout_requests_admin_update). */
+export const approvePayout = (id: string) =>
+  mutateExtras(
+    async () => {
+      const { data: auth } = await supabase.auth.getSession();
+      const { error } = await rawFrom('payout_requests')
+        .update({
+          status: 'approved',
+          approved_by: auth.session?.user.id ?? null,
+          approved_at: now(),
+        })
+        .eq('id', id)
+        .eq('status', 'pending');
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo aprobar el retiro.'),
+  );
+
+/** Envía un retiro aprobado por Stripe (edge function stripe-create-payout). */
+export const sendPayout = (id: string) =>
+  mutateExtras(
+    async () => {
+      const { data, error } = await supabase.functions.invoke(
+        'stripe-create-payout',
+        { body: { payout_request_id: id } },
+      );
+      if (error) throw error;
+      return data ?? true;
+    },
+    'No se pudo enviar el retiro por Stripe. Revisa la cuenta conectada del técnico.',
+  );
+
+/** Activa/desactiva una zona de cobertura (admin; coverage_zones_admin). */
+export const setZoneActive = (id: string, active: boolean) =>
+  mutateExtras(
+    async () => {
+      const { error } = await rawFrom('coverage_zones')
+        .update({ is_active: active })
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo actualizar la zona.'),
+  );
+
+/** Edita el perfil público del técnico (nombre visible y bio) y su nombre. */
+export async function updateTechnicianProfile(
+  techId: string,
+  input: { full_name: string; display_name: string; bio: string | null },
+) {
+  return mutate(
+    async () => {
+      const { error: pe } = await supabase
+        .from('profiles')
+        .update({ full_name: input.full_name })
+        .eq('id', techId);
+      if (pe) throw pe;
+      const { error } = await supabase
+        .from('technicians')
+        .update({ display_name: input.display_name, bio: input.bio })
+        .eq('id', techId);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar el perfil.'),
+  );
+}
+
+// ══ fin consola-c · extras ══════════════════════════════════════════════════

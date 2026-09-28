@@ -1,518 +1,558 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  MapPin,
-  FolderTree,
-  Star,
-  X,
+  SlidersHorizontal,
   Download,
+  Eye,
   Check,
-  ShieldCheck,
-  ShieldAlert,
-  UserCheck,
-  Users,
+  X,
+  Copy,
+  Star,
 } from 'lucide-react';
 import {
-  PageHeading,
-  Panel,
-  StatCard,
-  DataTable,
-  exportCsv,
-  LoadFailed,
-  type Column,
-} from '@/components/admin';
-import {
-  Avatar,
   Badge,
+  Button,
   Chip,
-  Stars,
+  DataTable,
+  EmptyState,
+  ErrorPage,
   Input,
-  PrimaryButton,
-  Skeleton,
-} from '@/components/ui';
-import { FadeIn } from '@/components/motion';
-import { toast } from '@/components/toast';
+  Modal,
+  PageHeader,
+  ScreenSkeleton,
+  Segmented,
+  Sheet,
+  Tabs,
+  Card,
+  Kicker,
+  toast,
+  type DataColumn,
+} from '@/components/ds';
+import { exportCsv } from '@/components/admin';
 import { useAction } from '@/components/use-action';
 import {
   getTechniciansWithProfile,
   getTechCategories,
   getCategories,
+  getAllRequests,
+  getTechMunicipality,
+  loadExtras,
   resolveKyc,
   rejectKyc,
+  useExtras,
   useTick,
   useWorldReady,
   useWorldFailed,
   loadWorld,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
-
-type Kyc = 'approved' | 'in_review' | 'declined' | 'suspended';
+import {
+  KYC_GROUP_META,
+  activeFilterCount,
+  filterTechs,
+  initials,
+  kycGroup,
+  type KycGroup,
+  type TechListFilters,
+} from '@/lib/techConsole';
 
 interface Row {
   id: string;
   name: string;
   phone: string;
   cats: string[];
-  region: string;
+  zone: string;
   rating: number;
   reviews: number;
   jobs: number;
   available: boolean;
-  kyc: Kyc;
+  kyc: KycGroup;
 }
 
-const REGIONS = [
-  'Todas',
-  'Guadalajara',
-  'Zapopan',
-  'Tlaquepaque',
-  'Tonalá',
-  'Tlajomulco',
-  'El Salto',
-];
+const DONE = new Set(['completed', 'paid', 'closed']);
+const ORDER_OPTIONS = [
+  { value: 'rating', label: 'Mejor rating' },
+  { value: 'jobs', label: 'Más trabajos' },
+  { value: 'name', label: 'Nombre A–Z' },
+] as const;
+type OrderKey = (typeof ORDER_OPTIONS)[number]['value'];
 
-const KYC_META: Record<
-  Kyc,
-  { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' }
-> = {
-  approved: { label: 'Aprobado', tone: 'success' },
-  in_review: { label: 'Pendiente', tone: 'warning' },
-  declined: { label: 'Rechazado', tone: 'error' },
-  suspended: { label: 'Suspendido', tone: 'neutral' },
+const EMPTY_FILTERS: TechListFilters = {
+  tab: 'all',
+  q: '',
+  category: null,
+  zones: [],
+  minRating: 0,
+  availability: 'all',
 };
-
-// ponytail: la región del técnico no existe en el esquema demo — mapa presentacional.
-// ponytail: no hay columna de región en technicians — se muestra '—' hasta que exista.
-const TECH_REGION: Record<string, string> = {
-  'u-carla': 'Guadalajara',
-  'u-miguel': 'Tlaquepaque',
-  'u-jose': 'Guadalajara',
-  'u-lupita': 'Zapopan',
-  'u-fer': 'Tonalá',
-  'u-luis': 'Guadalajara',
-  'u-ivan': 'El Salto',
-  'u-roberto': 'Guadalajara',
-};
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(s => s[0])
-    .join('')
-    .toUpperCase();
-}
-
-function SkeletonRows({ rows = 6 }: { rows?: number }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full" />
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function TecnicosPage() {
   const tick = useTick();
-  const { busy, run } = useAction();
+  const extras = useExtras();
   const router = useRouter();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const [query, setQuery] = useState('');
-  const [region, setRegion] = useState('Todas');
-  const [category, setCategory] = useState('Todas');
-  const [tab, setTab] = useState<'all' | Kyc>('all');
+  const { busy, run } = useAction();
+  const [f, setF] = useState<TechListFilters>(EMPTY_FILTERS);
+  const [order, setOrder] = useState<OrderKey>('rating');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [draft, setDraft] = useState<TechListFilters>(EMPTY_FILTERS);
+  const [rejecting, setRejecting] = useState<Row | null>(null);
+
+  useEffect(() => {
+    void loadExtras();
+  }, []);
 
   const rows = useMemo<Row[]>(() => {
     const cats = getCategories();
+    const orders = getAllRequests();
     return getTechniciansWithProfile().map(({ tech, profile }) => {
-      const catNames = [
+      const names = [
         ...new Set(
-          getTechCategories(tech.id).map(
-            tc => cats.find(c => c.id === tc.category_id)?.name ?? '—',
-          ),
+          getTechCategories(tech.id)
+            .map(tc => cats.find(c => c.id === tc.category_id)?.name)
+            .filter((n): n is string => !!n),
         ),
       ];
       return {
         id: tech.id,
-        name: profile?.full_name ?? 'Técnico',
-        phone: formatPhone(profile?.phone),
-        cats: catNames.length ? catNames : ['General'],
-        region: TECH_REGION[tech.id] ?? '—',
+        name: profile?.full_name ?? tech.display_name ?? 'Técnico',
+        phone: formatPhone(profile?.phone) || '—',
+        cats: names,
+        zone: getTechMunicipality(tech.id) ?? '—',
         rating: tech.rating_avg,
         reviews: tech.rating_count,
-        jobs: tech.rating_count,
+        jobs: orders.filter(
+          o => o.technician_id === tech.id && DONE.has(o.status),
+        ).length,
         available: tech.is_available,
-        kyc:
-          profile?.status === 'suspended'
-            ? 'suspended'
-            : tech.kyc_status === 'approved'
-              ? 'approved'
-              : tech.kyc_status === 'declined'
-                ? 'declined'
-                : 'in_review',
+        kyc: kycGroup(tech.kyc_status, profile?.status),
       };
     });
+    // `tick`/extras: el snapshot vive en el módulo del store.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [tick, extras]);
 
   const categoryNames = useMemo(
-    () => ['Todas', ...getCategories().map(c => c.name)],
-    // `tick` es el disparador deliberado: getCategories() lee el snapshot del
-    // módulo, así que la lista se recalcula cuando el mundo se recarga.
+    () => getCategories().map(c => c.name),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tick],
   );
+  const zoneNames = useMemo(
+    () => [...new Set(rows.map(r => r.zone).filter(z => z !== '—'))].sort(),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter(r => {
-      if (tab !== 'all' && r.kyc !== tab) return false;
-      if (region !== 'Todas' && r.region !== region) return false;
-      if (category !== 'Todas' && !r.cats.includes(category)) return false;
-      if (q && !`${r.name} ${r.phone}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [rows, query, region, category, tab]);
+    const list = filterTechs(rows, f);
+    const by: Record<OrderKey, (a: Row, b: Row) => number> = {
+      rating: (a, b) => b.rating - a.rating,
+      jobs: (a, b) => b.jobs - a.jobs,
+      name: (a, b) => a.name.localeCompare(b.name, 'es'),
+    };
+    return [...list].sort(by[order]);
+  }, [rows, f, order]);
 
-  const total = rows.length;
-  const activos = rows.filter(r => r.kyc === 'approved' && r.available).length;
-  const pendientes = rows.filter(r => r.kyc === 'in_review').length;
-
-  const tabs: { id: 'all' | Kyc; label: string; count: number }[] = [
-    { id: 'all', label: 'Todos', count: total },
-    { id: 'in_review', label: 'Pendientes de KYC', count: pendientes },
-    {
-      id: 'approved',
-      label: 'Aprobados',
-      count: rows.filter(r => r.kyc === 'approved').length,
-    },
-    {
-      id: 'declined',
-      label: 'Rechazados',
-      count: rows.filter(r => r.kyc === 'declined').length,
-    },
-    {
-      id: 'suspended',
-      label: 'Suspendidos',
-      count: rows.filter(r => r.kyc === 'suspended').length,
-    },
+  const count = (k: KycGroup) => rows.filter(r => r.kyc === k).length;
+  const tabs = [
+    { value: 'all' as const, label: 'Todos', count: rows.length },
+    { value: 'in_review' as const, label: 'Pendientes KYC', count: count('in_review') },
+    { value: 'approved' as const, label: 'Aprobados', count: count('approved') },
+    { value: 'declined' as const, label: 'Rechazados', count: count('declined') },
+    { value: 'suspended' as const, label: 'Suspendidos', count: count('suspended') },
   ];
+  const nFilters = activeFilterCount(f);
 
-  function onExport() {
+  const approve = (r: Row) =>
+    void run(`approve-${r.id}`, () => resolveKyc(r.id, true), `Técnico aprobado · ${r.name}`);
+
+  function onExport(list: Row[]) {
     exportCsv(
       'tecnicos.csv',
-      filtered.map(r => ({
+      list.map(r => ({
         ID: r.id,
         Nombre: r.name,
         Teléfono: r.phone,
-        Categorías: r.cats.join(' / '),
-        Región: r.region,
+        Especialidades: r.cats.join(' / '),
+        Zona: r.zone,
         Rating: r.rating || '',
         Trabajos: r.jobs,
         Disponible: r.available ? 'Sí' : 'No',
-        KYC: KYC_META[r.kyc].label,
+        KYC: KYC_GROUP_META[r.kyc].label,
       })),
     );
-    toast.success(`CSV exportado · ${filtered.length} técnicos`);
+    toast.success('CSV exportado', `${list.length} técnicos`);
   }
 
-  const columns: Column<Row>[] = [
+  const columns: DataColumn<Row>[] = [
     {
-      key: 'tech',
+      key: 'name',
       header: 'Técnico',
+      sortValue: r => r.name,
       render: r => (
-        <div className="flex items-center gap-3">
-          <Avatar initials={initials(r.name)} size={36} />
-          <div>
-            <div className="text-[13.5px] font-semibold text-navy">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-action font-display text-[12.5px] font-bold text-white">
+            {initials(r.name)}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate font-sans text-[13.5px] font-semibold text-navy">
               {r.name}
             </div>
-            <div className="mt-0.5 font-mono text-[11.5px] text-muted">
-              {r.phone}
-            </div>
+            <div className="font-mono text-[11.5px] text-muted">{r.phone}</div>
           </div>
         </div>
-      ),
-    },
-    {
-      key: 'kyc',
-      header: 'Estado KYC',
-      render: r => (
-        <Badge tone={KYC_META[r.kyc].tone}>{KYC_META[r.kyc].label}</Badge>
       ),
     },
     {
       key: 'cats',
-      header: 'Categorías',
+      header: 'Especialidades',
       render: r => (
-        <div className="flex flex-wrap gap-1.5">
-          {r.cats.slice(0, 2).map(c => (
-            <span
-              key={c}
-              className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-navy"
-            >
-              {c}
-            </span>
-          ))}
+        <span className="font-sans text-[13px] text-body">
+          {r.cats.length ? r.cats.slice(0, 2).join(' · ') : '—'}
           {r.cats.length > 2 && (
-            <span className="rounded-full border border-line bg-canvas px-2.5 py-0.5 text-[11.5px] font-medium text-muted">
-              +{r.cats.length - 2}
-            </span>
+            <span className="text-muted"> +{r.cats.length - 2}</span>
           )}
-        </div>
+        </span>
       ),
     },
     {
-      key: 'region',
-      header: 'Región',
-      render: r => <span className="text-[13px] text-navy">{r.region}</span>,
+      key: 'zone',
+      header: 'Zona',
+      sortValue: r => r.zone,
+      render: r => <span className="font-sans text-[13px] text-muted">{r.zone}</span>,
     },
     {
       key: 'rating',
       header: 'Rating',
+      sortValue: r => r.rating,
       render: r =>
         r.rating > 0 ? (
-          <div className="flex items-center gap-2">
-            <Stars value={r.rating} />
-            <span className="text-[13px] font-semibold text-navy">
-              {r.rating.toFixed(1)}
-            </span>
-            <span className="text-[12px] text-faint">({r.reviews})</span>
-          </div>
+          <span className="inline-flex items-center gap-1 font-display text-[13.5px] font-bold text-navy tabular">
+            <Star size={13} className="fill-navy text-navy" />
+            {r.rating.toFixed(1)}
+          </span>
         ) : (
-          <span className="text-[12px] italic text-faint">sin reseñas</span>
+          <span className="font-sans text-[12px] text-faint">Sin reseñas</span>
         ),
     },
     {
       key: 'jobs',
       header: 'Trabajos',
+      align: 'right',
+      sortValue: r => r.jobs,
       render: r => (
-        <span className="font-mono text-[13px] text-navy">{r.jobs}</span>
+        <span className="font-display text-[13.5px] font-bold text-navy tabular">
+          {r.jobs}
+        </span>
       ),
     },
     {
       key: 'avail',
       header: 'Disponibilidad',
+      sortValue: r => (r.available ? 1 : 0),
       render: r => (
-        <Badge tone={r.available ? 'success' : 'neutral'}>
-          {r.available ? 'Disponible' : 'Inactivo'}
-        </Badge>
+        <span className="inline-flex items-center gap-2 font-sans text-[13px] text-body">
+          <span
+            className={`h-2 w-2 rounded-full ${r.available ? 'bg-success' : 'bg-faint'}`}
+          />
+          {r.available ? 'Disponible' : 'No disponible'}
+        </span>
       ),
     },
     {
-      key: 'actions',
-      header: '',
-      className: 'text-right',
+      key: 'kyc',
+      header: 'Estado',
+      sortValue: r => r.kyc,
       render: r => (
-        <div className="flex items-center justify-end gap-1.5">
-          {r.kyc === 'in_review' && (
-            <>
-              <button
-                disabled={!!busy}
-                onClick={e => {
-                  e.stopPropagation();
-                  void run(
-                    `approve-${r.id}`,
-                    () => resolveKyc(r.id, true),
-                    `Técnico aprobado · ${r.name}`,
-                  );
-                }}
-                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11.5px] font-semibold text-success hover:bg-success/15"
-              >
-                <Check size={12} /> Aprobar
-              </button>
-              <button
-                disabled={!!busy}
-                onClick={e => {
-                  e.stopPropagation();
-                  if (!window.confirm(`¿Rechazar el KYC de ${r.name}?`)) return;
-                  void run(
-                    `reject-${r.id}`,
-                    () => rejectKyc(r.id, 'Rechazo rápido desde el listado'),
-                    `KYC rechazado · ${r.name}`,
-                  );
-                }}
-                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-error/30 bg-error/10 px-2.5 py-1 text-[11.5px] font-semibold text-error hover:bg-error/15"
-              >
-                <X size={12} /> Rechazar
-              </button>
-            </>
-          )}
-        </div>
+        <Badge tone={KYC_GROUP_META[r.kyc].tone}>{KYC_GROUP_META[r.kyc].label}</Badge>
       ),
     },
   ];
 
-  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
-  if (!ready) return <SkeletonRows />;
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready) return <ScreenSkeleton kind="list" />;
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading
+      <PageHeader
         title="Técnicos"
-        sub="Gestión y verificación de prestadores de servicio · ZMG"
+        description="Red PRO y cola de verificación. Meta: resolver cada KYC en menos de 24 h hábiles."
         actions={
-          <PrimaryButton onClick={onExport}>
-            <span className="inline-flex items-center gap-2">
-              <Download size={14} /> Exportar CSV
-            </span>
-          </PrimaryButton>
+          <Button variant="secondary" icon={Download} onClick={() => onExport(filtered)}>
+            Exportar
+          </Button>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          index={0}
-          label="Total de técnicos"
-          value={total}
-          icon={Users}
-          note="Roster completo ZMG"
-        />
-        <StatCard
-          index={1}
-          label="Activos y disponibles"
-          value={activos}
-          icon={UserCheck}
-          trend="up"
-          delta="+3"
-          note="vs. semana pasada"
-        />
-        <StatCard
-          index={2}
-          label="KYC pendiente"
-          value={pendientes}
-          icon={ShieldAlert}
-          note="Requieren revisión"
-        />
-        <StatCard
-          index={3}
-          label="Tasa de aprobación"
-          value={94}
-          suffix="%"
-          icon={ShieldCheck}
-          trend="up"
-          delta="+1.2%"
-        />
-      </div>
+      <Card padded={false} className="overflow-hidden">
+        <div className="border-b border-line px-5 pt-3">
+          <Tabs
+            tabs={tabs}
+            value={f.tab}
+            onChange={tab => setF(p => ({ ...p, tab }))}
+          />
+        </div>
 
-      <FadeIn>
-        <Panel>
-          {/* Tabs */}
-          <div className="-mx-4 flex gap-6 overflow-x-auto border-b border-line px-4 sm:-mx-5 sm:px-5">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap pb-3.5 pt-1 text-[13.5px] ${tab === t.id ? 'font-semibold text-cyan' : 'font-medium text-muted'}`}
-              >
-                <span>{t.label}</span>
-                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">
-                  {t.count.toLocaleString('es-MX')}
+        <div className="flex flex-col gap-3 p-5 pb-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              icon={Search}
+              value={f.q}
+              onChange={e => setF(p => ({ ...p, q: e.target.value }))}
+              placeholder="Nombre, teléfono o zona"
+              wrapperClassName="w-full max-w-sm"
+              aria-label="Buscar técnicos"
+            />
+            <Button
+              variant="secondary"
+              icon={SlidersHorizontal}
+              onClick={() => {
+                setDraft(f);
+                setSheetOpen(true);
+              }}
+            >
+              Filtros
+              {nFilters > 0 && (
+                <span className="ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] text-white">
+                  {nFilters}
                 </span>
-                {tab === t.id && (
-                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded bg-cyan" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-3 py-4">
-            <div className="relative w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-xs">
-              <Search
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
-              />
-              <Input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Buscar por nombre o teléfono"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
-              <MapPin size={14} className="text-cyan" />
-              <span className="text-[12px] text-muted">Región:</span>
-              <select
-                value={region}
-                onChange={e => setRegion(e.target.value)}
-                className="bg-transparent text-[13px] font-medium text-navy outline-none"
-              >
-                {REGIONS.map(r => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
-              <FolderTree size={14} className="text-cyan" />
-              <span className="text-[12px] text-muted">Categoría:</span>
-              <select
-                value={category}
-                onChange={e => setCategory(e.target.value)}
-                className="bg-transparent text-[13px] font-medium text-navy outline-none"
-              >
-                {categoryNames.map(c => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
-              <Star size={14} className="text-warning" /> Rating ≥{' '}
-              <span className="font-mono font-semibold text-navy">3.8</span>
-            </div>
-            {(query ||
-              region !== 'Todas' ||
-              category !== 'Todas' ||
-              tab !== 'all') && (
-              <Chip
-                onClick={() => {
-                  setQuery('');
-                  setRegion('Todas');
-                  setCategory('Todas');
-                  setTab('all');
-                }}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <X size={13} /> Limpiar filtros
-                </span>
-              </Chip>
+              )}
+            </Button>
+            {(nFilters > 0 || f.q || f.category) && (
+              <Button variant="ghost" size="sm" onClick={() => setF(p => ({ ...EMPTY_FILTERS, tab: p.tab }))}>
+                Limpiar
+              </Button>
             )}
           </div>
 
-          <DataTable
-            columns={columns}
-            rows={filtered}
-            onRowClick={r => router.push(`/tecnicos/${r.id}`)}
-            empty="No hay técnicos que coincidan con los filtros."
-          />
+          {/* Chips de filtros activos */}
+          {nFilters > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {f.zones.map(z => (
+                <Chip key={z} onRemove={() => setF(p => ({ ...p, zones: p.zones.filter(x => x !== z) }))}>
+                  {z}
+                </Chip>
+              ))}
+              {f.minRating > 0 && (
+                <Chip onRemove={() => setF(p => ({ ...p, minRating: 0 }))}>
+                  Rating ≥ {f.minRating.toFixed(1)}
+                </Chip>
+              )}
+              {f.availability !== 'all' && (
+                <Chip onRemove={() => setF(p => ({ ...p, availability: 'all' }))}>
+                  {f.availability === 'available' ? 'Disponibles' : 'No disponibles'}
+                </Chip>
+              )}
+            </div>
+          )}
 
-          <div className="flex items-center justify-between pt-4 text-[12.5px] text-muted">
-            <span>
-              Mostrando{' '}
-              <b className="font-semibold text-navy">{filtered.length}</b> de{' '}
-              <b className="font-semibold text-navy">{total}</b> técnicos
-            </span>
+          {/* Categorías */}
+          <div className="flex flex-wrap gap-2">
+            <Chip active={!f.category} onClick={() => setF(p => ({ ...p, category: null }))}>
+              Todas
+            </Chip>
+            {categoryNames.map(c => (
+              <Chip
+                key={c}
+                active={f.category === c}
+                onClick={() => setF(p => ({ ...p, category: p.category === c ? null : c }))}
+              >
+                {c}
+              </Chip>
+            ))}
           </div>
-        </Panel>
-      </FadeIn>
+        </div>
+
+        <DataTable
+          rows={filtered}
+          rowKey={r => r.id}
+          columns={columns}
+          onRowClick={r => router.push(`/tecnicos/${r.id}`)}
+          selectable
+          bulkActions={(selected, clear) => (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Download}
+              onClick={() => {
+                onExport(selected);
+                clear();
+              }}
+            >
+              Exportar {selected.length}
+            </Button>
+          )}
+          rowMenu={r => [
+            { label: 'Ver perfil', icon: Eye, onSelect: () => router.push(`/tecnicos/${r.id}`) },
+            {
+              label: 'Copiar teléfono',
+              icon: Copy,
+              onSelect: () => {
+                void navigator.clipboard?.writeText(r.phone).then(
+                  () => toast.success('Teléfono copiado'),
+                  () => toast.error('No se pudo copiar'),
+                );
+              },
+            },
+            ...(r.kyc === 'in_review'
+              ? ([
+                  'divider',
+                  { label: 'Aprobar KYC', icon: Check, disabled: !!busy, onSelect: () => approve(r) },
+                  { label: 'Rechazar KYC', icon: X, destructive: true, disabled: !!busy, onSelect: () => setRejecting(r) },
+                ] as const)
+              : []),
+          ]}
+          pageSize={8}
+          empty={
+            <EmptyState
+              kind="no-results"
+              title="Sin técnicos con estos filtros"
+              description="Prueba con otra zona, categoría o quita el rating mínimo."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setF(EMPTY_FILTERS)}>
+                  Limpiar filtros
+                </Button>
+              }
+              compact
+            />
+          }
+        />
+      </Card>
+
+      {/* Filtros */}
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Filtros"
+        kicker="Técnicos"
+        width={400}
+        footer={
+          <div className="flex w-full gap-2">
+            <Button
+              variant="secondary"
+              full
+              onClick={() => setDraft(d => ({ ...d, zones: [], minRating: 0, availability: 'all' }))}
+            >
+              Limpiar
+            </Button>
+            <Button
+              full
+              onClick={() => {
+                setF(draft);
+                setSheetOpen(false);
+              }}
+            >
+              Aplicar
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <section>
+            <Kicker className="mb-2.5">Zona</Kicker>
+            {zoneNames.length ? (
+              <div className="flex flex-wrap gap-2">
+                {zoneNames.map(z => (
+                  <Chip
+                    key={z}
+                    active={draft.zones.includes(z)}
+                    onClick={() =>
+                      setDraft(d => ({
+                        ...d,
+                        zones: d.zones.includes(z) ? d.zones.filter(x => x !== z) : [...d.zones, z],
+                      }))
+                    }
+                  >
+                    {z}
+                  </Chip>
+                ))}
+              </div>
+            ) : (
+              <p className="font-sans text-[13px] text-muted">
+                Ningún técnico tiene base registrada todavía.
+              </p>
+            )}
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Rating mínimo</Kicker>
+            <Segmented
+              options={[
+                { value: '0', label: 'Todos' },
+                { value: '4', label: '4.0+' },
+                { value: '4.5', label: '4.5+' },
+                { value: '4.8', label: '4.8+' },
+              ]}
+              value={String(draft.minRating)}
+              onChange={v => setDraft(d => ({ ...d, minRating: Number(v) }))}
+            />
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Disponibilidad</Kicker>
+            <Segmented
+              options={[
+                { value: 'all', label: 'Todas' },
+                { value: 'available', label: 'Disponibles' },
+                { value: 'unavailable', label: 'No disponibles' },
+              ]}
+              value={draft.availability}
+              onChange={v => setDraft(d => ({ ...d, availability: v }))}
+            />
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Ordenar por</Kicker>
+            <Segmented
+              options={ORDER_OPTIONS}
+              value={order}
+              onChange={v => setOrder(v)}
+            />
+          </section>
+        </div>
+      </Sheet>
+
+      <Modal
+        open={!!rejecting}
+        onClose={() => !busy && setRejecting(null)}
+        dismissible={!busy}
+        title="Rechazar KYC"
+        description={
+          rejecting
+            ? `Se le avisará a ${rejecting.name.split(' ')[0]} para que corrija sus documentos. Para dar un motivo detallado abre su perfil.`
+            : undefined
+        }
+        icon={X}
+        tone="danger"
+        footer={
+          <>
+            <Button variant="secondary" disabled={!!busy} onClick={() => setRejecting(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              loading={!!busy}
+              onClick={async () => {
+                if (!rejecting) return;
+                const ok = await run(
+                  `reject-${rejecting.id}`,
+                  () => rejectKyc(rejecting.id, 'Documentos incompletos (rechazo desde el listado)'),
+                  `KYC rechazado · ${rejecting.name}`,
+                );
+                if (ok) setRejecting(null);
+              }}
+            >
+              Rechazar
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

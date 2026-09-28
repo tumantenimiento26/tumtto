@@ -1,50 +1,223 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import {
-  LayoutDashboard,
-  Users,
-  Wrench,
-  FolderTree,
-  Map,
-  Wallet,
-  LifeBuoy,
+  AlertTriangle,
   BarChart3,
-  Settings,
-  ChevronRight,
-  ChevronDown,
-  LogOut,
-  Search,
-  HelpCircle,
   Bell,
-  Menu,
-  X,
-  ShieldAlert,
+  CheckCheck,
+  ChevronRight,
+  CornerDownLeft,
+  FolderTree,
+  IdCard,
+  LayoutDashboard,
+  LifeBuoy,
+  LogOut,
+  Map,
+  Moon,
+  PanelLeft,
+  RefreshCw,
   Scale,
+  Search,
+  Settings,
+  Sun,
+  User,
+  Users,
+  Wallet,
+  Wrench,
+  WifiOff,
+  X,
+  Banknote,
+  CreditCard,
+  Info,
   type LucideIcon,
 } from 'lucide-react';
+
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
+import { toast } from './toast';
+import { IconButton, Kicker, Portal, ScreenSkeleton, useEscape } from './ds';
 import {
-  getDisputes,
+  getAllRequests,
+  getClients,
   getOpenSupportCount,
   getPendingKyc,
-  getTickets,
+  getProfile,
+  getTechniciansWithProfile,
   loadWorld,
   setErrorNotifier,
   useTick,
+  useWorldFailed,
 } from '@/lib/data/store';
+import {
+  timeAgo,
+  useNotifState,
+  useNotifications,
+  type NotifType,
+} from '@/lib/data/notifications';
 import { useAuth } from '@/lib/auth';
-import { toast } from './toast';
+import { useTheme, applyTheme } from '@/lib/theme';
+import { orderCode } from '@/lib/orderCode';
 
 /**
- * Admin console shell — 240px deep-navy sidebar with active indicator + sub-items,
- * y header de 64px (breadcrumbs, buscador, acciones, pill de usuario). Wraps every
- * console route. Bajo `lg` la sidebar se vuelve cajón off-canvas con scrim.
+ * Shell de la consola (handoff web · C. Consola admin):
+ * - Sidebar #061B3A 256px ↔ riel compacto 76px (solo íconos; badges → punto
+ *   cian). Toggle a mitad del borde, botón en el header y ⌘B. Bajo 1100px el
+ *   riel queda en flujo y la versión completa se abre encima con scrim.
+ * - Header 64px: migas mono + título, buscador que abre la paleta ⌘K, tema
+ *   claro/oscuro y campana con el panel de notificaciones (440px).
+ * - Skeleton por tipo de pantalla al navegar y banner "Sin conexión".
  */
+
+/* ── Estado del shell (persistido: riel compacto) ── */
+interface ShellState {
+  compact: boolean;
+  drawer: boolean;
+  palette: boolean;
+  notifs: boolean;
+  toggleCompact: () => void;
+  setDrawer: (v: boolean) => void;
+  setPalette: (v: boolean) => void;
+  setNotifs: (v: boolean) => void;
+}
+export const useShell = create<ShellState>()(
+  persist(
+    set => ({
+      compact: false,
+      drawer: false,
+      palette: false,
+      notifs: false,
+      toggleCompact: () => set(s => ({ compact: !s.compact })),
+      setDrawer: drawer => set({ drawer }),
+      setPalette: palette => set({ palette }),
+      setNotifs: notifs => set({ notifs }),
+    }),
+    {
+      name: 'tumtto-admin-shell',
+      storage: createJSONStorage(() => localStorage),
+      partialize: s => ({ compact: s.compact }),
+    },
+  ),
+);
+
+/** ¿Ventana angosta (<1100px)? En ese caso el sidebar es riel + cajón. */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1099px)');
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return narrow;
+}
+
+/* ── Navegación ── */
+interface NavItem {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  badge?: () => number;
+}
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+function useNavGroups(): NavGroup[] {
+  useTick();
+  const { unread } = useNotifications();
+  return [
+    {
+      label: 'General',
+      items: [
+        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        {
+          href: '/notificaciones',
+          icon: Bell,
+          label: 'Notificaciones',
+          badge: () => unread,
+        },
+      ],
+    },
+    {
+      label: 'Usuarios',
+      items: [
+        { href: '/clientes', icon: Users, label: 'Clientes' },
+        {
+          href: '/tecnicos',
+          icon: IdCard,
+          label: 'Técnicos',
+          badge: () => getPendingKyc().length,
+        },
+      ],
+    },
+    {
+      label: 'Operación',
+      items: [
+        { href: '/servicios', icon: Wrench, label: 'Servicios' },
+        { href: '/regiones', icon: Map, label: 'Regiones' },
+        { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        {
+          href: '/soporte',
+          icon: Scale,
+          label: 'Soporte',
+          badge: getOpenSupportCount,
+        },
+      ],
+    },
+    {
+      label: 'Analítica',
+      items: [{ href: '/reportes', icon: BarChart3, label: 'Reportes' }],
+    },
+    {
+      label: 'Sistema',
+      items: [
+        { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
+        { href: '/config', icon: Settings, label: 'Configuración' },
+        { href: '/estados', icon: AlertTriangle, label: 'Estados y errores' },
+      ],
+    },
+  ];
+}
+
+/** Ruta → [grupo, título] para las migas del header. */
+const CRUMB: Record<string, [string, string]> = {
+  '/dashboard': ['Inicio', 'Panel de control'],
+  '/notificaciones': ['Inicio', 'Centro de notificaciones'],
+  '/clientes': ['Usuarios', 'Clientes'],
+  '/tecnicos': ['Usuarios', 'Técnicos'],
+  '/servicios': ['Operación', 'Servicios'],
+  '/regiones': ['Operación', 'Regiones y cobertura'],
+  '/finanzas': ['Operación', 'Finanzas'],
+  '/soporte': ['Operación', 'Soporte'],
+  '/reportes': ['Analítica', 'Reportes'],
+  '/catalogo': ['Sistema', 'Catálogo'],
+  '/config': ['Sistema', 'Configuración'],
+  '/estados': ['Sistema', 'Estados y errores'],
+};
+const DETAIL_TITLE: Record<string, string> = {
+  '/servicios': 'Detalle de servicio',
+  '/clientes': 'Detalle de cliente',
+  '/tecnicos': 'Detalle de técnico',
+};
+
+function isActive(href: string, pathname: string) {
+  return pathname === href || pathname.startsWith(href + '/');
+}
+
+/** Tipo de skeleton según la ruta (dashboard / lista / detalle). */
+export function screenKind(pathname: string): 'dashboard' | 'list' | 'detail' {
+  if (pathname.startsWith('/dashboard')) return 'dashboard';
+  return pathname.split('/').filter(Boolean).length > 1 ? 'detail' : 'list';
+}
+
 function useAdminUser() {
-  const { usuario } = useAuth();
+  const { usuario, session } = useAuth();
   const name = usuario?.full_name ?? 'Admin';
   const initials =
     name
@@ -52,164 +225,660 @@ function useAdminUser() {
       .slice(0, 2)
       .map(p => p[0]?.toUpperCase() ?? '')
       .join('') || 'A';
-  return { name, role: 'Admin', initials };
+  return { name, email: session?.user.email ?? '', initials };
 }
 
-interface NavItem {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  live?: boolean;
-  sub?: { href: string; label: string }[];
-}
-const NAV: NavItem[] = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  {
-    href: '/clientes',
-    icon: Users,
-    label: 'Usuarios',
-    sub: [
-      { href: '/clientes', label: 'Clientes' },
-      { href: '/tecnicos', label: 'Técnicos' },
-    ],
-  },
-  { href: '/servicios', icon: Wrench, label: 'Servicios' },
-  { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
-  { href: '/regiones', icon: Map, label: 'Regiones y cobertura' },
-  { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
-  { href: '/soporte', icon: LifeBuoy, label: 'Soporte y disputas', live: true },
-  { href: '/reportes', icon: BarChart3, label: 'Reportes' },
-  { href: '/config', icon: Settings, label: 'Configuración' },
-];
-
-// pathname -> breadcrumb trail
-const CRUMB: Record<string, string[]> = {
-  '/dashboard': ['Inicio', 'Dashboard'],
-  '/clientes': ['Usuarios', 'Clientes'],
-  '/tecnicos': ['Usuarios', 'Técnicos'],
-  '/servicios': ['Operación', 'Servicios'],
-  '/catalogo': ['Configuración', 'Catálogo'],
-  '/regiones': ['Operación', 'Regiones y cobertura'],
-  '/finanzas': ['Operación', 'Finanzas'],
-  '/soporte': ['Operación', 'Soporte y disputas'],
-  '/reportes': ['Analítica', 'Reportes'],
-  '/config': ['Configuración', 'General'],
-};
-
-// No es un hook: predicado puro sobre la ruta. Llamarlo `useActive` hacía que
-// react-hooks/rules-of-hooks lo marcara como violación dentro de los .map().
-function isActive(href: string, pathname: string) {
-  return href === '/'
-    ? pathname === '/'
-    : pathname === href || pathname.startsWith(href + '/');
-}
-
-function Sidebar({ onClose }: { onClose?: () => void }) {
+/* ── Sidebar ── */
+function Sidebar({
+  compact,
+  overlay,
+  onToggle,
+  onClose,
+}: {
+  compact: boolean;
+  /** Versión completa sobre el contenido (pantallas angostas). */
+  overlay?: boolean;
+  onToggle: () => void;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
-  const USER = useAdminUser();
-  useTick();
-  const supportCount = getOpenSupportCount();
+  const user = useAdminUser();
+  const groups = useNavGroups();
+
   return (
-    <aside className="flex h-full w-60 flex-col bg-navy text-white">
-      <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-[18px] pb-4 pt-5">
-        <BrandMark size={28} className="rounded-lg" />
-        <div className="min-w-0 flex-1">
-          <div className="font-display text-sm font-extrabold leading-none">
-            Tumantenimiento
+    <aside
+      className={`relative flex h-full flex-col bg-sidebar text-white transition-[width] duration-300 ease-[cubic-bezier(.3,1,.4,1)] ${
+        compact ? 'w-[76px]' : 'w-64'
+      } ${overlay ? 'shadow-modal' : ''}`}
+    >
+      <div
+        className={`flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-white/[0.06] ${compact ? 'justify-center' : 'px-5'}`}
+      >
+        <BrandMark size={32} className="rounded-lg" />
+        {!compact && (
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-[15px] font-extrabold leading-none">
+              Tumantenimiento
+            </div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+              Consola admin
+            </div>
           </div>
-          <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-white/50">
-            Admin Panel
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Cerrar menú"
-          className="-mr-1 grid place-items-center rounded-lg p-1.5 hover:bg-white/5 lg:hidden"
-        >
-          <X size={18} className="text-white/70" />
-        </button>
+        )}
+        {overlay && (
+          <button
+            onClick={onClose}
+            aria-label="Cerrar menú"
+            className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/5"
+          >
+            <X size={18} className="text-white/70" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-2">
-        {NAV.map(it => {
-          const active = isActive(it.href, pathname);
-          const subOpen = it.sub?.some(s => isActive(s.href, pathname));
-          const Icon = it.icon;
-          return (
-            <div key={it.label}>
-              <Link
-                href={it.href}
-                className={`relative mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${active || subOpen ? 'bg-primary/20' : 'hover:bg-white/5'}`}
-              >
-                {(active || subOpen) && (
-                  <span className="absolute -left-3 bottom-1.5 top-1.5 w-[3px] rounded bg-cyan" />
-                )}
-                <Icon
-                  size={18}
-                  className={active || subOpen ? 'text-white' : 'text-white/75'}
-                  strokeWidth={1.75}
-                />
-                <span
-                  className={`flex-1 text-[13.5px] font-medium ${active || subOpen ? 'text-white' : 'text-white/[0.78]'}`}
+      <nav
+        className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3"
+        aria-label="Principal"
+      >
+        {groups.map(g => (
+          <div key={g.label} className="mb-3">
+            {compact ? (
+              <div className="mx-auto my-2 h-px w-8 bg-white/[0.08]" />
+            ) : (
+              <p className="px-3 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+                {g.label}
+              </p>
+            )}
+            {g.items.map(it => {
+              const active = isActive(it.href, pathname);
+              const n = it.badge?.() ?? 0;
+              return (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  title={compact ? it.label : undefined}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative mb-0.5 flex items-center gap-3 rounded-btn py-2.5 transition-colors ${
+                    compact ? 'justify-center px-0' : 'px-3'
+                  } ${active ? 'bg-[#0a6bcf] text-white' : 'text-white/70 hover:bg-white/[0.06] hover:text-white'}`}
                 >
-                  {it.label}
-                </span>
-                {it.live && supportCount > 0 && (
-                  <span className="rounded-full bg-error/[0.18] px-[7px] py-px text-[11px] font-semibold text-error-soft">
-                    {supportCount}
+                  <span className="relative">
+                    <it.icon size={19} strokeWidth={1.9} />
+                    {compact && n > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-cyan" />
+                    )}
                   </span>
-                )}
-                {it.sub &&
-                  (subOpen ? (
-                    <ChevronDown size={14} className="text-white/50" />
-                  ) : (
-                    <ChevronRight size={14} className="text-white/50" />
-                  ))}
-              </Link>
-              {it.sub && subOpen && (
-                <div className="mb-1.5 ml-[38px] mt-0.5">
-                  {it.sub.map(s => {
-                    const sActive = isActive(s.href, pathname);
-                    return (
-                      <Link
-                        key={s.href}
-                        href={s.href}
-                        className={`block rounded-md px-3 py-1.5 text-[12.5px] ${sActive ? 'bg-cyan/10 font-semibold text-cyan' : 'text-white/60 hover:text-white/90'}`}
-                      >
-                        {s.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                  {!compact && (
+                    <>
+                      <span className="flex-1 truncate text-[13.5px] font-medium">
+                        {it.label}
+                      </span>
+                      {n > 0 && (
+                        <span
+                          className={`min-w-[22px] rounded-full px-1.5 py-px text-center font-mono text-[11px] font-semibold ${
+                            active
+                              ? 'bg-white/20 text-white'
+                              : 'bg-cyan/15 text-cyan'
+                          }`}
+                        >
+                          {n}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-white/[0.06] px-4 py-3.5">
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/30 text-[12px] font-semibold">
-          {USER.initials}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-semibold">{USER.name}</div>
-          <div className="text-[11px] text-white/55">{USER.role}</div>
-        </div>
-        <button
-          onClick={() => void signOut().then(() => router.replace('/login'))}
-          aria-label="Cerrar sesión"
-          className="grid place-items-center rounded-lg border border-white/[0.08] p-1.5 hover:bg-white/5"
+      <div
+        className={`border-t border-white/[0.06] p-3 ${compact ? 'flex justify-center' : ''}`}
+      >
+        <div
+          className={`flex items-center gap-2.5 rounded-btn bg-white/[0.04] ${compact ? 'p-2' : 'p-2.5'}`}
         >
-          <LogOut size={16} className="text-white/70" />
-        </button>
+          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0a6bcf] font-display text-[12.5px] font-bold">
+            {user.initials}
+          </span>
+          {!compact && (
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold">
+                  {user.name}
+                </div>
+                <div className="truncate text-[11px] text-white/50">
+                  {user.email || 'Admin'}
+                </div>
+              </div>
+              <button
+                onClick={() =>
+                  void signOut().then(() => router.replace('/login?out=1'))
+                }
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="grid h-8 w-8 place-items-center rounded-lg text-white/60 hover:bg-white/[0.08] hover:text-white"
+              >
+                <LogOut size={16} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Toggle a mitad del borde */}
+      {!overlay && (
+        <button
+          onClick={onToggle}
+          aria-label={compact ? 'Expandir menú' : 'Contraer menú'}
+          title="⌘B"
+          className="absolute -right-3.5 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-line bg-card text-navy shadow-float transition-transform hover:scale-105"
+        >
+          <ChevronRight
+            size={15}
+            className={`transition-transform duration-300 ${compact ? '' : 'rotate-180'}`}
+          />
+        </button>
+      )}
     </aside>
   );
 }
 
-/** Cierra al hacer click fuera vía scrim invisible; sin listeners globales. */
+/* ── Paleta ⌘K ── */
+interface PaletteItem {
+  id: string;
+  group: 'Pantallas' | 'Servicios' | 'Clientes' | 'Técnicos';
+  label: string;
+  hint?: string;
+  icon: LucideIcon;
+  href: string;
+}
+const norm = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function CommandPalette() {
+  const { palette, setPalette } = useShell();
+  const router = useRouter();
+  const groups = useNavGroups();
+  const [q, setQ] = useState('');
+  const [idx, setIdx] = useState(0);
+  const close = useCallback(() => {
+    setPalette(false);
+    setQ('');
+    setIdx(0);
+  }, [setPalette]);
+  useEscape(close, palette);
+
+  const items = useMemo<PaletteItem[]>(() => {
+    if (!palette) return [];
+    const screens: PaletteItem[] = groups.flatMap(g =>
+      g.items.map(i => ({
+        id: i.href,
+        group: 'Pantallas' as const,
+        label: i.label,
+        hint: g.label,
+        icon: i.icon,
+        href: i.href,
+      })),
+    );
+    const services: PaletteItem[] = getAllRequests().map(o => ({
+      id: o.id,
+      group: 'Servicios',
+      label: `${orderCode(o.id)} · ${o.title ?? o.description ?? 'Servicio'}`,
+      hint: getProfile(o.client_id)?.full_name ?? undefined,
+      icon: Wrench,
+      href: `/servicios/${o.id}`,
+    }));
+    const clients: PaletteItem[] = getClients().map(p => ({
+      id: p.id,
+      group: 'Clientes',
+      label: p.full_name ?? 'Cliente',
+      hint: p.phone ?? undefined,
+      icon: User,
+      href: `/clientes/${p.id}`,
+    }));
+    const techs: PaletteItem[] = getTechniciansWithProfile().map(
+      ({ tech, profile }) => ({
+        id: tech.id,
+        group: 'Técnicos',
+        label: profile?.full_name ?? tech.display_name ?? 'Técnico',
+        hint: tech.kyc_status,
+        icon: IdCard,
+        href: `/tecnicos/${tech.id}`,
+      }),
+    );
+    const all = [...screens, ...services, ...clients, ...techs];
+    if (!q.trim()) return screens;
+    const nq = norm(q.trim());
+    return all
+      .filter(i => norm(`${i.label} ${i.hint ?? ''}`).includes(nq))
+      .slice(0, 40);
+  }, [palette, q, groups]);
+
+  const go = (it: PaletteItem) => {
+    router.push(it.href);
+    close();
+  };
+  if (!palette) return null;
+
+  let last = '';
+  return (
+    <Portal>
+      <div
+        className="anim-fade fixed inset-0 z-[80] bg-[rgba(6,27,58,0.55)] backdrop-blur-[3px]"
+        onClick={close}
+      />
+      <div className="pointer-events-none fixed inset-0 z-[81] flex justify-center px-4 pt-[12vh]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Buscar"
+          className="anim-modal pointer-events-auto flex max-h-[70vh] w-full max-w-[620px] flex-col overflow-hidden rounded-modal border border-line bg-card shadow-modal"
+        >
+          <div className="flex items-center gap-3 border-b border-line px-4">
+            <Search size={18} className="text-muted" />
+            <input
+              autoFocus
+              value={q}
+              onChange={e => {
+                setQ(e.target.value);
+                setIdx(0);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setIdx(i => Math.min(i + 1, items.length - 1));
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setIdx(i => Math.max(i - 1, 0));
+                } else if (e.key === 'Enter' && items[idx]) {
+                  e.preventDefault();
+                  go(items[idx]);
+                }
+              }}
+              placeholder="Buscar servicio, cliente, técnico o pantalla"
+              aria-label="Buscar"
+              className="h-14 flex-1 bg-transparent text-[15px] text-navy outline-none placeholder:text-faint"
+            />
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-faint">
+              esc
+            </kbd>
+          </div>
+          <div className="overflow-y-auto p-2">
+            {items.length === 0 && (
+              <p className="px-3 py-8 text-center text-[13.5px] text-muted">
+                Sin resultados para “{q}”
+              </p>
+            )}
+            {items.map((it, i) => {
+              const header = it.group !== last;
+              last = it.group;
+              return (
+                <div key={`${it.group}-${it.id}`}>
+                  {header && (
+                    <Kicker className="px-3 pb-1.5 pt-3">{it.group}</Kicker>
+                  )}
+                  <button
+                    type="button"
+                    onMouseEnter={() => setIdx(i)}
+                    onClick={() => go(it)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ${i === idx ? 'bg-panel' : ''}`}
+                  >
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-chip text-muted">
+                      <it.icon size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-navy">
+                      {it.label}
+                    </span>
+                    {it.hint && (
+                      <span className="truncate text-[12px] text-muted">
+                        {it.hint}
+                      </span>
+                    )}
+                    {i === idx && (
+                      <CornerDownLeft size={14} className="text-faint" />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 border-t border-line px-4 py-2.5 font-mono text-[11px] text-faint">
+            <span>↑↓ moverse</span>
+            <span>↵ abrir</span>
+            <span>esc cerrar</span>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+/* ── Panel de notificaciones (campana) ── */
+const NOTIF_ICON: Record<NotifType, { icon: LucideIcon; tile: string }> = {
+  kyc: { icon: IdCard, tile: 'bg-warning-soft text-warning-ink' },
+  disputas: { icon: Scale, tile: 'bg-error-soft text-error' },
+  tickets: { icon: LifeBuoy, tile: 'bg-info-soft text-primary' },
+  retiros: { icon: Banknote, tile: 'bg-success-soft text-success' },
+  servicios: { icon: Wrench, tile: 'bg-warning-soft text-warning-ink' },
+  pagos: { icon: CreditCard, tile: 'bg-error-soft text-error' },
+  sistema: { icon: Info, tile: 'bg-chip text-muted' },
+};
+export { NOTIF_ICON };
+
+function NotificationsPanel({
+  anchor,
+}: {
+  anchor: React.RefObject<HTMLElement | null>;
+}) {
+  const { notifs, setNotifs } = useShell();
+  const router = useRouter();
+  const { items, unread } = useNotifications();
+  const { markRead } = useNotifState();
+  const panel = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setNotifs(false), [setNotifs]);
+  useEscape(close, notifs);
+  useEffect(() => {
+    if (!notifs) return;
+    const h = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (panel.current?.contains(t) || anchor.current?.contains(t)) return;
+      close();
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [notifs, close, anchor]);
+  if (!notifs) return null;
+  return (
+    <Portal>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-label="Notificaciones"
+        className="anim-pop fixed right-4 top-[72px] z-[85] flex max-h-[min(640px,calc(100vh-96px))] w-[440px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-box border border-line bg-card shadow-float"
+      >
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <div>
+            <p className="font-display text-[16px] font-bold text-navy">
+              Notificaciones
+            </p>
+            <p className="text-[12.5px] text-muted">{unread} sin leer</p>
+          </div>
+          <button
+            type="button"
+            disabled={unread === 0}
+            onClick={() => markRead(items.map(n => n.id))}
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary disabled:opacity-40"
+          >
+            <CheckCheck size={15} /> Marcar leídas
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {items.length === 0 && (
+            <p className="px-5 py-10 text-center text-[13.5px] text-muted">
+              Todo al día. Sin avisos pendientes.
+            </p>
+          )}
+          {items.slice(0, 12).map(n => {
+            const k = NOTIF_ICON[n.type];
+            return (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => {
+                  markRead([n.id]);
+                  close();
+                  router.push(n.href);
+                }}
+                className="flex w-full items-start gap-3 border-b border-divider px-5 py-3.5 text-left hover:bg-panel"
+              >
+                <span
+                  className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg ${k.tile}`}
+                >
+                  <k.icon size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`truncate text-[13.5px] text-navy ${n.read ? 'font-medium' : 'font-bold'}`}
+                    >
+                      {n.title}
+                    </span>
+                    {!n.read && (
+                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                    )}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[12.5px] text-muted">
+                    {n.body}
+                  </span>
+                  <span className="mt-1 block font-mono text-[11px] text-faint">
+                    {timeAgo(n.ts)}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <Link
+          href="/notificaciones"
+          onClick={close}
+          className="border-t border-line px-5 py-3 text-center text-[13px] font-semibold text-primary hover:bg-panel"
+        >
+          Ver todas las notificaciones
+        </Link>
+      </div>
+    </Portal>
+  );
+}
+
+/* ── Header ── */
+function Header({ onMenu }: { onMenu: () => void }) {
+  const pathname = usePathname();
+  const { setPalette, notifs, setNotifs } = useShell();
+  const { theme, toggle } = useTheme();
+  const { unread } = useNotifications();
+  const bell = useRef<HTMLDivElement>(null);
+  const base = '/' + (pathname.split('/')[1] ?? '');
+  const isDetail = pathname.split('/').filter(Boolean).length > 1;
+  const [group, title] = CRUMB[base] ?? ['Consola', 'Página no encontrada'];
+  const shownTitle = isDetail ? (DETAIL_TITLE[base] ?? title) : title;
+
+  return (
+    <header className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-line bg-card px-4 md:gap-5 md:px-6">
+      <IconButton icon={PanelLeft} label="Menú (⌘B)" onClick={onMenu} />
+      <div className="min-w-0">
+        <Kicker className="!text-[10px]">{group}</Kicker>
+        <p className="truncate font-display text-[16px] font-bold text-navy">
+          {shownTitle}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setPalette(true)}
+        className="mx-auto hidden h-10 w-full max-w-[480px] items-center gap-2.5 rounded-btn border border-line bg-panel px-3.5 text-left text-[13.5px] text-faint transition-colors hover:border-line-strong md:flex"
+      >
+        <Search size={16} />
+        <span className="flex-1 truncate">
+          Buscar servicio, cliente, técnico o pantalla
+        </span>
+        <kbd className="rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[11px]">
+          ⌘K
+        </kbd>
+      </button>
+      <div className="ml-auto flex items-center gap-2.5 md:ml-0">
+        <IconButton
+          icon={Search}
+          label="Buscar (⌘K)"
+          onClick={() => setPalette(true)}
+          className="md:hidden"
+        />
+        <IconButton
+          icon={theme === 'dark' ? Sun : Moon}
+          label={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+          onClick={toggle}
+        />
+        <div ref={bell}>
+          <IconButton
+            icon={Bell}
+            label="Notificaciones"
+            active={notifs}
+            badge={unread}
+            onClick={() => setNotifs(!notifs)}
+          />
+        </div>
+        <NotificationsPanel anchor={bell} />
+      </div>
+    </header>
+  );
+}
+
+/* ── Banner sin conexión ── */
+function OfflineBanner() {
+  const failed = useWorldFailed();
+  const [offline, setOffline] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    const on = () => setOffline(!navigator.onLine);
+    on();
+    window.addEventListener('online', on);
+    window.addEventListener('offline', on);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', on);
+    };
+  }, []);
+  if (!offline && !failed) return null;
+  return (
+    <div
+      role="alert"
+      className="flex items-center gap-3 border-b border-warning-ring bg-warning-soft px-6 py-2.5 text-[13.5px] text-warning-ink"
+    >
+      <WifiOff size={16} />
+      <span className="flex-1 font-medium">
+        {offline
+          ? 'Sin conexión. Los datos pueden estar desactualizados.'
+          : 'No pudimos actualizar los datos.'}
+      </span>
+      <button
+        type="button"
+        disabled={retrying}
+        onClick={() => {
+          setRetrying(true);
+          void loadWorld(true).finally(() => setRetrying(false));
+        }}
+        className="inline-flex items-center gap-1.5 font-semibold hover:underline disabled:opacity-50"
+      >
+        <RefreshCw size={14} className={retrying ? 'animate-spin' : ''} />{' '}
+        Reintentar
+      </button>
+    </div>
+  );
+}
+
+/* ── Shell ── */
+export function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const narrow = useNarrow();
+  const { compact, toggleCompact, drawer, setDrawer, setPalette, setNotifs } =
+    useShell();
+  const hydrateTheme = useTheme(s => s.hydrate);
+  const [navigating, setNavigating] = useState(false);
+  const first = useRef(true);
+
+  // Tema solo dentro de la consola; al salir (login) se quita.
+  useEffect(() => {
+    hydrateTheme();
+    return () => applyTheme(null);
+  }, [hydrateTheme]);
+
+  // Primer snapshot del backend al montar la consola (el gate ya validó admin).
+  useEffect(() => {
+    setErrorNotifier(m => toast.error(m));
+    void loadWorld();
+  }, []);
+
+  // Al navegar: cierra cajón/paneles y muestra el skeleton de la pantalla 480 ms.
+  useEffect(() => {
+    setDrawer(false);
+    setNotifs(false);
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    setNavigating(true);
+    const t = setTimeout(() => setNavigating(false), 480);
+    return () => clearTimeout(t);
+  }, [pathname, setDrawer, setNotifs]);
+
+  // ⌘K paleta · ⌘B menú.
+  const onMenu = useCallback(() => {
+    if (narrow) setDrawer(!useShell.getState().drawer);
+    else toggleCompact();
+  }, [narrow, setDrawer, toggleCompact]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'k') {
+        e.preventDefault();
+        setPalette(!useShell.getState().palette);
+      } else if (k === 'b') {
+        e.preventDefault();
+        onMenu();
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onMenu, setPalette]);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-page">
+      {/* Riel/sidebar en flujo (angosto: siempre riel) */}
+      <div className="relative z-30 flex-shrink-0">
+        <Sidebar compact={narrow || compact} onToggle={onMenu} />
+      </div>
+      {/* Angosto: versión completa encima con scrim */}
+      {narrow && drawer && (
+        <>
+          <div
+            className="anim-fade fixed inset-0 z-[60] bg-[rgba(6,27,58,0.55)] backdrop-blur-[2px]"
+            onClick={() => setDrawer(false)}
+          />
+          <div className="anim-fade fixed inset-y-0 left-0 z-[61]">
+            <Sidebar
+              compact={false}
+              overlay
+              onToggle={onMenu}
+              onClose={() => setDrawer(false)}
+            />
+          </div>
+        </>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Header onMenu={onMenu} />
+        <OfflineBanner />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
+          {navigating ? (
+            <ScreenSkeleton kind={screenKind(pathname)} />
+          ) : (
+            <PageTransition key={pathname}>{children}</PageTransition>
+          )}
+        </main>
+      </div>
+      <CommandPalette />
+    </div>
+  );
+}
+
+/**
+ * @deprecated Popover anterior (absoluto, se recorta dentro de contenedores con
+ * overflow). Usa `Popover` de `@/components/ds` (fixed + portal). Se conserva
+ * para las pantallas aún no rediseñadas.
+ */
 export function Popover({
   onClose,
   children,
@@ -223,235 +892,10 @@ export function Popover({
     <>
       <div onClick={onClose} className="fixed inset-0 z-40" />
       <div
-        className={`absolute right-0 top-full z-50 mt-2 rounded-xl border border-line bg-white p-1.5 shadow-overlay ${className}`}
+        className={`absolute right-0 top-full z-50 mt-2 rounded-xl border border-line bg-card p-1.5 shadow-overlay ${className}`}
       >
         {children}
       </div>
     </>
-  );
-}
-
-function Header({ onMenu }: { onMenu: () => void }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { session, signOut } = useAuth();
-  const USER = useAdminUser();
-  const [menu, setMenu] = useState<'notif' | 'user' | null>(null);
-  useTick();
-  const base = '/' + (pathname.split('/')[1] ?? '');
-  const crumbs = CRUMB[base] ?? CRUMB[pathname] ?? ['Inicio'];
-
-  const notifs = [
-    {
-      icon: LifeBuoy,
-      label: 'Tickets sin resolver',
-      count: getTickets().filter(t => t.status !== 'resolved').length,
-      href: '/soporte',
-    },
-    {
-      icon: Scale,
-      label: 'Disputas abiertas',
-      count: getDisputes().filter(
-        d => d.status === 'open' || d.status === 'in_review',
-      ).length,
-      href: '/soporte',
-    },
-    {
-      icon: ShieldAlert,
-      label: 'KYC pendiente de revisión',
-      count: getPendingKyc().length,
-      href: '/tecnicos',
-    },
-  ].filter(n => n.count > 0);
-  const notifCount = notifs.reduce((s, n) => s + n.count, 0);
-  return (
-    <header className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-line bg-white px-4 md:gap-6 md:px-7">
-      <button
-        onClick={onMenu}
-        aria-label="Abrir menú"
-        className="-ml-1 grid flex-shrink-0 place-items-center rounded-[10px] border border-line p-2 hover:bg-surface lg:hidden"
-      >
-        <Menu size={18} className="text-muted" />
-      </button>
-      {/* Bajo md solo cabe la última miga; el resto es ruido en pantalla chica. */}
-      <div className="flex min-w-0 flex-shrink items-center gap-2 text-[13px]">
-        {crumbs.map((c, i) => (
-          <span
-            key={i}
-            className={`items-center gap-2 ${i === crumbs.length - 1 ? 'flex min-w-0' : 'hidden md:flex'}`}
-          >
-            {i > 0 && (
-              <ChevronRight
-                size={12}
-                className="hidden flex-shrink-0 text-faint md:block"
-              />
-            )}
-            <span
-              className={`truncate ${i === crumbs.length - 1 ? 'font-medium text-navy' : 'text-faint'}`}
-            >
-              {c}
-            </span>
-          </span>
-        ))}
-      </div>
-      <div className="hidden h-10 max-w-[540px] flex-1 items-center rounded-[10px] border border-line bg-surface md:flex">
-        <Search size={16} className="ml-3.5 flex-shrink-0 text-faint" />
-        <input
-          placeholder="Buscar por nombre, ID de servicio, email o teléfono…"
-          className="min-w-0 flex-1 bg-transparent px-3 text-[13px] text-navy outline-none placeholder:text-faint"
-        />
-        <span className="mr-2 hidden rounded-md border border-line bg-white px-1.5 py-0.5 font-mono text-[11px] text-faint lg:block">
-          ⌘ K
-        </span>
-      </div>
-      <div className="ml-auto flex flex-shrink-0 items-center gap-2.5">
-        <button
-          aria-label="Buscar"
-          className="grid place-items-center rounded-[10px] border border-line p-2 hover:bg-surface md:hidden"
-        >
-          <Search size={18} className="text-muted" />
-        </button>
-        <button
-          aria-label="Ayuda"
-          className="hidden place-items-center rounded-[10px] border border-line p-2 hover:bg-surface sm:grid"
-        >
-          <HelpCircle size={18} className="text-muted" />
-        </button>
-        <div className="relative">
-          <button
-            aria-label="Notificaciones"
-            aria-expanded={menu === 'notif'}
-            onClick={() => setMenu(m => (m === 'notif' ? null : 'notif'))}
-            className="relative grid place-items-center rounded-[10px] border border-line p-2 hover:bg-surface"
-          >
-            <Bell size={18} className="text-muted" />
-            {notifCount > 0 && (
-              <span className="absolute -right-1 -top-1 rounded-full border-2 border-white bg-error px-[5px] text-[10px] font-bold text-white">
-                {notifCount}
-              </span>
-            )}
-          </button>
-          {menu === 'notif' && (
-            <Popover onClose={() => setMenu(null)} className="w-72">
-              <div className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">
-                Notificaciones
-              </div>
-              {notifs.length === 0 && (
-                <div className="px-3 pb-2.5 pt-1 text-[13px] text-muted">
-                  Sin pendientes. Todo en orden.
-                </div>
-              )}
-              {notifs.map(n => (
-                <Link
-                  key={n.label}
-                  href={n.href}
-                  onClick={() => setMenu(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface"
-                >
-                  <n.icon size={16} className="flex-shrink-0 text-muted" />
-                  <span className="flex-1 text-[13px] text-navy">
-                    {n.label}
-                  </span>
-                  <span className="rounded-full bg-error/[0.12] px-2 py-px text-[11.5px] font-semibold text-error">
-                    {n.count}
-                  </span>
-                </Link>
-              ))}
-            </Popover>
-          )}
-        </div>
-        <div className="relative">
-          <button
-            aria-label="Menú de usuario"
-            aria-expanded={menu === 'user'}
-            onClick={() => setMenu(m => (m === 'user' ? null : 'user'))}
-            className="flex items-center gap-2.5 rounded-full border border-line bg-white p-1 hover:bg-surface xl:pr-3"
-          >
-            <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-primary/[0.12] text-[12px] font-semibold text-primary">
-              {USER.initials}
-            </span>
-            <div className="hidden text-left leading-tight xl:block">
-              <div className="text-[13px] font-semibold text-navy">
-                {USER.name}
-              </div>
-              <div className="text-[11px] text-muted">{USER.role}</div>
-            </div>
-            <ChevronDown
-              size={14}
-              className={`hidden text-faint transition-transform xl:block ${menu === 'user' ? 'rotate-180' : ''}`}
-            />
-          </button>
-          {menu === 'user' && (
-            <Popover onClose={() => setMenu(null)} className="w-60">
-              <div className="border-b border-line px-3 pb-2.5 pt-2">
-                <div className="text-[13px] font-semibold text-navy">
-                  {USER.name}
-                </div>
-                <div className="truncate text-[12px] text-muted">
-                  {session?.user.email ?? USER.role}
-                </div>
-              </div>
-              <Link
-                href="/config"
-                onClick={() => setMenu(null)}
-                className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface"
-              >
-                <Settings size={16} className="text-muted" />
-                <span className="text-[13px] text-navy">Configuración</span>
-              </Link>
-              <button
-                onClick={() =>
-                  void signOut().then(() => router.replace('/login'))
-                }
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-error/[0.06]"
-              >
-                <LogOut size={16} className="text-error" />
-                <span className="text-[13px] font-medium text-error">
-                  Cerrar sesión
-                </span>
-              </button>
-            </Popover>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export function AdminShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  // Navegar cierra el cajón; en desktop nunca está abierto porque el aside es estático.
-  useEffect(() => setOpen(false), [pathname]);
-  // Primer snapshot del backend al montar la consola (el gate ya validó admin).
-  useEffect(() => {
-    setErrorNotifier(m => toast.error(m));
-    void loadWorld();
-  }, []);
-
-  return (
-    <div className="flex h-screen overflow-hidden">
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-40 bg-navy/45 backdrop-blur-[2px] lg:hidden"
-        />
-      )}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none lg:static lg:translate-x-0 ${open ? 'translate-x-0 shadow-overlay' : '-translate-x-full'}`}
-      >
-        <Sidebar onClose={() => setOpen(false)} />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenu={() => setOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-canvas p-4 sm:p-6 lg:p-7">
-          {/* Re-key on route change so content re-animates on navigation.
-              No AnimatePresence here: route-level presence tracking flakily
-              leaves the entering page frozen at opacity 0 after many
-              navigations. Keyed remount plays the enter animation reliably. */}
-          <PageTransition key={pathname}>{children}</PageTransition>
-        </main>
-      </div>
-    </div>
   );
 }

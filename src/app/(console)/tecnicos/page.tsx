@@ -46,6 +46,7 @@ import {
   useWorldFailed,
   loadWorld,
 } from '@/lib/data/store';
+import { formatPhone } from '@/lib/phone';
 
 type Kyc = 'approved' | 'in_review' | 'declined' | 'suspended';
 
@@ -146,7 +147,7 @@ export default function TecnicosPage() {
       return {
         id: tech.id,
         name: profile?.full_name ?? 'Técnico',
-        phone: (profile?.phone ?? '').replace('+52 ', ''),
+        phone: formatPhone(profile?.phone),
         cats: catNames.length ? catNames : ['General'],
         region: TECH_REGION[tech.id] ?? '—',
         rating: tech.rating_avg,

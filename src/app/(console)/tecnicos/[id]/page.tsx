@@ -50,6 +50,7 @@ import {
   upsertTechRate,
   updateTechnicianBank,
 } from '@/lib/data/store';
+import { formatPhone } from '@/lib/phone';
 
 const initials = (name?: string | null) =>
   (name ?? '?')
@@ -194,7 +195,7 @@ export default function TecnicoDetailPage() {
             <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-muted">
               <span className="inline-flex items-center gap-1.5">
                 <Phone size={13} className="text-faint" />
-                {profile.phone ?? '—'}
+                {formatPhone(profile.phone) || '—'}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Mail size={13} className="text-faint" />
@@ -262,7 +263,11 @@ export default function TecnicoDetailPage() {
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <KV label="Nombre completo" value={name} />
-                <KV label="Teléfono" value={profile.phone ?? '—'} mono />
+                <KV
+                  label="Teléfono"
+                  value={formatPhone(profile.phone) || '—'}
+                  mono
+                />
                 <KV label="Email" value={email} />
                 <KV
                   label="Fecha de registro"

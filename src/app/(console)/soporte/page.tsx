@@ -74,6 +74,7 @@ import {
   ADMIN_ID,
 } from '@/lib/data/store';
 import type { Ticket } from '@/lib/demo/world';
+import { formatPhone } from '@/lib/phone';
 
 const TICKET_STATUS: Record<
   Ticket['status'],
@@ -519,7 +520,9 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
           <div className="text-sm font-semibold text-navy truncate">
             {profile?.full_name ?? 'Técnico'}
           </div>
-          <div className="text-xs text-muted">{profile?.phone ?? '—'}</div>
+          <div className="text-xs text-muted">
+            {formatPhone(profile?.phone) || '—'}
+          </div>
         </div>
         <Badge tone="warning">Pendiente</Badge>
       </div>
@@ -854,7 +857,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
               {requester?.full_name ?? 'Usuario'}
             </div>
             <div className="text-[11.5px] capitalize text-muted">
-              {ticket.role} · {requester?.phone ?? '—'}
+              {ticket.role} · {formatPhone(requester?.phone) || '—'}
             </div>
           </div>
         </div>

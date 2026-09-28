@@ -58,6 +58,7 @@ import {
 } from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { useState } from 'react';
+import { formatPhone } from '@/lib/phone';
 
 const FLOW: RequestStatus[] = [
   'requested',
@@ -308,7 +309,7 @@ export default function ServicioDetailPage() {
                     {client?.full_name ?? 'Cliente'}
                   </div>
                   <div className="mt-0.5 text-[11.5px] text-muted">
-                    {client?.phone ?? '—'}
+                    {formatPhone(client?.phone) || '—'}
                   </div>
                 </div>
               </div>
@@ -361,7 +362,7 @@ export default function ServicioDetailPage() {
                           {techRec?.rating_avg ?? '—'}
                         </b>
                         <span>({techRec?.rating_count ?? 0})</span>
-                        <span>· {techProfile.phone}</span>
+                        <span>· {formatPhone(techProfile.phone)}</span>
                       </div>
                     </div>
                   </div>

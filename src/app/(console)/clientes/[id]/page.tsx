@@ -79,6 +79,7 @@ import {
   deleteAddress,
 } from '@/lib/data/store';
 import type { ServiceRequest, Payment } from '@/lib/demo/world';
+import { formatPhone } from '@/lib/phone';
 
 const peso = (n: number) =>
   new Intl.NumberFormat('es-MX', {
@@ -209,7 +210,7 @@ export default function ClientDetailPage() {
     );
   }
 
-  const phone = profile.phone ?? '—';
+  const phone = formatPhone(profile.phone) || '—';
   const name = profile.full_name ?? 'Cliente';
   const suspended = profile.status === 'suspended';
   // ponytail: el email vive en auth.users, no en profiles — sin columna que mostrar.

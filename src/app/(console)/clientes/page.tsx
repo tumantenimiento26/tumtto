@@ -42,6 +42,7 @@ import {
   getAllRequests,
   getAllDisputes,
 } from '@/lib/data/store';
+import { formatPhone } from '@/lib/phone';
 
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
@@ -168,7 +169,7 @@ export default function ClientesPage() {
         id: p.id,
         name: p.full_name ?? 'Cliente',
         email: '—', // profiles no guarda email (vive en auth.users)
-        phone: p.phone ?? '—',
+        phone: formatPhone(p.phone) || '—',
         city: lastReq?.municipality ?? '—',
         services: myReqs.length,
         gmv,

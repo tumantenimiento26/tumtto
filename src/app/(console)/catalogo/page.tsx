@@ -23,7 +23,13 @@ import {
   Check,
   type LucideIcon,
 } from 'lucide-react';
-import { PageHeading, Panel, Modal } from '@/components/admin';
+import {
+  PageHeading,
+  Panel,
+  Modal,
+  LoadFailed,
+  PageSkeleton,
+} from '@/components/admin';
 import {
   PrimaryButton,
   GhostButton,
@@ -35,6 +41,7 @@ import {
 } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
 import {
   useTick,
   getCategoriesWithCounts,
@@ -42,6 +49,10 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getSettingInt,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -69,6 +80,9 @@ export default function CatalogoPage() {
   const [deleteCatOpen, setDeleteCatOpen] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
+  const { busy, run } = useAction();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
 
   const active = cats.find(c => c.id === activeId) ?? cats[0];
   const ActiveIcon = (active && ICONS[active.icon ?? '']) || Settings;
@@ -80,20 +94,33 @@ export default function CatalogoPage() {
 
   function onToggleCategory() {
     if (!active) return;
-    toggleCategory(active.id);
-    toast.success(
+    void run(
+      'toggle',
+      () => toggleCategory(active.id),
       `Categoría ${active.is_active ? 'desactivada' : 'activada'} · ${active.name}`,
     );
   }
-  function onSaveConfig() {
+  async function onSaveConfig() {
     if (!active) return;
-    updateCategory(active.id, {
-      name: name ?? active.name,
-      description: description ?? active.description,
-    });
-    setName(null);
-    setDescription(null);
-    toast.success('Configuración guardada');
+    const nextName = (name ?? active.name).trim();
+    if (!nextName) {
+      toast.error('La categoría necesita un nombre.');
+      return;
+    }
+    const ok = await run(
+      'save',
+      () =>
+        updateCategory(active.id, {
+          name: nextName,
+          description: description ?? active.description,
+        }),
+      'Configuración guardada',
+    );
+    // Los borradores solo se limpian si se guardó; si no, siguen para reintentar.
+    if (ok) {
+      setName(null);
+      setDescription(null);
+    }
   }
   async function onDeleteCategory() {
     if (!active) return;
@@ -108,6 +135,10 @@ export default function CatalogoPage() {
       toast.error('No se pudo eliminar la categoría. Reintenta.');
     }
   }
+
+  // Sin snapshot el catálogo se veía vacío ("0 categorías") en vez de fallar.
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -254,7 +285,10 @@ export default function CatalogoPage() {
               <Panel
                 title="Configuración general"
                 action={
-                  <GhostButton onClick={onSaveConfig}>
+                  <GhostButton
+                    onClick={() => void onSaveConfig()}
+                    disabled={!!busy}
+                  >
                     <span className="inline-flex items-center gap-2">
                       <Check size={14} />
                       Guardar
@@ -293,54 +327,7 @@ export default function CatalogoPage() {
               </Panel>
 
               {/* Comisión */}
-              <Panel
-                title="Comisión específica"
-                action={
-                  <GhostButton
-                    onClick={() =>
-                      toast.success(`Comisión guardada · ${active.name}`)
-                    }
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Check size={14} />
-                      Guardar
-                    </span>
-                  </GhostButton>
-                }
-              >
-                <SectionLead num="02" icon={Percent} />
-                {/* ponytail: comisión session-local — el guardado solo confirma con toast. */}
-                <div className="flex items-center gap-6 p-4 bg-canvas border border-line rounded-xl">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-navy">
-                      ¿{active.name} usa comisión personalizada?
-                    </div>
-                    <div className="text-xs text-muted mt-1">
-                      Comisión global:{' '}
-                      <b className="text-navy font-semibold">15%</b> ·
-                      Personalizada:{' '}
-                      <b className="text-primary font-semibold">12%</b> · Ahorro
-                      al técnico:{' '}
-                      <b className="text-success font-semibold">
-                        ~$95 MXN por servicio
-                      </b>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center bg-surface border border-line rounded-lg px-3 h-11 w-28">
-                      <input
-                        type="number"
-                        defaultValue={12}
-                        className="w-full bg-transparent outline-none font-display font-bold text-xl text-navy"
-                      />
-                      <span className="font-display font-bold text-lg text-muted">
-                        %
-                      </span>
-                    </div>
-                    <Toggle on onChange={() => {}} />
-                  </div>
-                </div>
-              </Panel>
+              <CategoryCommission key={active.id} cat={active} />
             </>
           )}
         </div>
@@ -403,9 +390,13 @@ function NewCategoryModal({
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('wrench');
 
+  const [saving, setSaving] = useState(false);
+
   async function submit() {
-    if (!name.trim()) return;
+    if (!name.trim() || saving) return;
+    setSaving(true);
     const cat = await createCategory(name.trim(), icon);
+    setSaving(false);
     if (!cat) return;
     toast.success(`Categoría creada · ${cat.name}`);
     setName('');
@@ -424,8 +415,14 @@ function NewCategoryModal({
       width={440}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!name.trim()}>
+          <GhostButton onClick={onClose} disabled={saving}>
+            Cancelar
+          </GhostButton>
+          <PrimaryButton
+            onClick={() => void submit()}
+            loading={saving}
+            disabled={!name.trim()}
+          >
             Crear categoría
           </PrimaryButton>
         </>
@@ -472,5 +469,101 @@ function SectionLead({ num, icon: Icon }: { num: string; icon: LucideIcon }) {
         <Icon size={15} className="text-primary" />
       </span>
     </div>
+  );
+}
+
+/**
+ * Comisión por categoría (service_categories.commission_bps). NULL = usa la
+ * global de Configuración. Antes el botón solo mostraba un toast.
+ */
+function CategoryCommission({
+  cat,
+}: {
+  cat: { id: string; name: string; commission_bps?: number | null };
+}) {
+  const globalPct = getSettingInt('commission_bps', 1500) / 100;
+  const [custom, setCustom] = useState(cat.commission_bps != null);
+  const [pct, setPct] = useState(
+    cat.commission_bps != null ? String(cat.commission_bps / 100) : '',
+  );
+  const { busy, run } = useAction();
+  const n = Number(pct);
+  const invalid =
+    custom && (!pct.trim() || !Number.isFinite(n) || n < 0 || n > 100);
+
+  function save() {
+    if (invalid) return;
+    void run(
+      'commission',
+      () =>
+        updateCategory(cat.id, {
+          commission_bps: custom ? Math.round(n * 100) : null,
+        }),
+      `Comisión guardada · ${cat.name}`,
+    );
+  }
+
+  return (
+    <Panel
+      title="Comisión específica"
+      action={
+        <GhostButton onClick={save} disabled={invalid || !!busy}>
+          <span className="inline-flex items-center gap-2">
+            <Check size={14} />
+            {busy ? 'Guardando…' : 'Guardar'}
+          </span>
+        </GhostButton>
+      }
+    >
+      <SectionLead num="02" icon={Percent} />
+      <div className="flex items-center gap-6 rounded-xl border border-line bg-canvas p-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-navy">
+            ¿{cat.name} usa comisión personalizada?
+          </div>
+          <div className="mt-1 text-xs text-muted">
+            Comisión global:{' '}
+            <b className="font-semibold text-navy">{globalPct}%</b>
+            {custom && pct.trim() && !invalid && (
+              <>
+                {' '}
+                · Personalizada:{' '}
+                <b className="font-semibold text-primary">{n}%</b>
+              </>
+            )}
+          </div>
+          {invalid && (
+            <p className="mt-1 text-[11.5px] text-error" role="alert">
+              Escribe un porcentaje entre 0 y 100.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          <div
+            className={`flex h-11 w-28 items-center rounded-lg border bg-surface px-3 ${invalid ? 'border-error' : 'border-line'} ${custom ? '' : 'opacity-50'}`}
+          >
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              aria-label={`Comisión de ${cat.name}`}
+              disabled={!custom}
+              value={pct}
+              onChange={e => setPct(e.target.value)}
+              className="w-full bg-transparent font-display text-xl font-bold text-navy outline-none"
+            />
+            <span className="font-display text-lg font-bold text-muted">%</span>
+          </div>
+          <Toggle
+            on={custom}
+            onChange={() => {
+              setCustom(c => !c);
+              if (!pct) setPct(String(globalPct));
+            }}
+          />
+        </div>
+      </div>
+    </Panel>
   );
 }

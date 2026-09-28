@@ -26,7 +26,14 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react';
-import { PageHeading, Panel, StatusPill, Modal } from '@/components/admin';
+import {
+  PageHeading,
+  Panel,
+  StatusPill,
+  Modal,
+  LoadFailed,
+  PageSkeleton,
+} from '@/components/admin';
 import {
   GhostButton,
   PrimaryButton,
@@ -36,6 +43,7 @@ import {
 } from '@/components/ui';
 import { FadeIn, Reveal } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
 import {
   useTick,
   getRequest,
@@ -55,6 +63,9 @@ import {
   addNote,
   createTicket,
   ADMIN_ID,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { useState } from 'react';
@@ -130,7 +141,13 @@ export default function ServicioDetailPage() {
   const [refundOpen, setRefundOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [caseTicketId, setCaseTicketId] = useState<string | null>(null);
+  const { busy, run } = useAction();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
 
+  // Antes de cargar el snapshot todo id "no existe": primero cargar/fallar.
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
   if (!req) {
     return (
       <FadeIn>
@@ -704,10 +721,14 @@ export default function ServicioDetailPage() {
         open={reassignOpen}
         onClose={() => setReassignOpen(false)}
         currentTechUserId={techUserId}
-        onSelect={(userId, name) => {
-          reassignRequest(req.id, userId);
-          setReassignOpen(false);
-          toast.success(`Servicio reasignado a ${name}`);
+        busy={busy === 'reassign'}
+        onSelect={async (userId, name) => {
+          const ok = await run(
+            'reassign',
+            () => reassignRequest(req.id, userId),
+            `Servicio reasignado a ${name}`,
+          );
+          if (ok) setReassignOpen(false);
         }}
       />
 
@@ -720,20 +741,26 @@ export default function ServicioDetailPage() {
         width={480}
         footer={
           <>
-            <GhostButton onClick={() => setRefundOpen(false)}>
+            <GhostButton
+              disabled={busy === 'refund'}
+              onClick={() => setRefundOpen(false)}
+            >
               Cancelar
             </GhostButton>
             <button
-              onClick={() => {
-                refundPayment(req.id);
-                setRefundOpen(false);
-                toast.success(
-                  `Reembolso iniciado · ${money(payment?.amount_cents ?? subtotalCents)}`,
+              disabled={busy === 'refund'}
+              onClick={async () => {
+                const ok = await run(
+                  'refund',
+                  () => refundPayment(req.id),
+                  `Reembolso registrado · ${money(payment?.amount_cents ?? subtotalCents)}`,
                 );
+                if (ok) setRefundOpen(false);
               }}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Check size={14} /> Confirmar reembolso
+              <Check size={14} />{' '}
+              {busy === 'refund' ? 'Procesando…' : 'Confirmar reembolso'}
             </button>
           </>
         }
@@ -774,11 +801,13 @@ function ReassignModal({
   onClose,
   onSelect,
   currentTechUserId,
+  busy,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (userId: string, name: string) => void;
   currentTechUserId: string | null;
+  busy?: boolean;
 }) {
   const candidates = getTechniciansWithProfile().filter(
     ({ tech, profile }) =>
@@ -808,8 +837,9 @@ function ReassignModal({
             return (
               <button
                 key={tech.id}
+                disabled={busy}
                 onClick={() => onSelect(tech.id, name)}
-                className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition-colors hover:border-primary/40 hover:bg-info-soft"
+                className="disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition-colors hover:border-primary/40 hover:bg-info-soft"
               >
                 <Avatar initials={initials(name)} size={40} />
                 <div className="min-w-0 flex-1">

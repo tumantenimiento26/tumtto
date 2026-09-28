@@ -39,6 +39,8 @@ import {
   DataTable,
   Modal,
   type Column,
+  LoadFailed,
+  PageSkeleton,
 } from '@/components/admin';
 import {
   Avatar,
@@ -61,6 +63,7 @@ import {
   ProgressBar,
 } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
 import {
   useTick,
   getProfile,
@@ -77,6 +80,9 @@ import {
   createTicket,
   saveAddress,
   deleteAddress,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 import type { ServiceRequest, Payment } from '@/lib/demo/world';
 import { formatPhone } from '@/lib/phone';
@@ -191,7 +197,13 @@ export default function ClientDetailPage() {
     const cats = getCategories();
     return (catId: string) => cats.find(c => c.id === catId)?.name ?? '—';
   }, []);
+  const { busy, run } = useAction();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
 
+  // Antes de cargar el snapshot todo id "no existe": primero cargar/fallar.
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
   if (!profile) {
     return (
       <div>
@@ -378,13 +390,16 @@ export default function ClientDetailPage() {
                 </button>
                 {addrDeleting === a.id ? (
                   <button
-                    onClick={() => {
-                      setAddrDeleting(null);
-                      void deleteAddress(a.id).then(
-                        ok => ok && toast.success('Dirección eliminada'),
+                    disabled={!!busy}
+                    onClick={async () => {
+                      await run(
+                        `del-${a.id}`,
+                        () => deleteAddress(a.id),
+                        'Dirección eliminada',
                       );
+                      setAddrDeleting(null);
                     }}
-                    className="rounded-lg bg-error px-2 py-1 text-[11.5px] font-semibold text-white"
+                    className="disabled:opacity-50 rounded-lg bg-error px-2 py-1 text-[11.5px] font-semibold text-white"
                   >
                     Confirmar
                   </button>
@@ -513,11 +528,15 @@ export default function ClientDetailPage() {
             </button>
             {suspended ? (
               <button
-                onClick={() => {
-                  reactivateUser(id);
-                  toast.success(`Cuenta reactivada · ${name}`);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-success bg-white px-3.5 py-2.5 text-[13px] font-semibold text-success hover:bg-success-soft"
+                disabled={!!busy}
+                onClick={() =>
+                  void run(
+                    'reactivate',
+                    () => reactivateUser(id),
+                    `Cuenta reactivada · ${name}`,
+                  )
+                }
+                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-2 rounded-xl border border-success bg-white px-3.5 py-2.5 text-[13px] font-semibold text-success hover:bg-success-soft"
               >
                 <RotateCcw size={14} /> Reactivar
               </button>
@@ -885,18 +904,26 @@ export default function ClientDetailPage() {
         width={460}
         footer={
           <>
-            <GhostButton onClick={() => setSuspendOpen(false)}>
+            <GhostButton
+              disabled={busy === 'suspend'}
+              onClick={() => setSuspendOpen(false)}
+            >
               Cancelar
             </GhostButton>
             <button
-              onClick={() => {
-                suspendUser(id);
-                setSuspendOpen(false);
-                toast.success(`Cuenta suspendida · ${name}`);
+              disabled={busy === 'suspend'}
+              onClick={async () => {
+                const ok = await run(
+                  'suspend',
+                  () => suspendUser(id),
+                  `Cuenta suspendida · ${name}`,
+                );
+                if (ok) setSuspendOpen(false);
               }}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Ban size={14} /> Suspender cuenta
+              <Ban size={14} />{' '}
+              {busy === 'suspend' ? 'Suspendiendo…' : 'Suspender cuenta'}
             </button>
           </>
         }
@@ -951,19 +978,26 @@ function AddressModal({
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF({ ...f, [k]: e.target.value });
+  const { busy, run } = useAction();
+  const cpInvalid = !!f.postal_code && !/^\d{5}$/.test(f.postal_code.trim());
 
-  function submit() {
-    if (!f.address_line.trim()) return;
-    void saveAddress(
-      clientId,
-      { ...f, address_line: f.address_line.trim() },
-      addr?.id,
-    ).then(ok => {
-      if (ok) {
-        toast.success(addr ? 'Dirección actualizada' : 'Dirección agregada');
-        onClose();
-      }
-    });
+  async function submit() {
+    if (!f.address_line.trim() || cpInvalid) return;
+    const ok = await run(
+      'save',
+      () =>
+        saveAddress(
+          clientId,
+          {
+            ...f,
+            address_line: f.address_line.trim(),
+            postal_code: f.postal_code?.trim() || null,
+          },
+          addr?.id,
+        ),
+      addr ? 'Dirección actualizada' : 'Dirección agregada',
+    );
+    if (ok) onClose();
   }
 
   return (
@@ -975,8 +1009,14 @@ function AddressModal({
       width={520}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!f.address_line.trim()}>
+          <GhostButton onClick={onClose} disabled={!!busy}>
+            Cancelar
+          </GhostButton>
+          <PrimaryButton
+            onClick={() => void submit()}
+            loading={!!busy}
+            disabled={!f.address_line.trim() || cpInvalid}
+          >
             {addr ? 'Guardar cambios' : 'Agregar dirección'}
           </PrimaryButton>
         </>
@@ -996,7 +1036,13 @@ function AddressModal({
               value={f.postal_code ?? ''}
               onChange={set('postal_code')}
               placeholder="44100"
+              aria-invalid={cpInvalid}
             />
+            {cpInvalid && (
+              <p className="mt-1 text-[11.5px] text-error">
+                El código postal son 5 dígitos.
+              </p>
+            )}
           </Field>
         </div>
         <Field label="Calle y número">

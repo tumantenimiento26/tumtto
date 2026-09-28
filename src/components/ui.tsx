@@ -95,13 +95,15 @@ export function GhostButton({
   onClick,
   href,
   className = '',
+  disabled,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   href?: string;
   className?: string;
+  disabled?: boolean;
 }) {
-  const cls = `inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-3 font-semibold text-primary transition-colors hover:bg-surface ${className}`;
+  const cls = `inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-3 font-semibold text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 ${className}`;
   if (href)
     return (
       <Link href={href} className={cls}>
@@ -109,7 +111,7 @@ export function GhostButton({
       </Link>
     );
   return (
-    <button onClick={onClick} className={cls}>
+    <button type="button" onClick={onClick} disabled={disabled} className={cls}>
       {children}
     </button>
   );

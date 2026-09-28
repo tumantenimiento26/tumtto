@@ -31,6 +31,8 @@ import {
   StatCard,
   StatusPill,
   Modal,
+  LoadFailed,
+  PageSkeleton,
 } from '@/components/admin';
 import {
   Avatar,
@@ -51,6 +53,7 @@ import {
   motion,
 } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
 import {
   getAllDisputes,
   getDisputes,
@@ -67,6 +70,9 @@ import {
   escalateDispute,
   resolveKyc,
   rejectKyc,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
   createTicket,
   replyTicket,
   resolveTicket,
@@ -110,6 +116,8 @@ const hora = (iso: string) =>
 
 export default function SoportePage() {
   useTick();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
   const [tab, setTab] = useState<'disputas' | 'kyc' | 'tickets'>('disputas');
   const [newTicketOpen, setNewTicketOpen] = useState(false);
 
@@ -130,6 +138,10 @@ export default function SoportePage() {
         d.resolved_at &&
         new Date(d.resolved_at).toDateString() === new Date().toDateString(),
     ).length + tickets.filter(t => t.status === 'resolved').length;
+
+  // Sin snapshot, las colas vacías se leían como "¡Buen trabajo!".
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -281,6 +293,7 @@ function DisputeCard({
     : null;
   const typeLabel = dispute.reason;
   const escalated = dispute.status === 'in_review';
+  const { busy, run } = useAction();
 
   return (
     <motion.div
@@ -396,10 +409,15 @@ function DisputeCard({
           <div className="space-y-2">
             <PrimaryButton
               className="w-full"
-              onClick={() => {
-                resolveDispute(dispute.id, 'resuelto');
-                toast.success(`Disputa resuelta · #${dispute.id}`);
-              }}
+              loading={busy === 'resolve'}
+              disabled={!!busy}
+              onClick={() =>
+                void run(
+                  'resolve',
+                  () => resolveDispute(dispute.id, 'resuelto'),
+                  `Disputa resuelta · #${dispute.id}`,
+                )
+              }
             >
               <span className="inline-flex items-center justify-center gap-2">
                 <Check size={14} /> Resolver
@@ -408,10 +426,14 @@ function DisputeCard({
             {!escalated && (
               <GhostButton
                 className="w-full"
-                onClick={() => {
-                  escalateDispute(dispute.id);
-                  toast.success(`Disputa escalada a nivel 2 · #${dispute.id}`);
-                }}
+                disabled={!!busy}
+                onClick={() =>
+                  void run(
+                    'escalate',
+                    () => escalateDispute(dispute.id),
+                    `Disputa escalada a nivel 2 · #${dispute.id}`,
+                  )
+                }
               >
                 <span className="inline-flex items-center justify-center gap-2">
                   <ArrowUpRight size={14} /> Escalar
@@ -503,6 +525,8 @@ function KycPanel() {
 
 function KycCard({ techId, userId }: { techId: string; userId: string }) {
   const profile = getProfile(userId);
+  const { busy, run } = useAction();
+  const who = profile?.full_name ?? techId;
   const docs = getKycSessions(techId);
 
   return (
@@ -567,21 +591,31 @@ function KycCard({ techId, userId }: { techId: string; userId: string }) {
       <div className="flex items-center gap-2 pt-1">
         <PrimaryButton
           className="flex-1"
-          onClick={() => {
-            resolveKyc(techId, true);
-            toast.success(`Técnico aprobado · ${profile?.full_name ?? techId}`);
-          }}
+          loading={busy === 'approve'}
+          disabled={!!busy}
+          onClick={() =>
+            void run(
+              'approve',
+              () => resolveKyc(techId, true),
+              `Técnico aprobado · ${who}`,
+            )
+          }
         >
           <span className="inline-flex items-center justify-center gap-2">
             <Check size={14} /> Aprobar
           </span>
         </PrimaryButton>
         <button
+          disabled={!!busy}
           onClick={() => {
-            rejectKyc(techId, 'Rechazo desde cola KYC');
-            toast.success(`KYC rechazado · ${profile?.full_name ?? techId}`);
+            if (!window.confirm(`¿Rechazar el KYC de ${who}?`)) return;
+            void run(
+              'reject',
+              () => rejectKyc(techId, 'Rechazo desde cola KYC'),
+              `KYC rechazado · ${who}`,
+            );
           }}
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface py-2 text-sm font-medium text-error hover:bg-surface-2"
+          className="disabled:cursor-not-allowed disabled:opacity-50 flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface py-2 text-sm font-medium text-error hover:bg-surface-2"
         >
           <X size={14} /> Rechazar
         </button>

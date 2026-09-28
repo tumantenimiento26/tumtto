@@ -35,6 +35,7 @@ import {
 } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
 import {
   getTechniciansWithProfile,
   getTechCategories,
@@ -126,6 +127,7 @@ function SkeletonRows({ rows = 6 }: { rows?: number }) {
 
 export default function TecnicosPage() {
   const tick = useTick();
+  const { busy, run } = useAction();
   const router = useRouter();
   const ready = useWorldReady();
   const failed = useWorldFailed();
@@ -320,22 +322,31 @@ export default function TecnicosPage() {
           {r.kyc === 'in_review' && (
             <>
               <button
+                disabled={!!busy}
                 onClick={e => {
                   e.stopPropagation();
-                  resolveKyc(r.id, true);
-                  toast.success(`Técnico aprobado · ${r.name}`);
+                  void run(
+                    `approve-${r.id}`,
+                    () => resolveKyc(r.id, true),
+                    `Técnico aprobado · ${r.name}`,
+                  );
                 }}
-                className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11.5px] font-semibold text-success hover:bg-success/15"
+                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11.5px] font-semibold text-success hover:bg-success/15"
               >
                 <Check size={12} /> Aprobar
               </button>
               <button
+                disabled={!!busy}
                 onClick={e => {
                   e.stopPropagation();
-                  rejectKyc(r.id, 'Rechazo rápido desde el listado');
-                  toast.success(`KYC rechazado · ${r.name}`);
+                  if (!window.confirm(`¿Rechazar el KYC de ${r.name}?`)) return;
+                  void run(
+                    `reject-${r.id}`,
+                    () => rejectKyc(r.id, 'Rechazo rápido desde el listado'),
+                    `KYC rechazado · ${r.name}`,
+                  );
                 }}
-                className="inline-flex items-center gap-1 rounded-lg border border-error/30 bg-error/10 px-2.5 py-1 text-[11.5px] font-semibold text-error hover:bg-error/15"
+                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-error/30 bg-error/10 px-2.5 py-1 text-[11.5px] font-semibold text-error hover:bg-error/15"
               >
                 <X size={12} /> Rechazar
               </button>

@@ -24,7 +24,13 @@ import {
   BadgeCheck,
   AlertOctagon,
 } from 'lucide-react';
-import { PageHeading, Panel, Modal } from '@/components/admin';
+import {
+  PageHeading,
+  Panel,
+  Modal,
+  LoadFailed,
+  PageSkeleton,
+} from '@/components/admin';
 import {
   Avatar,
   Badge,
@@ -34,6 +40,8 @@ import {
 } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
 import { toast } from '@/components/toast';
+import { useAction } from '@/components/use-action';
+import { isValidClabe } from '@/lib/clabe';
 import {
   useTick,
   getTechnician,
@@ -49,6 +57,9 @@ import {
   addNote,
   upsertTechRate,
   updateTechnicianBank,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
 
@@ -95,10 +106,16 @@ export default function TecnicoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [note, setNote] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const { busy, run } = useAction();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
 
   const tech = getTechnician(id);
   const profile = tech ? getProfile(tech.id) : null;
 
+  // Antes de cargar el snapshot todo id "no existe": primero cargar/fallar.
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
   if (!tech || !profile) {
     return (
       <FadeIn>
@@ -142,28 +159,36 @@ export default function TecnicoDetailPage() {
     suspended: { label: 'Suspendido', tone: 'neutral' },
   };
 
-  function onApprove() {
-    resolveKyc(tech!.id, true);
-    toast.success(`Técnico aprobado · ${name}`);
-  }
-  function onSuspend() {
-    suspendTechnician(tech!.id);
-    toast.success(`Técnico suspendido · ${name}`);
-  }
-  function onReactivate() {
-    reactivateTechnician(tech!.id);
-    toast.success(`Técnico reactivado · ${name}`);
-  }
+  const onApprove = () =>
+    void run(
+      'approve',
+      () => resolveKyc(tech!.id, true),
+      `Técnico aprobado · ${name}`,
+    );
+  const onSuspend = () =>
+    void run(
+      'suspend',
+      () => suspendTechnician(tech!.id),
+      `Técnico suspendido · ${name}`,
+    );
+  const onReactivate = () =>
+    void run(
+      'reactivate',
+      () => reactivateTechnician(tech!.id),
+      `Técnico reactivado · ${name}`,
+    );
   function onSaveNote() {
     if (!note.trim()) return;
     addNote(tech!.id, note.trim());
     setNote('');
     toast.local('Nota guardada');
   }
-  function onApproveAllDocs() {
-    resolveKyc(tech!.id, true);
-    toast.success('Verificación aprobada');
-  }
+  const onApproveAllDocs = () =>
+    void run(
+      'approve',
+      () => resolveKyc(tech!.id, true),
+      'Verificación aprobada',
+    );
 
   return (
     <div className="flex flex-col gap-5 text-navy">
@@ -220,7 +245,11 @@ export default function TecnicoDetailPage() {
                 >
                   <X size={14} /> Rechazar
                 </button>
-                <PrimaryButton onClick={onApprove}>
+                <PrimaryButton
+                  onClick={onApprove}
+                  loading={busy === 'approve'}
+                  disabled={!!busy}
+                >
                   <span className="inline-flex items-center gap-2">
                     <Check size={14} /> Aprobar KYC
                   </span>
@@ -228,7 +257,11 @@ export default function TecnicoDetailPage() {
               </>
             )}
             {kyc === 'declined' && (
-              <PrimaryButton onClick={onApprove}>
+              <PrimaryButton
+                onClick={onApprove}
+                loading={busy === 'approve'}
+                disabled={!!busy}
+              >
                 <span className="inline-flex items-center gap-2">
                   <Check size={14} /> Aprobar KYC
                 </span>
@@ -237,13 +270,18 @@ export default function TecnicoDetailPage() {
             {kyc === 'approved' && (
               <button
                 onClick={onSuspend}
-                className="inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft"
+                disabled={!!busy}
+                className="disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-2 rounded-xl border border-error bg-white px-3.5 py-2.5 text-[13px] font-semibold text-error hover:bg-error-soft"
               >
                 <Ban size={14} /> Suspender
               </button>
             )}
             {kyc === 'suspended' && (
-              <PrimaryButton onClick={onReactivate}>
+              <PrimaryButton
+                onClick={onReactivate}
+                loading={busy === 'reactivate'}
+                disabled={!!busy}
+              >
                 <span className="inline-flex items-center gap-2">
                   <RotateCcw size={14} /> Reactivar
                 </span>
@@ -317,24 +355,28 @@ export default function TecnicoDetailPage() {
                           defaultValue={r.visita_cents / 100}
                           aria-label={`Tarifa de visita · ${r.cat}`}
                           onBlur={e => {
-                            const cents = Math.round(
-                              Number(e.target.value) * 100,
-                            );
-                            if (
-                              !Number.isFinite(cents) ||
-                              cents < 0 ||
-                              cents === r.visita_cents
-                            )
+                            const input = e.target;
+                            const saved = String(r.visita_cents / 100);
+                            const raw = input.value.trim();
+                            const cents = Math.round(Number(raw) * 100);
+                            if (raw === saved) return;
+                            // Vacío o ≤ 0 no es una tarifa: se avisa y se
+                            // regresa al valor guardado (antes guardaba $0).
+                            if (!raw || !Number.isFinite(cents) || cents <= 0) {
+                              toast.error('La tarifa debe ser mayor a $0.');
+                              input.value = saved;
                               return;
+                            }
                             void upsertTechRate(tech!.id, r.category_id, {
                               visita_cents: cents,
                               hora_cents: r.hora_cents,
                               minimo_cents: r.minimo_cents,
-                            }).then(
-                              ok =>
-                                ok &&
-                                toast.success(`Tarifa actualizada · ${r.cat}`),
-                            );
+                            }).then(ok => {
+                              if (ok)
+                                toast.success(`Tarifa actualizada · ${r.cat}`);
+                              // Si falló, que el input muestre lo que hay en la base.
+                              else input.value = saved;
+                            });
                           }}
                           onKeyDown={e =>
                             e.key === 'Enter' &&
@@ -404,20 +446,16 @@ export default function TecnicoDetailPage() {
                         d.status === 'in_progress') && (
                         <div className="flex gap-1.5">
                           <button
-                            onClick={() => {
-                              resolveKyc(tech!.id, true);
-                              toast.success('Verificación aprobada');
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"
+                            disabled={!!busy}
+                            onClick={onApproveAllDocs}
+                            className="disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success"
                           >
                             <Check size={12} /> Aprobar verificación
                           </button>
                           <button
-                            onClick={() => {
-                              resolveKyc(tech!.id, false);
-                              toast.error('Verificación rechazada');
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-warning-ink"
+                            disabled={!!busy}
+                            onClick={() => setRejectOpen(true)}
+                            className="disabled:opacity-50 inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-warning-ink"
                           >
                             <X size={12} /> Rechazar
                           </button>
@@ -429,6 +467,7 @@ export default function TecnicoDetailPage() {
               )}
               {pendingDocs.length > 0 && (
                 <button
+                  disabled={!!busy}
                   onClick={onApproveAllDocs}
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary/[0.06] px-3.5 py-2.5 text-[13px] font-semibold text-primary hover:bg-info-soft"
                 >
@@ -503,10 +542,16 @@ export default function TecnicoDetailPage() {
         onClose={() => setRejectOpen(false)}
         techName={name}
         email={email}
-        onConfirm={(reason, comment) => {
-          rejectKyc(tech.id, comment ? `${reason} — ${comment}` : reason);
-          setRejectOpen(false);
-          toast.success(`KYC rechazado · ${name}`);
+        busy={busy === 'reject'}
+        onConfirm={async (reason, comment) => {
+          // El modal solo se cierra si el rechazo quedó guardado.
+          const ok = await run(
+            'reject',
+            () =>
+              rejectKyc(tech.id, comment ? `${reason} — ${comment}` : reason),
+            `KYC rechazado · ${name}`,
+          );
+          if (ok) setRejectOpen(false);
         }}
       />
     </div>
@@ -519,12 +564,14 @@ function RejectModal({
   onConfirm,
   techName,
   email,
+  busy,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (reason: string, comment: string) => void;
   techName: string;
   email: string;
+  busy?: boolean;
 }) {
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [comment, setComment] = useState('');
@@ -539,12 +586,13 @@ function RejectModal({
       width={580}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
+          <GhostButton onClick={() => !busy && onClose()}>Cancelar</GhostButton>
           <button
+            disabled={busy}
             onClick={() => onConfirm(reason, comment.trim())}
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
+            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <X size={14} /> Confirmar rechazo
+            <X size={14} /> {busy ? 'Rechazando…' : 'Confirmar rechazo'}
           </button>
         </>
       }
@@ -597,20 +645,19 @@ function BankPanel({
   const [editing, setEditing] = useState(false);
   const [clabe, setClabe] = useState(tech.clabe ?? '');
   const [bank, setBank] = useState(tech.bank_name ?? '');
+  const { busy, run } = useAction();
 
-  function onSave() {
-    if (clabe && !/^\d{18}$/.test(clabe)) {
-      toast.error('La CLABE debe tener 18 dígitos');
+  async function onSave() {
+    if (clabe && !isValidClabe(clabe)) {
+      toast.error('CLABE no válida: revisa los 18 dígitos.');
       return;
     }
-    void updateTechnicianBank(tech.id, bank.trim() || null, clabe || null).then(
-      ok => {
-        if (ok) {
-          toast.success('Datos bancarios guardados');
-          setEditing(false);
-        }
-      },
+    const ok = await run(
+      'bank',
+      () => updateTechnicianBank(tech.id, bank.trim() || null, clabe || null),
+      'Datos bancarios guardados',
     );
+    if (ok) setEditing(false);
   }
 
   return (
@@ -628,7 +675,9 @@ function BankPanel({
             >
               Cancelar
             </GhostButton>
-            <PrimaryButton onClick={onSave}>Guardar</PrimaryButton>
+            <PrimaryButton onClick={() => void onSave()} loading={!!busy}>
+              Guardar
+            </PrimaryButton>
           </div>
         ) : (
           <button

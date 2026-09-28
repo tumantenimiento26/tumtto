@@ -136,6 +136,7 @@ const CAT = (
   description,
   sort_order,
   is_active: true,
+  commission_bps: null,
   ...ts(),
 });
 

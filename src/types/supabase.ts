@@ -419,6 +419,7 @@ export type Database = {
       }
       service_categories: {
         Row: {
+          commission_bps: number | null
           created_at: string
           description: string | null
           icon: string | null
@@ -430,6 +431,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commission_bps?: number | null
           created_at?: string
           description?: string | null
           icon?: string | null
@@ -441,6 +443,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commission_bps?: number | null
           created_at?: string
           description?: string | null
           icon?: string | null

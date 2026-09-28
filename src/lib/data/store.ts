@@ -368,6 +368,12 @@ export const getOrderEvents = (orderId: string) =>
   w()
     .events.filter(e => e.service_order_id === orderId)
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
+// ── consola-a (dashboard) ─────────────────────────────────────────────────
+/** Todos los eventos de estado (actividad en vivo del dashboard). */
+export const getAllEvents = () => w().events;
+/** Todas las calificaciones (demo-only hasta leer order_ratings). */
+export const getAllRatings = () => w().ratings;
+// ── /consola-a ────────────────────────────────────────────────────────────
 export const getCategoriesWithCounts = () =>
   w().categories.map(c => ({
     ...c,

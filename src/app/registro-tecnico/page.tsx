@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -52,6 +52,11 @@ export default function RegistroTecnicoPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Código del enlace de invitación (/invitacion/CODIGO sin la app instalada).
+  const [invite, setInvite] = useState<string | null>(null);
+  useEffect(() => {
+    setInvite(new URLSearchParams(window.location.search).get('invite'));
+  }, []);
 
   const country = COUNTRIES.find(c => c.iso === countryIso) ?? DEFAULT_COUNTRY;
   const phone = toE164(national, country);
@@ -77,7 +82,10 @@ export default function RegistroTecnicoPage() {
           full_name: name.trim(),
           phone,
           requested_role: 'tecnico',
+          ...(invite ? { invite_code: invite } : {}),
         },
+        // El correo de confirmación abre la app (App Link) o su respaldo web.
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setLoading(false);
@@ -147,6 +155,11 @@ export default function RegistroTecnicoPage() {
             <p className="mb-7 text-sm text-muted">
               Crea tu cuenta y termina tu alta desde la app.
             </p>
+            {invite && (
+              <p className="-mt-4 mb-6 rounded-xl bg-success-soft px-3.5 py-2.5 text-xs text-success">
+                Registro con invitación · código <b>{invite}</b>
+              </p>
+            )}
 
             <form onSubmit={submit} noValidate className="flex flex-col gap-5">
               <div>

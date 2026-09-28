@@ -1,724 +1,514 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Download, Snowflake, Star } from 'lucide-react';
 import {
-  CalendarRange,
-  ChevronDown,
-  Download,
-  Link2,
-  Star,
-  TrendingUp,
-  AlertTriangle,
-  MapPin,
-  HardHat,
-  Snowflake,
-  UserPlus,
-} from 'lucide-react';
-import {
-  PageHeading,
-  Panel,
-  StatCard,
+  Badge,
+  Button,
+  Card,
   DataTable,
-  exportCsv,
-  type Column,
-  LoadFailed,
-  PageSkeleton,
-} from '@/components/admin';
-import { LineChart, VBars, HBars, HeatCalendar } from '@/components/charts';
-import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
-import { toast } from '@/components/toast';
+  EmptyState,
+  ErrorPage,
+  Kicker,
+  PageHeader,
+  ScreenSkeleton,
+  Segmented,
+  toast,
+} from '@/components/ds';
+import { LineChart, HBars } from '@/components/charts';
 import {
-  getTechniciansWithProfile,
-  getMetrics,
   getCategoriesWithCounts,
+  getReportData,
+  getTechniciansWithProfile,
+  fetchReportKpis,
+  fetchTicketByCategory,
+  fetchColdZones,
+  type ReportKpis,
   useTick,
   useWorldReady,
   useWorldFailed,
   loadWorld,
 } from '@/lib/data/store';
+import {
+  completedSeries,
+  demandHeatmap,
+  funnel,
+  lastDays,
+  prdKpis,
+  toCsv,
+  type Kpi,
+} from '@/lib/reportMetrics';
+import { Heatmap } from './_components/Heatmap';
 
-const RANGES = ['7 días', '30 días', 'Trimestre', 'Año'] as const;
+const RANGES = ['7 días', '30 días', '90 días'] as const;
 type Range = (typeof RANGES)[number];
-
-// ── Series por rango (mock, valores en servicios y $K MXN) ──────────────────
-const pts = (labels: string[], values: number[]) =>
-  labels.map((label, i) => ({ label, value: values[i] }));
-const RANGE_DATA: Record<
-  Range,
-  {
-    svc: { label: string; value: number }[];
-    gmv: { label: string; value: number }[];
-    svcDelta: string;
-    gmvDelta: string;
-    periodo: string;
-  }
-> = {
-  '7 días': {
-    svc: pts(
-      ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
-      [64, 71, 58, 82, 96, 118, 87],
-    ),
-    gmv: pts(
-      ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
-      [61, 68, 52, 79, 92, 121, 83],
-    ),
-    svcDelta: '+6% WoW',
-    gmvDelta: '+9% WoW',
-    periodo: '25 jun – 01 jul 2026',
-  },
-  '30 días': {
-    svc: pts(['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], [498, 531, 507, 576]),
-    gmv: pts(['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], [471, 502, 489, 548]),
-    svcDelta: '+11% MoM',
-    gmvDelta: '+18% MoM',
-    periodo: '02 jun – 01 jul 2026',
-  },
-  Trimestre: {
-    svc: pts(['Abr', 'May', 'Jun'], [489, 542, 601]),
-    gmv: pts(['Abr', 'May', 'Jun'], [468, 498, 553]),
-    svcDelta: '+23% QoQ',
-    gmvDelta: '+27% QoQ',
-    periodo: 'Abr – Jun 2026',
-  },
-  Año: {
-    svc: pts(
-      [
-        'Jul',
-        'Ago',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dic',
-        'Ene',
-        'Feb',
-        'Mar',
-        'Abr',
-        'May',
-        'Jun',
-      ],
-      [201, 224, 248, 271, 296, 312, 358, 401, 447, 489, 542, 601],
-    ),
-    gmv: pts(
-      [
-        'Jul',
-        'Ago',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dic',
-        'Ene',
-        'Feb',
-        'Mar',
-        'Abr',
-        'May',
-        'Jun',
-      ],
-      [188, 212, 239, 260, 288, 313, 352, 398, 431, 468, 498, 553],
-    ),
-    svcDelta: '+112% YoY',
-    gmvDelta: '+124% YoY',
-    periodo: 'Jul 2025 – Jun 2026',
-  },
+const DAYS: Record<Range, number> = {
+  '7 días': 7,
+  '30 días': 30,
+  '90 días': 90,
 };
 
-// ── Demanda por día y hora (demo determinista) ───────────────────────────────
-const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const HORAS = Array.from({ length: 12 }, (_, i) => `${8 + i}h`);
-// demo: patrón determinista — picos matutinos (10–12 h) y fin de semana,
-// mismo shape que el artefacto del Design System.
-function demanda(r: number, c: number) {
-  const h = 8 + c;
-  const matutino = Math.exp(-((h - 11) ** 2) / 8);
-  const vespertino = 0.5 * Math.exp(-((h - 17) ** 2) / 10);
-  const finde = r >= 5 ? 1.45 : 1;
-  return Math.round(
-    (14 + 46 * Math.max(matutino, vespertino)) *
-      finde *
-      (1 + 0.06 * ((r * 7 + c * 3) % 5)),
-  );
-}
+const mxn = (cents: number) =>
+  `$${Math.round(cents / 100).toLocaleString('es-MX')}`;
 
-// demo: cancelaciones concentradas en tarde-noche y zonas frías del finde.
-function cancelaciones(r: number, c: number) {
-  const h = 8 + c;
-  const tarde = Math.exp(-((h - 18) ** 2) / 6);
-  const finde = r >= 5 ? 1.6 : 1;
-  return Math.round(
-    (1 + 5 * tarde) * finde * (1 + 0.12 * ((r * 5 + c * 2) % 4)),
-  );
-}
-
-const COLD_ZONES = [
-  {
-    name: 'Tlajomulco Centro',
-    city: 'Tlajomulco',
-    ratio: '8.4 : 1',
-    demand: 142,
-    techs: 17,
-    note: 'Alta demanda de plomería y electricidad con cobertura insuficiente en horario pico.',
-  },
-  {
-    name: 'El Salto Industrial',
-    city: 'El Salto',
-    ratio: '6.1 : 1',
-    demand: 98,
-    techs: 16,
-    note: 'Servicios de refrigeración con tiempos de respuesta por encima del SLA objetivo.',
-  },
-  {
-    name: 'Tonalá Oriente',
-    city: 'Tonalá',
-    ratio: '5.7 : 1',
-    demand: 87,
-    techs: 15,
-    note: 'Demanda creciente de cerrajería sin técnicos disponibles los fines de semana.',
-  },
-];
-
-const CITY_TINTS: Record<string, string> = {
-  Guadalajara: '#0A6BCF',
-  Zapopan: '#0894EA',
-  Tlaquepaque: '#5CB7F0',
-  Tonalá: '#18C1FF',
-  Tlajomulco: '#0E2C56',
-  'El Salto': '#B2CCE3',
+type TicketRow = {
+  category_id: string;
+  paid_orders: number;
+  avg_ticket_cents: number;
 };
-
-interface TechRow {
-  rank: number;
-  id: string;
-  name: string;
-  initials: string;
-  region: string;
-  rating: number;
-  jobs: number;
-  gmv: number;
-}
+type ColdRow = { zone_id: string; zone_name: string; order_count: number };
 
 export default function ReportesPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const [range, setRange] = useState<Range>('30 días');
+  const days = DAYS[range];
+  const period = useMemo(() => lastDays(days), [days]);
 
-  const metrics = getMetrics();
+  const [rpc, setRpc] = useState<{
+    kpis: ReportKpis | null;
+    tickets: TicketRow[] | null;
+    cold: ColdRow[] | null;
+    loading: boolean;
+  }>({ kpis: null, tickets: null, cold: null, loading: true });
+
+  useEffect(() => {
+    let live = true;
+    setRpc(r => ({ ...r, loading: true }));
+    void Promise.all([
+      fetchReportKpis(period.from, period.to),
+      fetchTicketByCategory(period.from, period.to),
+      fetchColdZones(period.from, period.to),
+    ]).then(([kpis, tickets, cold]) => {
+      if (live) setRpc({ kpis, tickets, cold, loading: false });
+    });
+    return () => {
+      live = false;
+    };
+  }, [period]);
+
+  const { orders, events, technicians } = getReportData();
+  const kpis = prdKpis(orders, events, technicians, period);
+  const series = completedSeries(orders, Math.min(days, 30));
+  const steps = funnel(orders, events, period);
+  const grid = demandHeatmap(orders, period);
   const cats = getCategoriesWithCounts();
-  const serie = RANGE_DATA[range];
-  // ponytail: periodo anterior demo — factores fijos sobre la serie actual.
-  const svcPrev = serie.svc.map((d, i) =>
-    Math.round(d.value * [0.86, 0.92, 0.83, 0.9][i % 4]),
-  );
-  const gmvTotal = serie.gmv.reduce((s, d) => s + d.value, 0);
-  const svcTotal = serie.svc.reduce((s, d) => s + d.value, 0);
-
-  const techRows: TechRow[] = useMemo(() => {
-    const regions = [
-      'Guadalajara',
-      'Zapopan',
-      'Tlaquepaque',
-      'Tonalá',
-      'Tlajomulco',
-    ];
-    return getTechniciansWithProfile()
-      .map(({ tech, profile }, i) => {
-        const name = profile?.full_name ?? `Técnico ${i + 1}`;
-        const initials = name
-          .split(' ')
-          .map(w => w[0])
-          .slice(0, 2)
-          .join('')
-          .toUpperCase();
-        return {
-          id: tech.id,
-          name,
-          initials,
-          region: regions[i % regions.length],
-          rating: tech.rating_avg,
-          jobs: tech.rating_count,
-          gmv: Math.round(tech.rating_count * 1180),
-        };
-      })
-      .sort((a, b) => b.rating - a.rating || b.jobs - a.jobs)
-      .map((t, i) => ({ ...t, rank: i + 1 }));
-  }, []);
-
-  // ponytail: sin ticket promedio por categoría — los pagos del demo son muy
-  // escasos para derivarlo; solo conteo de servicios vivo.
+  const ticketBy = new Map((rpc.tickets ?? []).map(t => [t.category_id, t]));
   const catRows = cats
     .filter(c => c.services > 0)
-    .map(c => ({ label: c.name, value: c.services }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
+    .map(c => {
+      const t = ticketBy.get(c.id);
+      return {
+        label: c.name,
+        value: c.services,
+        meta: t ? `ticket medio ${mxn(Number(t.avg_ticket_cents))}` : undefined,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
 
-  const fmtMXN = (n: number) => `$${(n / 1000).toFixed(0)}K`;
+  const doneByTech = new Map<string, number>();
+  for (const o of orders)
+    if (o.technician_id && ['completed', 'paid', 'closed'].includes(o.status))
+      doneByTech.set(
+        o.technician_id,
+        (doneByTech.get(o.technician_id) ?? 0) + 1,
+      );
+  const techRows = getTechniciansWithProfile()
+    .map(({ tech, profile }) => ({
+      id: tech.id,
+      name: profile?.full_name ?? 'Técnico',
+      rating: tech.rating_avg,
+      reviews: tech.rating_count,
+      done: doneByTech.get(tech.id) ?? 0,
+    }))
+    .sort((a, b) => b.done - a.done || b.rating - a.rating)
+    .slice(0, 10)
+    .map((t, i) => ({ ...t, rank: i + 1 }));
 
-  const columns: Column<TechRow>[] = [
-    {
-      key: 'rank',
-      header: '#',
-      className: 'w-10',
-      render: r => (
-        <span
-          className={`inline-grid h-6 w-6 place-items-center rounded-md font-mono text-[11px] font-bold ${r.rank <= 3 ? 'bg-grad-brand text-white' : 'bg-surface-2 text-muted'}`}
-        >
-          {r.rank}
-        </span>
-      ),
-    },
-    {
-      key: 'name',
-      header: 'Técnico',
-      render: r => (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Avatar initials={r.initials} size={32} />
-          <span className="text-[13px] font-semibold text-navy">{r.name}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'region',
-      header: 'Región',
-      render: r => <span className="text-[12.5px] text-muted">{r.region}</span>,
-    },
-    {
-      key: 'rating',
-      header: 'Rating',
-      className: 'text-right',
-      render: r => (
-        <span className="inline-flex items-center gap-1">
-          <Star className="text-warning" size={12} fill="currentColor" />
-          <b className="text-[12.5px] font-semibold text-navy">
-            {r.rating.toFixed(2)}
-          </b>
-        </span>
-      ),
-    },
-    {
-      key: 'jobs',
-      header: 'Servicios',
-      className: 'text-right',
-      render: r => (
-        <span className="font-mono text-[12.5px] text-navy">{r.jobs}</span>
-      ),
-    },
-    {
-      key: 'gmv',
-      header: 'GMV',
-      className: 'text-right',
-      render: r => (
-        <span className="font-mono text-[13px] font-semibold text-navy">
-          {fmtMXN(r.gmv)}
-        </span>
-      ),
-    },
-  ];
+  function exportCsv() {
+    const rows = [
+      ...kpis.map(k => ({
+        Sección: 'KPI',
+        Métrica: k.label,
+        Valor: k.display,
+        Meta: k.goal,
+      })),
+      ...steps.map(s => ({
+        Sección: 'Embudo',
+        Métrica: s.label,
+        Valor: s.value,
+        Meta: '',
+      })),
+      ...catRows.map(c => ({
+        Sección: 'Categoría',
+        Métrica: c.label,
+        Valor: c.value,
+        Meta: c.meta ?? '',
+      })),
+      ...techRows.map(t => ({
+        Sección: 'Top técnicos',
+        Métrica: t.name,
+        Valor: t.done,
+        Meta: `${t.rating.toFixed(2)} ★`,
+      })),
+    ];
+    try {
+      const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reporte-${days}d-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV exportado', `${rows.length} filas · ${range}`);
+    } catch {
+      toast.error('No se pudo exportar el CSV');
+    }
+  }
 
-  // Sin snapshot los reportes se veían en cero como si no hubiera actividad.
-  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
-  if (!ready) return <PageSkeleton />;
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready) return <ScreenSkeleton kind="dashboard" />;
+
+  const cur = rpc.kpis?.current;
+  const prev = rpc.kpis?.previous;
+  const delta = (a?: number, b?: number) =>
+    a == null ||
+    b == null ||
+    !Number.isFinite(a) ||
+    !Number.isFinite(b) ||
+    b === 0
+      ? null
+      : Math.round(((a - b) / b) * 100);
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading
+      <PageHeader
         title="Reportes y analítica"
-        sub="Insights de negocio, adquisición, desempeño y cobertura geográfica."
+        description="Metas del PRD a 6 meses frente a la operación actual."
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2">
-              <CalendarRange className="text-cyan" size={14} />
-              <span className="text-[12.5px] font-medium text-navy">
-                {serie.periodo}
-              </span>
-              <ChevronDown className="text-faint" size={13} />
-            </div>
-            <GhostButton
-              onClick={() => {
-                // El navegador puede negarlo (permisos / http): solo avisar si copió.
-                void navigator.clipboard?.writeText(window.location.href).then(
-                  () => toast.success('Link copiado al portapapeles'),
-                  () =>
-                    toast.error(
-                      'No se pudo copiar. Copia el link de la barra.',
-                    ),
-                );
-              }}
-            >
-              <Link2 size={14} className="mr-2" />
-              Compartir link
-            </GhostButton>
-            <PrimaryButton onClick={() => window.print()}>
-              <Download size={14} className="mr-2" />
-              Exportar PDF
-            </PrimaryButton>
+            <Segmented options={RANGES} value={range} onChange={setRange} />
+            <Button variant="secondary" icon={Download} onClick={exportCsv}>
+              Exportar CSV
+            </Button>
           </div>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {RANGES.map(r => (
-          <Chip key={r} active={r === range} onClick={() => setRange(r)}>
-            {r}
-          </Chip>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((k, i) => (
+          <KpiGoal key={k.key} k={k} index={i} />
         ))}
       </div>
 
-      {/* Summary StatCards */}
-      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem>
-          <StatCard
-            index={0}
-            label="GMV del periodo"
-            value={`$${gmvTotal.toLocaleString('es-MX')}K`}
-            delta={serie.gmvDelta}
-            trend="up"
-            note="Crecimiento sostenido"
-            icon={TrendingUp}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={1}
-            label="Servicios completados"
-            value={svcTotal.toLocaleString('es-MX')}
-            suffix="serv."
-            delta={serie.svcDelta}
-            trend="up"
-            note="vs. periodo anterior"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={2}
-            label="Comisión plataforma"
-            value={`$${Math.round(gmvTotal * 0.12).toLocaleString('es-MX')}K`}
-            delta={serie.gmvDelta}
-            trend="up"
-            note="Take rate 12%"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={3}
-            label="Técnicos activos"
-            value={metrics.activeTechs}
-            suffix={`/ ${metrics.totalTechs}`}
-            note="Cobertura ZMG 86%"
-            icon={HardHat}
-          />
-        </StaggerItem>
-      </Stagger>
-
-      {/* Two charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <FadeIn>
-          <Panel
-            title={`Volumen de servicios · ${range.toLowerCase()}`}
-            action={
-              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success">
-                <TrendingUp size={11} />
-                {serie.svcDelta}
-              </span>
-            }
-          >
-            <div className="pt-2">
-              <VBars
-                key={`svc-${range}`}
-                data={serie.svc}
-                height={200}
-                format={v => `${v.toLocaleString('es-MX')} serv.`}
-                controls={{
-                  avg: true,
-                  compare: { label: 'Periodo anterior', values: svcPrev },
-                }}
-              />
-            </div>
-          </Panel>
-        </FadeIn>
-        <FadeIn>
-          <Panel
-            title={`Ingresos (GMV) · ${range.toLowerCase()}`}
-            action={
-              <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11.5px] font-semibold text-success">
-                <TrendingUp size={11} />
-                {serie.gmvDelta}
-              </span>
-            }
-          >
-            {/* key por rango: al cambiar de serie se repite el draw-in */}
-            <div className="pt-2">
-              <LineChart
-                key={`gmv-${range}`}
-                data={serie.gmv}
-                height={200}
-                format={v => `$${v.toLocaleString('es-MX')}K`}
-                controls={{ avg: true }}
-              />
-            </div>
-          </Panel>
-        </FadeIn>
-      </div>
-
-      {/* Category breakdown + top techs */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
-        <FadeIn>
-          <Panel
-            title="Desempeño por categoría"
-            action={<span className="text-[11.5px] text-muted">servicios</span>}
-          >
-            <div className="pt-2">
-              <HBars rows={catRows} controls showPct />
-            </div>
-          </Panel>
-        </FadeIn>
-        <FadeIn>
-          <Panel
-            title="Top técnicos · este mes"
-            action={
-              <GhostButton
-                onClick={() => {
-                  exportCsv(
-                    'top-tecnicos.csv',
-                    techRows.map(t => ({
-                      Rank: t.rank,
-                      Técnico: t.name,
-                      Región: t.region,
-                      Rating: t.rating.toFixed(2),
-                      Servicios: t.jobs,
-                      GMV: t.gmv,
-                    })),
-                  );
-                  toast.success(`CSV exportado · ${techRows.length} técnicos`);
-                }}
-              >
-                <Download size={12} className="mr-1.5" />
-                CSV
-              </GhostButton>
-            }
-          >
-            <DataTable columns={columns} rows={techRows} empty="Sin técnicos" />
-          </Panel>
-        </FadeIn>
-      </div>
-
-      {/* Geo stats */}
-      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem>
-          <StatCard
-            index={0}
-            label="Colonias activas"
-            value="758"
-            delta="+24 este mes"
-            trend="up"
-            icon={MapPin}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={1}
-            label="Cobertura técnica"
-            value="86%"
-            note="al menos 1 técnico"
-            icon={HardHat}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={2}
-            label="Demanda total · mes"
-            value="2,847"
-            delta="+18%"
-            trend="up"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            index={3}
-            label="Zonas frías detectadas"
-            value="3"
-            note="alta demanda · poca oferta"
-            icon={AlertTriangle}
-          />
-        </StaggerItem>
-      </Stagger>
-
-      {/* Heatmap */}
-      <FadeIn>
-        <Panel
-          title="Mapa de calor · demanda por zona"
-          action={
-            <span className="text-[11.5px] text-muted">
-              ZMG · últimos 30 días
-            </span>
+      {/* Números del periodo (RPC admin_report_kpis) */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <PeriodStat
+          label="GMV cobrado"
+          value={cur ? mxn(Number(cur.gmv_cents)) : '—'}
+          delta={delta(Number(cur?.gmv_cents), Number(prev?.gmv_cents))}
+          loading={rpc.loading}
+        />
+        <PeriodStat
+          label="Servicios pagados"
+          value={cur ? String(cur.paid_orders) : '—'}
+          delta={delta(Number(cur?.paid_orders), Number(prev?.paid_orders))}
+          loading={rpc.loading}
+        />
+        <PeriodStat
+          label="Llegada promedio"
+          value={
+            cur && Number(cur.avg_arrival_seconds) > 0
+              ? `${Math.round(Number(cur.avg_arrival_seconds) / 60)} min`
+              : '—'
           }
-        >
-          <HeatMap />
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-[11.5px] text-muted">Demanda baja</span>
-            <div
-              className="h-2.5 flex-1 rounded-md"
-              style={{
-                background:
-                  'linear-gradient(90deg,#DDE7F1,#5CB7F0,#0A6BCF,#0E2C56)',
+          delta={delta(
+            Number(cur?.avg_arrival_seconds),
+            Number(prev?.avg_arrival_seconds),
+          )}
+          invert
+          loading={rpc.loading}
+        />
+      </div>
+      {!rpc.loading && !rpc.kpis && (
+        <p className="-mt-3 font-sans text-[12px] text-muted">
+          El resumen del periodo viene del reporte del servidor y no respondió;
+          el resto de la página se calcula con los datos cargados.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Card padded>
+          <Kicker className="mb-4">Servicios completados</Kicker>
+          {series.every(p => p.value === 0 && p.prev === 0) ? (
+            <EmptyState
+              compact
+              kind="first-use"
+              title="Sin servicios completados"
+              description="En este periodo no hay servicios terminados."
+            />
+          ) : (
+            <LineChart
+              key={range}
+              data={series.map(p => ({ label: p.label, value: p.value }))}
+              height={220}
+              format={v => `${v} servicios`}
+              controls={{
+                avg: true,
+                compare: {
+                  label: 'Periodo anterior',
+                  values: series.map(p => p.prev),
+                },
               }}
             />
-            <span className="text-[11.5px] text-muted">Demanda alta</span>
+          )}
+        </Card>
+        <Card padded>
+          <Kicker className="mb-4">Embudo de conversión</Kicker>
+          <Funnel steps={steps} />
+        </Card>
+      </div>
+
+      <Card padded>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <Kicker>Demanda por día y franja</Kicker>
+          <span className="font-sans text-[12px] text-muted">
+            Solicitudes creadas · {range} · 8–20 h
+          </span>
+        </div>
+        <Heatmap grid={grid} />
+      </Card>
+
+      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <Card padded>
+          <Kicker className="mb-4">Desempeño por categoría</Kicker>
+          {catRows.length ? (
+            <HBars rows={catRows} controls showPct />
+          ) : (
+            <EmptyState compact kind="first-use" title="Sin servicios aún" />
+          )}
+        </Card>
+        <Card padded>
+          <div className="mb-4 flex items-center justify-between">
+            <Kicker>Zonas frías</Kicker>
+            <Badge tone="warning" dot>
+              <Snowflake size={11} /> Demanda sin cobertura
+            </Badge>
           </div>
-        </Panel>
-      </FadeIn>
-
-      {/* Demanda por día y hora */}
-      <FadeIn>
-        <Panel
-          title="Demanda por día y hora"
-          action={
-            <span className="text-[11.5px] text-muted">
-              solicitudes · promedio 30 días · 8–20 h
-            </span>
-          }
-        >
-          <HeatCalendar
-            rows={7}
-            cols={12}
-            rowLabels={DIAS}
-            colLabels={HORAS}
-            metrics={[
-              {
-                label: 'Solicitudes',
-                value: demanda,
-                format: v => `${v} solicitudes`,
-              },
-              {
-                label: 'Cancelaciones',
-                value: cancelaciones,
-                format: v => `${v} cancelaciones`,
-              },
-            ]}
-          />
-        </Panel>
-      </FadeIn>
-
-      {/* Cold zones */}
-      <FadeIn>
-        <Panel
-          title="Zonas frías · alta demanda con baja oferta"
-          action={
-            <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 text-[11.5px] font-semibold text-warning">
-              <Snowflake size={11} />
-              Expandir red
-            </span>
-          }
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {COLD_ZONES.map(z => (
-              <div
-                key={z.name}
-                className="rounded-xl border border-warning/30 bg-warning/[0.06] p-4"
-              >
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <AlertTriangle className="text-warning" size={16} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13.5px] font-semibold text-navy">
-                      {z.name}
-                    </div>
-                    <div className="text-[11px] text-muted">{z.city}</div>
-                  </div>
-                  <span className="rounded-full bg-error/10 px-2.5 py-1 font-mono text-[11px] font-bold text-error">
-                    {z.ratio}
+          {rpc.loading ? (
+            <p className="font-sans text-[13px] text-muted">Cargando…</p>
+          ) : rpc.cold && rpc.cold.length ? (
+            <ul className="flex flex-col divide-y divide-divider">
+              {rpc.cold.slice(0, 6).map(z => (
+                <li
+                  key={z.zone_id}
+                  className="flex items-center justify-between py-2.5"
+                >
+                  <span className="font-sans text-[13.5px] font-semibold text-navy">
+                    {z.zone_name}
                   </span>
-                </div>
-                <p className="my-2.5 text-[12px] leading-relaxed text-muted">
-                  {z.note}
-                </p>
-                <div className="flex justify-between border-t border-warning/20 pt-2.5">
-                  <div>
-                    <div className="font-display text-lg font-bold leading-none text-navy">
-                      {z.demand}
-                    </div>
-                    <div className="mt-1 text-[10px] text-faint">
-                      servicios solicitados
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-display text-lg font-bold leading-none text-error">
-                      {z.techs}
-                    </div>
-                    <div className="mt-1 text-[10px] text-faint">
-                      técnicos activos
-                    </div>
-                  </div>
-                </div>
-                <GhostButton className="mt-3.5 w-full justify-center">
-                  <UserPlus size={12} className="mr-1.5" />
-                  Lanzar reclutamiento
-                </GhostButton>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </FadeIn>
+                  <span className="font-mono text-[12.5px] text-muted tabular">
+                    {z.order_count} solicitudes
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              compact
+              kind={rpc.cold ? 'all-clear' : 'no-results'}
+              title={rpc.cold ? 'Sin zonas frías' : 'Reporte no disponible'}
+              description={
+                rpc.cold
+                  ? 'Toda la demanda del periodo tuvo técnicos en su zona.'
+                  : 'El reporte de zonas del servidor no respondió.'
+              }
+            />
+          )}
+        </Card>
+      </div>
+
+      <Card padded>
+        <Kicker className="mb-4">Top técnicos</Kicker>
+        <DataTable
+          rows={techRows}
+          rowKey={r => r.id}
+          pageSize={10}
+          columns={[
+            {
+              key: 'rank',
+              header: '#',
+              render: r => (
+                <span
+                  className={`inline-grid h-6 w-6 place-items-center rounded-md font-mono text-[11px] font-bold ${
+                    r.rank <= 3 ? 'bg-action text-white' : 'bg-chip text-muted'
+                  }`}
+                >
+                  {r.rank}
+                </span>
+              ),
+              sortValue: r => r.rank,
+            },
+            {
+              key: 'name',
+              header: 'Técnico',
+              render: r => (
+                <span className="font-sans text-[13.5px] font-semibold text-navy">
+                  {r.name}
+                </span>
+              ),
+              sortValue: r => r.name,
+            },
+            {
+              key: 'rating',
+              header: 'Calificación',
+              align: 'right',
+              render: r => (
+                <span className="inline-flex items-center gap-1 font-mono text-[12.5px] text-navy">
+                  <Star size={12} className="fill-current text-warning" />
+                  {r.reviews ? r.rating.toFixed(2) : '—'}
+                </span>
+              ),
+              sortValue: r => r.rating,
+            },
+            {
+              key: 'done',
+              header: 'Servicios',
+              align: 'right',
+              render: r => (
+                <span className="font-mono text-[12.5px] text-navy tabular">
+                  {r.done}
+                </span>
+              ),
+              sortValue: r => r.done,
+            },
+          ]}
+          empty={
+            <EmptyState compact kind="first-use" title="Aún no hay técnicos" />
+          }
+        />
+      </Card>
     </div>
   );
 }
 
-// Colored grid heatmap of ZMG colonias (stable pseudo-random density)
-function HeatMap() {
-  const rows = 8,
-    cols = 18;
-  const cities = Object.keys(CITY_TINTS);
-  const cells = [] as { v: number; city: string }[];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const peakA = 1 - Math.sqrt((col - 8) ** 2 + (row - 3) ** 2) / 9;
-      const peakB = 1 - Math.sqrt((col - 4) ** 2 + (row - 2) ** 2) / 8;
-      const cold = Math.sqrt((col - 15) ** 2 + (row - 6) ** 2) / 16;
-      const v = Math.min(
-        1,
-        Math.max(0, Math.max(peakA, peakB) * 0.85 - cold * 0.4),
-      );
-      cells.push({ v, city: cities[(row + col) % cities.length] });
-    }
-  }
-  const colorFor = (v: number) =>
-    v < 0.15
-      ? '#DDE7F1'
-      : v < 0.35
-        ? '#B2CCE3'
-        : v < 0.55
-          ? '#5CB7F0'
-          : v < 0.75
-            ? '#0A6BCF'
-            : '#0E2C56';
-
+function KpiGoal({ k, index }: { k: Kpi; index: number }) {
+  const tone = k.ok == null ? 'neutral' : k.ok ? 'success' : 'warning';
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-3">
+    <Card padded hover className="animate-up">
       <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+        className="flex items-start justify-between gap-2"
+        style={{ animationDelay: `${index * 60}ms` }}
       >
-        {cells.map((c, i) => (
-          <div
-            key={i}
-            className="aspect-square rounded-[3px] transition-transform hover:scale-110"
-            style={{ background: colorFor(c.v) }}
-            title={`${c.city} · demanda ${(c.v * 100).toFixed(0)}%`}
-          />
-        ))}
+        <Kicker>{k.label}</Kicker>
+        <Badge tone={tone}>
+          {k.ok == null ? 'Sin datos' : k.ok ? 'En meta' : 'Por debajo'}
+        </Badge>
       </div>
-      <div className="mt-3 flex flex-wrap gap-3">
-        {Object.entries(CITY_TINTS).map(([city, color]) => (
+      <div className="mt-3 font-display text-[30px] font-extrabold leading-none text-navy tabular">
+        {k.display}
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-segment">
+        <div
+          className={`h-full rounded-full transition-[width] duration-700 ${
+            k.ok ? 'bg-approve' : 'bg-warning'
+          }`}
+          style={{ width: `${Math.round(k.bar * 100)}%` }}
+        />
+      </div>
+      <div className="mt-2 font-sans text-[12.5px] text-muted">{k.goal}</div>
+    </Card>
+  );
+}
+
+function PeriodStat({
+  label,
+  value,
+  delta,
+  invert,
+  loading,
+}: {
+  label: string;
+  value: string;
+  delta: number | null;
+  /** true: bajar es bueno (tiempo de llegada). */
+  invert?: boolean;
+  loading: boolean;
+}) {
+  const good = delta == null ? null : invert ? delta <= 0 : delta >= 0;
+  return (
+    <Card padded>
+      <Kicker>{label}</Kicker>
+      <div className="mt-2 flex items-end gap-2">
+        <span className="font-display text-[24px] font-extrabold text-navy tabular">
+          {loading ? '…' : value}
+        </span>
+        {!loading && delta != null && (
           <span
-            key={city}
-            className="inline-flex items-center gap-1.5 text-[11px] text-muted"
+            className={`mb-1 font-mono text-[12px] font-semibold ${
+              good ? 'text-success' : 'text-error'
+            }`}
           >
-            <span
-              className="h-2.5 w-2.5 rounded-[2px]"
-              style={{ background: color }}
-            />
-            {city}
+            {delta > 0 ? '+' : ''}
+            {delta}% vs anterior
           </span>
-        ))}
+        )}
       </div>
+    </Card>
+  );
+}
+
+function Funnel({
+  steps,
+}: {
+  steps: { label: string; value: number; ofTotal: number; ofPrev: number }[];
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (!steps[0]?.value)
+    return (
+      <EmptyState
+        compact
+        kind="first-use"
+        title="Sin solicitudes"
+        description="No hubo solicitudes en el periodo."
+      />
+    );
+  return (
+    <div className="flex flex-col gap-2.5" onMouseLeave={() => setHover(null)}>
+      {steps.map((s, i) => (
+        <div
+          key={s.label}
+          onMouseEnter={() => setHover(i)}
+          className={`transition-opacity ${
+            hover != null && hover !== i ? 'opacity-40' : ''
+          }`}
+        >
+          <div className="mb-1 flex items-center justify-between font-sans text-[12.5px]">
+            <span className="font-semibold text-navy">{s.label}</span>
+            <span className="font-mono text-muted tabular">
+              {s.value}
+              {hover === i && i > 0 && (
+                <span className="ml-2 text-primary">
+                  {Math.round(s.ofPrev * 100)}% del paso anterior
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-segment">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-700"
+              style={{ width: `${Math.max(2, Math.round(s.ofTotal * 100))}%` }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

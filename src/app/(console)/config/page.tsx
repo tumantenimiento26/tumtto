@@ -1,1595 +1,821 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Settings,
-  Building2,
-  Percent,
-  Timer,
-  Ban,
-  Wallet,
-  Bell,
-  ShieldCheck,
-  ListChecks,
-  UsersRound,
-  Hash,
-  CreditCard,
-  Store,
+  Home,
   Banknote,
-  Tag,
-  Rocket,
+  Clock,
+  X as XIcon,
+  Bell,
   Users,
-  Info,
-  ArrowRight,
-  History,
-  AlarmClock,
-  UserX,
-  HardHat,
-  UserMinus,
-  TrendingUp,
-  AlertTriangle,
-  FolderTree,
-  ArrowDownToLine,
+  Mail,
+  ShieldCheck,
   Check,
+  Minus,
   type LucideIcon,
 } from 'lucide-react';
 import {
-  PageHeading,
-  exportCsv,
-  LoadFailed,
-  PageSkeleton,
-  Modal,
-} from '@/components/admin';
-import {
-  PrimaryButton,
-  GhostButton,
-  Input,
-  Toggle,
   Badge,
-} from '@/components/ui';
-import { FadeIn, motion, AnimatePresence } from '@/components/motion';
+  Button,
+  Card,
+  ErrorPage,
+  Input,
+  Kicker,
+  Modal,
+  PageHeader,
+  ScreenSkeleton,
+  Toggle,
+  toast,
+} from '@/components/ds';
 import {
   useTick,
   useWorldReady,
   useWorldFailed,
   loadWorld,
-  getCategoriesWithCounts,
-  getMetrics,
   getSettingInt,
   getSettingBool,
   getSettingStr,
   saveSettings,
-  toggleCategory,
   getAdmins,
   inviteAdmin,
+  getMyMfaVerified,
+  getSessionUserId,
 } from '@/lib/data/store';
-import { toast } from '@/components/toast';
 import {
   changedSettings,
   pctToBps,
   validateSettings,
   type Settings as SettingsMap,
 } from '@/lib/settingsRules';
-
-const peso = (n: number) => `$${n.toLocaleString('es-MX')}`;
-const initials = (n: string) =>
-  n
-    .split(' ')
-    .slice(0, 2)
-    .map(s => s[0])
-    .join('')
-    .toUpperCase();
+import {
+  NOTIF_CHANNELS,
+  mutedTypes,
+  notifKey,
+  readMatrix,
+  type PrefMatrix,
+} from '@/lib/notifPrefs';
+import { NOTIF_TYPES, useNotifState } from '@/lib/data/notifications';
 
 type SectionId =
   'general' | 'commission' | 'sla' | 'cancel' | 'notifications' | 'team';
 
-const SECTIONS: {
-  id: SectionId;
-  label: string;
-  icon: LucideIcon;
-  count?: number;
-}[] = [
-  { id: 'general', label: 'General', icon: Building2 },
-  { id: 'commission', label: 'Comisiones y precios', icon: Percent },
-  { id: 'sla', label: 'Tiempos y SLA', icon: Timer },
-  { id: 'cancel', label: 'Cancelaciones y penalizaciones', icon: Ban },
+const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
+  { id: 'general', label: 'General', icon: Home },
+  { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
+  { id: 'sla', label: 'Tiempos y SLA', icon: Clock },
+  { id: 'cancel', label: 'Cancelaciones', icon: XIcon },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
-  { id: 'team', label: 'Equipo y permisos', icon: UsersRound, count: 5 },
-];
-
-const AUDIT = [
-  {
-    author: 'Sofía Martínez',
-    field: 'Comisión Plomería',
-    from: '15%',
-    to: '12%',
-    time: 'Hoy · 14:18',
-    role: 'Admin Soporte',
-  },
-  {
-    author: 'Javier Olvera',
-    field: 'SLA disputas',
-    from: '8 h',
-    to: '4 h',
-    time: '18/05 · 09:42',
-    role: 'Super Admin',
-  },
-  {
-    author: 'Sofía Martínez',
-    field: 'Comisión OXXO',
-    from: '3.5%',
-    to: '3.8%',
-    time: '17/05 · 16:14',
-    role: 'Admin Soporte',
-  },
-  {
-    author: 'Javier Olvera',
-    field: 'Ventana sin costo',
-    from: '2 h',
-    to: '4 h',
-    time: '15/05 · 11:08',
-    role: 'Super Admin',
-  },
+  { id: 'team', label: 'Equipo y permisos', icon: Users },
 ];
 
 // Comisión por método de pago → key de platform_settings (en bps).
-const FEE_KEY: Record<string, string> = {
-  Tarjeta: 'card',
-  'OXXO Pay': 'oxxo',
-  'MP wallet': 'wallet',
-  Efectivo: 'cash',
+const METHODS = [
+  { key: 'card', label: 'Tarjeta', note: 'Visa / Mastercard' },
+  { key: 'oxxo', label: 'OXXO Pay', note: 'Comisión OXXO + IVA' },
+  { key: 'wallet', label: 'Monedero', note: 'Saldo en cuenta' },
+  { key: 'cash', label: 'Efectivo', note: 'Sin comisión adicional' },
+] as const;
+
+const TYPE_KEYS = NOTIF_TYPES.map(t => t.type);
+
+/** Lee todo el formulario desde platform_settings. */
+function readForm(): SettingsMap {
+  const m = readMatrix(TYPE_KEYS, getSettingBool);
+  return {
+    platform_name: getSettingStr('platform_name', 'Tumantenimiento'),
+    support_email: getSettingStr('support_email', 'soporte@tumantenimiento.mx'),
+    support_phone: getSettingStr('support_phone', '+52 33 0000 0000'),
+    base_city: getSettingStr('base_city', 'Guadalajara, ZMG'),
+    rfc: getSettingStr('rfc', ''),
+    maintenance_mode: getSettingBool('maintenance_mode', false),
+    signups_enabled: getSettingBool('signups_enabled', true),
+    commission_bps: getSettingInt('commission_bps', 1500),
+    fee_card_bps: getSettingInt('fee_card_bps', 350),
+    fee_oxxo_bps: getSettingInt('fee_oxxo_bps', 380),
+    fee_wallet_bps: getSettingInt('fee_wallet_bps', 150),
+    fee_cash_bps: getSettingInt('fee_cash_bps', 0),
+    intro_program_enabled: getSettingBool('intro_program_enabled', true),
+    intro_commission_bps: getSettingInt('intro_commission_bps', 1000),
+    intro_program_days: getSettingInt('intro_program_days', 90),
+    request_ttl_minutes: getSettingInt('request_ttl_minutes', 30),
+    sla_first_response_minutes: getSettingInt('sla_first_response_minutes', 15),
+    sla_dispute_hours: getSettingInt('sla_dispute_hours', 4),
+    auto_reassign_enabled: getSettingBool('auto_reassign_enabled', true),
+    cancel_free_window_hours: getSettingInt('cancel_free_window_hours', 4),
+    cancel_penalty_bps: getSettingInt('cancel_penalty_bps', 1500),
+    cancel_auto_charge: getSettingBool('cancel_auto_charge', true),
+    tech_max_cancellations_30d: getSettingInt('tech_max_cancellations_30d', 3),
+    noshow_wait_minutes: getSettingInt('noshow_wait_minutes', 20),
+    quiet_hours_enabled: getSettingBool('quiet_hours_enabled', false),
+    quiet_start_hours: getSettingInt('quiet_start_hours', 22),
+    quiet_end_hours: getSettingInt('quiet_end_hours', 7),
+    ...m,
+  };
+}
+
+const LABELS: Record<string, string> = {
+  platform_name: 'Nombre comercial',
+  support_email: 'Correo de soporte',
+  support_phone: 'Teléfono de soporte',
+  base_city: 'Ciudad base',
+  rfc: 'RFC',
+  commission_bps: 'Comisión global',
+  request_ttl_minutes: 'Ventana de aceptación',
 };
-
-function exportAudit() {
-  exportCsv(
-    'bitacora.csv',
-    AUDIT.map(a => ({
-      Autor: a.author,
-      Rol: a.role,
-      Campo: a.field,
-      De: a.from,
-      A: a.to,
-      Cuándo: a.time,
-    })),
-  );
-  toast.success(`Bitácora exportada · ${AUDIT.length} eventos`);
-}
-
-// ---------- small building blocks ----------
-
-function SectionHead({
-  icon: Icon,
-  title,
-  sub,
-  dirty,
-}: {
-  icon: LucideIcon;
-  title: string;
-  sub: string;
-  dirty: number;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-5">
-      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-info-soft">
-        <Icon size={20} className="text-cyan" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <h2 className="font-display text-xl font-bold tracking-tight text-navy">
-          {title}
-        </h2>
-        <p className="mt-0.5 text-[13px] text-muted">{sub}</p>
-      </div>
-      {dirty > 0 && (
-        <span className="inline-flex items-center gap-2 rounded-full bg-warning/15 px-3 py-1.5 text-xs font-semibold text-warning">
-          <span className="h-2 w-2 rounded-full bg-warning shadow-[0_0_0_4px] shadow-warning/20" />
-          {dirty} {dirty === 1 ? 'cambio sin guardar' : 'cambios sin guardar'}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function ConfigCard({
-  title,
-  sub,
-  icon: Icon,
-  headRight,
-  children,
-}: {
-  title: string;
-  sub?: string;
-  icon: LucideIcon;
-  headRight?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex items-center gap-2.5 border-b border-line px-4 py-4 sm:px-5">
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-info-soft">
-          <Icon size={14} className="text-cyan" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-navy">{title}</div>
-          {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
-        </div>
-        {headRight}
-      </div>
-      <div className="flex flex-col gap-3.5 p-5">{children}</div>
-    </div>
-  );
-}
-
-function Hint({
-  children,
-  tone = 'info',
-}: {
-  children: React.ReactNode;
-  tone?: 'info' | 'success';
-}) {
-  const Icon = tone === 'success' ? Users : Info;
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
-      <Icon
-        size={12}
-        className={tone === 'success' ? 'text-success' : 'text-cyan'}
-      />
-      <span>{children}</span>
-    </div>
-  );
-}
-
-function ToggleRow({
-  title,
-  sub,
-  on,
-  onChange,
-}: {
-  title: string;
-  sub: string;
-  on: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-lg border border-line bg-canvas px-4 py-3.5">
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-semibold text-navy">{title}</div>
-        <div className="mt-0.5 text-[11.5px] text-muted">{sub}</div>
-      </div>
-      <Toggle on={on} onChange={onChange} />
-    </div>
-  );
-}
-
-/** Vacío → NaN (no 0): la validación lo marca en vez de guardar un 0. */
-const numOf = (raw: string) => (raw.trim() === '' ? NaN : Number(raw));
-const shown = (v: number) => (Number.isNaN(v) ? '' : v);
-
-function FieldError({ msg }: { msg?: string }) {
-  return msg ? (
-    <p className="text-[11.5px] text-error" role="alert">
-      {msg}
-    </p>
-  ) : null;
-}
-
-function PercentField({
-  label,
-  value,
-  onChange,
-  big = true,
-  error,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  big?: boolean;
-  error?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11.5px] font-medium text-muted">{label}</label>
-      <div
-        className={`inline-flex w-36 items-baseline gap-1 rounded-xl border bg-surface px-3.5 py-2 ${error ? 'border-error' : 'border-line'}`}
-      >
-        <input
-          type="number"
-          min={0}
-          max={100}
-          step="0.01"
-          aria-label={label}
-          aria-invalid={!!error}
-          value={shown(value)}
-          onChange={e => onChange(numOf(e.target.value))}
-          className={`w-16 bg-transparent font-display font-bold tracking-tight text-navy outline-none ${big ? 'text-2xl' : 'text-base'}`}
-        />
-        <span className="font-display text-lg font-bold text-muted">%</span>
-      </div>
-      <FieldError msg={error} />
-    </div>
-  );
-}
-
-function NumField({
-  label,
-  value,
-  unit,
-  onChange,
-  error,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  onChange: (v: number) => void;
-  error?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11.5px] font-medium text-muted">{label}</label>
-      <div
-        className={`inline-flex w-full items-center gap-2 rounded-xl border bg-surface px-3.5 py-2 ${error ? 'border-error' : 'border-line'}`}
-      >
-        <input
-          type="number"
-          min={0}
-          step={1}
-          aria-label={label}
-          aria-invalid={!!error}
-          value={shown(value)}
-          onChange={e => onChange(numOf(e.target.value))}
-          className="w-14 bg-transparent font-display text-xl font-bold text-navy outline-none"
-        />
-        <span className="text-[13px] font-medium text-muted">{unit}</span>
-      </div>
-      <FieldError msg={error} />
-    </div>
-  );
-}
-
-function AuditTrail() {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 py-3.5 sm:px-5">
-        <History size={15} className="text-cyan" />
-        <span className="text-[13.5px] font-semibold text-navy">
-          Últimos cambios en este módulo
-        </span>
-        <span className="font-mono text-[11px] text-faint">
-          {AUDIT.length} eventos
-        </span>
-        <button
-          onClick={exportAudit}
-          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-cyan"
-        >
-          Ver bitácora completa <ArrowRight size={11} />
-        </button>
-      </div>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-canvas">
-            {['Autor', 'Campo', 'De', 'A', 'Cuándo'].map((h, i) => (
-              <th
-                key={h}
-                className={`border-b border-line px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-faint ${i > 1 ? 'text-right' : 'text-left'}`}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {AUDIT.map((a, i) => (
-            <motion.tr
-              key={i}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: i * 0.04 }}
-              className="border-b border-line last:border-0"
-            >
-              <td className="px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`grid h-7 w-7 place-items-center rounded-full text-[10.5px] font-semibold ${a.role === 'Super Admin' ? 'bg-error/10 text-error' : 'bg-info-soft text-cyan'}`}
-                  >
-                    {initials(a.author)}
-                  </div>
-                  <div>
-                    <div className="text-[12.5px] font-medium text-navy">
-                      {a.author}
-                    </div>
-                    <div className="text-[10.5px] text-faint">{a.role}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-2.5 text-[12.5px] text-navy">{a.field}</td>
-              <td className="px-4 py-2.5 text-right font-mono text-xs text-faint line-through">
-                {a.from}
-              </td>
-              <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold text-cyan">
-                {a.to}
-              </td>
-              <td className="px-4 py-2.5 text-right font-mono text-[11.5px] text-muted">
-                {a.time}
-              </td>
-            </motion.tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ---------- page ----------
 
 export default function ConfigPage() {
   useTick();
-  const cats = getCategoriesWithCounts();
-  const metrics = getMetrics();
-
-  const [active, setActive] = useState<SectionId>('commission');
-
-  // ---- form state ----
-  const [general, setGeneral] = useState({
-    name: 'Tu Mantenimiento',
-    email: 'soporte@tumtto.mx',
-    phone: '33 1234 5678',
-    city: 'Guadalajara, ZMG',
-    maintenance: false,
-    newSignups: true,
-  });
-  const [globalCommission, setGlobalCommission] = useState(15);
-  const [methods, setMethods] = useState([
-    {
-      method: 'Tarjeta',
-      icon: CreditCard,
-      color: 'text-cyan',
-      bg: 'bg-info-soft',
-      pct: 3.5,
-      note: 'Visa / Mastercard',
-    },
-    {
-      method: 'OXXO Pay',
-      icon: Store,
-      color: 'text-warning',
-      bg: 'bg-warning/15',
-      pct: 3.8,
-      note: 'Comisión OXXO + IVA',
-    },
-    {
-      method: 'MP wallet',
-      icon: Wallet,
-      color: 'text-cyan',
-      bg: 'bg-info-soft',
-      pct: 1.5,
-      note: 'Saldo en cuenta MP',
-    },
-    {
-      method: 'Efectivo',
-      icon: Banknote,
-      color: 'text-success',
-      bg: 'bg-success/15',
-      pct: 0.0,
-      note: 'Sin comisión adicional',
-    },
-  ]);
-  const [program, setProgram] = useState({ on: true, pct: 10, days: 90 });
-  const [sla, setSla] = useState({
-    accept: 30,
-    dispute: 4,
-    reassign: true,
-    firstResponse: 15,
-  });
-  const [cancel, setCancel] = useState({
-    window: 4,
-    penalty: 15,
-    autoCharge: true,
-    maxTech: 3,
-    wait: 20,
-  });
-  const [notif, setNotif] = useState({
-    push: true,
-    email: true,
-    sms: false,
-    weekly: true,
-    kyc: true,
-  });
-
-  // track dirty count loosely vs initial defaults (demo: count flips)
-  const [dirty, setDirty] = useState(0);
-  const touch = () => setDirty(d => d + 1);
-
-  // Todo el formulario se hidrata desde platform_settings (jsonb key/value);
-  // los porcentajes se guardan como bps siguiendo la convención del backend.
-  const worldReady = useWorldReady();
-  const worldFailed = useWorldFailed();
-  function hydrate() {
-    setGeneral({
-      name: getSettingStr('platform_name', 'Tu Mantenimiento'),
-      email: getSettingStr('support_email', 'soporte@tumtto.mx'),
-      phone: getSettingStr('support_phone', '33 1234 5678'),
-      city: getSettingStr('base_city', 'Guadalajara, ZMG'),
-      maintenance: getSettingBool('maintenance_mode', false),
-      newSignups: getSettingBool('signups_enabled', true),
-    });
-    setGlobalCommission(getSettingInt('commission_bps', 1500) / 100);
-    setMethods(ms =>
-      ms.map(m => ({
-        ...m,
-        pct:
-          getSettingInt(
-            `fee_${FEE_KEY[m.method]}_bps`,
-            Math.round(m.pct * 100),
-          ) / 100,
-      })),
-    );
-    setProgram({
-      on: getSettingBool('intro_program_enabled', true),
-      pct: getSettingInt('intro_commission_bps', 1000) / 100,
-      days: getSettingInt('intro_program_days', 90),
-    });
-    setSla({
-      accept: getSettingInt('request_ttl_minutes', 30),
-      dispute: getSettingInt('sla_dispute_hours', 4),
-      reassign: getSettingBool('auto_reassign_enabled', true),
-      firstResponse: getSettingInt('sla_first_response_minutes', 15),
-    });
-    setCancel({
-      window: getSettingInt('cancel_free_window_hours', 4),
-      penalty: getSettingInt('cancel_penalty_bps', 1500) / 100,
-      autoCharge: getSettingBool('cancel_auto_charge', true),
-      maxTech: getSettingInt('tech_max_cancellations_30d', 3),
-      wait: getSettingInt('noshow_wait_minutes', 20),
-    });
-    setNotif({
-      push: getSettingBool('notif_push', true),
-      email: getSettingBool('notif_email', true),
-      sms: getSettingBool('notif_sms', false),
-      weekly: getSettingBool('notif_weekly_summary', true),
-      kyc: getSettingBool('notif_kyc_alerts', true),
-    });
-  }
-  const [hydrations, setHydrations] = useState(0);
-  useEffect(() => {
-    if (worldReady) {
-      hydrate();
-      setHydrations(n => n + 1);
-    }
-  }, [worldReady]);
-  // Tras hidratar (ya con el estado nuevo), fija lo cargado como base del diff.
-  useEffect(() => {
-    if (hydrations) setBaseline(buildSettings());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrations]);
-
-  // Lo último cargado/guardado: se escriben solo las keys que cambiaron, así un
-  // guardado no pisa settings que otro admin cambió mientras tanto.
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
+  const [active, setActive] = useState<SectionId>('general');
+  const [form, setForm] = useState<SettingsMap>({});
   const [baseline, setBaseline] = useState<SettingsMap>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const setMuted = useNotifState(s => s.setMuted);
 
-  function buildSettings(): SettingsMap {
-    return {
-      platform_name: general.name,
-      support_email: general.email,
-      support_phone: general.phone,
-      base_city: general.city,
-      maintenance_mode: general.maintenance,
-      signups_enabled: general.newSignups,
-      commission_bps: pctToBps(globalCommission),
-      ...Object.fromEntries(
-        methods.map(m => [`fee_${FEE_KEY[m.method]}_bps`, pctToBps(m.pct)]),
-      ),
-      intro_program_enabled: program.on,
-      intro_commission_bps: pctToBps(program.pct),
-      intro_program_days: program.days,
-      request_ttl_minutes: sla.accept,
-      auto_reassign_enabled: sla.reassign,
-      sla_first_response_minutes: sla.firstResponse,
-      sla_dispute_hours: sla.dispute,
-      cancel_free_window_hours: cancel.window,
-      cancel_penalty_bps: pctToBps(cancel.penalty),
-      cancel_auto_charge: cancel.autoCharge,
-      tech_max_cancellations_30d: cancel.maxTech,
-      noshow_wait_minutes: cancel.wait,
-      notif_push: notif.push,
-      notif_email: notif.email,
-      notif_sms: notif.sms,
-      notif_weekly_summary: notif.weekly,
-      notif_kyc_alerts: notif.kyc,
-    };
-  }
+  // Solo se edita con el snapshot listo: si no, se mostrarían (y guardarían)
+  // los defaults del código como si fueran los valores reales.
+  useEffect(() => {
+    if (!ready) return;
+    const f = readForm();
+    setForm(f);
+    setBaseline(f);
+    setMuted(mutedTypes(TYPE_KEYS, f as PrefMatrix));
+  }, [ready, setMuted]);
 
-  /** Valida antes de pedir confirmación; los errores quedan junto a cada campo. */
+  const changes = useMemo(
+    () => changedSettings(form, baseline),
+    [form, baseline],
+  );
+  const dirty = Object.keys(changes).length;
+
+  const set = (key: string, value: string | number | boolean) =>
+    setForm(f => ({ ...f, [key]: value }));
+  const num = (key: string) => form[key] as number;
+  const bool = (key: string) => form[key] as boolean;
+  const str = (key: string) => (form[key] as string) ?? '';
+
   function requestSave() {
-    const e = validateSettings(buildSettings());
+    const e = validateSettings(form);
     setErrs(e);
     if (Object.keys(e).length) {
-      toast.error('Revisa los campos marcados en rojo.');
+      toast.error('Revisa los campos marcados', 'Hay valores fuera de rango.');
       return;
     }
-    setModal(true);
+    setConfirm(true);
   }
 
-  async function persistSettings() {
-    const next = buildSettings();
-    const changes = changedSettings(next, baseline);
-    if (!Object.keys(changes).length) {
-      setModal(false);
-      setDirty(0);
-      toast.success('No había cambios que guardar');
+  async function persist() {
+    if (!dirty) {
+      setConfirm(false);
       return;
     }
     setSaving(true);
     const ok = await saveSettings(changes);
     setSaving(false);
-    // Solo al confirmar la escritura se limpia el estado "sin guardar"; si
-    // falla, el modal y los cambios siguen ahí para reintentar.
+    // Solo al confirmar la escritura se limpia "sin guardar"; si falla, el
+    // modal y los cambios siguen para reintentar (el store ya mostró el error).
     if (!ok) return;
-    setBaseline(next);
-    setDirty(0);
-    setModal(false);
-    toast.success('Configuración guardada');
+    setBaseline(form);
+    setConfirm(false);
+    setMuted(mutedTypes(TYPE_KEYS, form as PrefMatrix));
+    toast.success('Configuración guardada', `${dirty} cambio(s) aplicados`);
   }
 
-  const [modal, setModal] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
-
-  function onExportConfig() {
-    exportCsv('configuracion.csv', [
-      {
-        Sección: 'General',
-        Parámetro: 'Nombre comercial',
-        Valor: general.name,
-      },
-      {
-        Sección: 'General',
-        Parámetro: 'Correo de soporte',
-        Valor: general.email,
-      },
-      { Sección: 'General', Parámetro: 'Teléfono', Valor: general.phone },
-      { Sección: 'General', Parámetro: 'Ciudad base', Valor: general.city },
-      {
-        Sección: 'General',
-        Parámetro: 'Modo mantenimiento',
-        Valor: general.maintenance ? 'Sí' : 'No',
-      },
-      {
-        Sección: 'General',
-        Parámetro: 'Aceptar nuevos registros',
-        Valor: general.newSignups ? 'Sí' : 'No',
-      },
-      {
-        Sección: 'Comisiones',
-        Parámetro: 'Comisión global',
-        Valor: `${globalCommission}%`,
-      },
-      ...methods.map(m => ({
-        Sección: 'Comisiones',
-        Parámetro: `Método · ${m.method}`,
-        Valor: `${m.pct}%`,
-      })),
-      {
-        Sección: 'Comisiones',
-        Parámetro: 'Programa comisión reducida',
-        Valor: program.on
-          ? `${program.pct}% · ${program.days} días`
-          : 'Inactivo',
-      },
-      {
-        Sección: 'SLA',
-        Parámetro: 'Ventana de aceptación',
-        Valor: `${sla.accept} min`,
-      },
-      {
-        Sección: 'SLA',
-        Parámetro: 'Reasignación automática',
-        Valor: sla.reassign ? 'Sí' : 'No',
-      },
-      {
-        Sección: 'SLA',
-        Parámetro: 'Primera respuesta',
-        Valor: `${sla.firstResponse} min`,
-      },
-      {
-        Sección: 'SLA',
-        Parámetro: 'Resolución de disputas',
-        Valor: `${sla.dispute} h`,
-      },
-      {
-        Sección: 'Cancelaciones',
-        Parámetro: 'Ventana sin costo',
-        Valor: `${cancel.window} h`,
-      },
-      {
-        Sección: 'Cancelaciones',
-        Parámetro: 'Penalización tardía',
-        Valor: `${cancel.penalty}%`,
-      },
-      {
-        Sección: 'Cancelaciones',
-        Parámetro: 'Cobro automático',
-        Valor: cancel.autoCharge ? 'Sí' : 'No',
-      },
-      {
-        Sección: 'Cancelaciones',
-        Parámetro: 'Máx. cancelaciones técnico / 30 días',
-        Valor: cancel.maxTech,
-      },
-      {
-        Sección: 'Cancelaciones',
-        Parámetro: 'Espera no-show',
-        Valor: `${cancel.wait} min`,
-      },
-      {
-        Sección: 'Notificaciones',
-        Parámetro: 'Push',
-        Valor: notif.push ? 'On' : 'Off',
-      },
-      {
-        Sección: 'Notificaciones',
-        Parámetro: 'Email',
-        Valor: notif.email ? 'On' : 'Off',
-      },
-      {
-        Sección: 'Notificaciones',
-        Parámetro: 'SMS',
-        Valor: notif.sms ? 'On' : 'Off',
-      },
-      {
-        Sección: 'Notificaciones',
-        Parámetro: 'Resumen semanal',
-        Valor: notif.weekly ? 'On' : 'Off',
-      },
-      {
-        Sección: 'Notificaciones',
-        Parámetro: 'Alertas KYC',
-        Valor: notif.kyc ? 'On' : 'Off',
-      },
-    ]);
-    toast.success('Configuración exportada');
+  function discard() {
+    setForm(baseline);
+    setErrs({});
   }
 
-  const ActiveSection = SECTIONS.find(s => s.id === active)!;
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready || !Object.keys(form).length)
+    return <ScreenSkeleton kind="detail" />;
 
-  // Sin snapshot, el formulario se hidrataría con los defaults del código y los
-  // mostraría como si fueran los valores guardados — y "Guardar" los escribiría.
-  if (worldFailed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
-  if (!worldReady) return <PageSkeleton />;
+  const pctField = (key: string, label: string, desc?: string) => (
+    <Row label={label} desc={desc} error={errs[key]}>
+      <Input
+        type="number"
+        min={0}
+        max={100}
+        step="0.01"
+        value={Number.isNaN(num(key)) ? '' : num(key) / 100}
+        onChange={e =>
+          set(
+            key,
+            e.target.value.trim() === ''
+              ? NaN
+              : pctToBps(Number(e.target.value)),
+          )
+        }
+        suffix="%"
+        error={!!errs[key]}
+        aria-label={label}
+      />
+    </Row>
+  );
+  const intField = (
+    key: string,
+    label: string,
+    suffix: string,
+    desc?: string,
+  ) => (
+    <Row label={label} desc={desc} error={errs[key]}>
+      <Input
+        type="number"
+        step="1"
+        value={Number.isNaN(num(key)) ? '' : num(key)}
+        onChange={e =>
+          set(key, e.target.value.trim() === '' ? NaN : Number(e.target.value))
+        }
+        suffix={suffix}
+        error={!!errs[key]}
+        aria-label={label}
+      />
+    </Row>
+  );
+  const textField = (key: string, label: string, desc?: string) => (
+    <Row label={label} desc={desc} error={errs[key]}>
+      <Input
+        value={str(key)}
+        onChange={e => set(key, e.target.value)}
+        error={!!errs[key]}
+        aria-label={label}
+      />
+    </Row>
+  );
+  const toggleField = (key: string, label: string, desc?: string) => (
+    <Row label={label} desc={desc}>
+      <div className="flex justify-end">
+        <Toggle checked={bool(key)} onChange={v => set(key, v)} />
+      </div>
+    </Row>
+  );
 
   return (
-    <div className="pb-24">
-      <PageHeading
+    <div className="flex flex-col gap-6 pb-28">
+      <PageHeader
         title="Configuración del sistema"
-        sub="Parámetros globales de la plataforma · solo Super Admin."
-        actions={
-          <div className="flex gap-2.5">
-            <GhostButton onClick={exportAudit}>
-              <span className="inline-flex items-center gap-2">
-                <History size={14} /> Bitácora completa
-              </span>
-            </GhostButton>
-            <GhostButton onClick={onExportConfig}>
-              <span className="inline-flex items-center gap-2">
-                <ArrowDownToLine size={14} /> Exportar config
-              </span>
-            </GhostButton>
-          </div>
-        }
+        description="Reglas globales de la plataforma. Los cambios aplican a solicitudes nuevas."
       />
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        {/* ---- side nav ---- */}
-        <aside className="overflow-hidden rounded-2xl border border-line bg-surface lg:sticky lg:top-4">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3.5">
-            <Settings size={14} className="text-navy" />
-            <span className="text-[13px] font-semibold text-navy">
-              Configuración
-            </span>
-            <span className="ml-auto rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-bold text-error">
-              SUPER ADMIN
-            </span>
-          </div>
-          <nav className="p-2">
-            {SECTIONS.map(s => {
-              const on = s.id === active;
-              const Icon = s.icon;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setActive(s.id)}
-                  className={`relative mb-0.5 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${on ? 'bg-info-soft' : 'hover:bg-canvas'}`}
-                >
-                  {on && (
-                    <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-cyan" />
-                  )}
-                  <Icon size={15} className={on ? 'text-cyan' : 'text-muted'} />
-                  <span
-                    className={`text-[13px] ${on ? 'font-semibold text-cyan' : 'font-medium text-navy'}`}
-                  >
-                    {s.label}
-                  </span>
-                  {s.count && (
-                    <span className="ml-auto rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-bold text-cyan">
-                      {s.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav
+          aria-label="Secciones de configuración"
+          className="flex gap-1 overflow-x-auto lg:sticky lg:top-4 lg:flex-col"
+        >
+          {SECTIONS.map(s => {
+            const on = s.id === active;
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                aria-current={on ? 'page' : undefined}
+                className={`flex shrink-0 items-center gap-3 rounded-btn px-3.5 py-2.5 text-left font-sans text-[14px] transition-colors ${
+                  on
+                    ? 'border border-line bg-card font-semibold text-navy shadow-kpi'
+                    : 'border border-transparent font-medium text-muted hover:bg-panel hover:text-navy'
+                }`}
+              >
+                <Icon size={16} className={on ? 'text-navy' : 'text-muted'} />
+                {s.label}
+              </button>
+            );
+          })}
+        </nav>
 
-        {/* ---- content ---- */}
-        <div className="min-w-0">
-          <FadeIn key={active} className="flex flex-col gap-5">
-            <SectionHead
-              icon={ActiveSection.icon}
-              title={ActiveSection.label}
-              sub={SUBTITLES[active]}
-              dirty={dirty}
-            />
+        <div key={active} className="animate-up flex min-w-0 flex-col gap-4">
+          {active === 'general' && (
+            <>
+              <Section title="Datos de la plataforma">
+                {textField(
+                  'platform_name',
+                  'Nombre comercial',
+                  'Aparece en recibos y notificaciones.',
+                )}
+                {textField(
+                  'support_email',
+                  'Correo de soporte',
+                  'Destino de respuestas de clientes y técnicos.',
+                )}
+                {textField('support_phone', 'Teléfono de soporte')}
+                {textField('rfc', 'RFC', 'Para facturación CFDI.')}
+                {textField('base_city', 'Ciudad base')}
+              </Section>
+              <Section title="Estado del servicio">
+                {toggleField(
+                  'maintenance_mode',
+                  'Modo mantenimiento',
+                  'Suspende temporalmente las solicitudes nuevas en toda la plataforma.',
+                )}
+                {toggleField(
+                  'signups_enabled',
+                  'Aceptar nuevos registros',
+                  'Permite que clientes y técnicos creen cuentas.',
+                )}
+              </Section>
+            </>
+          )}
 
-            {/* GENERAL */}
-            {active === 'general' && (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ConfigCard title="Datos de la plataforma" icon={Building2}>
-                    <Labeled label="Nombre comercial">
-                      <Input
-                        value={general.name}
-                        onChange={e => {
-                          setGeneral({ ...general, name: e.target.value });
-                          touch();
-                        }}
-                      />
-                      <FieldError msg={errs.platform_name} />
-                    </Labeled>
-                    <Labeled label="Correo de soporte">
-                      <Input
-                        value={general.email}
-                        onChange={e => {
-                          setGeneral({ ...general, email: e.target.value });
-                          touch();
-                        }}
-                      />
-                      <FieldError msg={errs.support_email} />
-                    </Labeled>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Labeled label="Teléfono">
-                        <Input
-                          value={general.phone}
-                          onChange={e => {
-                            setGeneral({ ...general, phone: e.target.value });
-                            touch();
-                          }}
-                        />
-                        <FieldError msg={errs.support_phone} />
-                      </Labeled>
-                      <Labeled label="Ciudad base">
-                        <Input
-                          value={general.city}
-                          onChange={e => {
-                            setGeneral({ ...general, city: e.target.value });
-                            touch();
-                          }}
-                        />
-                      </Labeled>
-                    </div>
-                  </ConfigCard>
-                  <ConfigCard title="Estado del servicio" icon={ShieldCheck}>
-                    <ToggleRow
-                      title="Modo mantenimiento"
-                      sub="Suspende temporalmente nuevas solicitudes en toda la plataforma."
-                      on={general.maintenance}
-                      onChange={v => {
-                        setGeneral({ ...general, maintenance: v });
-                        touch();
-                      }}
-                    />
-                    <ToggleRow
-                      title="Aceptar nuevos registros"
-                      sub="Permite que clientes y técnicos creen cuentas."
-                      on={general.newSignups}
-                      onChange={v => {
-                        setGeneral({ ...general, newSignups: v });
-                        touch();
-                      }}
-                    />
-                    <Hint>
-                      Plataforma activa con{' '}
-                      <b className="font-semibold text-navy">
-                        {metrics.activeTechs} técnicos
-                      </b>{' '}
-                      y{' '}
-                      <b className="font-semibold text-navy">
-                        {metrics.active} solicitudes
-                      </b>{' '}
-                      en curso.
-                    </Hint>
-                  </ConfigCard>
-                </div>
-
-                <ConfigCard
-                  title="Categorías activas"
-                  icon={ListChecks}
-                  sub="Activa o desactiva la disponibilidad de cada categoría de servicio."
-                >
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {cats.map(c => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-line bg-canvas px-4 py-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-semibold text-navy">
-                            {c.name}
-                          </div>
-                          <div className="font-mono text-[11px] text-faint">
-                            {c.services ?? 0} servicios
-                          </div>
-                        </div>
-                        {/* Escribe directo a service_categories.is_active (misma fuente que Catálogo). */}
-                        <Toggle
-                          on={c.is_active}
-                          onChange={() => void toggleCategory(c.id)}
-                        />
-                      </div>
-                    ))}
+          {active === 'commission' && (
+            <>
+              <Section title="Comisión de la plataforma">
+                {pctField(
+                  'commission_bps',
+                  'Comisión global',
+                  'Aplica a categorías sin comisión específica (se edita en Catálogo).',
+                )}
+              </Section>
+              <Section title="Comisión por método de pago">
+                {METHODS.map(m => (
+                  <div key={m.key}>
+                    {pctField(`fee_${m.key}_bps`, m.label, m.note)}
                   </div>
-                </ConfigCard>
-                <AuditTrail />
-              </>
-            )}
+                ))}
+              </Section>
+              <Section title="Programa de comisión reducida">
+                {toggleField(
+                  'intro_program_enabled',
+                  'Programa activo',
+                  'Comisión menor para técnicos nuevos durante su primer periodo.',
+                )}
+                {bool('intro_program_enabled') && (
+                  <>
+                    {pctField('intro_commission_bps', 'Comisión del programa')}
+                    {intField('intro_program_days', 'Duración', 'días')}
+                  </>
+                )}
+              </Section>
+            </>
+          )}
 
-            {/* COMMISSION */}
-            {active === 'commission' && (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ConfigCard
-                    title="Comisión global"
-                    icon={Hash}
-                    sub="Se aplica a todas las categorías que no tengan comisión específica."
-                  >
-                    <PercentField
-                      label="Porcentaje de comisión default"
-                      error={errs.commission_bps}
-                      value={globalCommission}
-                      onChange={v => {
-                        setGlobalCommission(v);
-                        touch();
-                      }}
-                    />
-                    <Hint>
-                      2 categorías tienen overrides:{' '}
-                      <b className="font-semibold text-navy">Plomería 12%</b> ·{' '}
-                      <b className="font-semibold text-navy">
-                        Electricidad 14%
-                      </b>
-                    </Hint>
-                    <div className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-canvas px-3.5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[12.5px] font-semibold text-navy">
-                          Aplicar a todas las categorías
-                        </div>
-                        <div className="mt-0.5 text-[11px] text-muted">
-                          Sobrescribe los overrides existentes. Requiere
-                          confirmación.
-                        </div>
-                      </div>
-                      <GhostButton>
-                        <span className="inline-flex items-center gap-1.5">
-                          <ArrowDownToLine size={12} /> Aplicar
-                        </span>
-                      </GhostButton>
-                    </div>
-                  </ConfigCard>
+          {active === 'sla' && (
+            <Section title="Tiempos y SLA">
+              {intField(
+                'request_ttl_minutes',
+                'Ventana de aceptación',
+                'min',
+                'Tiempo que una solicitud espera técnico antes de expirar.',
+              )}
+              {intField(
+                'sla_first_response_minutes',
+                'Primera respuesta de soporte',
+                'min',
+              )}
+              {intField('sla_dispute_hours', 'Resolución de disputas', 'h')}
+              {toggleField(
+                'auto_reassign_enabled',
+                'Reasignación automática',
+                'Si el técnico no llega a tiempo, se ofrece la orden a otro.',
+              )}
+            </Section>
+          )}
 
-                  <ConfigCard
-                    title="Comisión por método de pago"
-                    icon={CreditCard}
-                    sub="Se suma a la comisión global. Cubre comisiones bancarias."
-                  >
-                    {methods.map((m, i) => {
-                      const Icon = m.icon;
-                      return (
-                        <div
-                          key={m.method}
-                          className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-3 py-2.5"
-                        >
-                          <div
-                            className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${m.bg}`}
-                          >
-                            <Icon size={14} className={m.color} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-semibold text-navy">
-                              {m.method}
-                            </div>
-                            <div className="mt-0.5 text-[11px] text-faint">
-                              {m.note}
-                            </div>
-                          </div>
-                          <div className="inline-flex w-[88px] items-baseline gap-1 rounded-lg border border-line bg-surface px-3 py-1.5">
-                            <input
-                              type="number"
-                              step="0.1"
-                              aria-label={`Comisión ${m.method}`}
-                              aria-invalid={
-                                !!errs[`fee_${FEE_KEY[m.method]}_bps`]
-                              }
-                              value={shown(m.pct)}
-                              onChange={e => {
-                                const n = [...methods];
-                                n[i] = { ...m, pct: numOf(e.target.value) };
-                                setMethods(n);
-                                touch();
-                              }}
-                              className="w-10 bg-transparent font-display text-base font-bold text-navy outline-none"
-                            />
-                            <span className="font-display text-sm font-bold text-muted">
-                              %
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </ConfigCard>
-                </div>
+          {active === 'cancel' && (
+            <Section title="Cancelaciones y penalizaciones">
+              {intField(
+                'cancel_free_window_hours',
+                'Ventana sin costo',
+                'h',
+                'Antes de la cita el cliente cancela sin cargo.',
+              )}
+              {pctField(
+                'cancel_penalty_bps',
+                'Penalización',
+                'Porcentaje de la visita que se cobra fuera de la ventana.',
+              )}
+              {toggleField(
+                'cancel_auto_charge',
+                'Cobro automático de penalización',
+              )}
+              {intField(
+                'tech_max_cancellations_30d',
+                'Máximo de cancelaciones del técnico',
+                'en 30 días',
+              )}
+              {intField('noshow_wait_minutes', 'Espera por no-show', 'min')}
+            </Section>
+          )}
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ConfigCard
-                    title="Tarifa base por defecto"
-                    icon={Tag}
-                    sub="Precios mínimos, máximos y sugeridos por subcategoría."
-                  >
-                    <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas p-3.5">
-                      <FolderTree size={16} className="text-cyan" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-medium text-navy">
-                          Configurado en el módulo Catálogo
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted">
-                          {cats.length} categorías · última edición 12/05/2026
-                        </div>
-                      </div>
-                      <a
-                        href="/catalogo"
-                        className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-cyan"
-                      >
-                        Ir a Catálogo <ArrowRight size={12} />
-                      </a>
-                    </div>
-                  </ConfigCard>
+          {active === 'notifications' && (
+            <NotificationsSection form={form} set={set} errs={errs} />
+          )}
 
-                  <ConfigCard
-                    title="Programa de comisión reducida"
-                    icon={Rocket}
-                    sub="Comisión preferente durante los primeros días de cada técnico nuevo."
-                    headRight={
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-xs font-semibold text-navy">
-                          {program.on ? 'Activo' : 'Inactivo'}
-                        </span>
-                        <Toggle
-                          on={program.on}
-                          onChange={v => {
-                            setProgram({ ...program, on: v });
-                            touch();
-                          }}
-                        />
-                      </div>
-                    }
-                  >
-                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                      <PercentField
-                        label="Comisión durante el programa"
-                        error={errs.intro_commission_bps}
-                        value={program.pct}
-                        onChange={v => {
-                          setProgram({ ...program, pct: v });
-                          touch();
-                        }}
-                      />
-                      <NumField
-                        label="Duración del programa"
-                        error={errs.intro_program_days}
-                        value={program.days}
-                        unit="días"
-                        onChange={v => {
-                          setProgram({ ...program, days: v });
-                          touch();
-                        }}
-                      />
-                    </div>
-                    <Hint tone="success">
-                      <b className="font-semibold text-navy">32 técnicos</b>{' '}
-                      bajo el programa · ahorro acumulado{' '}
-                      <b className="font-semibold text-success">
-                        {peso(24180)} MXN
-                      </b>
-                    </Hint>
-                  </ConfigCard>
-                </div>
-                <AuditTrail />
-              </>
-            )}
-
-            {/* SLA */}
-            {active === 'sla' && (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ConfigCard
-                    title="Tiempo de aceptación"
-                    icon={AlarmClock}
-                    sub="Minutos para que el técnico acepte o rechace una solicitud."
-                  >
-                    <NumField
-                      label="Ventana de aceptación"
-                      error={errs.request_ttl_minutes}
-                      value={sla.accept}
-                      unit="minutos"
-                      onChange={v => {
-                        setSla({ ...sla, accept: v });
-                        touch();
-                      }}
-                    />
-                    <ToggleRow
-                      title="Reasignar automáticamente si expira"
-                      sub="El sistema busca al siguiente mejor candidato en la zona."
-                      on={sla.reassign}
-                      onChange={v => {
-                        setSla({ ...sla, reassign: v });
-                        touch();
-                      }}
-                    />
-                    <div className="flex items-center gap-2.5 rounded-lg border border-success/25 bg-success/10 px-3.5 py-3">
-                      <TrendingUp size={14} className="text-success" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[12.5px] font-semibold text-navy">
-                          97% de solicitudes se aceptan en menos de 8 min
-                        </div>
-                        <div className="mt-0.5 text-[11px] text-faint">
-                          Solo 1.2% expira sin respuesta · vs. 4.8% hace 3 meses
-                        </div>
-                      </div>
-                    </div>
-                  </ConfigCard>
-
-                  <ConfigCard
-                    title="SLA de soporte"
-                    icon={Timer}
-                    sub="Tiempos objetivo de respuesta del equipo de operaciones."
-                  >
-                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                      <NumField
-                        label="Primera respuesta"
-                        error={errs.sla_first_response_minutes}
-                        value={sla.firstResponse}
-                        unit="min"
-                        onChange={v => {
-                          setSla({ ...sla, firstResponse: v });
-                          touch();
-                        }}
-                      />
-                      <NumField
-                        label="Resolución de disputas"
-                        error={errs.sla_dispute_hours}
-                        value={sla.dispute}
-                        unit="horas"
-                        onChange={v => {
-                          setSla({ ...sla, dispute: v });
-                          touch();
-                        }}
-                      />
-                    </div>
-                    <Hint>
-                      El incumplimiento de SLA genera alertas automáticas al
-                      Super Admin.
-                    </Hint>
-                  </ConfigCard>
-                </div>
-                <AuditTrail />
-              </>
-            )}
-
-            {/* CANCEL */}
-            {active === 'cancel' && (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ConfigCard
-                    title="Política de cancelación del cliente"
-                    icon={UserX}
-                  >
-                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                      <NumField
-                        label="Ventana sin costo"
-                        error={errs.cancel_free_window_hours}
-                        value={cancel.window}
-                        unit="h antes"
-                        onChange={v => {
-                          setCancel({ ...cancel, window: v });
-                          touch();
-                        }}
-                      />
-                      <PercentField
-                        label="Penalización tardía"
-                        error={errs.cancel_penalty_bps}
-                        value={cancel.penalty}
-                        big={false}
-                        onChange={v => {
-                          setCancel({ ...cancel, penalty: v });
-                          touch();
-                        }}
-                      />
-                    </div>
-                    <ToggleRow
-                      title="Cobrar penalización automáticamente"
-                      sub="Se carga a la tarjeta o saldo del cliente al confirmar."
-                      on={cancel.autoCharge}
-                      onChange={v => {
-                        setCancel({ ...cancel, autoCharge: v });
-                        touch();
-                      }}
-                    />
-                    <Hint>
-                      El cliente verá esta política al confirmar el servicio.
-                    </Hint>
-                  </ConfigCard>
-
-                  <ConfigCard
-                    title="Política de cancelación del técnico"
-                    icon={HardHat}
-                  >
-                    <NumField
-                      label="Máximo de cancelaciones en 30 días"
-                      error={errs.tech_max_cancellations_30d}
-                      value={cancel.maxTech}
-                      unit="cancelaciones"
-                      onChange={v => {
-                        setCancel({ ...cancel, maxTech: v });
-                        touch();
-                      }}
-                    />
-                    <div className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/15 px-3.5 py-3 text-[12.5px] leading-relaxed">
-                      <AlertTriangle
-                        size={14}
-                        className="mt-0.5 shrink-0 text-warning"
-                      />
-                      <div>
-                        <b className="font-semibold text-warning">
-                          Al exceder el límite
-                        </b>
-                        <span className="text-muted">
-                          {' '}
-                          la cuenta entra en revisión automática por operaciones
-                          y no recibe nuevas solicitudes.
-                        </span>
-                      </div>
-                    </div>
-                  </ConfigCard>
-                </div>
-
-                <ConfigCard
-                  title="No-show del cliente"
-                  icon={UserMinus}
-                  sub="Cuando el cliente no está disponible al momento de la visita."
-                >
-                  <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
-                    <NumField
-                      label="Tiempo de espera del técnico"
-                      error={errs.noshow_wait_minutes}
-                      value={cancel.wait}
-                      unit="min"
-                      onChange={v => {
-                        setCancel({ ...cancel, wait: v });
-                        touch();
-                      }}
-                    />
-                    <div className="rounded-xl border border-line bg-canvas px-4 py-3.5">
-                      <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-wider text-faint">
-                        Flujo de no-show
-                      </div>
-                      <ol className="flex flex-col gap-2 text-[12.5px] leading-relaxed text-muted">
-                        <li>
-                          <b className="font-semibold text-navy">1.</b> Técnico
-                          toca timbre y espera al cliente.
-                        </li>
-                        <li>
-                          <b className="font-semibold text-navy">2.</b> Tras{' '}
-                          {cancel.wait} min marca &quot;No-show&quot; + foto con
-                          geolocalización.
-                        </li>
-                        <li>
-                          <b className="font-semibold text-navy">3.</b> Cliente
-                          recibe push + email; tarifa de visita ({peso(280)}) se
-                          cobra.
-                        </li>
-                        <li>
-                          <b className="font-semibold text-navy">4.</b> Soporte
-                          revisa la evidencia y cierra el caso en menos de 2
-                          horas.
-                        </li>
-                      </ol>
-                    </div>
-                  </div>
-                </ConfigCard>
-                <AuditTrail />
-              </>
-            )}
-
-            {/* NOTIFICATIONS */}
-            {active === 'notifications' && (
-              <>
-                <ConfigCard
-                  title="Canales de notificación"
-                  icon={Bell}
-                  sub="Define cómo se comunican los eventos a clientes, técnicos y al equipo."
-                >
-                  <ToggleRow
-                    title="Notificaciones push"
-                    sub="Alertas en la app móvil para clientes y técnicos."
-                    on={notif.push}
-                    onChange={v => {
-                      setNotif({ ...notif, push: v });
-                      touch();
-                    }}
-                  />
-                  <ToggleRow
-                    title="Correo electrónico"
-                    sub="Confirmaciones, recibos y resúmenes por email."
-                    on={notif.email}
-                    onChange={v => {
-                      setNotif({ ...notif, email: v });
-                      touch();
-                    }}
-                  />
-                  <ToggleRow
-                    title="SMS"
-                    sub="Mensajes de texto para eventos críticos. Tiene costo por envío."
-                    on={notif.sms}
-                    onChange={v => {
-                      setNotif({ ...notif, sms: v });
-                      touch();
-                    }}
-                  />
-                </ConfigCard>
-                <ConfigCard
-                  title="Notificaciones internas"
-                  icon={ShieldCheck}
-                  sub="Avisos para el equipo de administración."
-                >
-                  <ToggleRow
-                    title="Resumen semanal de operación"
-                    sub="Reporte de GMV, solicitudes y disputas cada lunes."
-                    on={notif.weekly}
-                    onChange={v => {
-                      setNotif({ ...notif, weekly: v });
-                      touch();
-                    }}
-                  />
-                  <ToggleRow
-                    title="Alertas de KYC pendiente"
-                    sub="Notifica cuando un técnico envía documentos para verificación."
-                    on={notif.kyc}
-                    onChange={v => {
-                      setNotif({ ...notif, kyc: v });
-                      touch();
-                    }}
-                  />
-                </ConfigCard>
-                <AuditTrail />
-              </>
-            )}
-
-            {/* TEAM */}
-            {active === 'team' && (
-              <>
-                <ConfigCard
-                  title="Equipo y permisos"
-                  icon={UsersRound}
-                  sub="Miembros con acceso al panel de administración y su rol."
-                  headRight={
-                    <PrimaryButton onClick={() => setInviteOpen(true)}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users size={14} /> Invitar
-                      </span>
-                    </PrimaryButton>
-                  }
-                >
-                  <div className="overflow-hidden rounded-xl border border-line">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-canvas">
-                          {['Miembro', 'Estado', 'Rol'].map((h, i) => (
-                            <th
-                              key={i}
-                              className="border-b border-line px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-wider text-faint"
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* ponytail: el correo vive en auth.users (no en
-                            profiles) y el rol es único 'admin' — sin
-                            sub-roles ni edición hasta que existan en el esquema. */}
-                        {getAdmins().map((m, i) => (
-                          <motion.tr
-                            key={m.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: i * 0.04 }}
-                            className="border-b border-line last:border-0"
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="grid h-8 w-8 place-items-center rounded-full bg-info-soft text-[11px] font-semibold text-cyan">
-                                  {initials(m.full_name ?? 'Admin')}
-                                </div>
-                                <span className="text-[13px] font-medium text-navy">
-                                  {m.full_name ?? 'Admin'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-muted">
-                              {m.status === 'active' ? 'Activo' : 'Suspendido'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge tone="info">Admin</Badge>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </ConfigCard>
-                <AuditTrail />
-              </>
-            )}
-          </FadeIn>
+          {active === 'team' && <TeamSection />}
         </div>
       </div>
 
-      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-
-      {/* sticky save bar */}
-      <AnimatePresence>
-        {dirty > 0 && (
-          <motion.div
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-0 left-60 right-0 z-20 flex items-center justify-between border-t border-line bg-surface px-8 py-4 shadow-hover"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-warning shadow-[0_0_0_4px] shadow-warning/20" />
-              <div>
-                <div className="text-[13.5px] font-semibold text-navy">
-                  Tienes {dirty} {dirty === 1 ? 'cambio' : 'cambios'} sin
-                  guardar
-                </div>
-                <div className="mt-0.5 text-xs text-muted">
-                  Los cambios afectan la operación en producción.
-                </div>
+      {/* Barra de cambios sin guardar */}
+      {dirty > 0 && (
+        <div className="pointer-events-none fixed inset-x-4 bottom-5 z-30 flex justify-center">
+          <div className="anim-fade pointer-events-auto flex w-full max-w-[640px] items-center gap-4 rounded-box bg-tooltip px-5 py-3.5 text-white shadow-modal">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-warning" />
+            <div className="min-w-0 flex-1">
+              <div className="font-sans text-[14px] font-semibold">
+                {dirty}{' '}
+                {dirty === 1 ? 'cambio sin guardar' : 'cambios sin guardar'}
+              </div>
+              <div className="truncate font-sans text-[12px] text-white/70">
+                {Object.keys(changes)
+                  .map(k => LABELS[k] ?? k)
+                  .slice(0, 3)
+                  .join(' · ')}
               </div>
             </div>
-            <div className="flex gap-2.5">
-              <GhostButton
-                onClick={() => {
-                  hydrate();
-                  setErrs({});
-                  setDirty(0);
-                }}
-              >
-                Descartar
-              </GhostButton>
-              <PrimaryButton onClick={requestSave}>
-                <span className="inline-flex items-center gap-2">
-                  <ShieldCheck size={14} /> Guardar · requiere MFA
-                </span>
-              </PrimaryButton>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* re-auth modal */}
-      <AnimatePresence>
-        {modal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 grid place-items-center bg-navy/50 p-4 backdrop-blur-sm"
-            onClick={() => setModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-              className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-surface shadow-hover"
+            <Button
+              variant="ghost"
+              onClick={discard}
+              className="text-white hover:bg-white/10 hover:text-white"
             >
-              <div className="flex items-start gap-3.5 border-b border-line px-6 py-5">
-                <div className="grid h-11 w-11 place-items-center rounded-xl bg-error/10">
-                  <ShieldCheck size={22} className="text-error" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[17px] font-bold text-navy">
-                    Confirma tu identidad
-                  </div>
-                  <div className="mt-1 text-[13px] text-muted">
-                    Los cambios afectan comisión y flujo de pagos. Valida que
-                    eres tú antes de guardar.
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-4 px-6 py-5">
-                <div className="rounded-xl border border-line bg-canvas px-4 py-3.5">
-                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-faint">
-                    {dirty} cambios a aplicar
-                  </div>
-                  <div className="text-[12.5px] text-muted">
-                    Se registrarán en la bitácora a tu nombre con timestamp
-                    27/06/2026.
-                  </div>
-                </div>
-                <Labeled label="Código MFA · App autenticadora">
-                  <div className="grid grid-cols-6 gap-2">
-                    {['4', '8', '2', '7', '1', '9'].map((d, i) => (
-                      <div
-                        key={i}
-                        className="grid h-12 place-items-center rounded-xl border border-cyan bg-info-soft font-display text-xl font-bold text-navy"
-                      >
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                </Labeled>
-              </div>
-              <div className="flex justify-end gap-2.5 border-t border-line px-6 py-4">
-                <GhostButton onClick={() => !saving && setModal(false)}>
-                  Cancelar
-                </GhostButton>
-                <PrimaryButton
-                  loading={saving}
-                  onClick={() => void persistSettings()}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Check size={14} /> Confirmar y guardar
-                  </span>
-                </PrimaryButton>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              Descartar
+            </Button>
+            <Button onClick={requestSave}>Guardar</Button>
+          </div>
+        </div>
+      )}
+
+      <Modal
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        dismissible={!saving}
+        title="Guardar configuración"
+        description="Estos cambios afectan la operación en producción desde la siguiente solicitud."
+        icon={ShieldCheck}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirm(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => void persist()} loading={saving}>
+              Confirmar y guardar
+            </Button>
+          </>
+        }
+      >
+        <ul className="flex flex-col gap-1.5 font-sans text-[13px] text-body">
+          {Object.keys(changes).map(k => (
+            <li key={k} className="flex justify-between gap-3">
+              <span className="text-muted">{LABELS[k] ?? k}</span>
+              <span className="font-mono text-[12.5px] text-navy">
+                {fmt(k, changes[k])}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Modal>
     </div>
   );
 }
 
-const SUBTITLES: Record<SectionId, string> = {
-  general: 'Datos de la plataforma, estado del servicio y categorías activas.',
-  commission:
-    'Comisión global, overrides por método de pago y programa de bienvenida.',
-  sla: 'Tiempos de aceptación, reasignación y objetivos de soporte.',
-  cancel: 'Políticas para clientes y técnicos · no-shows y penalizaciones.',
-  notifications: 'Canales de comunicación y alertas internas del equipo.',
-  team: 'Miembros con acceso al panel y sus roles.',
-};
+function fmt(key: string, v: unknown) {
+  if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+  if (key.endsWith('_bps') && typeof v === 'number') return `${v / 100}%`;
+  return String(v);
+}
 
-function Labeled({
-  label,
+function Section({
+  title,
   children,
 }: {
-  label: string;
+  title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11.5px] font-medium text-muted">{label}</label>
-      {children}
+    <Card className="overflow-hidden">
+      <div className="border-b border-divider px-5 py-4 font-display text-[16px] font-bold text-navy">
+        {title}
+      </div>
+      <div className="divide-y divide-divider">{children}</div>
+    </Card>
+  );
+}
+
+function Row({
+  label,
+  desc,
+  error,
+  children,
+}: {
+  label: string;
+  desc?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-1 items-center gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="min-w-0">
+        <div className="font-sans text-[14px] font-semibold text-navy">
+          {label}
+        </div>
+        {desc && (
+          <div className="mt-0.5 font-sans text-[12.5px] text-muted">
+            {desc}
+          </div>
+        )}
+      </div>
+      <div>
+        {children}
+        {error && (
+          <p role="alert" className="mt-1 font-sans text-[12px] text-error">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
+  );
+}
+
+// ── Notificaciones ───────────────────────────────────────────────────────────
+function NotificationsSection({
+  form,
+  set,
+  errs,
+}: {
+  form: SettingsMap;
+  set: (key: string, v: string | number | boolean) => void;
+  errs: Record<string, string>;
+}) {
+  const muted = mutedTypes(TYPE_KEYS, form as PrefMatrix);
+  const hours = Array.from({ length: 24 }, (_, h) => h);
+  return (
+    <>
+      <Card className="overflow-hidden">
+        <div className="border-b border-divider px-5 py-4">
+          <div className="font-display text-[16px] font-bold text-navy">
+            Tipos y canales
+          </div>
+          <p className="mt-0.5 font-sans text-[12.5px] text-muted">
+            Un tipo con todos los canales apagados deja de aparecer en la
+            campana de la consola.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse">
+            <thead>
+              <tr className="bg-panel">
+                <th className="px-5 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
+                  Tipo
+                </th>
+                {NOTIF_CHANNELS.map(c => (
+                  <th
+                    key={c.key}
+                    className="px-3 py-2.5 text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted"
+                  >
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {NOTIF_TYPES.map(t => (
+                <tr key={t.type} className="border-t border-divider">
+                  <td className="px-5 py-3 font-sans text-[14px] font-semibold text-navy">
+                    {t.label}
+                    {muted.includes(t.type) && (
+                      <Badge tone="neutral" className="ml-2">
+                        Silenciado
+                      </Badge>
+                    )}
+                  </td>
+                  {NOTIF_CHANNELS.map(c => {
+                    const k = notifKey(t.type, c.key);
+                    return (
+                      <td key={c.key} className="px-3 py-3">
+                        <div className="flex justify-center">
+                          <Toggle
+                            checked={form[k] === true}
+                            onChange={v => set(k, v)}
+                            label={
+                              <span className="sr-only">
+                                {t.label} por {c.label}
+                              </span>
+                            }
+                          />
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="border-t border-divider px-5 py-3 font-sans text-[12px] text-muted">
+          Push, correo y SMS a administradores se envían cuando el backend tenga
+          notificaciones de admin; hoy estas preferencias ya filtran la campana
+          y el sonido de la consola.
+        </p>
+      </Card>
+
+      <Section title="No molestar">
+        <Row
+          label="Horario silencioso"
+          desc="Sin sonido ni push fuera del horario laboral."
+        >
+          <div className="flex justify-end">
+            <Toggle
+              checked={form.quiet_hours_enabled === true}
+              onChange={v => set('quiet_hours_enabled', v)}
+            />
+          </div>
+        </Row>
+        {form.quiet_hours_enabled === true && (
+          <Row
+            label="De / hasta"
+            desc="Puede cruzar la medianoche (p. ej. 22:00 a 07:00)."
+            error={errs.quiet_start_hours ?? errs.quiet_end_hours}
+          >
+            <div className="flex items-center gap-2">
+              {(['quiet_start_hours', 'quiet_end_hours'] as const).map(
+                (k, i) => (
+                  <select
+                    key={k}
+                    value={String(form[k])}
+                    onChange={e => set(k, Number(e.target.value))}
+                    aria-label={i ? 'Hasta' : 'Desde'}
+                    className="h-10 flex-1 rounded-btn border border-line bg-card px-3 font-mono text-[13px] text-navy outline-none focus:border-primary focus:shadow-focus"
+                  >
+                    {hours.map(h => (
+                      <option key={h} value={h}>
+                        {String(h).padStart(2, '0')}:00
+                      </option>
+                    ))}
+                  </select>
+                ),
+              )}
+            </div>
+          </Row>
+        )}
+      </Section>
+    </>
+  );
+}
+
+// ── Equipo y permisos ────────────────────────────────────────────────────────
+const MODULES = [
+  'Dashboard',
+  'Clientes y técnicos',
+  'Servicios',
+  'Finanzas y reembolsos',
+  'Soporte y disputas',
+  'Catálogo',
+  'Configuración',
+];
+
+function TeamSection() {
+  useTick();
+  const admins = getAdmins();
+  const [me, setMe] = useState<string | null>(null);
+  const [myMfa, setMyMfa] = useState<boolean | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  useEffect(() => {
+    void getSessionUserId().then(setMe);
+    void getMyMfaVerified().then(setMyMfa);
+  }, []);
+
+  return (
+    <>
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-divider px-5 py-4">
+          <div>
+            <div className="font-display text-[16px] font-bold text-navy">
+              Administradores
+            </div>
+            <p className="mt-0.5 font-sans text-[12.5px] text-muted">
+              {admins.length} con acceso a la consola.
+            </p>
+          </div>
+          <Button icon={Mail} onClick={() => setInviteOpen(true)}>
+            Invitar
+          </Button>
+        </div>
+        <ul className="divide-y divide-divider">
+          {admins.map(a => {
+            const mine = a.id === me;
+            return (
+              <li key={a.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-action font-display text-[12px] font-bold text-white">
+                  {(a.full_name ?? 'A')
+                    .split(' ')
+                    .slice(0, 2)
+                    .map(w => w[0])
+                    .join('')
+                    .toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-sans text-[14px] font-semibold text-navy">
+                    {a.full_name ?? 'Admin'}
+                    {mine && <span className="ml-1.5 text-muted">(tú)</span>}
+                  </div>
+                  <div className="font-sans text-[12px] text-muted">
+                    {a.status === 'active' ? 'Activo' : 'Suspendido'}
+                  </div>
+                </div>
+                <Badge tone="navy">Admin</Badge>
+                <span className="w-24 text-right font-sans text-[12px]">
+                  {mine && myMfa != null ? (
+                    myMfa ? (
+                      <span className="font-semibold text-success">
+                        MFA activo
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-warning-ink">
+                        Sin MFA
+                      </span>
+                    )
+                  ) : (
+                    <span
+                      className="text-faint"
+                      title="Supabase solo expone el MFA de tu propia sesión"
+                    >
+                      MFA —
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-divider px-5 py-4">
+          <div className="font-display text-[16px] font-bold text-navy">
+            Matriz de permisos
+          </div>
+          <p className="mt-0.5 font-sans text-[12.5px] text-muted">
+            Hoy existe un solo rol de consola (admin) con acceso total. Los
+            roles granulares se habilitarán cuando el backend los soporte.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[420px] border-collapse">
+            <thead>
+              <tr className="bg-panel">
+                {['Módulo', 'Ver', 'Editar'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-5 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted ${
+                      i ? 'text-center' : 'text-left'
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MODULES.map(m => (
+                <tr key={m} className="border-t border-divider">
+                  <td className="px-5 py-3 font-sans text-[13.5px] text-navy">
+                    {m}
+                  </td>
+                  {[0, 1].map(i => (
+                    <td key={i} className="px-5 py-3 text-center">
+                      <Check
+                        size={16}
+                        className="inline text-success"
+                        aria-label="Permitido"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              <tr className="border-t border-divider">
+                <td className="px-5 py-3 font-sans text-[13.5px] text-muted">
+                  Soporte (solo lectura)
+                </td>
+                {[0, 1].map(i => (
+                  <td key={i} className="px-5 py-3 text-center">
+                    <Minus
+                      size={16}
+                      className="inline text-faint"
+                      aria-label="No disponible"
+                    />
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+    </>
   );
 }
 
@@ -1610,8 +836,8 @@ function InviteModal({
     setSending(true);
     const ok = await inviteAdmin(email.trim(), name.trim());
     setSending(false);
-    if (ok === null) return; // el store ya mostró el error; el modal sigue abierto
-    toast.success(`Invitación enviada · ${email.trim()}`);
+    if (ok === null) return; // el store ya mostró el error; el modal sigue
+    toast.success('Invitación enviada', email.trim());
     setEmail('');
     setName('');
     onClose();
@@ -1620,43 +846,43 @@ function InviteModal({
   return (
     <Modal
       open={open}
-      onClose={() => !sending && onClose()}
+      onClose={onClose}
+      dismissible={!sending}
       title="Invitar administrador"
-      sub="Recibirá un correo para crear su contraseña y entrar a la consola."
-      icon={<Users size={16} />}
-      width={440}
+      description="Recibirá un correo para crear su contraseña y entrar a la consola."
+      icon={Mail}
+      width={460}
       footer={
         <>
-          <GhostButton onClick={onClose} disabled={sending}>
+          <Button variant="secondary" onClick={onClose} disabled={sending}>
             Cancelar
-          </GhostButton>
-          <PrimaryButton
+          </Button>
+          <Button
             onClick={() => void send()}
             loading={sending}
             disabled={invalid}
           >
             Enviar invitación
-          </PrimaryButton>
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Labeled label="Correo">
-          <Input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="nombre@tumtto.mx"
-          />
-          {email && invalid && <FieldError msg="Correo no válido." />}
-        </Labeled>
-        <Labeled label="Nombre (opcional)">
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Nombre y apellido"
-          />
-        </Labeled>
+        <Input
+          label="Correo"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="nombre@tumantenimiento.mx"
+          error={email && invalid ? 'Correo no válido.' : null}
+        />
+        <Input
+          label="Nombre (opcional)"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Nombre y apellido"
+        />
+        <Kicker>Se invita con rol admin</Kicker>
       </div>
     </Modal>
   );

@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
@@ -26,6 +27,8 @@ export type AuthState = {
   usuario: Usuario | null;
   loading: boolean;
   usuarioError: UsuarioError | null;
+  /** Hay una resolución de perfil en curso (Reintentar deshabilitado). */
+  resolving: boolean;
 };
 
 export type AuthContextValue = AuthState & {
@@ -41,6 +44,8 @@ export type AuthContextValue = AuthState & {
 
 const RETRY_DELAY_MS = 1500;
 const MAX_ATTEMPTS = 2;
+// Sin timeout, una consulta colgada deja la consola en blanco para siempre.
+const PROFILE_TIMEOUT_MS = 10_000;
 
 const TRANSIENT_MESSAGE =
   'No pudimos cargar tu cuenta. Verifica tu conexión e inténtalo de nuevo.';
@@ -52,6 +57,7 @@ async function resolveUsuario(userId: string): Promise<Usuario | null> {
     .from('profiles')
     .select('*')
     .eq('id', userId)
+    .abortSignal(AbortSignal.timeout(PROFILE_TIMEOUT_MS))
     .maybeSingle();
   if (error) throw error;
   return data ?? null;
@@ -65,13 +71,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     usuario: null,
     loading: true,
     usuarioError: null,
+    resolving: false,
   });
+  // Usuario cuyo perfil ya está cargado (o cargando): los eventos del mismo
+  // usuario (TOKEN_REFRESHED, SIGNED_IN al volver a la pestaña) no lo tiran.
+  const resolvedFor = useRef<string | null>(null);
 
   const refreshUsuario = useCallback(async (session: Session | null) => {
     if (!session?.user) {
       setState(s => ({ ...s, usuario: null, usuarioError: null }));
       return;
     }
+    setState(s => ({ ...s, resolving: true }));
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         const usuario = await resolveUsuario(session.user.id);
@@ -79,11 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setState(s => ({
             ...s,
             usuario: null,
+            resolving: false,
             usuarioError: { kind: 'no-account', message: NO_ACCOUNT_MESSAGE },
           }));
           return;
         }
-        setState(s => ({ ...s, usuario, usuarioError: null }));
+        setState(s => ({ ...s, usuario, usuarioError: null, resolving: false }));
         return;
       } catch {
         if (attempt < MAX_ATTEMPTS)
@@ -93,12 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(s => ({
       ...s,
       usuario: null,
+      resolving: false,
       usuarioError: { kind: 'transient', message: TRANSIENT_MESSAGE },
     }));
   }, []);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user.id ?? null;
+      // Mismo usuario (refresh de token, pestaña que vuelve): solo la sesión.
+      // Tirar `usuario` aquí desmontaba la consola y perdía lo capturado.
+      if (event !== 'SIGNED_OUT' && userId && userId === resolvedFor.current) {
+        setState(s => ({ ...s, session, loading: false }));
+        return;
+      }
+      resolvedFor.current = userId;
       setState(s => ({
         ...s,
         session,
@@ -121,11 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    resolvedFor.current = null;
     setState({
       session: null,
       usuario: null,
       loading: false,
       usuarioError: null,
+      resolving: false,
     });
   }, []);
 

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { Spinner } from '@/components/ui';
 
 /**
  * Console gate: Supabase session + profiles.role === 'admin'.
@@ -17,6 +18,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     usuario,
     usuarioError,
     isAdmin,
+    resolving,
     signOut,
     retryUsuario,
   } = useAuth();
@@ -25,10 +27,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     if (!loading && !session) router.replace('/login');
   }, [loading, session, router]);
 
-  if (loading || !session) return null;
-
-  // Session up, profile still resolving.
-  if (!usuario && !usuarioError) return null;
+  // Sesión o perfil resolviéndose: spinner, nunca pantalla en blanco (la
+  // consulta del perfil tiene timeout y cae al panel de error).
+  if (loading || !session || (!usuario && !usuarioError)) return <Resolving />;
 
   if (usuarioError) {
     return (
@@ -36,8 +37,13 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
         title="No pudimos cargar tu cuenta"
         body={usuarioError.message}
         actionLabel={
-          usuarioError.kind === 'transient' ? 'Reintentar' : 'Cerrar sesión'
+          usuarioError.kind === 'transient'
+            ? resolving
+              ? 'Reintentando…'
+              : 'Reintentar'
+            : 'Cerrar sesión'
         }
+        busy={resolving}
         onAction={() => {
           if (usuarioError.kind === 'transient') void retryUsuario();
           else void signOut().then(() => router.replace('/login'));
@@ -65,11 +71,13 @@ function Panel({
   body,
   actionLabel,
   onAction,
+  busy,
 }: {
   title: string;
   body: string;
   actionLabel: string;
   onAction: () => void;
+  busy?: boolean;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-app p-6">
@@ -80,11 +88,24 @@ function Panel({
         <p className="mt-2 text-sm text-muted">{body}</p>
         <button
           onClick={onAction}
-          className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-2"
+          disabled={busy}
+          className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {actionLabel}
         </button>
       </div>
+    </div>
+  );
+}
+
+function Resolving() {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center bg-app"
+      role="status"
+      aria-label="Cargando tu cuenta"
+    >
+      <Spinner className="text-primary" />
     </div>
   );
 }

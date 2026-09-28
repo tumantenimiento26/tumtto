@@ -1,483 +1,403 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Ban, Download, Eye, Pencil, RotateCcw, Search, UserPlus } from 'lucide-react';
 import {
-  Search,
-  Download,
-  Filter,
-  ShieldAlert,
-  Star,
-  MapPin,
-  UserPlus,
-  Users,
-  X,
-} from 'lucide-react';
-import {
-  PageHeading,
-  Panel,
-  StatCard,
-  DataTable,
-  exportCsv,
-  LoadFailed,
-} from '@/components/admin';
-import { Popover } from '@/components/admin-shell';
-import type { Column } from '@/components/admin';
-import {
-  GhostButton,
-  Input,
-  Chip,
-  Avatar,
   Badge,
-  Skeleton,
-} from '@/components/ui';
-import { FadeIn } from '@/components/motion';
-import { toast } from '@/components/toast';
+  Button,
+  Card,
+  Chip,
+  DataTable,
+  EmptyState,
+  ErrorPage,
+  Input,
+  PageHeader,
+  ScreenSkeleton,
+  Segmented,
+  Select,
+  Tabs,
+  snackbar,
+  toast,
+  type DataColumn,
+} from '@/components/ds';
 import {
-  useTick,
-  useWorldReady,
-  useWorldFailed,
-  loadWorld,
-  getClients,
-  getAllRequests,
+  getAddresses,
   getAllDisputes,
+  getAllRequests,
+  getClients,
+  loadWorld,
+  reactivateUser,
+  suspendUser,
+  useTick,
+  useWorldFailed,
+  useWorldReady,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import {
+  EMPTY_CLIENT_FILTERS,
+  SPEND_BUCKETS,
+  clientTabCounts,
+  filterClients,
+  toCsv,
+  type ClientFilters,
+  type ClientRow,
+  type ClientSort,
+  type ClientTab,
+} from '@/lib/serviciosFilter';
+import {
+  Avatar,
+  ZONES,
+  downloadCsv,
+  money,
+  timeAgo,
+} from '../servicios/_components/shared';
+import { ClientFormSheet } from './_components/ClientFormSheet';
 
-type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+const TABS: { value: ClientTab; label: string }[] = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'activos', label: 'Activos' },
+  { value: 'recurrentes', label: 'Recurrentes' },
+  { value: 'suspendidos', label: 'Suspendidos' },
+];
 
-type ClientRow = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  city: string;
-  services: number;
-  gmv: number;
-  rating: number;
-  last: string;
-  disputes: number;
-  status: 'active' | 'new' | 'inactive';
-};
-
-const STATUS: Record<ClientRow['status'], { label: string; tone: Tone }> = {
-  active: { label: 'Activo', tone: 'success' },
-  new: { label: 'Nuevo', tone: 'info' },
-  inactive: { label: 'Inactivo', tone: 'neutral' },
-};
-
-const initials = (n: string) =>
-  n
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(s => s[0])
-    .join('')
-    .toUpperCase();
-
-const fmt = (n: number) => n.toLocaleString('es-MX');
-
-const FILTERS = [
-  'Todos',
-  'Activos',
-  'Nuevos',
-  'Inactivos',
-  'Con disputas',
-] as const;
-
-// ponytail: vistas guardadas en localStorage; mover a backend si deben compartirse entre admins.
-type SavedView = {
-  name: string;
-  query: string;
-  filter: (typeof FILTERS)[number];
-};
-const VIEWS_KEY = 'tumtto:clientes:vistas';
-
-const DAY_MS = 24 * 3600 * 1000;
-const relDays = (iso: string | null) => {
-  if (!iso) return '—';
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
-  if (d === 0) return 'Hoy';
-  if (d < 7) return `Hace ${d} día${d === 1 ? '' : 's'}`;
-  if (d < 60) return `Hace ${Math.floor(d / 7)} sem`;
-  return `Hace ${Math.floor(d / 30)} meses`;
-};
-
-function SkeletonRows({ rows = 6 }: { rows?: number }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-10 w-72" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full" />
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: rows }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    </div>
-  );
-}
+const SORTS: { value: ClientSort; label: string }[] = [
+  { value: 'reciente', label: 'Más recientes' },
+  { value: 'gasto', label: 'Mayor gasto' },
+  { value: 'servicios', label: 'Más servicios' },
+  { value: 'nombre', label: 'Nombre A–Z' },
+];
 
 export default function ClientesPage() {
   const tick = useTick();
   const router = useRouter();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Todos');
-  const [viewsOpen, setViewsOpen] = useState(false);
-  const [views, setViews] = useState<SavedView[]>([]);
-  const [viewName, setViewName] = useState('');
-  useEffect(() => {
-    try {
-      setViews(
-        JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '[]') as SavedView[],
-      );
-    } catch {
-      /* JSON corrupto: empieza vacío */
-    }
-  }, []);
-  function persistViews(v: SavedView[]) {
-    setViews(v);
-    try {
-      localStorage.setItem(VIEWS_KEY, JSON.stringify(v));
-    } catch {
-      // Modo privado o cuota llena: la vista vive solo en esta sesión.
-      toast.error('No se pudo guardar la vista en este navegador.');
-    }
-  }
-  function saveCurrentView() {
-    const name = viewName.trim() || `${filter}${query ? ` · “${query}”` : ''}`;
-    persistViews([
-      ...views.filter(v => v.name !== name),
-      { name, query, filter },
-    ]);
-    setViewName('');
-    toast.success(`Vista guardada · ${name}`);
-  }
+  const [f, setF] = useState<ClientFilters>(EMPTY_CLIENT_FILTERS);
+  const [form, setForm] = useState<{ open: boolean; id: string | null }>({
+    open: false,
+    id: null,
+  });
 
   const rows = useMemo<ClientRow[]>(() => {
-    const reqs = getAllRequests();
+    const reqs = getAllRequests(); // ya viene del más reciente al más viejo
     const disputes = getAllDisputes();
     return getClients().map(p => {
-      const myReqs = reqs.filter(r => r.client_id === p.id);
-      const gmv =
-        myReqs.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0) / 100;
-      const lastReq = myReqs[0] ?? null; // getAllRequests ya viene ordenado por fecha
-      const recent =
-        lastReq &&
-        Date.now() - new Date(lastReq.created_at).getTime() < 60 * DAY_MS;
+      const mine = reqs.filter(r => r.client_id === p.id);
+      const addr = getAddresses(p.id);
       return {
         id: p.id,
         name: p.full_name ?? 'Cliente',
-        email: '—', // profiles no guarda email (vive en auth.users)
         phone: formatPhone(p.phone) || '—',
-        city: lastReq?.municipality ?? '—',
-        services: myReqs.length,
-        gmv,
-        rating: 0, // sin tabla de ratings por servicio todavía
-        last: relDays(lastReq?.created_at ?? null),
+        zone:
+          addr.find(a => a.is_default)?.municipality ??
+          mine[0]?.municipality ??
+          addr[0]?.municipality ??
+          '—',
+        services: mine.length,
+        gmvCents: mine.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0),
+        lastAt: mine[0]?.created_at ?? null,
+        suspended: p.status === 'suspended',
         disputes: disputes.filter(d => d.opened_by === p.id).length,
-        status: (myReqs.length === 0
-          ? 'new'
-          : recent
-            ? 'active'
-            : 'inactive') as ClientRow['status'],
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter(r => {
-      const matchesQ =
-        !q ||
-        r.name.toLowerCase().includes(q) ||
-        r.phone.includes(q) ||
-        r.email.toLowerCase().includes(q);
-      const matchesF =
-        filter === 'Todos' ||
-        (filter === 'Activos' && r.status === 'active') ||
-        (filter === 'Nuevos' && r.status === 'new') ||
-        (filter === 'Inactivos' && r.status === 'inactive') ||
-        (filter === 'Con disputas' && r.disputes > 0);
-      return matchesQ && matchesF;
+  const visible = useMemo(() => filterClients(rows, f), [rows, f]);
+  const counts = useMemo(() => clientTabCounts(rows), [rows]);
+  const recurrentPct = rows.length
+    ? Math.round((counts.recurrentes / rows.length) * 100)
+    : 0;
+
+  async function toggleSuspend(r: ClientRow) {
+    if (r.suspended) {
+      const ok = await reactivateUser(r.id);
+      if (ok !== null) toast.success('Cuenta reactivada', r.name);
+      return;
+    }
+    const ok = await suspendUser(r.id);
+    if (ok === null) return;
+    // Suspender es reversible: "Deshacer" reactiva de verdad.
+    snackbar.show(`${r.name} suspendido`, {
+      undo: () => {
+        void reactivateUser(r.id).then(x => {
+          if (x !== null) toast.success('Suspensión revertida', r.name);
+        });
+      },
     });
-  }, [rows, query, filter]);
-
-  const total = rows.length;
-  const nuevos = rows.filter(r => r.status === 'new').length;
-  const activos = rows.filter(r => r.status === 'active').length;
-  const conDisputas = rows.filter(r => r.disputes > 0).length;
-
-  function onExport() {
-    exportCsv(
-      'clientes.csv',
-      filtered.map(r => ({
-        ID: r.id,
-        Nombre: r.name,
-        Email: r.email,
-        Teléfono: r.phone,
-        Ciudad: r.city,
-        Servicios: r.services,
-        GMV: r.gmv,
-        Rating: r.rating || '',
-        Estado: STATUS[r.status].label,
-      })),
-    );
-    toast.success(`CSV exportado · ${filtered.length} clientes`);
   }
 
-  const columns: Column<ClientRow>[] = [
+  function exportRows(list: ClientRow[]) {
+    downloadCsv(
+      'clientes.csv',
+      toCsv(
+        list.map(r => ({
+          ID: r.id,
+          Nombre: r.name,
+          Teléfono: r.phone,
+          Zona: r.zone,
+          Servicios: r.services,
+          'Gasto total': r.gmvCents / 100,
+          'Último servicio': r.lastAt ?? '',
+          Estado: r.suspended ? 'Suspendido' : 'Activo',
+          Disputas: r.disputes,
+        })),
+      ),
+    );
+    toast.success('CSV exportado', `${list.length} clientes`);
+  }
+
+  const columns: DataColumn<ClientRow>[] = [
     {
-      key: 'name',
+      key: 'cliente',
       header: 'Cliente',
+      sortValue: r => r.name,
       render: r => (
-        <div className="flex items-center gap-3">
-          <Avatar initials={initials(r.name)} size={36} />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[13.5px] font-semibold text-navy">
-                {r.name}
-              </span>
-              {r.disputes > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-bold text-error">
-                  <ShieldAlert size={10} /> {r.disputes}
-                </span>
-              )}
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={r.name} size={36} />
+          <div className="min-w-0">
+            <div className="truncate font-display text-[14px] font-bold text-navy">
+              {r.name}
             </div>
-            <div className="mt-0.5 text-[11.5px] text-muted">{r.email}</div>
+            {r.disputes > 0 && (
+              <span className="text-[11.5px] font-semibold text-error">
+                {r.disputes} disputa{r.disputes === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
         </div>
       ),
     },
     {
-      key: 'phone',
+      key: 'telefono',
       header: 'Teléfono',
       render: r => (
-        <span className="font-mono text-[12.5px] text-muted">{r.phone}</span>
-      ),
-    },
-    {
-      key: 'city',
-      header: 'Ciudad',
-      render: r => (
-        <span className="inline-flex items-center gap-1.5 text-[13px] text-navy">
-          <MapPin size={13} className="text-cyan" /> {r.city}
+        <span className="whitespace-nowrap font-mono text-[12.5px] text-body">
+          {r.phone}
         </span>
       ),
     },
     {
-      key: 'services',
+      key: 'zona',
+      header: 'Zona',
+      sortValue: r => r.zone,
+      render: r => <span className="text-[13.5px] text-muted">{r.zone}</span>,
+    },
+    {
+      key: 'servicios',
       header: 'Servicios',
+      align: 'right',
+      sortValue: r => r.services,
       render: r => (
-        <span className="font-mono text-[13px] text-navy">{r.services}</span>
-      ),
-    },
-    {
-      key: 'gmv',
-      header: 'GMV total',
-      render: r => (
-        <span className="font-display text-[13px] font-semibold text-navy">
-          ${fmt(r.gmv)}
-          <span className="ml-1 text-[11px] font-normal text-faint">MXN</span>
+        <span className="font-mono text-[13px] text-navy tabular">
+          {r.services}
         </span>
       ),
     },
     {
-      key: 'rating',
-      header: 'Rating',
-      render: r =>
-        r.rating > 0 ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Star size={13} className="text-warning" fill="currentColor" />
-            <span className="text-[13px] font-semibold text-navy">
-              {r.rating.toFixed(1)}
-            </span>
-          </span>
-        ) : (
-          <span className="text-[13px] text-faint">—</span>
-        ),
-    },
-    {
-      key: 'last',
-      header: 'Último servicio',
-      render: r => <span className="text-[12.5px] text-muted">{r.last}</span>,
-    },
-    {
-      key: 'status',
-      header: 'Estado',
+      key: 'gasto',
+      header: 'Gasto total',
+      align: 'right',
+      sortValue: r => r.gmvCents,
       render: r => (
-        <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
+        <span className="font-mono text-[13px] font-semibold text-navy tabular">
+          {money(r.gmvCents)}
+        </span>
       ),
+    },
+    {
+      key: 'ultimo',
+      header: 'Último',
+      sortValue: r => r.lastAt,
+      render: r => (
+        <span className="whitespace-nowrap text-[12.5px] text-muted">
+          {timeAgo(r.lastAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      render: r =>
+        r.suspended ? (
+          <Badge tone="danger" dot>
+            Suspendido
+          </Badge>
+        ) : (
+          <Badge tone="success" dot>
+            Activo
+          </Badge>
+        ),
     },
   ];
 
-  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
-  if (!ready) return <SkeletonRows />;
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready) return <ScreenSkeleton kind="list" />;
 
   return (
-    <div className="space-y-6">
-      <PageHeading
+    <div className="flex flex-col gap-5">
+      <PageHeader
         title="Clientes"
-        sub="Base de usuarios finales de la plataforma · ZMG"
+        description={`${rows.length.toLocaleString('es-MX')} cuentas registradas · ${recurrentPct}% recurrentes`}
         actions={
-          <div className="flex gap-2.5">
-            <div className="relative">
-              <GhostButton onClick={() => setViewsOpen(o => !o)}>
-                <span className="inline-flex items-center gap-2">
-                  <Filter size={14} /> Vistas guardadas
-                  {views.length > 0 ? ` (${views.length})` : ''}
-                </span>
-              </GhostButton>
-              {viewsOpen && (
-                <Popover onClose={() => setViewsOpen(false)} className="w-72">
-                  {views.length === 0 && (
-                    <div className="px-3 py-2.5 text-[13px] text-muted">
-                      Sin vistas guardadas. Ajusta filtros y guarda la vista
-                      actual.
-                    </div>
-                  )}
-                  {views.map(v => (
-                    <div
-                      key={v.name}
-                      className="flex items-center rounded-lg hover:bg-surface"
-                    >
-                      <button
-                        onClick={() => {
-                          setQuery(v.query);
-                          setFilter(v.filter);
-                          setViewsOpen(false);
-                        }}
-                        className="min-w-0 flex-1 px-3 py-2.5 text-left"
-                      >
-                        <div className="truncate text-[13px] font-medium text-navy">
-                          {v.name}
-                        </div>
-                        <div className="text-[11px] text-muted">
-                          {v.filter}
-                          {v.query ? ` · “${v.query}”` : ''}
-                        </div>
-                      </button>
-                      <button
-                        aria-label={`Eliminar vista ${v.name}`}
-                        onClick={() =>
-                          persistViews(views.filter(x => x.name !== v.name))
-                        }
-                        className="mr-1.5 rounded-md p-1.5 text-faint hover:text-error"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ))}
-                  <div className="mt-1 flex items-center gap-2 border-t border-line px-2 pb-1 pt-2">
-                    <input
-                      value={viewName}
-                      onChange={e => setViewName(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && saveCurrentView()}
-                      placeholder="Nombre de la vista…"
-                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] text-navy outline-none placeholder:text-faint"
-                    />
-                    <button
-                      onClick={saveCurrentView}
-                      className="flex-shrink-0 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-white"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </Popover>
-              )}
-            </div>
-            <GhostButton onClick={onExport}>
-              <span className="inline-flex items-center gap-2 text-cyan">
-                <Download size={14} /> Exportar CSV
-              </span>
-            </GhostButton>
-          </div>
+          <>
+            <Button
+              variant="secondary"
+              icon={Download}
+              onClick={() => exportRows(visible)}
+              disabled={!visible.length}
+            >
+              Exportar
+            </Button>
+            <Button icon={UserPlus} onClick={() => setForm({ open: true, id: null })}>
+              Nuevo cliente
+            </Button>
+          </>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          index={0}
-          label="Total clientes"
-          value={fmt(total)}
-          icon={Users}
-          note="Base registrada en ZMG"
-        />
-        <StatCard
-          index={1}
-          label="Nuevos este mes"
-          value={fmt(nuevos)}
-          trend="up"
-          delta="+12%"
-          icon={UserPlus}
-        />
-        <StatCard
-          index={2}
-          label="Activos"
-          value={fmt(activos)}
-          note={`${Math.round((activos / total) * 100)}% de la base`}
-          progress={activos / total}
-        />
-        <StatCard
-          index={3}
-          label="Con disputas"
-          value={fmt(conDisputas)}
-          trend="down"
-          icon={ShieldAlert}
-          note="Requieren seguimiento"
-        />
-      </div>
-
-      <FadeIn>
-        <Panel>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="relative w-full min-w-[220px] flex-1 sm:w-auto sm:max-w-[320px]">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
-              />
-              <Input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Nombre, teléfono o email"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map(f => (
-                <Chip
-                  key={f}
-                  active={filter === f}
-                  onClick={() => setFilter(f)}
-                >
-                  {f}
-                </Chip>
-              ))}
-            </div>
-          </div>
-
-          <DataTable
-            columns={columns}
-            rows={filtered}
-            onRowClick={r => router.push(`/clientes/${r.id}`)}
-            empty="No se encontraron clientes"
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-5">
+          <Tabs
+            className="border-b-0"
+            tabs={TABS.map(t => ({ ...t, count: counts[t.value] }))}
+            value={f.tab}
+            onChange={tab => setF(s => ({ ...s, tab }))}
           />
+          <Input
+            icon={Search}
+            value={f.query}
+            onChange={e => setF(s => ({ ...s, query: e.target.value }))}
+            placeholder="Nombre o teléfono"
+            aria-label="Buscar clientes"
+            wrapperClassName="mb-2.5 w-full sm:w-[300px]"
+          />
+        </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-line pt-4 text-[12.5px] text-muted">
-            <span>
-              Mostrando{' '}
-              <b className="font-semibold text-navy">{filtered.length}</b> de{' '}
-              <b className="font-semibold text-navy">{fmt(total)}</b> clientes
-            </span>
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Zona">
+            {ZONES.map(z => (
+              <Chip
+                key={z}
+                active={f.zones.includes(z)}
+                onClick={() =>
+                  setF(s => ({
+                    ...s,
+                    zones: s.zones.includes(z)
+                      ? s.zones.filter(x => x !== z)
+                      : [...s.zones, z],
+                  }))
+                }
+              >
+                {z}
+              </Chip>
+            ))}
           </div>
-        </Panel>
-      </FadeIn>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+              Gasto
+            </span>
+            <Segmented
+              size="sm"
+              options={SPEND_BUCKETS}
+              value={f.spend}
+              onChange={spend => setF(s => ({ ...s, spend }))}
+            />
+            <div className="ml-auto flex items-center gap-2">
+              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+                Orden
+              </span>
+              <div className="w-[190px]">
+                <Select
+                  aria-label="Ordenar clientes"
+                  options={SORTS}
+                  value={f.sort}
+                  onChange={sort => setF(s => ({ ...s, sort }))}
+                  searchable={false}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DataTable
+          rows={visible}
+          columns={columns}
+          rowKey={r => r.id}
+          onRowClick={r => router.push(`/clientes/${r.id}`)}
+          selectable
+          pageSize={8}
+          minWidth={900}
+          bulkActions={selected => (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Download}
+              onClick={() => exportRows(selected)}
+            >
+              Exportar
+            </Button>
+          )}
+          rowMenu={r => [
+            {
+              label: 'Ver perfil',
+              icon: Eye,
+              onSelect: () => router.push(`/clientes/${r.id}`),
+            },
+            {
+              label: 'Editar',
+              icon: Pencil,
+              onSelect: () => setForm({ open: true, id: r.id }),
+            },
+            'divider',
+            r.suspended
+              ? {
+                  label: 'Reactivar cuenta',
+                  icon: RotateCcw,
+                  onSelect: () => void toggleSuspend(r),
+                }
+              : {
+                  label: 'Suspender cuenta',
+                  icon: Ban,
+                  destructive: true,
+                  onSelect: () => void toggleSuspend(r),
+                },
+          ]}
+          empty={
+            rows.length === 0 ? (
+              <EmptyState
+                kind="first-use"
+                title="Aún no hay clientes"
+                description="Los clientes aparecen aquí al crear su cuenta en la app."
+              />
+            ) : (
+              <EmptyState
+                kind="no-results"
+                title="Sin resultados"
+                description="Ningún cliente coincide con la búsqueda y los filtros."
+                action={
+                  <Button variant="secondary" onClick={() => setF(EMPTY_CLIENT_FILTERS)}>
+                    Quitar filtros
+                  </Button>
+                }
+              />
+            )
+          }
+        />
+      </Card>
+
+      <ClientFormSheet
+        open={form.open}
+        clientId={form.id}
+        onClose={() => setForm({ open: false, id: null })}
+      />
     </div>
   );
 }

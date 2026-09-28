@@ -1,0 +1,272 @@
+/* Landing pública (handoff web, sección A). Estilos acotados a .lp-root:
+   keyframes propios (prefijo lp-), reveal on scroll y movimiento reducido.
+   Colores de marca del tema azul que no son tokens compartidos: aquí, una vez. */
+
+.lp-root {
+  --lp-soft: #b8c4d6; /* texto secundario claro */
+  --lp-dim: #6f819b; /* texto tenue */
+  --lp-coord: #4f6a90; /* coordenadas mono */
+  --lp-panel: #0b1d38; /* paneles internos */
+  --lp-tile: #12325a; /* icon tiles */
+  --lp-track: #1d3557; /* pistas / bordes internos */
+  --lp-ok: #5fd39b;
+  --lp-ok-bg: #0f3a2b;
+  --lp-warn: #f5b94a;
+  --lp-gold: #f59e0b;
+  --lp-blue: #0a6bcf;
+  --lp-blue-hover: #095fb8;
+  --lp-link: #5ab0ff;
+  --lp-cyan: #18c1ff;
+  --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: var(--color-lp-page);
+  color: var(--color-lp-text);
+  overflow-x: clip;
+}
+
+.lp-root a:focus-visible,
+.lp-root button:focus-visible,
+.lp-root input:focus-visible {
+  outline: 2px solid var(--lp-cyan);
+  outline-offset: 2px;
+}
+
+/* ── Reveal on scroll ── */
+.lp-rv [data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s var(--lp-ease),
+    transform 0.7s var(--lp-ease);
+}
+.lp-rv [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Movimiento reducido: sin animaciones continuas ni reveals ── */
+.lp-still *,
+.lp-still *::before,
+.lp-still *::after {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ── Keyframes ── */
+@keyframes lp-wordin {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+@keyframes lp-drift1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(8vw, 6vh) scale(1.12);
+  }
+}
+@keyframes lp-drift2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-10vw, 8vh) scale(0.92);
+  }
+}
+@keyframes lp-drift3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6vw, -8vh) scale(1.1);
+  }
+}
+@keyframes lp-beam {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100vw);
+    opacity: 0;
+  }
+}
+@keyframes lp-catbar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes lp-catin {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-catrow {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes lp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes lp-marq {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes lp-marq-r {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes lp-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes lp-scan {
+  0% {
+    top: 8%;
+  }
+  50% {
+    top: 84%;
+  }
+  100% {
+    top: 8%;
+  }
+}
+@keyframes lp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lp-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes lp-shine {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+@keyframes lp-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Utilidades de animación reutilizadas por varias secciones */
+.lp-word {
+  display: inline-block;
+  animation: lp-wordin 0.8s var(--lp-ease) both;
+}
+.lp-float {
+  animation: lp-float 6s ease-in-out infinite;
+}
+.lp-marquee:hover {
+  animation-play-state: paused;
+}
+.lp-grid-bg {
+  background-image:
+    linear-gradient(rgb(90 176 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(90 176 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(rgb(90 176 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(90 176 255 / 0.025) 1px, transparent 1px);
+  background-size:
+    120px 120px,
+    120px 120px,
+    24px 24px,
+    24px 24px;
+}
+.lp-stripes {
+  background: repeating-linear-gradient(
+    135deg,
+    #16294a 0 10px,
+    var(--lp-panel) 10px 20px
+  );
+}
+.lp-glass {
+  background: var(--color-lp-card);
+  border: 1px solid var(--color-lp-line);
+  backdrop-filter: blur(10px);
+}
+.lp-band {
+  background: var(--color-lp-band);
+  border-top: 1px solid rgb(90 176 255 / 0.1);
+  border-bottom: 1px solid rgb(90 176 255 / 0.1);
+}
+.lp-fade-x {
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; height: 100%; background: #EEF2F8; font-family: Inter, sans-serif; color: #0E2C56; -webkit-font-smoothing: antialiased; }
+a { color: #0A6BCF; text-decoration: none; } a:hover { color: #0E2C56; }
+@keyframes up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</helmet>
+<div style="height: 100vh; display: flex; flex-direction: column;">
+  <header style="flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid #E1E8F0;">
+    <div style="display: flex; align-items: center; gap: 10px; flex: none;">
+      <span style="width: 28px; height: 28px; border-radius: 7px; background: #0E2C56; color: #fff; font: 800 13px Manrope, sans-serif; display: flex; align-items: center; justify-content: center;">T</span>
+      <span style="font: 800 15px Manrope, sans-serif; white-space: nowrap;">Tumtto · Web</span>
+    </div>
+    <div style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: #EBEFF5;">
+      <sc-for list="{{ modes }}" as="m" hint-placeholder-count="2"><button onClick="{{ m.pick }}" style="height: 32px; padding: 0 12px; border: none; border-radius: 7px; background: {{ m.bg }}; color: {{ m.fg }}; box-shadow: {{ m.sh }}; font: 600 13px Inter, sans-serif; cursor: pointer;">{{ m.label }}</button></sc-for>
+    </div>
+    <sc-if value="{{ isProto }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: #EBEFF5;">
+        <sc-for list="{{ pages }}" as="p" hint-placeholder-count="3"><button onClick="{{ p.pick }}" style="height: 32px; padding: 0 12px; border: none; border-radius: 7px; background: {{ p.bg }}; color: {{ p.fg }}; box-shadow: {{ p.sh }}; font: 600 13px Inter, sans-serif; cursor: pointer; white-space: nowrap;">{{ p.label }}</button></sc-for>
+      </div>
+      <sc-if value="{{ isConsola }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleDark }}" style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid #E1E8F0; border-radius: 9px; background: transparent; color: #0E2C56; font: 600 13px Inter, sans-serif; cursor: pointer;"><span style="position: relative; width: 30px; height: 18px; border-radius: 9px; background: {{ trackBg }}; transition: background .2s;"><span style="position: absolute; top: 2px; left: {{ knobX }}; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .2s;"></span></span>Oscuro</button>
+      </sc-if>
+    </sc-if>
+    <nav style="margin-left: auto; display: flex; gap: 6px;">
+      <a href="Style%20Guide.dc.html" style="height: 36px; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #0E2C56;">Style Guide</a>
+      <a href="App%20Prototipo.dc.html" style="height: 36px; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #0E2C56;">App móvil</a>
+      <a href="{{ openHref }}" target="_blank" style="height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid #E1E8F0; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #0E2C56;">Abrir en pestaña</a>
+    </nav>
+  </header>
+
+  <sc-if value="{{ isProto }}" hint-placeholder-val="{{ true }}">
+    <div style="flex: 1; min-height: 0; background: #050F22;">
+      <iframe key="{{ src }}" src="{{ src }}" title="Prototipo web" style="width: 100%; height: 100%; border: 0; display: block;"></iframe>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isFlows }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Todos los flujos" style="flex: 1; overflow-y: auto; padding: 28px 24px 60px;">
+      <div style="max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px;">
+        <div><p style="margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #0A6BCF;">Web · Tumantenimiento</p><h1 style="margin: 0 0 6px; font: 800 30px Manrope, sans-serif; letter-spacing: -.6px;">Todos los flujos</h1><p style="margin: 0; font-size: 14.5px; color: #6B7280;">Toca cualquier paso para abrirlo en el prototipo.</p></div>
+        <sc-for list="{{ flows }}" as="f" hint-placeholder-count="4">
+          <div style="background: #fff; border: 1px solid #E1E8F0; border-radius: 14px; padding: 20px; animation: up .4s ease both;">
+            <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #0A6BCF;">{{ f.n }}</span><span style="font: 800 18px Manrope, sans-serif;">{{ f.t }}</span><span style="font-size: 13px; color: #6B7280;">{{ f.sub }}</span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+              <sc-for list="{{ f.steps }}" as="s" hint-placeholder-count="5">
+                <button onClick="{{ s.go }}" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px 8px 10px; border: 1px solid #E1E8F0; border-radius: 10px; background: #F5F8FC; color: #0E2C56; cursor: pointer; text-align: left; transition: border-color .15s, background .15s;" style-hover="border-color: #0A6BCF; background: #F0F7FF;"><span style="width: 24px; height: 24px; border-radius: 6px; background: #0E2C56; color: #fff; font: 700 11px 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ s.i }}</span><span><span style="display: block; font-size: 13.5px; font-weight: 600;">{{ s.t }}</span><span style="display: block; font-size: 12px; color: #6B7280;">{{ s.d }}</span></span></button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { mode: 'proto', page: 'landing', dark: false, hash: '' };
+  FILES = { login: 'Web Login.dc.html', landing: 'Web Landing.dc.html', registro: 'Web Registro Tecnico.dc.html', consola: 'Web Consola Admin.dc.html', consolaD: 'Web Consola Admin Dark.dc.html' };
+  open(page, hash, dark) { this.setState({ mode: 'proto', page, hash: hash || '', dark: dark ?? this.state.dark }); }
+  renderVals() {
+    const s = this.state, seg = (on) => ({ bg: on ? '#fff' : 'transparent', fg: on ? '#0E2C56' : '#6B7280', sh: on ? '0 1px 2px rgba(14,44,86,0.12)' : 'none' });
+    const file = s.page === 'consola' ? (s.dark ? this.FILES.consolaD : this.FILES.consola) : this.FILES[s.page];
+    const src = encodeURI(file) + (s.hash ? '#' + s.hash : '');
+    const L = (t, d, h) => [t, d, () => this.open('landing', h)], Lg = (t, d, hh) => [t, d, () => this.open('login', hh)], C = (t, d, h) => [t, d, () => this.open('consola', 's=' + h)], Rg = (t, d, hh) => [t, d, () => this.open('registro', hh)];
+    const FL = [
+      ['01', 'Cliente en la landing', 'Descubrir, estimar precio y descargar la app', [L('Hero', 'Spotlight, parallax y CTA', 'top'), L('Categorías', 'Tarjetas con inclinación 3D', 'servicios'), L('Cómo funciona', 'Pasos con scroll y teléfono', 'como'), L('Técnicos verificados', 'Verificación animada', 'tecnicos'), L('Trabajos realizados', 'Galería con fotos', 'trabajos'), L('Cobertura', 'Mapa de la ZMG', 'cobertura'), L('Estimador de precio', 'Rango y urgente', 'precios'), L('FAQ', 'Acordeón', 'faq')]],
+      ['02', 'Técnico se registra', 'De la landing al alta en la app', [L('Para técnicos', 'Calculadora de ingresos', 'unete'), Rg('Formulario', 'Validación en línea'), Rg('Cuenta creada', 'Siguiente paso en la app', 'done')]],
+      ['03', 'Admin opera la plataforma', 'Consola web completa', [Lg('Iniciar sesión', 'Correo y contraseña'), Lg('Verificación 2 pasos', 'Código TOTP → consola', 'mfa'), C('Dashboard', 'KPIs, gráficas y actividad', 'dashboard'), C('Servicios', 'Tabla, filtros y fechas', 'servicios'), C('Detalle de servicio', 'Bitácora, cobro y acciones', 'servicio'), C('Clientes', 'Lista y edición', 'clientes'), C('Técnicos', 'Cola KYC y perfiles', 'tecnicos'), C('Revisión KYC', 'Aprobar o rechazar', 'tecnico'), C('Regiones', 'Cobertura por municipio', 'regiones'), C('Finanzas', 'Ingresos, retiros y carteras', 'finanzas'), C('Soporte', 'Disputas y tickets', 'soporte'), C('Reportes', 'Metas, embudo y mapa de calor', 'reportes'), C('Catálogo', 'Categorías y precios', 'catalogo'), C('Configuración', 'Reglas, notificaciones y equipo', 'config'), C('Notificaciones', 'Centro con selección múltiple', 'notificaciones')]],
+      ['04', 'Acceso y cuenta', 'Login, recuperación y salida', [L('Iniciar sesión desde la landing', 'Nav · Iniciar sesión', 'top'), Lg('Login', 'Validación, errores y bloqueo'), Lg('Cliente o técnico', 'Continuar en la app', 'app'), Lg('Olvidé mi contraseña', 'Enviar enlace', 'forgot'), Lg('Nueva contraseña', 'Medidor y confirmación', 'reset'), Lg('Admin 2 pasos', 'Entra a la consola', 'mfa'), C('Cerrar sesión', 'Desde la consola → login', 'dashboard')]],
+      ['05', 'Estados del sistema', 'Errores, vacíos y avisos', [C('Catálogo de estados', 'Toasts, snackbar, carga', 'estados'), C('404', 'Página no encontrada', 'e404'), C('500', 'Error del servidor', 'e500'), C('Sin conexión', 'Offline', 'offline'), C('403', 'Sin permisos', 'e403'), C('Mantenimiento', 'Plataforma en pausa', 'mant'), C('Sesión expirada', 'Volver a entrar', 'sesion')]],
+    ];
+    return {
+      isProto: s.mode === 'proto', isFlows: s.mode === 'flows', isConsola: s.page === 'consola',
+      modes: [['proto', 'Prototipo'], ['flows', 'Todos los flujos']].map(([k, label]) => ({ label, pick: () => this.setState({ mode: k }), ...seg(s.mode === k) })),
+      pages: [['landing', 'Landing'], ['login', 'Login'], ['registro', 'Registro técnico'], ['consola', 'Consola admin']].map(([k, label]) => ({ label, pick: () => this.setState({ page: k, hash: k === 'consola' ? 's=dashboard' : '' }), ...seg(s.page === k) })),
+      toggleDark: () => this.setState({ dark: !s.dark }), trackBg: s.dark ? '#0A6BCF' : '#D6DEE8', knobX: s.dark ? '14px' : '2px',
+      src, openHref: src,
+      flows: FL.map(([n, t, sub, steps]) => ({ n, t, sub, steps: steps.map(([st, d, go], i) => ({ t: st, d, go, i: String(i + 1).padStart(2, '0') })) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

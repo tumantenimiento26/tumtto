@@ -104,12 +104,31 @@ export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 export const ADMIN_ID = 'demo-admin';
 
-function profile(id: string, full_name: string, role: UserRole, phone = '+52 33 0000 0000'): Profile {
-  return { id, full_name, phone, role, avatar_path: null, status: 'active', ...ts() };
+function profile(
+  id: string,
+  full_name: string,
+  role: UserRole,
+  phone = '+52 33 0000 0000',
+): Profile {
+  return {
+    id,
+    full_name,
+    phone,
+    role,
+    avatar_path: null,
+    status: 'active',
+    ...ts(),
+  };
 }
 
 // ── Catalog (mirrors supabase/seed.sql) ──────────────────────────────────────
-const CAT = (slug: string, name: string, icon: string, sort_order: number, description: string): ServiceCategory => ({
+const CAT = (
+  slug: string,
+  name: string,
+  icon: string,
+  sort_order: number,
+  description: string,
+): ServiceCategory => ({
   id: `cat-${slug}`,
   slug,
   name,
@@ -117,11 +136,17 @@ const CAT = (slug: string, name: string, icon: string, sort_order: number, descr
   description,
   sort_order,
   is_active: true,
+  commission_bps: null,
   ...ts(),
 });
 
 // ── Technician factory (id = profile id) ─────────────────────────────────────
-function tech(id: string, rating: number, ratings: number, available = true): Technician {
+function tech(
+  id: string,
+  rating: number,
+  ratings: number,
+  available = true,
+): Technician {
   return {
     id,
     display_name: null,
@@ -139,7 +164,13 @@ function tech(id: string, rating: number, ratings: number, available = true): Te
   };
 }
 
-const rate = (technician_id: string, category_id: string, visita: number, hora: number, minimo: number): TechnicianRate => ({
+const rate = (
+  technician_id: string,
+  category_id: string,
+  visita: number,
+  hora: number,
+  minimo: number,
+): TechnicianRate => ({
   id: nextId('rate'),
   technician_id,
   category_id,
@@ -150,7 +181,10 @@ const rate = (technician_id: string, category_id: string, visita: number, hora: 
   ...ts(),
 });
 
-const geo = (lng: number, lat: number) => ({ type: 'Point', coordinates: [lng, lat] });
+const geo = (lng: number, lat: number) => ({
+  type: 'Point',
+  coordinates: [lng, lat],
+});
 
 export interface World {
   profiles: Profile[];
@@ -178,7 +212,12 @@ export interface World {
 function build(): World {
   const profiles: Profile[] = [
     profile(CLIENT_ID, 'María Cliente (demo)', 'client', '+52 33 1234 5678'),
-    profile(TECH_USER_ID, 'Ramón Hernández (demo)', 'technician', '+52 33 2345 6789'),
+    profile(
+      TECH_USER_ID,
+      'Ramón Hernández (demo)',
+      'technician',
+      '+52 33 2345 6789',
+    ),
     profile(ADMIN_ID, 'Sofía Admin (demo)', 'admin'),
     profile('u-ag', 'Adriana García Soto', 'technician'),
     profile('u-sc', 'Sergio Camarena R.', 'technician'),
@@ -187,24 +226,95 @@ function build(): World {
     profile('u-carlos', 'Carlos Mendoza', 'client'),
     // Roster ZMG (antes mocks del listado de técnicos — ahora viven en el mundo
     // para que las acciones KYC muten filas reales).
-    profile('u-miguel', 'Miguel Ángel López Rentería', 'technician', '+52 33 1842 5790'),
-    profile('u-jose', 'José Carlos Juárez Mendoza', 'technician', '+52 33 1567 2034'),
-    profile('u-lupita', 'Lupita Pérez Vázquez', 'technician', '+52 33 3120 9846'),
-    profile('u-fer', 'Fernanda Olivares Ramírez', 'technician', '+52 33 1029 7733'),
-    profile('u-luis', 'Luis Esteban Gómez Salinas', 'technician', '+52 33 2811 4467'),
-    profile('u-ivan', 'Carlos Iván Velázquez Robles', 'technician', '+52 33 1992 0354'),
-    profile('u-roberto', 'Roberto Villanueva Aceves', 'technician', '+52 33 3678 1102'),
+    profile(
+      'u-miguel',
+      'Miguel Ángel López Rentería',
+      'technician',
+      '+52 33 1842 5790',
+    ),
+    profile(
+      'u-jose',
+      'José Carlos Juárez Mendoza',
+      'technician',
+      '+52 33 1567 2034',
+    ),
+    profile(
+      'u-lupita',
+      'Lupita Pérez Vázquez',
+      'technician',
+      '+52 33 3120 9846',
+    ),
+    profile(
+      'u-fer',
+      'Fernanda Olivares Ramírez',
+      'technician',
+      '+52 33 1029 7733',
+    ),
+    profile(
+      'u-luis',
+      'Luis Esteban Gómez Salinas',
+      'technician',
+      '+52 33 2811 4467',
+    ),
+    profile(
+      'u-ivan',
+      'Carlos Iván Velázquez Robles',
+      'technician',
+      '+52 33 1992 0354',
+    ),
+    profile(
+      'u-roberto',
+      'Roberto Villanueva Aceves',
+      'technician',
+      '+52 33 3678 1102',
+    ),
   ];
   // Luis está suspendido a nivel usuario (la suspensión vive en profiles.status).
   profiles.find(p => p.id === 'u-luis')!.status = 'suspended';
 
   const categories = [
-    CAT('plumbing', 'Plomería', 'wrench', 10, 'Fugas, destapes, instalaciones hidráulicas'),
-    CAT('electrical', 'Electricidad', 'zap', 20, 'Cortocircuitos, instalaciones y mantenimiento eléctrico'),
-    CAT('gas', 'Gas', 'flame', 30, 'Fugas, instalación y revisión de gas LP/natural'),
-    CAT('ac', 'Aire acondicionado', 'wind', 40, 'Instalación, carga de gas y mantenimiento de AA'),
-    CAT('appliances', 'Electrodomésticos', 'plug', 50, 'Reparación de lavadoras, refrigeradores y más'),
-    CAT('locks', 'Cerrajería', 'key', 60, 'Aperturas, cambios de chapas y emergencias'),
+    CAT(
+      'plumbing',
+      'Plomería',
+      'wrench',
+      10,
+      'Fugas, destapes, instalaciones hidráulicas',
+    ),
+    CAT(
+      'electrical',
+      'Electricidad',
+      'zap',
+      20,
+      'Cortocircuitos, instalaciones y mantenimiento eléctrico',
+    ),
+    CAT(
+      'gas',
+      'Gas',
+      'flame',
+      30,
+      'Fugas, instalación y revisión de gas LP/natural',
+    ),
+    CAT(
+      'ac',
+      'Aire acondicionado',
+      'wind',
+      40,
+      'Instalación, carga de gas y mantenimiento de AA',
+    ),
+    CAT(
+      'appliances',
+      'Electrodomésticos',
+      'plug',
+      50,
+      'Reparación de lavadoras, refrigeradores y más',
+    ),
+    CAT(
+      'locks',
+      'Cerrajería',
+      'key',
+      60,
+      'Aperturas, cambios de chapas y emergencias',
+    ),
   ];
 
   const technicians = [
@@ -227,7 +337,10 @@ function build(): World {
   }
   technicians.find(t => t.id === 'u-roberto')!.kyc_status = 'declined';
 
-  const tcat = (technician_id: string, category_id: string): TechnicianCategory => ({
+  const tcat = (
+    technician_id: string,
+    category_id: string,
+  ): TechnicianCategory => ({
     technician_id,
     category_id,
     ...ts(),
@@ -296,7 +409,8 @@ function build(): World {
 
   // One historical closed+rated service, one active in-progress service.
   const old = new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString();
-  const mins = (n: number) => new Date(Date.now() - 1000 * 60 * n).toISOString();
+  const mins = (n: number) =>
+    new Date(Date.now() - 1000 * 60 * n).toISOString();
 
   function order(
     partial: Partial<ServiceOrder> &
@@ -364,7 +478,8 @@ function build(): World {
       client_address_id: 'addr-1',
       status: 'enroute',
       title: 'Fuga en el baño',
-      description: 'Fuga debajo del lavabo del baño desde ayer. El agua gotea y mojó el piso.',
+      description:
+        'Fuga debajo del lavabo del baño desde ayer. El agua gotea y mojó el piso.',
       address_line: 'Av. Pablo Neruda 2825',
       neighborhood: 'Providencia',
       municipality: 'Zapopan',
@@ -388,14 +503,57 @@ function build(): World {
     },
   ];
   const quoteItems: ServiceQuoteItem[] = [
-    { id: 'qi-1', quote_id: 'q-2851', description: 'Cambio de llave angular dañada', quantity: 1, unit_cents: 18000, total_cents: 18000, ...ts() },
-    { id: 'qi-2', quote_id: 'q-2851', description: 'Reemplazo de cespol y sello', quantity: 1, unit_cents: 24000, total_cents: 24000, ...ts() },
+    {
+      id: 'qi-1',
+      quote_id: 'q-2851',
+      description: 'Cambio de llave angular dañada',
+      quantity: 1,
+      unit_cents: 18000,
+      total_cents: 18000,
+      ...ts(),
+    },
+    {
+      id: 'qi-2',
+      quote_id: 'q-2851',
+      description: 'Reemplazo de cespol y sello',
+      quantity: 1,
+      unit_cents: 24000,
+      total_cents: 24000,
+      ...ts(),
+    },
   ];
 
   const events: ServiceStatusEvent[] = [
-    { id: 'ev-1', service_order_id: 'SVC-2851', from_status: null, to_status: 'requested', actor_id: CLIENT_ID, note: null, created_at: mins(40), updated_at: mins(40) },
-    { id: 'ev-2', service_order_id: 'SVC-2851', from_status: 'requested', to_status: 'accepted', actor_id: TECH_USER_ID, note: null, created_at: mins(25), updated_at: mins(25) },
-    { id: 'ev-3', service_order_id: 'SVC-2851', from_status: 'accepted', to_status: 'enroute', actor_id: TECH_USER_ID, note: null, created_at: mins(12), updated_at: mins(12) },
+    {
+      id: 'ev-1',
+      service_order_id: 'SVC-2851',
+      from_status: null,
+      to_status: 'requested',
+      actor_id: CLIENT_ID,
+      note: null,
+      created_at: mins(40),
+      updated_at: mins(40),
+    },
+    {
+      id: 'ev-2',
+      service_order_id: 'SVC-2851',
+      from_status: 'requested',
+      to_status: 'accepted',
+      actor_id: TECH_USER_ID,
+      note: null,
+      created_at: mins(25),
+      updated_at: mins(25),
+    },
+    {
+      id: 'ev-3',
+      service_order_id: 'SVC-2851',
+      from_status: 'accepted',
+      to_status: 'enroute',
+      actor_id: TECH_USER_ID,
+      note: null,
+      created_at: mins(12),
+      updated_at: mins(12),
+    },
   ];
 
   const payments: Payment[] = [
@@ -442,13 +600,31 @@ function build(): World {
     updated_at: old,
   });
   const ledger: LedgerEntry[] = [
-    led('led-1', TECH_USER_ID, 'adjustment', 139400, 'Neto SVC-2835 (tarjeta)', 'SVC-2835'),
-    led('led-2', TECH_USER_ID, 'commission_collected', -24600, 'Comisión plataforma SVC-2835', 'SVC-2835'),
+    led(
+      'led-1',
+      TECH_USER_ID,
+      'adjustment',
+      139400,
+      'Neto SVC-2835 (tarjeta)',
+      'SVC-2835',
+    ),
+    led(
+      'led-2',
+      TECH_USER_ID,
+      'commission_collected',
+      -24600,
+      'Comisión plataforma SVC-2835',
+      'SVC-2835',
+    ),
     led('led-3', 'u-ag', 'adjustment', 31800, 'Neto servicios de la semana'),
     led('led-4', 'u-sc', 'adjustment', 22400, 'Neto servicios de la semana'),
   ];
 
-  const kyc = (id: string, technician_id: string, status: KycSession['status']): KycSession => ({
+  const kyc = (
+    id: string,
+    technician_id: string,
+    status: KycSession['status'],
+  ): KycSession => ({
     id,
     technician_id,
     didit_session_id: `didit-${id}`,
@@ -495,16 +671,50 @@ function build(): World {
   ];
 
   const messages: DemoMessage[] = [
-    { id: 'm-1', order_id: 'SVC-2851', sender_id: TECH_USER_ID, content: '¡Hola! Ya acepté tu solicitud, voy en camino.', created_at: mins(24) },
-    { id: 'm-2', order_id: 'SVC-2851', sender_id: CLIENT_ID, content: 'Perfecto, te espero. La fuga está en el baño principal.', created_at: mins(22) },
-    { id: 'm-3', order_id: 'SVC-2851', sender_id: TECH_USER_ID, content: 'Entendido, llevo refacciones. Llego en 15 min.', created_at: mins(20) },
+    {
+      id: 'm-1',
+      order_id: 'SVC-2851',
+      sender_id: TECH_USER_ID,
+      content: '¡Hola! Ya acepté tu solicitud, voy en camino.',
+      created_at: mins(24),
+    },
+    {
+      id: 'm-2',
+      order_id: 'SVC-2851',
+      sender_id: CLIENT_ID,
+      content: 'Perfecto, te espero. La fuga está en el baño principal.',
+      created_at: mins(22),
+    },
+    {
+      id: 'm-3',
+      order_id: 'SVC-2851',
+      sender_id: TECH_USER_ID,
+      content: 'Entendido, llevo refacciones. Llego en 15 min.',
+      created_at: mins(20),
+    },
   ];
 
   const ratings: DemoRating[] = [
-    { id: 'rt-1', order_id: 'SVC-2835', from_id: CLIENT_ID, to_id: TECH_USER_ID, stars: 5, comment: 'Excelente trabajo, muy puntual.', tags: ['Puntual', 'Profesional'], created_at: old },
+    {
+      id: 'rt-1',
+      order_id: 'SVC-2835',
+      from_id: CLIENT_ID,
+      to_id: TECH_USER_ID,
+      stars: 5,
+      comment: 'Excelente trabajo, muy puntual.',
+      tags: ['Puntual', 'Profesional'],
+      created_at: old,
+    },
   ];
 
-  const payout = (id: string, technician_id: string, amount_cents: number, status: DemoPayout['status'], clabe: string, batch: string | null = null): DemoPayout => ({
+  const payout = (
+    id: string,
+    technician_id: string,
+    amount_cents: number,
+    status: DemoPayout['status'],
+    clabe: string,
+    batch: string | null = null,
+  ): DemoPayout => ({
     id,
     technician_id,
     amount_cents,
@@ -516,50 +726,163 @@ function build(): World {
     updated_at: old,
   });
   const payouts: DemoPayout[] = [
-    payout('po-1', TECH_USER_ID, 300000, 'processed', '012345678901234567', 'B-2026-05'),
+    payout(
+      'po-1',
+      TECH_USER_ID,
+      300000,
+      'processed',
+      '012345678901234567',
+      'B-2026-05',
+    ),
     payout('po-2', 'u-carla', 542000, 'pending', '012180001234567890'),
     payout('po-3', 'u-ag', 318000, 'pending', '044580009876543210'),
-    payout('po-4', 'u-sc', 224000, 'processing', '014320005566778899', 'B-2026-06'),
+    payout(
+      'po-4',
+      'u-sc',
+      224000,
+      'processing',
+      '014320005566778899',
+      'B-2026-06',
+    ),
   ];
 
   const notes: Note[] = [
-    { id: 'n-1', entity_id: 'SVC-2851', author: 'Sofía Admin', text: 'Servicio monitoreado. Sin incidencias reportadas hasta el momento.', created_at: now() },
-    { id: 'n-2', entity_id: CLIENT_ID, author: 'Sofía Admin', text: 'Cliente recurrente y puntual con los pagos. Prefiere visitas por la mañana.', created_at: now() },
-    { id: 'n-3', entity_id: 'u-miguel', author: 'Sofía Admin', text: 'Verifiqué dirección por WhatsApp. Vive en Las Juntas, confirmado. Doc CFE coincide.', created_at: old },
-    { id: 'n-4', entity_id: 'u-miguel', author: 'Daniel Olvera', text: 'Llamada de bienvenida realizada. Habla claro, entiende el flujo. Le envié liga de tutorial.', created_at: old },
+    {
+      id: 'n-1',
+      entity_id: 'SVC-2851',
+      author: 'Sofía Admin',
+      text: 'Servicio monitoreado. Sin incidencias reportadas hasta el momento.',
+      created_at: now(),
+    },
+    {
+      id: 'n-2',
+      entity_id: CLIENT_ID,
+      author: 'Sofía Admin',
+      text: 'Cliente recurrente y puntual con los pagos. Prefiere visitas por la mañana.',
+      created_at: now(),
+    },
+    {
+      id: 'n-3',
+      entity_id: 'u-miguel',
+      author: 'Sofía Admin',
+      text: 'Verifiqué dirección por WhatsApp. Vive en Las Juntas, confirmado. Doc CFE coincide.',
+      created_at: old,
+    },
+    {
+      id: 'n-4',
+      entity_id: 'u-miguel',
+      author: 'Daniel Olvera',
+      text: 'Llamada de bienvenida realizada. Habla claro, entiende el flujo. Le envié liga de tutorial.',
+      created_at: old,
+    },
   ];
 
-  const tmsg = (id: string, ticket_id: string, sender_id: string, content: string, created_at = now()): TicketMessage => ({
-    id, ticket_id, sender_id, content, created_at,
+  const tmsg = (
+    id: string,
+    ticket_id: string,
+    sender_id: string,
+    content: string,
+    created_at = now(),
+  ): TicketMessage => ({
+    id,
+    ticket_id,
+    sender_id,
+    content,
+    created_at,
   });
   const tickets: Ticket[] = [
     {
-      id: 'TK-501', subject: 'Cobro duplicado en mi tarjeta', requester_id: CLIENT_ID, role: 'cliente',
-      status: 'open', priority: 'alta', order_id: 'SVC-2835', created_at: old,
+      id: 'TK-501',
+      subject: 'Cobro duplicado en mi tarjeta',
+      requester_id: CLIENT_ID,
+      role: 'cliente',
+      status: 'open',
+      priority: 'alta',
+      order_id: 'SVC-2835',
+      created_at: old,
       messages: [
-        tmsg('tm-1', 'TK-501', CLIENT_ID, 'Hola, me aparecen dos cargos por el servicio del calentador. ¿Me pueden ayudar?', old),
-        tmsg('tm-2', 'TK-501', ADMIN_ID, 'Hola María, ya lo estamos revisando con el procesador de pagos. Te confirmo hoy mismo.', old),
+        tmsg(
+          'tm-1',
+          'TK-501',
+          CLIENT_ID,
+          'Hola, me aparecen dos cargos por el servicio del calentador. ¿Me pueden ayudar?',
+          old,
+        ),
+        tmsg(
+          'tm-2',
+          'TK-501',
+          ADMIN_ID,
+          'Hola María, ya lo estamos revisando con el procesador de pagos. Te confirmo hoy mismo.',
+          old,
+        ),
       ],
     },
     {
-      id: 'TK-502', subject: 'No puedo actualizar mi CLABE', requester_id: TECH_USER_ID, role: 'tecnico',
-      status: 'pending', priority: 'media', order_id: null, created_at: old,
+      id: 'TK-502',
+      subject: 'No puedo actualizar mi CLABE',
+      requester_id: TECH_USER_ID,
+      role: 'tecnico',
+      status: 'pending',
+      priority: 'media',
+      order_id: null,
+      created_at: old,
       messages: [
-        tmsg('tm-3', 'TK-502', TECH_USER_ID, 'La app me marca error al guardar mi nueva CLABE de BBVA.'),
-        tmsg('tm-4', 'TK-502', ADMIN_ID, '¿Nos compartes una captura del error? Con eso lo escalamos a ingeniería.'),
+        tmsg(
+          'tm-3',
+          'TK-502',
+          TECH_USER_ID,
+          'La app me marca error al guardar mi nueva CLABE de BBVA.',
+        ),
+        tmsg(
+          'tm-4',
+          'TK-502',
+          ADMIN_ID,
+          '¿Nos compartes una captura del error? Con eso lo escalamos a ingeniería.',
+        ),
       ],
     },
     {
-      id: 'TK-503', subject: 'El técnico llegó tarde a la cita', requester_id: 'u-carlos', role: 'cliente',
-      status: 'open', priority: 'baja', order_id: null, created_at: now(),
-      messages: [tmsg('tm-5', 'TK-503', 'u-carlos', 'La cita era a las 10 y llegó 11:40. Quiero dejar constancia.')],
+      id: 'TK-503',
+      subject: 'El técnico llegó tarde a la cita',
+      requester_id: 'u-carlos',
+      role: 'cliente',
+      status: 'open',
+      priority: 'baja',
+      order_id: null,
+      created_at: now(),
+      messages: [
+        tmsg(
+          'tm-5',
+          'TK-503',
+          'u-carlos',
+          'La cita era a las 10 y llegó 11:40. Quiero dejar constancia.',
+        ),
+      ],
     },
     {
-      id: 'TK-504', subject: '¿Cómo amplío mi zona de cobertura?', requester_id: 'u-ag', role: 'tecnico',
-      status: 'resolved', priority: 'baja', order_id: null, created_at: old,
+      id: 'TK-504',
+      subject: '¿Cómo amplío mi zona de cobertura?',
+      requester_id: 'u-ag',
+      role: 'tecnico',
+      status: 'resolved',
+      priority: 'baja',
+      order_id: null,
+      created_at: old,
       messages: [
-        tmsg('tm-6', 'TK-504', 'u-ag', 'Quiero cubrir también Tonalá, ¿dónde lo configuro?', old),
-        tmsg('tm-7', 'TK-504', ADMIN_ID, 'Desde tu perfil > Cobertura puedes agregar zonas. Ya te habilité la opción. ¡Saludos!', old),
+        tmsg(
+          'tm-6',
+          'TK-504',
+          'u-ag',
+          'Quiero cubrir también Tonalá, ¿dónde lo configuro?',
+          old,
+        ),
+        tmsg(
+          'tm-7',
+          'TK-504',
+          ADMIN_ID,
+          'Desde tu perfil > Cobertura puedes agregar zonas. Ya te habilité la opción. ¡Saludos!',
+          old,
+        ),
       ],
     },
   ];

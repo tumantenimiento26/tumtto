@@ -1,271 +1,554 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Wrench, Zap, Flame, Hammer, Paintbrush, Square, Droplets, Wind, Plug, KeyRound,
-  Plus, Pencil, Trash2, Search, Hash, Settings, Percent, Upload, Check,
+  Wrench,
+  Zap,
+  Flame,
+  Hammer,
+  Paintbrush,
+  Square,
+  Droplets,
+  Wind,
+  Plug,
+  KeyRound,
+  Snowflake,
+  Plus,
+  Trash2,
+  Search,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
-import { PageHeading, Panel, Modal } from '@/components/admin';
 import {
-  PrimaryButton, GhostButton, Input, Textarea, Toggle, Field, EmptyState,
-} from '@/components/ui';
-import { FadeIn, Stagger, StaggerItem } from '@/components/motion';
-import { toast } from '@/components/toast';
+  Badge,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  ErrorPage,
+  Field,
+  Input,
+  Kicker,
+  Modal,
+  PageHeader,
+  ScreenSkeleton,
+  Sheet,
+  Textarea,
+  Toggle,
+  snackbar,
+  toast,
+} from '@/components/ds';
+import { useAction } from '@/components/use-action';
 import {
-  useTick, getCategoriesWithCounts,
-  toggleCategory, createCategory, updateCategory, deleteCategory,
+  useTick,
+  getCategoriesWithCounts,
+  getCatalogData,
+  toggleCategory,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getSettingInt,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
+import { addIncluded, categoryStats, rangeLabel } from '@/lib/catalogStats';
 
 const ICONS: Record<string, LucideIcon> = {
-  wrench: Wrench, zap: Zap, flame: Flame, hammer: Hammer,
-  paintbrush: Paintbrush, square: Square, droplets: Droplets,
-  wind: Wind, plug: Plug, key: KeyRound,
+  wrench: Wrench,
+  zap: Zap,
+  flame: Flame,
+  hammer: Hammer,
+  paintbrush: Paintbrush,
+  square: Square,
+  droplets: Droplets,
+  wind: Wind,
+  snowflake: Snowflake,
+  plug: Plug,
+  key: KeyRound,
 };
 
-// ponytail: el esquema desplegado tiene UNA capa de catálogo
-// (service_categories). Los precios por servicio viven en technician_rates,
-// no en el catálogo — este panel gestiona solo categorías.
+type Cat = ReturnType<typeof getCategoriesWithCounts>[number];
+
+// ponytail: "servicios incluidos" no tiene tabla (el esquema tiene una sola
+// capa: service_categories). Se guardan en este navegador; subir a una
+// columna/tabla cuando el catálogo tenga subservicios.
+const INCLUDED_KEY = 'tumtto-catalog-included';
+function readIncluded(): Record<string, string[]> {
+  try {
+    return JSON.parse(localStorage.getItem(INCLUDED_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+function writeIncluded(v: Record<string, string[]>) {
+  try {
+    localStorage.setItem(INCLUDED_KEY, JSON.stringify(v));
+  } catch {
+    /* modo privado / cuota llena: solo en memoria */
+  }
+}
+
 export default function CatalogoPage() {
   useTick();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
   const cats = getCategoriesWithCounts();
-  const [activeId, setActiveId] = useState<string>(cats[0]?.id ?? '');
+  const data = getCatalogData();
   const [query, setQuery] = useState('');
-  const [newCatOpen, setNewCatOpen] = useState(false);
-  const [deleteCatOpen, setDeleteCatOpen] = useState(false);
-  const [name, setName] = useState<string | null>(null);
-  const [description, setDescription] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [included, setIncluded] = useState<Record<string, string[]>>({});
+  const { busy, run } = useAction();
 
-  const active = cats.find(c => c.id === activeId) ?? cats[0];
-  const ActiveIcon = (active && ICONS[active.icon ?? '']) || Settings;
+  useEffect(() => setIncluded(readIncluded()), []);
 
-  const filtered = cats.filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
-  const activeCount = cats.filter(c => c.is_active).length;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? cats.filter(c => c.name.toLowerCase().includes(q)) : cats;
+  }, [cats, query]);
+  const published = cats.filter(c => c.is_active).length;
 
-  function onToggleCategory() {
-    if (!active) return;
-    toggleCategory(active.id);
-    toast.success(`Categoría ${active.is_active ? 'desactivada' : 'activada'} · ${active.name}`);
-  }
-  function onSaveConfig() {
-    if (!active) return;
-    updateCategory(active.id, {
-      name: name ?? active.name,
-      description: description ?? active.description,
+  async function onToggle(c: Cat) {
+    const ok = await run(`toggle-${c.id}`, () => toggleCategory(c.id));
+    if (!ok) return;
+    snackbar.show(`${c.name} ${c.is_active ? 'pausada' : 'publicada'}`, {
+      undo: () => void toggleCategory(c.id),
     });
-    setName(null);
-    setDescription(null);
-    toast.success('Configuración guardada');
   }
-  async function onDeleteCategory() {
-    if (!active) return;
-    const ok = await deleteCategory(active.id);
-    setDeleteCatOpen(false);
-    if (ok) {
-      toast.success(`Categoría eliminada · ${active.name}`);
-      setActiveId(getCategoriesWithCounts()[0]?.id ?? '');
-    } else {
-      toast.error('No puedes eliminar una categoría con servicios registrados');
-    }
+
+  function saveIncluded(catId: string, list: string[]) {
+    const next = { ...included, [catId]: list };
+    setIncluded(next);
+    writeIncluded(next);
   }
+
+  if (failed)
+    return (
+      <ErrorPage
+        kind="500"
+        primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }}
+      />
+    );
+  if (!ready) return <ScreenSkeleton kind="list" />;
+
+  const active = cats.find(c => c.id === editing) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading
+      <PageHeader
         title="Catálogo de servicios"
-        sub="Administra categorías, iconos y comisiones. Las tarifas las fija cada técnico (technician_rates)."
+        description="Categorías que ve el cliente en la app, con rangos de precio y comisión."
         actions={
-          <div className="flex gap-2.5">
-            <GhostButton><span className="inline-flex items-center gap-2"><Upload size={14} />Importar</span></GhostButton>
-            <PrimaryButton onClick={() => setNewCatOpen(true)}><span className="inline-flex items-center gap-2"><Plus size={14} />Nueva categoría</span></PrimaryButton>
-          </div>
+          <Button icon={Plus} onClick={() => setCreating(true)}>
+            Nueva categoría
+          </Button>
         }
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        {/* LEFT — category list */}
-        <FadeIn>
-          <aside className="bg-surface border border-line rounded-2xl overflow-hidden sticky top-2">
-            <div className="p-4 border-b border-line flex flex-col gap-2.5">
-              <div className="flex items-center h-9 bg-canvas border border-line rounded-lg px-3 gap-2">
-                <Search size={14} className="text-faint" />
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Buscar categoría…"
-                  className="flex-1 bg-transparent outline-none text-sm text-navy"
-                />
-              </div>
-              <div className="text-xs text-muted">
-                <b className="text-navy font-semibold">{cats.length}</b> categorías ·{' '}
-                <b className="text-success font-semibold">{activeCount}</b> activas
-              </div>
-            </div>
-            <Stagger className="flex flex-col p-2">
-              {filtered.map(c => {
-                const Icon = ICONS[c.icon ?? ''] ?? Settings;
-                const isActive = c.id === active?.id;
-                return (
-                  <StaggerItem key={c.id}>
-                    <button
-                      onClick={() => { setActiveId(c.id); setName(null); setDescription(null); }}
-                      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 text-left transition-colors ${isActive ? 'bg-canvas border border-primary/20' : 'border border-transparent hover:bg-canvas'}`}
-                    >
-                      {isActive && <span className="absolute -left-1 top-2 bottom-2 w-[3px] bg-primary rounded" />}
-                      <span className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${isActive ? 'bg-info-soft' : 'bg-surface-2'}`}>
-                        <Icon size={16} className="text-primary" />
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="flex items-center gap-1.5">
-                          <span className={`text-sm text-navy ${isActive ? 'font-semibold' : 'font-medium'}`}>{c.name}</span>
-                        </span>
-                        <span className="block text-xs text-muted mt-0.5">{c.services} servicios</span>
-                      </span>
-                      {!c.is_active && <span className="text-[10px] text-faint">inactiva</span>}
-                    </button>
-                  </StaggerItem>
-                );
-              })}
-            </Stagger>
-          </aside>
-        </FadeIn>
-
-        {/* RIGHT — detail */}
-        <div className="min-w-0 flex flex-col gap-5">
-          {!active ? (
-            <Panel><EmptyState title="Selecciona una categoría" body="Elige una categoría del panel izquierdo para configurarla." icon={Settings} /></Panel>
-          ) : (
-            <>
-              <FadeIn>
-                <div className="flex flex-wrap items-center gap-4 bg-surface border border-line rounded-2xl p-4 sm:p-5">
-                  <div className="w-16 h-16 rounded-2xl bg-info-soft grid place-items-center shrink-0">
-                    <ActiveIcon size={28} className="text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-display font-bold text-2xl text-navy flex items-center gap-2">
-                      {active.name}
-                      <Pencil size={13} className="text-faint" />
-                    </h2>
-                    <div className="text-xs text-muted mt-1 flex items-center gap-3.5">
-                      <span className="flex items-center gap-1.5"><Hash size={12} className="text-faint" /><span className="font-mono">{active.slug}</span></span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1.5 text-success font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-success" />{active.services} servicios
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 px-3.5 py-2 bg-canvas border border-line rounded-xl">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-muted">Estado</span>
-                      <span className="text-sm text-navy font-semibold">{active.is_active ? 'Activa' : 'Inactiva'}</span>
-                    </div>
-                    <Toggle on={active.is_active} onChange={onToggleCategory} />
-                  </div>
-                  <GhostButton onClick={() => setDeleteCatOpen(true)}><span className="inline-flex items-center gap-2 text-error"><Trash2 size={14} />Eliminar</span></GhostButton>
-                </div>
-              </FadeIn>
-
-              {/* Config general */}
-              <Panel
-                title="Configuración general"
-                action={<GhostButton onClick={onSaveConfig}><span className="inline-flex items-center gap-2"><Check size={14} />Guardar</span></GhostButton>}
-              >
-                <SectionLead num="01" icon={Settings} />
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <Field label="Nombre">
-                    <Input key={`name-${active.id}`} value={name ?? active.name} onChange={e => setName(e.target.value)} />
-                  </Field>
-                  <Field label="Slug"><Input key={`slug-${active.id}`} defaultValue={active.slug} className="font-mono" disabled /></Field>
-                  <div className="col-span-2">
-                    <Field label="Descripción corta">
-                      <Textarea
-                        key={`desc-${active.id}`}
-                        rows={2}
-                        value={description ?? active.description ?? ''}
-                        onChange={e => setDescription(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              </Panel>
-
-              {/* Comisión */}
-              <Panel
-                title="Comisión específica"
-                action={<GhostButton onClick={() => toast.success(`Comisión guardada · ${active.name}`)}><span className="inline-flex items-center gap-2"><Check size={14} />Guardar</span></GhostButton>}
-              >
-                <SectionLead num="02" icon={Percent} />
-                {/* ponytail: comisión session-local — el guardado solo confirma con toast. */}
-                <div className="flex items-center gap-6 p-4 bg-canvas border border-line rounded-xl">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-navy">¿{active.name} usa comisión personalizada?</div>
-                    <div className="text-xs text-muted mt-1">
-                      Comisión global: <b className="text-navy font-semibold">15%</b> · Personalizada:{' '}
-                      <b className="text-primary font-semibold">12%</b> · Ahorro al técnico:{' '}
-                      <b className="text-success font-semibold">~$95 MXN por servicio</b>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center bg-surface border border-line rounded-lg px-3 h-11 w-28">
-                      <input type="number" defaultValue={12} className="w-full bg-transparent outline-none font-display font-bold text-xl text-navy" />
-                      <span className="font-display font-bold text-lg text-muted">%</span>
-                    </div>
-                    <Toggle on onChange={() => {}} />
-                  </div>
-                </div>
-              </Panel>
-            </>
-          )}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full max-w-[320px]">
+          <Input
+            icon={Search}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar categoría…"
+            aria-label="Buscar categoría"
+          />
         </div>
+        <span className="font-sans text-[13px] text-muted">
+          <b className="font-semibold text-navy">{cats.length}</b> categorías ·{' '}
+          <b className="font-semibold text-success">{published}</b> publicadas
+        </span>
       </div>
 
-      {/* Nueva categoría */}
-      <NewCategoryModal
-        open={newCatOpen}
-        onClose={() => setNewCatOpen(false)}
-        onCreated={id => setActiveId(id)}
-      />
+      {filtered.length === 0 ? (
+        <Card padded>
+          <EmptyState
+            kind={cats.length ? 'no-results' : 'first-use'}
+            title={cats.length ? 'Sin coincidencias' : 'Aún no hay categorías'}
+            description={
+              cats.length
+                ? `Ninguna categoría coincide con "${query.trim()}".`
+                : 'Crea la primera para que aparezca en la app.'
+            }
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((c, i) => {
+            const Icon = ICONS[c.icon ?? ''] ?? Settings;
+            const s = categoryStats(c.id, data);
+            const inc = included[c.id]?.length ?? 0;
+            return (
+              <Card
+                key={c.id}
+                hover
+                onClick={() => setEditing(c.id)}
+                className={`animate-up cursor-pointer p-5 ${
+                  editing === c.id ? 'border-primary' : ''
+                }`}
+              >
+                <div
+                  className="flex items-start justify-between"
+                  style={{ animationDelay: `${i * 40}ms` }}
+                >
+                  <span className="grid h-11 w-11 place-items-center rounded-btn bg-info-soft">
+                    <Icon size={20} className="text-primary" />
+                  </span>
+                  {/* El toggle no abre el editor */}
+                  <span onClick={e => e.stopPropagation()}>
+                    <Toggle
+                      checked={c.is_active}
+                      disabled={busy === `toggle-${c.id}`}
+                      onChange={() => void onToggle(c)}
+                      label={
+                        <span className="sr-only">
+                          {c.is_active ? 'Pausar' : 'Publicar'} {c.name}
+                        </span>
+                      }
+                    />
+                  </span>
+                </div>
+                <h3 className="mt-3 font-display text-[17px] font-bold text-navy">
+                  {c.name}
+                </h3>
+                <span
+                  className={`font-sans text-[12.5px] font-semibold ${
+                    c.is_active ? 'text-success' : 'text-muted'
+                  }`}
+                >
+                  {c.is_active ? 'Publicada' : 'Pausada'}
+                </span>
+                <div className="mt-3 grid grid-cols-2 gap-y-1 font-sans text-[12.5px] text-muted">
+                  <span>{inc ? `${inc} servicios` : 'Sin servicios'}</span>
+                  <span className="text-right">{s.technicians} técnicos</span>
+                  <span className="font-mono text-[12px] font-medium text-primary tabular">
+                    {rangeLabel(s)}
+                  </span>
+                  <span className="text-right">{s.orders} servicios</span>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Confirmar eliminación de categoría */}
-      <Modal
-        open={deleteCatOpen}
-        onClose={() => setDeleteCatOpen(false)}
-        title="Eliminar categoría"
-        sub="Esta acción quita la categoría del catálogo público."
-        icon={<Trash2 size={15} className="text-error" />}
-        width={440}
-        footer={
-          <>
-            <GhostButton onClick={() => setDeleteCatOpen(false)}>Cancelar</GhostButton>
-            <button
-              onClick={onDeleteCategory}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-error px-4 py-3 font-semibold text-white hover:opacity-90"
-            >
-              <Trash2 size={14} /> Eliminar
-            </button>
-          </>
-        }
-      >
-        <p className="text-[13px] leading-relaxed text-muted">
-          ¿Eliminar <b className="font-semibold text-navy">{active?.name}</b>?{' '}
-          {active && active.services > 0
-            ? <span className="text-error">Tiene {active.services} servicio(s) registrados: no se puede eliminar.</span>
-            : 'La categoría no tiene servicios, se puede eliminar de forma segura.'}
-        </p>
-      </Modal>
+      {active && (
+        <CategoryEditor
+          key={active.id}
+          cat={active}
+          included={included[active.id] ?? []}
+          onIncluded={list => saveIncluded(active.id, list)}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      <NewCategoryModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={id => setEditing(id)}
+      />
     </div>
   );
 }
 
-function NewCategoryModal({ open, onClose, onCreated }: {
-  open: boolean; onClose: () => void; onCreated: (id: string) => void;
+function CategoryEditor({
+  cat,
+  included,
+  onIncluded,
+  onClose,
+}: {
+  cat: Cat;
+  included: string[];
+  onIncluded: (list: string[]) => void;
+  onClose: () => void;
+}) {
+  const stats = categoryStats(cat.id, getCatalogData());
+  const globalPct = getSettingInt('commission_bps', 1500) / 100;
+  const [name, setName] = useState(cat.name);
+  const [description, setDescription] = useState(cat.description ?? '');
+  const [custom, setCustom] = useState(cat.commission_bps != null);
+  const [pct, setPct] = useState(
+    cat.commission_bps != null ? String(cat.commission_bps / 100) : '',
+  );
+  const [chip, setChip] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [shake, setShake] = useState(false);
+  const { busy, run } = useAction();
+
+  const n = Number(pct);
+  const pctError =
+    custom && (!pct.trim() || !Number.isFinite(n) || n < 0 || n > 100)
+      ? 'Escribe un porcentaje entre 0 y 100.'
+      : null;
+  const nameError = !name.trim() ? 'La categoría necesita un nombre.' : null;
+  const dirty =
+    name.trim() !== cat.name ||
+    description !== (cat.description ?? '') ||
+    (custom ? Math.round(n * 100) : null) !== (cat.commission_bps ?? null);
+
+  async function save() {
+    if (nameError || pctError) {
+      setShake(true);
+      setTimeout(() => setShake(false), 450);
+      return;
+    }
+    const ok = await run(
+      'save',
+      () =>
+        updateCategory(cat.id, {
+          name: name.trim(),
+          description: description.trim() || null,
+          commission_bps: custom ? Math.round(n * 100) : null,
+        }),
+      `Categoría guardada · ${name.trim()}`,
+    );
+    if (ok) onClose();
+  }
+
+  async function remove() {
+    setDeleting(true);
+    const result = await deleteCategory(cat.id);
+    setDeleting(false);
+    setConfirmDelete(false);
+    if (result === 'ok') {
+      toast.success(`Categoría eliminada · ${cat.name}`);
+      onClose();
+    } else if (result === 'has-services') {
+      toast.error('No puedes eliminar una categoría con servicios registrados');
+    } else {
+      toast.error(
+        'No se pudo eliminar la categoría',
+        'Reintenta en un momento.',
+      );
+    }
+  }
+
+  function addChip() {
+    const next = addIncluded(included, chip);
+    if (next !== included) {
+      onIncluded(next);
+      toast.local('Servicio agregado (solo en este navegador)');
+    }
+    setChip('');
+  }
+
+  return (
+    <>
+      <Sheet
+        open
+        onClose={onClose}
+        kicker="Editar categoría"
+        title={cat.name}
+        width={480}
+        footerClassName={shake ? 'animate-shake' : ''}
+        footer={
+          <div className="flex w-full items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              icon={Trash2}
+              onClick={() => setConfirmDelete(true)}
+              className="text-error"
+            >
+              Eliminar
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => void save()}
+                loading={busy === 'save'}
+                disabled={!dirty}
+              >
+                Guardar
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <section className="flex flex-col gap-4">
+            <Kicker>Datos</Kicker>
+            <Input
+              label="Nombre"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              error={nameError}
+            />
+            <Input
+              label="Slug"
+              value={cat.slug}
+              disabled
+              className="font-mono"
+              hint="Se genera al crear la categoría; la app lo usa como clave."
+            />
+            <Field label="Descripción corta">
+              <Textarea
+                rows={2}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Lo que ve el cliente bajo el nombre"
+              />
+            </Field>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Kicker>Rango de precio</Kicker>
+            <div className="flex items-center justify-between rounded-box border border-line bg-panel px-4 py-3">
+              <span className="font-mono text-[15px] font-semibold text-navy tabular">
+                {rangeLabel(stats)}
+              </span>
+              <Badge tone="neutral">{stats.technicians} técnicos</Badge>
+            </div>
+            <p className="font-sans text-[12px] text-muted">
+              Sale de las tarifas de visita que fija cada técnico; no se edita
+              aquí.
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Kicker>Comisión</Kicker>
+            <Toggle
+              checked={custom}
+              onChange={next => {
+                setCustom(next);
+                if (next && !pct) setPct(String(globalPct));
+              }}
+              label={
+                <span className="font-sans text-[13.5px] text-navy">
+                  Comisión específica{' '}
+                  <span className="text-muted">(global: {globalPct}%)</span>
+                </span>
+              }
+            />
+            {custom && (
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={pct}
+                onChange={e => setPct(e.target.value)}
+                suffix="%"
+                error={pctError}
+                aria-label={`Comisión de ${cat.name}`}
+              />
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Kicker>Servicios incluidos</Kicker>
+            <div className="flex flex-wrap gap-2">
+              {included.length === 0 && (
+                <span className="font-sans text-[12.5px] text-muted">
+                  Aún no agregas servicios.
+                </span>
+              )}
+              {included.map(sv => (
+                <Chip
+                  key={sv}
+                  onRemove={() => onIncluded(included.filter(x => x !== sv))}
+                >
+                  {sv}
+                </Chip>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={chip}
+                onChange={e => setChip(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addChip();
+                  }
+                }}
+                placeholder="Ej. Reparación de fugas"
+                wrapperClassName="flex-1"
+                aria-label="Agregar servicio incluido"
+              />
+              <Button variant="secondary" icon={Plus} onClick={addChip}>
+                Agregar
+              </Button>
+            </div>
+            <p className="font-sans text-[12px] text-muted">
+              Se guardan en este navegador: el backend aún no tiene subservicios
+              por categoría.
+            </p>
+          </section>
+        </div>
+      </Sheet>
+
+      <Modal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        dismissible={!deleting}
+        title="Eliminar categoría"
+        description="Esta acción quita la categoría del catálogo público."
+        icon={Trash2}
+        tone="danger"
+        width={440}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              icon={Trash2}
+              loading={deleting}
+              disabled={stats.orders > 0}
+              onClick={() => void remove()}
+            >
+              Eliminar
+            </Button>
+          </>
+        }
+      >
+        <p className="font-sans text-[13.5px] leading-relaxed text-muted">
+          {stats.orders > 0 ? (
+            <span className="text-error">
+              {cat.name} tiene {stats.orders} servicio(s) registrados: no se
+              puede eliminar. Pausa la categoría para ocultarla de la app.
+            </span>
+          ) : (
+            <>
+              ¿Eliminar <b className="font-semibold text-navy">{cat.name}</b>?
+              No tiene servicios, se puede eliminar de forma segura.
+            </>
+          )}
+        </p>
+      </Modal>
+    </>
+  );
+}
+
+function NewCategoryModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (id: string) => void;
 }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('wrench');
+  const [saving, setSaving] = useState(false);
 
   async function submit() {
-    if (!name.trim()) return;
+    if (!name.trim() || saving) return;
+    setSaving(true);
     const cat = await createCategory(name.trim(), icon);
+    setSaving(false);
+    // createCategory ya avisó el error (duplicado 23505 incluido).
     if (!cat) return;
     toast.success(`Categoría creada · ${cat.name}`);
     setName('');
@@ -278,47 +561,57 @@ function NewCategoryModal({ open, onClose, onCreated }: {
     <Modal
       open={open}
       onClose={onClose}
+      dismissible={!saving}
       title="Nueva categoría"
-      sub="Se crea activa; los técnicos podrán fijar sus tarifas en ella."
-      icon={<Plus size={16} />}
-      width={440}
+      description="Se crea publicada; los técnicos podrán fijar sus tarifas en ella."
+      icon={Plus}
+      width={460}
       footer={
         <>
-          <GhostButton onClick={onClose}>Cancelar</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!name.trim()}>Crear categoría</PrimaryButton>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => void submit()}
+            loading={saving}
+            disabled={!name.trim()}
+          >
+            Crear categoría
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Nombre">
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Cerrajería" />
-        </Field>
-        <Field label="Icono">
+        <Input
+          label="Nombre"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Ej. Cerrajería"
+          onKeyDown={e => {
+            if (e.key === 'Enter') void submit();
+          }}
+        />
+        <Field label="Ícono">
           <div className="flex flex-wrap gap-2">
             {Object.entries(ICONS).map(([key, Icon]) => (
               <button
                 key={key}
+                type="button"
                 onClick={() => setIcon(key)}
                 aria-label={key}
-                className={`grid h-11 w-11 place-items-center rounded-xl border transition-colors ${
-                  icon === key ? 'border-primary bg-info-soft text-primary' : 'border-line bg-surface text-muted hover:bg-surface-2'
+                aria-pressed={icon === key}
+                className={`grid h-11 w-11 place-items-center rounded-btn border transition-colors ${
+                  icon === key
+                    ? 'border-primary bg-info-soft text-primary'
+                    : 'border-line bg-card text-muted hover:bg-panel'
                 }`}
               >
-                <Icon size={17} />
+                <Icon size={18} />
               </button>
             ))}
           </div>
         </Field>
       </div>
     </Modal>
-  );
-}
-
-function SectionLead({ num, icon: Icon }: { num: string; icon: LucideIcon }) {
-  return (
-    <div className="flex items-center gap-3 mb-4 -mt-1">
-      <span className="font-mono text-[11px] tracking-widest text-faint">{num}</span>
-      <span className="w-7 h-7 rounded-lg bg-info-soft grid place-items-center"><Icon size={15} className="text-primary" /></span>
-    </div>
   );
 }

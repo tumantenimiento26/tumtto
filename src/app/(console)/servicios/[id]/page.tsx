@@ -753,7 +753,7 @@ export default function ServicioDetailPage() {
                 const ok = await run(
                   'refund',
                   () => refundPayment(req.id),
-                  `Reembolso registrado · ${money(payment?.amount_cents ?? subtotalCents)}`,
+                  `Reembolso emitido · ${money(payment?.amount_cents ?? subtotalCents)}`,
                 );
                 if (ok) setRefundOpen(false);
               }}

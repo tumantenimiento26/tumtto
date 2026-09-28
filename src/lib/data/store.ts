@@ -201,6 +201,15 @@ async function mutate<R>(
   }
 }
 
+/**
+ * Mensaje de validación del backend (SQLSTATE 22023: textos en español
+ * pensados para mostrarse, p. ej. "El valor de request_ttl_minutes debe ser…").
+ */
+const pgMessage = (e: unknown, fallback: string) =>
+  pgCode(e) === '22023' && typeof e === 'object' && e && 'message' in e
+    ? String(e.message)
+    : fallback;
+
 /** Código de error de Postgres/PostgREST (p. ej. '23505' = único duplicado). */
 export const pgCode = (e: unknown) =>
   typeof e === 'object' && e && 'code' in e ? String(e.code) : null;
@@ -238,17 +247,20 @@ export function getSettingStr(key: string, fallback: string): string {
 export async function saveSettings(
   entries: Record<string, number | string | boolean>,
 ) {
-  return mutate(async () => {
-    const rows = Object.entries(entries).map(([key, value]) => ({
-      key,
-      value,
-    }));
-    const { error } = await supabase
-      .from('platform_settings')
-      .upsert(rows, { onConflict: 'key' });
-    if (error) throw error;
-    return true;
-  }, 'No se pudo guardar la configuración.');
+  return mutate(
+    async () => {
+      const rows = Object.entries(entries).map(([key, value]) => ({
+        key,
+        value,
+      }));
+      const { error } = await supabase
+        .from('platform_settings')
+        .upsert(rows, { onConflict: 'key' });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar la configuración.'),
+  );
 }
 export const saveSettingInt = (key: string, value: number) =>
   saveSettings({ [key]: value });
@@ -480,131 +492,97 @@ export async function setStatus(
 }
 
 export async function reassignRequest(orderId: string, techUserId: string) {
-  return mutate(async () => {
-    const req = getRequest(orderId);
-    const { error } = await supabase
-      .from('service_orders')
-      .update({ technician_id: techUserId })
-      .eq('id', orderId);
-    if (error) throw error;
-    const name = getProfile(techUserId)?.full_name ?? techUserId;
-    if (req) {
-      await sideWrite(
-        supabase.from('service_order_status_events').insert({
-          service_order_id: orderId,
-          from_status: req.status,
-          to_status: req.status,
-          actor_id: techUserId,
-          note: `Reasignado a ${name} por admin`,
-        }),
-        'el evento de reasignación',
-      );
-    }
-  }, 'No se pudo reasignar el servicio.');
+  // Reasignación + evento de estado en una sola transacción (antes el evento
+  // podía fallar en silencio).
+  return mutate(
+    async () => {
+      const name = getProfile(techUserId)?.full_name ?? techUserId;
+      const { error } = await supabase.rpc('admin_reassign_order', {
+        p_order_id: orderId,
+        p_technician_id: techUserId,
+        p_note: `Reasignado a ${name} por admin`,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo reasignar el servicio.'),
+  );
 }
 
-// ponytail: no hay estado 'reembolsado' en service_order_status — el reembolso
-// marca el pago 'refunded' y cancela el servicio con nota en el evento.
-export async function refundPayment(orderId: string) {
+/**
+ * Reembolso real: la Edge Function reembolsa en Stripe (tarjeta) y luego, en
+ * una transacción, marca el pago `refunded`, revierte el ledger y cancela la
+ * orden. En efectivo solo aplica el ajuste contable. Antes solo cambiaba el
+ * estado del pago en dos escrituras sueltas y no devolvía dinero.
+ */
+export async function refundPayment(orderId: string, reason?: string) {
   const pay = getPayment(orderId);
   if (!pay || pay.status !== 'paid') return null;
   return mutate(async () => {
-    const { error } = await supabase
-      .from('payments')
-      .update({ status: 'refunded' })
-      .eq('id', pay.id);
+    const { data, error } = await supabase.functions.invoke(
+      'stripe-refund-order',
+      { body: { service_order_id: orderId, reason } },
+    );
     if (error) throw error;
-    const { error: e2 } = await supabase.rpc('transition_service_order', {
-      p_order_id: orderId,
-      p_to_status: 'cancelled',
-      p_note: 'Reembolso emitido al cliente',
-    });
-    if (e2) throw e2;
-    return pay;
-  }, 'No se pudo emitir el reembolso.');
+    return data ?? pay;
+  }, 'No se pudo emitir el reembolso. Nada se cobró ni se canceló; reintenta.');
 }
 
-export async function resolveKyc(techId: string, approve: boolean) {
-  return mutate(async () => {
-    const status = approve ? 'approved' : 'declined';
-    const { error } = await supabase
-      .from('technicians')
-      .update({ kyc_status: status })
-      .eq('id', techId);
-    if (error) throw error;
-    // Keep the latest KYC session in sync when one exists.
-    const s = getKycSessions(techId).sort(byNewest)[0];
-    if (s) {
-      const { error: e2 } = await supabase
-        .from('kyc_sessions')
-        .update({ status })
-        .eq('id', s.id);
-      if (e2) throw e2;
-    }
-  }, 'No se pudo actualizar el KYC.');
+export async function resolveKyc(
+  techId: string,
+  approve: boolean,
+  note?: string,
+) {
+  // technicians.kyc_status + última kyc_sessions en una transacción.
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_resolve_kyc', {
+        p_technician_id: techId,
+        p_status: approve ? 'approved' : 'declined',
+        p_note: note,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo actualizar el KYC.'),
+  );
 }
 
 /** Rechaza el KYC guardando el motivo como nota interna del técnico. */
 export async function rejectKyc(techId: string, reason: string) {
-  const r = await resolveKyc(techId, false);
+  const r = await resolveKyc(techId, false, reason);
   // La nota solo si el rechazo sí quedó guardado.
   if (r !== null) addNote(techId, `KYC rechazado — ${reason}`);
   return r;
 }
 
-// La suspensión de técnicos vive en profiles.status del usuario dueño
-// (technicians.id === profiles.id).
-export async function suspendTechnician(techId: string) {
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('technicians')
-      .update({ is_available: false })
-      .eq('id', techId);
-    if (error) throw error;
-    const { error: e2 } = await supabase
-      .from('profiles')
-      .update({ status: 'suspended' })
-      .eq('id', techId);
-    if (e2) throw e2;
-    return true;
-  }, 'No se pudo suspender al técnico.');
-}
-export async function reactivateTechnician(techId: string) {
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('technicians')
-      .update({ is_available: true })
-      .eq('id', techId);
-    if (error) throw error;
-    const { error: e2 } = await supabase
-      .from('profiles')
-      .update({ status: 'active' })
-      .eq('id', techId);
-    if (e2) throw e2;
-    return true;
-  }, 'No se pudo reactivar al técnico.');
-}
+// Suspensión: profiles.status (+ technicians.is_available al suspender a un
+// técnico) en una sola transacción vía admin_set_user_status.
+const setUserStatus = (
+  userId: string,
+  status: 'active' | 'suspended',
+  errMsg: string,
+) =>
+  mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_user_status', {
+        p_user_id: userId,
+        p_status: status,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, errMsg),
+  );
 
-export async function suspendUser(userId: string) {
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'suspended' })
-      .eq('id', userId);
-    if (error) throw error;
-    return true;
-  }, 'No se pudo suspender al usuario.');
-}
-export async function reactivateUser(userId: string) {
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'active' })
-      .eq('id', userId);
-    if (error) throw error;
-    return true;
-  }, 'No se pudo reactivar al usuario.');
-}
+export const suspendTechnician = (techId: string) =>
+  setUserStatus(techId, 'suspended', 'No se pudo suspender al técnico.');
+export const reactivateTechnician = (techId: string) =>
+  setUserStatus(techId, 'active', 'No se pudo reactivar al técnico.');
+export const suspendUser = (userId: string) =>
+  setUserStatus(userId, 'suspended', 'No se pudo suspender al usuario.');
+export const reactivateUser = (userId: string) =>
+  setUserStatus(userId, 'active', 'No se pudo reactivar al usuario.');
 
 export async function upsertTechRate(
   techId: string,
@@ -664,21 +642,16 @@ type AddressFields = Pick<
   | 'is_default'
 >;
 
-/** Crea (sin addressId) o actualiza una dirección; si es principal, desmarca las demás. */
+/** Crea (sin addressId) o actualiza una dirección. */
 export async function saveAddress(
   clientId: string,
   fields: AddressFields,
   addressId?: string,
 ) {
+  // Al guardar con is_default el backend desmarca las demás en la misma
+  // sentencia (antes eran dos escrituras y un fallo dejaba al cliente sin
+  // dirección principal).
   return mutate(async () => {
-    if (fields.is_default) {
-      const { error } = await supabase
-        .from('client_addresses')
-        .update({ is_default: false })
-        .eq('client_id', clientId)
-        .eq('is_default', true);
-      if (error) throw error;
-    }
     const q = addressId
       ? await supabase
           .from('client_addresses')

@@ -1058,6 +1058,31 @@ export type Database = {
       }
     }
     Functions: {
+      // Escritos a mano (tumtto-backend 20260927150000_audit_fixes) hasta
+      // regenerar con `pnpm gen:types` tras el deploy.
+      admin_reassign_order: {
+        Args: { p_order_id: string; p_technician_id: string; p_note?: string }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      admin_refund_order: {
+        Args: { p_order_id: string; p_reason?: string; p_stripe_refund_id?: string }
+        Returns: Database["public"]["Tables"]["payments"]["Row"]
+      }
+      admin_resolve_kyc: {
+        Args: {
+          p_technician_id: string
+          p_status: Database["public"]["Enums"]["kyc_status"]
+          p_note?: string
+        }
+        Returns: Database["public"]["Tables"]["technicians"]["Row"]
+      }
+      admin_set_user_status: {
+        Args: {
+          p_user_id: string
+          p_status: Database["public"]["Enums"]["profile_status"]
+        }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
+      }
       accept_quote: {
         Args: { p_quote_id: string }
         Returns: {

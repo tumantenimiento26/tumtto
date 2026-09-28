@@ -293,7 +293,7 @@ export default function TecnicosPage() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         <div className="border-b border-line px-5 pt-3">
           <Tabs
             tabs={tabs}

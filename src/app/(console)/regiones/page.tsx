@@ -273,7 +273,7 @@ export default function RegionesPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card className="overflow-hidden">
+          <Card padded={false} className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <Kicker>Mapa de cobertura</Kicker>
               <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setEditingPolys(v => !v)}>
@@ -291,7 +291,7 @@ export default function RegionesPage() {
             />
           </Card>
 
-          <Card className="overflow-hidden">
+          <Card padded={false} className="overflow-hidden">
             <div className="border-b border-line px-5 py-3">
               <Kicker>Municipios</Kicker>
             </div>

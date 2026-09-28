@@ -48,6 +48,8 @@ export function KpiCard({
           className={`mt-2 inline-block rounded-full px-2 py-0.5 font-mono text-[11.5px] font-semibold ${
             delta === 'nuevo'
               ? 'bg-info-soft text-primary'
+              : delta === '0.0%'
+                ? 'bg-segment text-muted'
               : bad
                 ? 'bg-error-soft text-error'
                 : 'bg-success-soft text-success'

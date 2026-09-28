@@ -10,6 +10,8 @@ export default [
   {
     ignores: [
       'node_modules/',
+      // Prototipos HTML/JS del handoff (referencia, no código de la app).
+      'docs/',
       '.next/',
       'out/',
       'next-env.d.ts',

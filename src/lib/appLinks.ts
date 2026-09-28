@@ -34,3 +34,19 @@ export function intentUrl(path: string, fallbackUrl: string): string {
     `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`
   );
 }
+
+/**
+ * Error que Supabase manda en el enlace de correo (`?error=` o `#error=`),
+ * p. ej. otp_expired. null si el enlace viene bien.
+ */
+export function authLinkError(
+  search: string,
+  hash: string,
+): { code: string; expired: boolean } | null {
+  const params = new URLSearchParams(
+    `${search.replace(/^\?/, '')}&${hash.replace(/^#/, '')}`,
+  );
+  const code = params.get('error_code') ?? params.get('error');
+  if (!code) return null;
+  return { code, expired: code === 'otp_expired' || /expired/i.test(code) };
+}

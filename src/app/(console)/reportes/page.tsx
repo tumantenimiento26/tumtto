@@ -21,6 +21,8 @@ import {
   DataTable,
   exportCsv,
   type Column,
+  LoadFailed,
+  PageSkeleton,
 } from '@/components/admin';
 import { LineChart, VBars, HBars, HeatCalendar } from '@/components/charts';
 import { Avatar, Chip, GhostButton, PrimaryButton } from '@/components/ui';
@@ -31,6 +33,9 @@ import {
   getMetrics,
   getCategoriesWithCounts,
   useTick,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
 } from '@/lib/data/store';
 
 const RANGES = ['7 días', '30 días', 'Trimestre', 'Año'] as const;
@@ -193,6 +198,8 @@ interface TechRow {
 
 export default function ReportesPage() {
   useTick();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
   const [range, setRange] = useState<Range>('30 días');
 
   const metrics = getMetrics();
@@ -307,6 +314,10 @@ export default function ReportesPage() {
     },
   ];
 
+  // Sin snapshot los reportes se veían en cero como si no hubiera actividad.
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeading
@@ -323,8 +334,14 @@ export default function ReportesPage() {
             </div>
             <GhostButton
               onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                toast.success('Link copiado al portapapeles');
+                // El navegador puede negarlo (permisos / http): solo avisar si copió.
+                void navigator.clipboard?.writeText(window.location.href).then(
+                  () => toast.success('Link copiado al portapapeles'),
+                  () =>
+                    toast.error(
+                      'No se pudo copiar. Copia el link de la barra.',
+                    ),
+                );
               }}
             >
               <Link2 size={14} className="mr-2" />

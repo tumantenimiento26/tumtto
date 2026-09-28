@@ -142,7 +142,12 @@ export default function ClientesPage() {
   }, []);
   function persistViews(v: SavedView[]) {
     setViews(v);
-    localStorage.setItem(VIEWS_KEY, JSON.stringify(v));
+    try {
+      localStorage.setItem(VIEWS_KEY, JSON.stringify(v));
+    } catch {
+      // Modo privado o cuota llena: la vista vive solo en esta sesión.
+      toast.error('No se pudo guardar la vista en este navegador.');
+    }
   }
   function saveCurrentView() {
     const name = viewName.trim() || `${filter}${query ? ` · “${query}”` : ''}`;

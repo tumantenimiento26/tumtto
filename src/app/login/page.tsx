@@ -25,6 +25,7 @@ import {
 } from '@/components/motion';
 import { PrimaryButton, BrandMark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 /** Splash de entrada al panel: puente de marca entre el login y la consola. */
 function Splash() {
@@ -123,6 +124,30 @@ export default function LoginPage() {
   const [pass, setPass] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotBusy, setForgotBusy] = useState(false);
+
+  // Antes solo mostraba "Enviado" sin mandar nada.
+  async function sendReset() {
+    if (!EMAIL_RE.test(email.trim())) {
+      setErrors(er => ({
+        ...er,
+        email: 'Escribe tu correo para enviarte el enlace.',
+      }));
+      return;
+    }
+    setForgotBusy(true);
+    setAuthError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/restablecer`,
+    });
+    setForgotBusy(false);
+    if (error) {
+      setForgotSent(false);
+      setAuthError(authMessage(error.message));
+      return;
+    }
+    setForgotSent(true);
+  }
   const [errors, setErrors] = useState<{ email?: string; pass?: string }>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -315,10 +340,11 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setForgotSent(true)}
+                  onClick={() => void sendReset()}
+                  disabled={forgotBusy}
                   className="text-xs text-primary hover:text-primary-2"
                 >
-                  ¿Olvidaste tu contraseña?
+                  {forgotBusy ? 'Enviando…' : '¿Olvidaste tu contraseña?'}
                 </button>
               </div>
               <div className={field(!!errors.pass)}>
@@ -379,9 +405,8 @@ export default function LoginPage() {
                       <b className="text-navy font-semibold">
                         {email || 'tu correo'}
                       </b>{' '}
-                      está registrado como cuenta admin, recibirás un enlace de
-                      recuperación en los próximos minutos. Caduca a los 30
-                      minutos.
+                      está registrado, recibirás un enlace para crear una
+                      contraseña nueva en los próximos minutos.
                     </span>
                   </div>
                 </motion.div>

@@ -17,11 +17,19 @@ import {
   StatCard,
   DataTable,
   type Column,
+  LoadFailed,
+  PageSkeleton,
 } from '@/components/admin';
 import { Chip, Badge, GhostButton, PrimaryButton } from '@/components/ui';
 import { FadeIn, Stagger, StaggerItem, ProgressBar } from '@/components/motion';
 import { CoverageMap } from '@/components/coverage-map';
-import { useTick, getTechniciansWithProfile } from '@/lib/data/store';
+import {
+  useTick,
+  getTechniciansWithProfile,
+  useWorldReady,
+  useWorldFailed,
+  loadWorld,
+} from '@/lib/data/store';
 
 type Zone = {
   id: string;
@@ -84,6 +92,8 @@ const ZONE_STATUS: Record<Zone['status'], 'success' | 'warning'> = {
 
 export default function RegionesPage() {
   useTick();
+  const ready = useWorldReady();
+  const failed = useWorldFailed();
   const techs = getTechniciansWithProfile();
   const [selected, setSelected] = useState<string>('zap');
   const [editingPolys, setEditingPolys] = useState(false);
@@ -136,6 +146,9 @@ export default function RegionesPage() {
       render: () => <span className="text-muted">ZMG · Zapopan</span>,
     },
   ];
+
+  if (failed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!ready) return <PageSkeleton />;
 
   return (
     <div className="flex flex-col gap-6">

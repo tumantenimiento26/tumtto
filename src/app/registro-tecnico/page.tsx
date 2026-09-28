@@ -90,6 +90,12 @@ export default function RegistroTecnicoPage() {
     });
     setLoading(false);
     if (error) return setAuthError(signUpMessage(error.message));
+    // Con confirmación de correo, Supabase no devuelve error para un correo ya
+    // registrado (evita enumerar cuentas): llega un usuario sin identidades.
+    if (data.user && data.user.identities?.length === 0)
+      return setAuthError(
+        'Ese correo ya tiene una cuenta. Inicia sesión desde la app o recupera tu contraseña.',
+      );
     // El alta sigue en la app; no dejamos una sesión de técnico en la consola.
     if (data.session) await supabase.auth.signOut();
     setSentTo(email.trim());

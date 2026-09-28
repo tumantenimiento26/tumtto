@@ -55,7 +55,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-line bg-white shadow-card ${className}`}
+      className={`rounded-2xl border border-line bg-card shadow-card ${className}`}
     >
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3.5 sm:px-5">
@@ -165,7 +165,7 @@ export function StatCard({
   );
 
   const cls =
-    'group block h-full rounded-2xl border border-line bg-white p-5 shadow-card transition-[transform,box-shadow,border-color] duration-200 ' +
+    'group block h-full rounded-2xl border border-line bg-card p-5 shadow-card transition-[transform,box-shadow,border-color] duration-200 ' +
     (href
       ? 'hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-hover focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-primary/35'
       : 'hover:shadow-hover');
@@ -326,7 +326,7 @@ export function Modal({
             transition={{ duration: 0.25, ease: [0.2, 0.7, 0.3, 1] }}
             onClick={e => e.stopPropagation()}
             style={{ width, maxWidth: '100%' }}
-            className="max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-overlay"
+            className="max-h-[85vh] overflow-y-auto rounded-2xl bg-card shadow-overlay"
           >
             <div className="flex items-start gap-3.5 border-b border-line/70 px-4 pb-4 pt-5 sm:px-6">
               {icon && (
@@ -407,7 +407,7 @@ export function PageSkeleton() {
 export function LoadFailed({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-6 text-center shadow-card">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 text-center shadow-card">
         <h2 className="font-display text-lg font-semibold text-navy">
           No pudimos cargar los datos
         </h2>

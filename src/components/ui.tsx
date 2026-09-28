@@ -103,7 +103,7 @@ export function GhostButton({
   className?: string;
   disabled?: boolean;
 }) {
-  const cls = `inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-3 font-semibold text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 ${className}`;
+  const cls = `inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-3 font-semibold text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 ${className}`;
   if (href)
     return (
       <Link href={href} className={cls}>
@@ -128,7 +128,7 @@ export function Card({
   interactive?: boolean;
   onClick?: () => void;
 }) {
-  const base = `rounded-2xl border border-line bg-white p-4 shadow-card ${className}`;
+  const base = `rounded-2xl border border-line bg-card p-4 shadow-card ${className}`;
   if (interactive)
     return (
       <motion.div
@@ -154,7 +154,7 @@ export function Chip({
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors ${active ? 'border-primary bg-primary text-white' : 'border-line bg-white text-muted hover:bg-surface'}`}
+      className={`rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors ${active ? 'border-primary bg-primary text-white' : 'border-line bg-card text-muted hover:bg-surface'}`}
     >
       {children}
     </button>
@@ -266,7 +266,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`min-h-[48px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] text-navy outline-none transition-shadow placeholder:text-faint focus:border-primary focus:shadow-[0_0_0_3px_rgba(10,107,207,0.15)] ${props.className ?? ''}`}
+      className={`min-h-[48px] w-full rounded-xl border border-line bg-card px-3.5 text-[15px] text-navy outline-none transition-shadow placeholder:text-faint focus:border-primary focus:shadow-[0_0_0_3px_rgba(10,107,207,0.15)] ${props.className ?? ''}`}
     />
   );
 }
@@ -277,7 +277,7 @@ export function Textarea(
   return (
     <textarea
       {...props}
-      className={`w-full rounded-xl border border-line bg-white p-3.5 text-[15px] text-navy outline-none transition-shadow placeholder:text-faint focus:border-primary focus:shadow-[0_0_0_3px_rgba(10,107,207,0.15)] ${props.className ?? ''}`}
+      className={`w-full rounded-xl border border-line bg-card p-3.5 text-[15px] text-navy outline-none transition-shadow placeholder:text-faint focus:border-primary focus:shadow-[0_0_0_3px_rgba(10,107,207,0.15)] ${props.className ?? ''}`}
     />
   );
 }
@@ -299,7 +299,7 @@ export function Toggle({
       <motion.span
         layout
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow ${on ? 'left-[19px]' : 'left-[3px]'}`}
+        className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-card shadow ${on ? 'left-[19px]' : 'left-[3px]'}`}
       />
     </button>
   );

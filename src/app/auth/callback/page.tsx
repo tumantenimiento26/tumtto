@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MailCheck } from 'lucide-react';
+import { Mail, MailCheck, MailX } from 'lucide-react';
 import { OpenInApp } from '@/components/open-in-app';
-import { BrandMark, PrimaryButton } from '@/components/ui';
+import { Button, Input } from '@/components/ds';
+import { AuthShell } from '@/components/auth-shell';
 import { supabase } from '@/lib/supabase';
 import { authLinkError } from '@/lib/appLinks';
 
@@ -52,47 +53,64 @@ function ExpiredLink({ expired }: { expired: boolean }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#081A33] p-4">
-      <div className="w-full max-w-[420px] rounded-[20px] bg-surface p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-        <BrandMark size={44} className="mb-5 rounded-xl" />
-        <h1 className="mb-2 font-display text-2xl font-semibold text-navy">
+    <AuthShell
+      aside={{
+        kicker: 'Servicios a domicilio · ZMG',
+        title: 'Tu casa en buenas manos.',
+        lead: 'Confirma tu correo para entrar a la app de Tumantenimiento.',
+        bullets: [
+          'Técnicos verificados uno por uno',
+          'Pago protegido al terminar',
+          'Garantía de 30 días por escrito',
+        ],
+      }}
+    >
+      <div className="animate-up">
+        <span className="flex h-14 w-14 items-center justify-center rounded-box bg-warning-soft text-warning-ink">
+          <MailX size={26} aria-hidden />
+        </span>
+        <h1 className="mt-5 font-display text-[27px] font-extrabold tracking-[-0.6px] text-navy">
           {expired ? 'El enlace expiró' : 'El enlace no es válido'}
         </h1>
-        <p className="mb-6 text-sm text-muted">
+        <p className="mt-2 text-[14.5px] text-muted">
           {expired
             ? 'Los enlaces de confirmación duran poco y solo sirven una vez.'
             : 'Puede que ya lo hayas usado.'}{' '}
           Escribe tu correo y te mandamos uno nuevo.
         </p>
         {state === 'sent' ? (
-          <p className="flex items-start gap-2 rounded-xl bg-success-soft px-3.5 py-2.5 text-xs text-success">
-            <MailCheck size={14} className="mt-0.5 shrink-0" />
+          <p className="mt-6 flex items-start gap-2 rounded-box bg-success-soft px-3.5 py-2.5 text-[13px] text-success">
+            <MailCheck size={15} className="mt-0.5 shrink-0" aria-hidden />
             Si {email} tiene una cuenta pendiente, te llegará un enlace nuevo en
             unos minutos.
           </p>
         ) : (
-          <form onSubmit={resend} noValidate className="flex flex-col gap-3">
-            <input
+          <form
+            onSubmit={resend}
+            noValidate
+            className="mt-6 flex flex-col gap-4"
+          >
+            <Input
+              label="Correo electrónico"
               type="email"
               autoComplete="email"
-              aria-label="Correo electrónico"
+              icon={Mail}
               placeholder="tu@correo.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm text-navy outline-none focus:border-primary"
+              error={
+                state === 'error'
+                  ? 'No pudimos reenviar el correo. Revisa la dirección e intenta de nuevo en un minuto.'
+                  : null
+              }
+              wrapperClassName="h-12"
             />
-            {state === 'error' && (
-              <p role="alert" className="text-xs text-error">
-                No pudimos reenviar el correo. Revisa la dirección e intenta de
-                nuevo en un minuto.
-              </p>
-            )}
-            <PrimaryButton type="submit" loading={state === 'sending'}>
+            <Button type="submit" size="lg" full loading={state === 'sending'}>
               Reenviar enlace
-            </PrimaryButton>
+            </Button>
           </form>
         )}
       </div>
-    </div>
+    </AuthShell>
   );
 }

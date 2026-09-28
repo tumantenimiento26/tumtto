@@ -393,6 +393,17 @@ export function exportCsv(
  * El snapshot de la consola no cargó. Se muestra en lugar de la página para que
  * un fallo de red no se lea como "la plataforma está vacía".
  */
+/** Mientras llega el snapshot: nunca pintar vacío/“no encontrado” antes de cargar. */
+export function PageSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" role="status" aria-label="Cargando">
+      <div className="h-8 w-64 animate-pulse rounded-lg bg-surface-2" />
+      <div className="h-28 animate-pulse rounded-2xl bg-surface-2" />
+      <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
+    </div>
+  );
+}
+
 export function LoadFailed({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">

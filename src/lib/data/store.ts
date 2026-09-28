@@ -81,10 +81,21 @@ async function fetchAll<K extends keyof Database['public']['Tables']>(
 }
 
 let inflight: Promise<void> | null = null;
+let rerun: Promise<void> | null = null;
 
 /** Load (or reload) the world snapshot. Call once from the console shell. */
 export function loadWorld(force = false): Promise<void> {
-  if (inflight) return inflight;
+  if (inflight) {
+    if (!force) return inflight;
+    // Una escritura terminó mientras otra carga iba en vuelo: esa carga salió
+    // antes de la escritura y no la trae. Encadena UNA recarga más (las
+    // escrituras concurrentes comparten esa misma recarga).
+    rerun ??= inflight.then(() => {
+      rerun = null;
+      return loadWorld(true);
+    });
+    return rerun;
+  }
   if (!force && Date.now() - lastFetched < 15_000) return Promise.resolve();
   useData.setState(s =>
     s.status === 'ready' ? s : { ...s, status: 'loading' },
@@ -150,9 +161,15 @@ export function loadWorld(force = false): Promise<void> {
       lastFetched = Date.now();
       useData.setState({ status: 'ready' });
     } catch (e) {
-      useData.setState({ status: 'error' });
       console.error('[data] loadWorld failed', e);
-      notifyError('No se pudieron cargar los datos. Reintenta.');
+      // Con un snapshot ya cargado, una recarga fallida conserva el anterior
+      // (la escritura sí se hizo); solo la primera carga deja la consola en error.
+      if (useData.getState().status === 'ready') {
+        notifyError('No se pudieron actualizar los datos. Recarga la página.');
+      } else {
+        useData.setState({ status: 'error' });
+        notifyError('No se pudieron cargar los datos. Reintenta.');
+      }
     } finally {
       inflight = null;
       bump();
@@ -164,19 +181,42 @@ export function loadWorld(force = false): Promise<void> {
 /** Reload after a write so every view reflects the backend. */
 const refresh = () => loadWorld(true);
 
-/** Wrap a backend write: on error toast + null, on success reload the snapshot. */
+/**
+ * Wrap a backend write: on error toast + null, on success reload the snapshot.
+ * `errMsg` puede leer el error para dar la causa (p. ej. duplicado 23505).
+ */
 async function mutate<R>(
   fn: () => Promise<R>,
-  errMsg: string,
+  errMsg: string | ((e: unknown) => string),
 ): Promise<R | null> {
   try {
     const r = await fn();
     await refresh();
     return r;
   } catch (e) {
-    console.error('[data]', errMsg, e);
-    notifyError(errMsg);
+    const msg = typeof errMsg === 'string' ? errMsg : errMsg(e);
+    console.error('[data]', msg, e);
+    notifyError(msg);
     return null;
+  }
+}
+
+/** Código de error de Postgres/PostgREST (p. ej. '23505' = único duplicado). */
+export const pgCode = (e: unknown) =>
+  typeof e === 'object' && e && 'code' in e ? String(e.code) : null;
+
+/**
+ * Escritura secundaria (bitácora de eventos): si falla no se revierte la
+ * principal, pero se avisa en vez de tragarse el error.
+ */
+async function sideWrite(
+  p: PromiseLike<{ error: unknown }>,
+  what: string,
+): Promise<void> {
+  const { error } = await p;
+  if (error) {
+    console.error('[data]', what, error);
+    notifyError(`Se guardó, pero no se registró ${what}.`);
   }
 }
 
@@ -409,13 +449,16 @@ export async function createRequest(
       .select()
       .single();
     if (error) throw error;
-    await supabase.from('service_order_status_events').insert({
-      service_order_id: data.id,
-      from_status: null,
-      to_status: 'requested',
-      actor_id: input.client_id,
-      note: 'Creado por admin desde la consola',
-    });
+    await sideWrite(
+      supabase.from('service_order_status_events').insert({
+        service_order_id: data.id,
+        from_status: null,
+        to_status: 'requested',
+        actor_id: input.client_id,
+        note: 'Creado por admin desde la consola',
+      }),
+      'el evento de creación',
+    );
     return data;
   }, 'No se pudo crear el servicio.');
 }
@@ -432,6 +475,7 @@ export async function setStatus(
       p_note: note ?? undefined,
     });
     if (error) throw error;
+    return true;
   }, 'No se pudo cambiar el estado.');
 }
 
@@ -445,13 +489,16 @@ export async function reassignRequest(orderId: string, techUserId: string) {
     if (error) throw error;
     const name = getProfile(techUserId)?.full_name ?? techUserId;
     if (req) {
-      await supabase.from('service_order_status_events').insert({
-        service_order_id: orderId,
-        from_status: req.status,
-        to_status: req.status,
-        actor_id: techUserId,
-        note: `Reasignado a ${name} por admin`,
-      });
+      await sideWrite(
+        supabase.from('service_order_status_events').insert({
+          service_order_id: orderId,
+          from_status: req.status,
+          to_status: req.status,
+          actor_id: techUserId,
+          note: `Reasignado a ${name} por admin`,
+        }),
+        'el evento de reasignación',
+      );
     }
   }, 'No se pudo reasignar el servicio.');
 }
@@ -487,15 +534,22 @@ export async function resolveKyc(techId: string, approve: boolean) {
     if (error) throw error;
     // Keep the latest KYC session in sync when one exists.
     const s = getKycSessions(techId).sort(byNewest)[0];
-    if (s)
-      await supabase.from('kyc_sessions').update({ status }).eq('id', s.id);
+    if (s) {
+      const { error: e2 } = await supabase
+        .from('kyc_sessions')
+        .update({ status })
+        .eq('id', s.id);
+      if (e2) throw e2;
+    }
   }, 'No se pudo actualizar el KYC.');
 }
 
 /** Rechaza el KYC guardando el motivo como nota interna del técnico. */
 export async function rejectKyc(techId: string, reason: string) {
-  addNote(techId, `KYC rechazado — ${reason}`);
-  return resolveKyc(techId, false);
+  const r = await resolveKyc(techId, false);
+  // La nota solo si el rechazo sí quedó guardado.
+  if (r !== null) addNote(techId, `KYC rechazado — ${reason}`);
+  return r;
 }
 
 // La suspensión de técnicos vive en profiles.status del usuario dueño
@@ -512,6 +566,7 @@ export async function suspendTechnician(techId: string) {
       .update({ status: 'suspended' })
       .eq('id', techId);
     if (e2) throw e2;
+    return true;
   }, 'No se pudo suspender al técnico.');
 }
 export async function reactivateTechnician(techId: string) {
@@ -526,6 +581,7 @@ export async function reactivateTechnician(techId: string) {
       .update({ status: 'active' })
       .eq('id', techId);
     if (e2) throw e2;
+    return true;
   }, 'No se pudo reactivar al técnico.');
 }
 
@@ -536,6 +592,7 @@ export async function suspendUser(userId: string) {
       .update({ status: 'suspended' })
       .eq('id', userId);
     if (error) throw error;
+    return true;
   }, 'No se pudo suspender al usuario.');
 }
 export async function reactivateUser(userId: string) {
@@ -545,6 +602,7 @@ export async function reactivateUser(userId: string) {
       .update({ status: 'active' })
       .eq('id', userId);
     if (error) throw error;
+    return true;
   }, 'No se pudo reactivar al usuario.');
 }
 
@@ -645,6 +703,7 @@ export async function toggleCategory(catId: string) {
       .update({ is_active: !c.is_active })
       .eq('id', catId);
     if (error) throw error;
+    return true;
   }, 'No se pudo actualizar la categoría.');
 }
 
@@ -652,7 +711,11 @@ export async function createCategory(
   name: string,
   icon = 'wrench',
 ): Promise<ServiceCategory | null> {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const slug = slugify(name);
+  if (!slug) {
+    notifyError('Escribe un nombre para la categoría.');
+    return null;
+  }
   return mutate(async () => {
     const { data, error } = await supabase
       .from('service_categories')
@@ -666,20 +729,43 @@ export async function createCategory(
       .single();
     if (error) throw error;
     return data;
-  }, 'No se pudo crear la categoría.');
+  }, e =>
+    pgCode(e) === '23505'
+      ? 'Ya existe una categoría con ese nombre.'
+      : 'No se pudo crear la categoría.',
+  );
 }
 
 export async function updateCategory(
   catId: string,
   input: Partial<ServiceCategory>,
 ) {
+  if (input.name !== undefined && !input.name.trim()) {
+    notifyError('La categoría necesita un nombre.');
+    return null;
+  }
   return mutate(async () => {
     const { error } = await supabase
       .from('service_categories')
       .update(input)
       .eq('id', catId);
     if (error) throw error;
-  }, 'No se pudo actualizar la categoría.');
+    return true;
+  }, e =>
+    pgCode(e) === '23505'
+      ? 'Ya existe una categoría con ese nombre.'
+      : 'No se pudo actualizar la categoría.',
+  );
+}
+
+/** "Plomería y Gas" → "plomeria-y-gas" (sin acentos, ñ → n). */
+export function slugify(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export type DeleteCategoryResult = 'ok' | 'has-services' | 'failed';
@@ -721,6 +807,7 @@ export async function resolveDispute(disputeId: string, resolution: string) {
       })
       .eq('id', disputeId);
     if (error) throw error;
+    return true;
   }, 'No se pudo resolver la disputa.');
 }
 
@@ -735,6 +822,7 @@ export async function escalateDispute(disputeId: string) {
       })
       .eq('id', disputeId);
     if (error) throw error;
+    return true;
   }, 'No se pudo escalar la disputa.');
 }
 

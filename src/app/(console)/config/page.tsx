@@ -33,7 +33,12 @@ import {
   Check,
   type LucideIcon,
 } from 'lucide-react';
-import { PageHeading, exportCsv, LoadFailed } from '@/components/admin';
+import {
+  PageHeading,
+  exportCsv,
+  LoadFailed,
+  PageSkeleton,
+} from '@/components/admin';
 import {
   PrimaryButton,
   GhostButton,
@@ -56,6 +61,12 @@ import {
   toggleCategory,
 } from '@/lib/data/store';
 import { toast } from '@/components/toast';
+import {
+  changedSettings,
+  pctToBps,
+  validateSettings,
+  type Settings as SettingsMap,
+} from '@/lib/settingsRules';
 
 const peso = (n: number) => `$${n.toLocaleString('es-MX')}`;
 const initials = (n: string) =>
@@ -279,29 +290,51 @@ function ToggleRow({
   );
 }
 
+/** Vacío → NaN (no 0): la validación lo marca en vez de guardar un 0. */
+const numOf = (raw: string) => (raw.trim() === '' ? NaN : Number(raw));
+const shown = (v: number) => (Number.isNaN(v) ? '' : v);
+
+function FieldError({ msg }: { msg?: string }) {
+  return msg ? (
+    <p className="text-[11.5px] text-error" role="alert">
+      {msg}
+    </p>
+  ) : null;
+}
+
 function PercentField({
   label,
   value,
   onChange,
   big = true,
+  error,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   big?: boolean;
+  error?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-[11.5px] font-medium text-muted">{label}</label>
-      <div className="inline-flex w-36 items-baseline gap-1 rounded-xl border border-line bg-surface px-3.5 py-2">
+      <div
+        className={`inline-flex w-36 items-baseline gap-1 rounded-xl border bg-surface px-3.5 py-2 ${error ? 'border-error' : 'border-line'}`}
+      >
         <input
           type="number"
-          value={value}
-          onChange={e => onChange(Number(e.target.value))}
+          min={0}
+          max={100}
+          step="0.01"
+          aria-label={label}
+          aria-invalid={!!error}
+          value={shown(value)}
+          onChange={e => onChange(numOf(e.target.value))}
           className={`w-16 bg-transparent font-display font-bold tracking-tight text-navy outline-none ${big ? 'text-2xl' : 'text-base'}`}
         />
         <span className="font-display text-lg font-bold text-muted">%</span>
       </div>
+      <FieldError msg={error} />
     </div>
   );
 }
@@ -311,24 +344,33 @@ function NumField({
   value,
   unit,
   onChange,
+  error,
 }: {
   label: string;
   value: number;
   unit: string;
   onChange: (v: number) => void;
+  error?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-[11.5px] font-medium text-muted">{label}</label>
-      <div className="inline-flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2">
+      <div
+        className={`inline-flex w-full items-center gap-2 rounded-xl border bg-surface px-3.5 py-2 ${error ? 'border-error' : 'border-line'}`}
+      >
         <input
           type="number"
-          value={value}
-          onChange={e => onChange(Number(e.target.value))}
+          min={0}
+          step={1}
+          aria-label={label}
+          aria-invalid={!!error}
+          value={shown(value)}
+          onChange={e => onChange(numOf(e.target.value))}
           className="w-14 bg-transparent font-display text-xl font-bold text-navy outline-none"
         />
         <span className="text-[13px] font-medium text-muted">{unit}</span>
       </div>
+      <FieldError msg={error} />
     </div>
   );
 }
@@ -535,34 +577,46 @@ export default function ConfigPage() {
       kyc: getSettingBool('notif_kyc_alerts', true),
     });
   }
+  const [hydrations, setHydrations] = useState(0);
   useEffect(() => {
-    if (worldReady) hydrate();
+    if (worldReady) {
+      hydrate();
+      setHydrations(n => n + 1);
+    }
   }, [worldReady]);
+  // Tras hidratar (ya con el estado nuevo), fija lo cargado como base del diff.
+  useEffect(() => {
+    if (hydrations) setBaseline(buildSettings());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrations]);
 
-  async function persistSettings() {
-    const ok = await saveSettings({
+  // Lo último cargado/guardado: se escriben solo las keys que cambiaron, así un
+  // guardado no pisa settings que otro admin cambió mientras tanto.
+  const [baseline, setBaseline] = useState<SettingsMap>({});
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  function buildSettings(): SettingsMap {
+    return {
       platform_name: general.name,
       support_email: general.email,
       support_phone: general.phone,
       base_city: general.city,
       maintenance_mode: general.maintenance,
       signups_enabled: general.newSignups,
-      commission_bps: Math.round(globalCommission * 100),
+      commission_bps: pctToBps(globalCommission),
       ...Object.fromEntries(
-        methods.map(m => [
-          `fee_${FEE_KEY[m.method]}_bps`,
-          Math.round(m.pct * 100),
-        ]),
+        methods.map(m => [`fee_${FEE_KEY[m.method]}_bps`, pctToBps(m.pct)]),
       ),
       intro_program_enabled: program.on,
-      intro_commission_bps: Math.round(program.pct * 100),
+      intro_commission_bps: pctToBps(program.pct),
       intro_program_days: program.days,
       request_ttl_minutes: sla.accept,
       auto_reassign_enabled: sla.reassign,
       sla_first_response_minutes: sla.firstResponse,
       sla_dispute_hours: sla.dispute,
       cancel_free_window_hours: cancel.window,
-      cancel_penalty_bps: Math.round(cancel.penalty * 100),
+      cancel_penalty_bps: pctToBps(cancel.penalty),
       cancel_auto_charge: cancel.autoCharge,
       tech_max_cancellations_30d: cancel.maxTech,
       noshow_wait_minutes: cancel.wait,
@@ -571,8 +625,39 @@ export default function ConfigPage() {
       notif_sms: notif.sms,
       notif_weekly_summary: notif.weekly,
       notif_kyc_alerts: notif.kyc,
-    });
-    if (ok) toast.success('Configuración guardada');
+    };
+  }
+
+  /** Valida antes de pedir confirmación; los errores quedan junto a cada campo. */
+  function requestSave() {
+    const e = validateSettings(buildSettings());
+    setErrs(e);
+    if (Object.keys(e).length) {
+      toast.error('Revisa los campos marcados en rojo.');
+      return;
+    }
+    setModal(true);
+  }
+
+  async function persistSettings() {
+    const next = buildSettings();
+    const changes = changedSettings(next, baseline);
+    if (!Object.keys(changes).length) {
+      setModal(false);
+      setDirty(0);
+      toast.success('No había cambios que guardar');
+      return;
+    }
+    setSaving(true);
+    const ok = await saveSettings(changes);
+    setSaving(false);
+    // Solo al confirmar la escritura se limpia el estado "sin guardar"; si
+    // falla, el modal y los cambios siguen ahí para reintentar.
+    if (!ok) return;
+    setBaseline(next);
+    setDirty(0);
+    setModal(false);
+    toast.success('Configuración guardada');
   }
 
   const [modal, setModal] = useState(false);
@@ -697,6 +782,7 @@ export default function ConfigPage() {
   // Sin snapshot, el formulario se hidrataría con los defaults del código y los
   // mostraría como si fueran los valores guardados — y "Guardar" los escribiría.
   if (worldFailed) return <LoadFailed onRetry={() => void loadWorld(true)} />;
+  if (!worldReady) return <PageSkeleton />;
 
   return (
     <div className="pb-24">
@@ -784,6 +870,7 @@ export default function ConfigPage() {
                           touch();
                         }}
                       />
+                      <FieldError msg={errs.platform_name} />
                     </Labeled>
                     <Labeled label="Correo de soporte">
                       <Input
@@ -793,6 +880,7 @@ export default function ConfigPage() {
                           touch();
                         }}
                       />
+                      <FieldError msg={errs.support_email} />
                     </Labeled>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Labeled label="Teléfono">
@@ -803,6 +891,7 @@ export default function ConfigPage() {
                             touch();
                           }}
                         />
+                        <FieldError msg={errs.support_phone} />
                       </Labeled>
                       <Labeled label="Ciudad base">
                         <Input
@@ -891,6 +980,7 @@ export default function ConfigPage() {
                   >
                     <PercentField
                       label="Porcentaje de comisión default"
+                      error={errs.commission_bps}
                       value={globalCommission}
                       onChange={v => {
                         setGlobalCommission(v);
@@ -951,10 +1041,12 @@ export default function ConfigPage() {
                             <input
                               type="number"
                               step="0.1"
-                              value={m.pct}
+                              aria-label={`Comisión ${m.method}`}
+                              aria-invalid={!!errs[`fee_${FEE_KEY[m.method]}_bps`]}
+                              value={shown(m.pct)}
                               onChange={e => {
                                 const n = [...methods];
-                                n[i] = { ...m, pct: Number(e.target.value) };
+                                n[i] = { ...m, pct: numOf(e.target.value) };
                                 setMethods(n);
                                 touch();
                               }}
@@ -1017,6 +1109,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <PercentField
                         label="Comisión durante el programa"
+                      error={errs.intro_commission_bps}
                         value={program.pct}
                         onChange={v => {
                           setProgram({ ...program, pct: v });
@@ -1025,6 +1118,7 @@ export default function ConfigPage() {
                       />
                       <NumField
                         label="Duración del programa"
+                      error={errs.intro_program_days}
                         value={program.days}
                         unit="días"
                         onChange={v => {
@@ -1057,6 +1151,7 @@ export default function ConfigPage() {
                   >
                     <NumField
                       label="Ventana de aceptación"
+                      error={errs.request_ttl_minutes}
                       value={sla.accept}
                       unit="minutos"
                       onChange={v => {
@@ -1094,6 +1189,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField
                         label="Primera respuesta"
+                      error={errs.sla_first_response_minutes}
                         value={sla.firstResponse}
                         unit="min"
                         onChange={v => {
@@ -1103,6 +1199,7 @@ export default function ConfigPage() {
                       />
                       <NumField
                         label="Resolución de disputas"
+                      error={errs.sla_dispute_hours}
                         value={sla.dispute}
                         unit="horas"
                         onChange={v => {
@@ -1132,6 +1229,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField
                         label="Ventana sin costo"
+                      error={errs.cancel_free_window_hours}
                         value={cancel.window}
                         unit="h antes"
                         onChange={v => {
@@ -1141,6 +1239,7 @@ export default function ConfigPage() {
                       />
                       <PercentField
                         label="Penalización tardía"
+                      error={errs.cancel_penalty_bps}
                         value={cancel.penalty}
                         big={false}
                         onChange={v => {
@@ -1169,6 +1268,7 @@ export default function ConfigPage() {
                   >
                     <NumField
                       label="Máximo de cancelaciones en 30 días"
+                      error={errs.tech_max_cancellations_30d}
                       value={cancel.maxTech}
                       unit="cancelaciones"
                       onChange={v => {
@@ -1203,6 +1303,7 @@ export default function ConfigPage() {
                   <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                     <NumField
                       label="Tiempo de espera del técnico"
+                      error={errs.noshow_wait_minutes}
                       value={cancel.wait}
                       unit="min"
                       onChange={v => {
@@ -1405,12 +1506,13 @@ export default function ConfigPage() {
               <GhostButton
                 onClick={() => {
                   hydrate();
+                  setErrs({});
                   setDirty(0);
                 }}
               >
                 Descartar
               </GhostButton>
-              <PrimaryButton onClick={() => setModal(true)}>
+              <PrimaryButton onClick={requestSave}>
                 <span className="inline-flex items-center gap-2">
                   <ShieldCheck size={14} /> Guardar · requiere MFA
                 </span>
@@ -1475,15 +1577,12 @@ export default function ConfigPage() {
                 </Labeled>
               </div>
               <div className="flex justify-end gap-2.5 border-t border-line px-6 py-4">
-                <GhostButton onClick={() => setModal(false)}>
+                <GhostButton onClick={() => !saving && setModal(false)}>
                   Cancelar
                 </GhostButton>
                 <PrimaryButton
-                  onClick={() => {
-                    setModal(false);
-                    setDirty(0);
-                    void persistSettings();
-                  }}
+                  loading={saving}
+                  onClick={() => void persistSettings()}
                 >
                   <span className="inline-flex items-center gap-2">
                     <Check size={14} /> Confirmar y guardar

@@ -638,6 +638,20 @@ export async function updateTechnicianBank(
   }, 'No se pudieron guardar los datos bancarios.');
 }
 
+// ── Equipo (admins) ──────────────────────────────────────────────────────────
+export const getAdmins = () => w().profiles.filter(p => p.role === 'admin');
+
+/** Invita a un admin por correo vía la Edge Function admin-users (service role). */
+export async function inviteAdmin(email: string, fullName: string) {
+  return mutate(async () => {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'invite', email, full_name: fullName || undefined },
+    });
+    if (error) throw error;
+    return data ?? true;
+  }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
+}
+
 // ── Direcciones del cliente ──────────────────────────────────────────────────
 type AddressFields = Pick<
   Database['public']['Tables']['client_addresses']['Insert'],
@@ -670,13 +684,11 @@ export async function saveAddress(
           .from('client_addresses')
           .update(fields)
           .eq('id', addressId)
-      : await supabase
-          .from('client_addresses')
-          .insert({
-            ...fields,
-            client_id: clientId,
-            location: toGeography(null),
-          });
+      : await supabase.from('client_addresses').insert({
+          ...fields,
+          client_id: clientId,
+          location: toGeography(null),
+        });
     if (q.error) throw q.error;
     return true;
   }, 'No se pudo guardar la dirección.');
@@ -716,23 +728,25 @@ export async function createCategory(
     notifyError('Escribe un nombre para la categoría.');
     return null;
   }
-  return mutate(async () => {
-    const { data, error } = await supabase
-      .from('service_categories')
-      .insert({
-        slug,
-        name,
-        icon,
-        sort_order: (w().categories.length + 1) * 10,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  }, e =>
-    pgCode(e) === '23505'
-      ? 'Ya existe una categoría con ese nombre.'
-      : 'No se pudo crear la categoría.',
+  return mutate(
+    async () => {
+      const { data, error } = await supabase
+        .from('service_categories')
+        .insert({
+          slug,
+          name,
+          icon,
+          sort_order: (w().categories.length + 1) * 10,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    e =>
+      pgCode(e) === '23505'
+        ? 'Ya existe una categoría con ese nombre.'
+        : 'No se pudo crear la categoría.',
   );
 }
 
@@ -744,17 +758,19 @@ export async function updateCategory(
     notifyError('La categoría necesita un nombre.');
     return null;
   }
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('service_categories')
-      .update(input)
-      .eq('id', catId);
-    if (error) throw error;
-    return true;
-  }, e =>
-    pgCode(e) === '23505'
-      ? 'Ya existe una categoría con ese nombre.'
-      : 'No se pudo actualizar la categoría.',
+  return mutate(
+    async () => {
+      const { error } = await supabase
+        .from('service_categories')
+        .update(input)
+        .eq('id', catId);
+      if (error) throw error;
+      return true;
+    },
+    e =>
+      pgCode(e) === '23505'
+        ? 'Ya existe una categoría con ese nombre.'
+        : 'No se pudo actualizar la categoría.',
   );
 }
 

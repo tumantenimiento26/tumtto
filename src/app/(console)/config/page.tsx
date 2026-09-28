@@ -38,6 +38,7 @@ import {
   exportCsv,
   LoadFailed,
   PageSkeleton,
+  Modal,
 } from '@/components/admin';
 import {
   PrimaryButton,
@@ -59,6 +60,8 @@ import {
   getSettingStr,
   saveSettings,
   toggleCategory,
+  getAdmins,
+  inviteAdmin,
 } from '@/lib/data/store';
 import { toast } from '@/components/toast';
 import {
@@ -136,39 +139,6 @@ const FEE_KEY: Record<string, string> = {
   'MP wallet': 'wallet',
   Efectivo: 'cash',
 };
-
-const TEAM = [
-  {
-    name: 'Javier Olvera',
-    email: 'javier@tumtto.mx',
-    role: 'Super Admin',
-    super: true,
-  },
-  {
-    name: 'Sofía Martínez',
-    email: 'sofia@tumtto.mx',
-    role: 'Admin Soporte',
-    super: false,
-  },
-  {
-    name: 'Diego Ramírez',
-    email: 'diego@tumtto.mx',
-    role: 'Operaciones',
-    super: false,
-  },
-  {
-    name: 'Mariana López',
-    email: 'mariana@tumtto.mx',
-    role: 'Finanzas',
-    super: false,
-  },
-  {
-    name: 'Andrés Cano',
-    email: 'andres@tumtto.mx',
-    role: 'Solo lectura',
-    super: false,
-  },
-];
 
 function exportAudit() {
   exportCsv(
@@ -661,6 +631,7 @@ export default function ConfigPage() {
   }
 
   const [modal, setModal] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   function onExportConfig() {
     exportCsv('configuracion.csv', [
@@ -1042,7 +1013,9 @@ export default function ConfigPage() {
                               type="number"
                               step="0.1"
                               aria-label={`Comisión ${m.method}`}
-                              aria-invalid={!!errs[`fee_${FEE_KEY[m.method]}_bps`]}
+                              aria-invalid={
+                                !!errs[`fee_${FEE_KEY[m.method]}_bps`]
+                              }
                               value={shown(m.pct)}
                               onChange={e => {
                                 const n = [...methods];
@@ -1109,7 +1082,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <PercentField
                         label="Comisión durante el programa"
-                      error={errs.intro_commission_bps}
+                        error={errs.intro_commission_bps}
                         value={program.pct}
                         onChange={v => {
                           setProgram({ ...program, pct: v });
@@ -1118,7 +1091,7 @@ export default function ConfigPage() {
                       />
                       <NumField
                         label="Duración del programa"
-                      error={errs.intro_program_days}
+                        error={errs.intro_program_days}
                         value={program.days}
                         unit="días"
                         onChange={v => {
@@ -1189,7 +1162,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField
                         label="Primera respuesta"
-                      error={errs.sla_first_response_minutes}
+                        error={errs.sla_first_response_minutes}
                         value={sla.firstResponse}
                         unit="min"
                         onChange={v => {
@@ -1199,7 +1172,7 @@ export default function ConfigPage() {
                       />
                       <NumField
                         label="Resolución de disputas"
-                      error={errs.sla_dispute_hours}
+                        error={errs.sla_dispute_hours}
                         value={sla.dispute}
                         unit="horas"
                         onChange={v => {
@@ -1229,7 +1202,7 @@ export default function ConfigPage() {
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       <NumField
                         label="Ventana sin costo"
-                      error={errs.cancel_free_window_hours}
+                        error={errs.cancel_free_window_hours}
                         value={cancel.window}
                         unit="h antes"
                         onChange={v => {
@@ -1239,7 +1212,7 @@ export default function ConfigPage() {
                       />
                       <PercentField
                         label="Penalización tardía"
-                      error={errs.cancel_penalty_bps}
+                        error={errs.cancel_penalty_bps}
                         value={cancel.penalty}
                         big={false}
                         onChange={v => {
@@ -1415,7 +1388,7 @@ export default function ConfigPage() {
                   icon={UsersRound}
                   sub="Miembros con acceso al panel de administración y su rol."
                   headRight={
-                    <PrimaryButton>
+                    <PrimaryButton onClick={() => setInviteOpen(true)}>
                       <span className="inline-flex items-center gap-1.5">
                         <Users size={14} /> Invitar
                       </span>
@@ -1426,10 +1399,10 @@ export default function ConfigPage() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-canvas">
-                          {['Miembro', 'Correo', 'Rol', ''].map((h, i) => (
+                          {['Miembro', 'Estado', 'Rol'].map((h, i) => (
                             <th
                               key={i}
-                              className={`border-b border-line px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-faint ${i === 3 ? 'text-right' : 'text-left'}`}
+                              className="border-b border-line px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-wider text-faint"
                             >
                               {h}
                             </th>
@@ -1437,9 +1410,12 @@ export default function ConfigPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {TEAM.map((m, i) => (
+                        {/* ponytail: el correo vive en auth.users (no en
+                            profiles) y el rol es único 'admin' — sin
+                            sub-roles ni edición hasta que existan en el esquema. */}
+                        {getAdmins().map((m, i) => (
                           <motion.tr
-                            key={m.email}
+                            key={m.id}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: i * 0.04 }}
@@ -1447,26 +1423,19 @@ export default function ConfigPage() {
                           >
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2.5">
-                                <div
-                                  className={`grid h-8 w-8 place-items-center rounded-full text-[11px] font-semibold ${m.super ? 'bg-error/10 text-error' : 'bg-info-soft text-cyan'}`}
-                                >
-                                  {initials(m.name)}
+                                <div className="grid h-8 w-8 place-items-center rounded-full bg-info-soft text-[11px] font-semibold text-cyan">
+                                  {initials(m.full_name ?? 'Admin')}
                                 </div>
                                 <span className="text-[13px] font-medium text-navy">
-                                  {m.name}
+                                  {m.full_name ?? 'Admin'}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 font-mono text-xs text-muted">
-                              {m.email}
+                            <td className="px-4 py-3 text-xs text-muted">
+                              {m.status === 'active' ? 'Activo' : 'Suspendido'}
                             </td>
                             <td className="px-4 py-3">
-                              <Badge tone={m.super ? 'error' : 'info'}>
-                                {m.role}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <GhostButton>Editar</GhostButton>
+                              <Badge tone="info">Admin</Badge>
                             </td>
                           </motion.tr>
                         ))}
@@ -1480,6 +1449,8 @@ export default function ConfigPage() {
           </FadeIn>
         </div>
       </div>
+
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
       {/* sticky save bar */}
       <AnimatePresence>
@@ -1619,5 +1590,74 @@ function Labeled({
       <label className="text-[11.5px] font-medium text-muted">{label}</label>
       {children}
     </div>
+  );
+}
+
+function InviteModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [sending, setSending] = useState(false);
+  const invalid = !/^\S+@\S+\.\S+$/.test(email.trim());
+
+  async function send() {
+    if (invalid || sending) return;
+    setSending(true);
+    const ok = await inviteAdmin(email.trim(), name.trim());
+    setSending(false);
+    if (ok === null) return; // el store ya mostró el error; el modal sigue abierto
+    toast.success(`Invitación enviada · ${email.trim()}`);
+    setEmail('');
+    setName('');
+    onClose();
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => !sending && onClose()}
+      title="Invitar administrador"
+      sub="Recibirá un correo para crear su contraseña y entrar a la consola."
+      icon={<Users size={16} />}
+      width={440}
+      footer={
+        <>
+          <GhostButton onClick={onClose} disabled={sending}>
+            Cancelar
+          </GhostButton>
+          <PrimaryButton
+            onClick={() => void send()}
+            loading={sending}
+            disabled={invalid}
+          >
+            Enviar invitación
+          </PrimaryButton>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Labeled label="Correo">
+          <Input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="nombre@tumtto.mx"
+          />
+          {email && invalid && <FieldError msg="Correo no válido." />}
+        </Labeled>
+        <Labeled label="Nombre (opcional)">
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Nombre y apellido"
+          />
+        </Labeled>
+      </div>
+    </Modal>
   );
 }

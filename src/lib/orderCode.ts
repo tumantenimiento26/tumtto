@@ -5,9 +5,14 @@
  * Si se necesita folio único, columna `folio` con secuencia en el backend.
  */
 export function orderCode(id: string): string {
-  const hex = id.replace(/[^0-9a-f]/gi, '').slice(0, 8) || '0';
-  const n = (parseInt(hex, 16) % 9000) + 1000;
-  return `SVC-${n}`;
+  // Hash FNV-1a de todo el uuid: los ids del seed (y de prod) comparten
+  // prefijo, así que tomar los primeros dígitos daba el mismo código a todas.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `SVC-${(h % 9000) + 1000}`;
 }
 
 /** ¿El texto parece un código SVC? (para buscar por código). */

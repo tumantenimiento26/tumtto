@@ -55,7 +55,9 @@ export function GmvChart({
   const n = values.length;
 
   const { max, cur, old, avg, peak, total, delta } = useMemo(() => {
-    const max = niceMax(Math.max(1, ...values, ...(showPrev ? prev : [])));
+    // Piso del eje: sin ventas, un tope de 1 daba ticks "$1 $1 $1 $0".
+    const floor = metric === 'servicios' ? 4 : 1000;
+    const max = niceMax(Math.max(floor, ...values, ...(showPrev ? prev : [])));
     const cur = linePaths(values, max, W, H);
     const old = linePaths(prev, max, W, H);
     const avg = average(values);

@@ -128,6 +128,18 @@ export default function ConfigPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const [active, setActive] = useState<SectionId>('general');
+  // /config?tab=notificaciones (p. ej. desde Notificaciones → Configurar).
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('tab') ?? '';
+    const alias: Record<string, SectionId> = {
+      notificaciones: 'notifications',
+      equipo: 'team',
+      comisiones: 'commission',
+      cancelaciones: 'cancel',
+    };
+    const t = alias[raw] ?? raw;
+    if (SECTIONS.some(x => x.id === t)) setActive(t as SectionId);
+  }, []);
   const [form, setForm] = useState<SettingsMap>({});
   const [baseline, setBaseline] = useState<SettingsMap>({});
   const [errs, setErrs] = useState<Record<string, string>>({});

@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { enforceEphemeralSession } from '@/lib/sessionPrefs';
 import { Spinner } from '@/components/ui';
 
 /**
@@ -26,6 +28,26 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && !session) router.replace('/login');
   }, [loading, session, router]);
+
+  // "Mantener sesión" desmarcado + navegador cerrado → cerrar sesión.
+  useEffect(() => {
+    void enforceEphemeralSession();
+  }, []);
+
+  // Verificación en 2 pasos: si el admin tiene un factor verificado pero esta
+  // sesión sigue en aal1, termina el paso en /login. Sin factor se permite
+  // entrar (el login ofrece activarlo).
+  // ponytail: gate solo en el cliente; exigir aal2 también en RLS si se quiere
+  // blindar la API.
+  const [mfaOk, setMfaOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!session || !isAdmin) return;
+    void supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
+      const needs = data?.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
+      if (needs) router.replace('/login?mfa=1');
+      setMfaOk(!needs);
+    });
+  }, [session, isAdmin, router]);
 
   // Sesión o perfil resolviéndose: spinner, nunca pantalla en blanco (la
   // consulta del perfil tiene timeout y cae al panel de error).
@@ -62,6 +84,8 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
       />
     );
   }
+
+  if (!mfaOk) return <Resolving />;
 
   return <>{children}</>;
 }

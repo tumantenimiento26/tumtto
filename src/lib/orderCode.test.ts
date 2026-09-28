@@ -9,3 +9,12 @@ test('código estable de 4 dígitos', () => {
   expect(isOrderCode('svc-2851')).toBe(true);
   expect(isOrderCode('María')).toBe(false);
 });
+
+test('ids con el mismo prefijo dan códigos distintos', () => {
+  const ids = Array.from(
+    { length: 40 },
+    (_, i) => `60000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+  );
+  const codes = new Set(ids.map(orderCode));
+  expect(codes.size).toBeGreaterThan(35);
+});

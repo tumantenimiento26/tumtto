@@ -88,9 +88,17 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    setSignedOut(new URLSearchParams(window.location.search).has('out'));
+    const qs = new URLSearchParams(window.location.search);
+    setSignedOut(qs.has('out'));
     void enforceEphemeralSession();
     router.prefetch('/dashboard');
+    // La consola manda aquí (?mfa=1) a un admin con verificación en 2 pasos
+    // activada que aún no la cumplió en esta sesión: seguimos en el código.
+    if (qs.has('mfa'))
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) void routeAfterSignIn();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // Reloj del bloqueo (solo mientras dura).

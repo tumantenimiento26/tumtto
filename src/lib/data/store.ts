@@ -929,3 +929,109 @@ export function __setWorldForTests(next: World) {
 }
 
 export { CLIENT_ID, TECH_USER_ID, ADMIN_ID };
+
+// ── consola-b: Servicios y Clientes (ediciones, notas con Deshacer, evidencia)
+// Bloque aditivo del rediseño; no cambia los mutators de arriba.
+
+/** Edición de un servicio desde la consola (admin; RLS/guard lo permiten). */
+export async function updateOrder(
+  orderId: string,
+  fields: {
+    title?: string | null;
+    description?: string | null;
+    is_urgent?: boolean;
+    category_id?: string;
+  },
+) {
+  return mutate(
+    async () => {
+      const patch: Database['public']['Tables']['service_orders']['Update'] = {
+        ...fields,
+      };
+      if (fields.is_urgent !== undefined)
+        patch.urgent_surcharge_bps = fields.is_urgent
+          ? getSettingInt('urgent_surcharge_bps', 2000)
+          : 0;
+      const { error } = await supabase
+        .from('service_orders')
+        .update(patch)
+        .eq('id', orderId);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar el servicio.'),
+  );
+}
+
+/** Nombre y celular (E.164) de un perfil; el correo vive en auth.users. */
+export async function updateProfile(
+  userId: string,
+  fields: { full_name?: string; phone?: string | null },
+) {
+  return mutate(
+    async () => {
+      const { error } = await supabase
+        .from('profiles')
+        .update(fields)
+        .eq('id', userId);
+      if (error) throw error;
+      return true;
+    },
+    e =>
+      pgCode(e) === '23514'
+        ? 'El celular no tiene un formato válido (+52 y 10 dígitos).'
+        : pgMessage(e, 'No se pudo guardar el perfil.'),
+  );
+}
+
+/** Quita una nota (sesión) y la regresa para poder deshacer. */
+export function removeNote(noteId: string): Note | null {
+  const i = w().notes.findIndex(n => n.id === noteId);
+  if (i < 0) return null;
+  const [n] = w().notes.splice(i, 1);
+  bump();
+  return n;
+}
+
+export function restoreNote(note: Note) {
+  if (!w().notes.some(n => n.id === note.id)) w().notes.unshift(note);
+  bump();
+}
+
+export type OrderEvidence = {
+  id: string;
+  kind: string;
+  is_final: boolean;
+  created_at: string;
+  url: string | null;
+};
+
+/**
+ * Evidencia de un servicio con URLs firmadas (bucket privado job-evidence).
+ * Fuera del snapshot: se pide al abrir el detalle.
+ */
+export async function listOrderEvidence(
+  orderId: string,
+): Promise<OrderEvidence[]> {
+  const { data, error } = await supabase
+    .from('service_evidence')
+    .select('id, kind, is_final, created_at, storage_path')
+    .eq('service_order_id', orderId)
+    .order('created_at');
+  if (error) throw error;
+  return Promise.all(
+    (data ?? []).map(async e => {
+      const { data: s } = await supabase.storage
+        .from('job-evidence')
+        .createSignedUrl(e.storage_path, 600);
+      return {
+        id: e.id,
+        kind: e.kind,
+        is_final: e.is_final,
+        created_at: e.created_at,
+        url: s?.signedUrl ?? null,
+      };
+    }),
+  );
+}
+// ── fin consola-b ────────────────────────────────────────────────────────────

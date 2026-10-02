@@ -1,4 +1,4 @@
-// Selectors + session-local domains of the live data store, exercised over an
+// Selectors of the live data store, exercised over an
 // injected demo world (no Supabase in tests — backend writes are RLS/RPC
 // pass-throughs verified by typecheck + advisors).
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= 'http://localhost:54321';
@@ -35,9 +35,9 @@ describe('selectors over the world snapshot', () => {
     expect(store.getWalletBalanceCents('demo-tecnico')).toBe(139400 - 24600);
   });
 
-  it('support badge counts unresolved disputes + tickets', () => {
-    // seed: 2 open disputes + 3 unresolved tickets
-    expect(store.getOpenSupportCount()).toBe(5);
+  it('support badge counts unresolved disputes (+ tickets del backend)', () => {
+    // seed: 2 open disputes; los tickets viven en support_tickets (vacío aquí)
+    expect(store.getOpenSupportCount()).toBe(2);
   });
 });
 
@@ -67,34 +67,6 @@ describe('retiros derivados del ledger', () => {
 
   it('sin entradas payout el panel queda vacío (no inventa filas)', () => {
     expect(store.getAllPayouts()).toHaveLength(0);
-  });
-});
-
-describe('session-local domains (sin tabla backend todavía)', () => {
-  it('notes attach to an entity, newest first', () => {
-    store.addNote('SVC-2851', 'Segunda nota');
-    const notes = store.getNotes('SVC-2851');
-    expect(notes[0].text).toBe('Segunda nota');
-    expect(notes.length).toBeGreaterThan(1);
-  });
-
-  it('ticket lifecycle: create → reply (admin) → resolve', () => {
-    const t = store.createTicket({
-      subject: 'Prueba',
-      requester_id: 'demo-cliente',
-      content: 'hola',
-    });
-    store.replyTicket(t.id, store.ADMIN_ID, 'respuesta');
-    expect(store.getTicket(t.id)?.status).toBe('pending');
-    store.resolveTicket(t.id);
-    expect(store.getTicket(t.id)?.status).toBe('resolved');
-  });
-
-  it('order chat is scoped and chronological', () => {
-    store.sendMessage('SVC-2851', store.ADMIN_ID, 'mensaje admin');
-    const msgs = store.getMessages('SVC-2851');
-    expect(msgs.at(-1)?.content).toBe('mensaje admin');
-    expect(store.getMessages('SVC-2835')).toHaveLength(0);
   });
 });
 

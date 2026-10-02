@@ -12,6 +12,7 @@ import React, {
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { can as canRole, roleFromMetadata, type AdminRole, type Permission } from '@/lib/rbac';
 import type { Database } from '@/types/supabase';
 
 // Mirrors the mobile dual-layer rule: a Supabase session AND a matching
@@ -34,6 +35,10 @@ export type AuthState = {
 export type AuthContextValue = AuthState & {
   /** Consola = solo staff: sesión válida + profiles.role admin. */
   isAdmin: boolean;
+  /** app_metadata.admin_role (fallback super_admin). */
+  adminRole: AdminRole;
+  /** ¿El rol de la sesión tiene el permiso? (mapa del contrato §3). */
+  can: (perm: Permission) => boolean;
   signIn: (
     email: string,
     password: string,
@@ -157,16 +162,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [refreshUsuario, state.session],
   );
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const value = useMemo<AuthContextValue>(() => {
+    const adminRole = roleFromMetadata(state.session?.user.app_metadata);
+    return {
       ...state,
       isAdmin: !!state.session && state.usuario?.role === 'admin',
+      adminRole,
+      can: perm => canRole(adminRole, perm),
       signIn,
       signOut,
       retryUsuario,
-    }),
-    [state, signIn, signOut, retryUsuario],
-  );
+    };
+  }, [state, signIn, signOut, retryUsuario]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

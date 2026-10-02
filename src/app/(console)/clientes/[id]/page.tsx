@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -28,8 +28,6 @@ import {
   Tabs,
   Textarea,
   Toggle,
-  snackbar,
-  toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import {
@@ -43,13 +41,12 @@ import {
   getNotes,
   getPayment,
   getProfile,
-  getRating,
+  loadExtras,
   loadWorld,
   reactivateUser,
-  removeNote,
-  restoreNote,
   saveAddress,
   suspendUser,
+  useExtras,
   useTick,
   useWorldFailed,
   useWorldReady,
@@ -90,6 +87,11 @@ export default function ClientDetailPage() {
   });
   const [addrDelete, setAddrDelete] = useState<AddressRow | null>(null);
   const [note, setNote] = useState('');
+  // order_ratings (calificaciones que da el cliente) viven en los extras.
+  const orderRatings = useExtras(s => s.ratings);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
 
   if (failed)
     return (
@@ -122,22 +124,16 @@ export default function ClientDetailPage() {
   );
   const spentCents = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0);
   const ticketCents = requests.length ? Math.round(spentCents / requests.length) : null;
-  const ratings = requests.map(r => getRating(r.id)).filter(Boolean) as { stars: number }[];
+  const ratings = orderRatings.filter(r => r.reviewer_id === id);
   const avgRating = ratings.length
-    ? ratings.reduce((s, r) => s + r.stars, 0) / ratings.length
+    ? ratings.reduce((s, r) => s + r.score, 0) / ratings.length
     : null;
 
-  function saveNote() {
+  async function saveNote() {
     const text = note.trim();
     if (!text) return;
-    const n = addNote(id, text);
-    setNote('');
-    snackbar.show('Nota agregada', {
-      undo: () => {
-        removeNote(n.id);
-        setNote(text);
-      },
-    });
+    const ok = await run('note', () => addNote('profiles', id, text), 'Nota agregada');
+    if (ok) setNote('');
   }
 
   const tabs: { value: TabId; label: string; count?: number }[] = [
@@ -383,31 +379,19 @@ export default function ClientDetailPage() {
                 placeholder="Agregar una nota interna sobre este cliente…"
               />
               <div className="flex justify-end">
-                <Button size="sm" onClick={saveNote} disabled={!note.trim()}>
+                <Button size="sm" onClick={() => void saveNote()} loading={busy === 'note'} disabled={!note.trim()}>
                   Guardar nota
                 </Button>
               </div>
               {notes.map(n => (
-                <div key={n.id} className="group rounded-box border border-line bg-panel p-3">
+                <div key={n.id} className="rounded-box border border-line bg-panel p-3">
                   <div className="flex items-center gap-2">
                     <span className="font-display text-[13px] font-bold text-navy">{n.author}</span>
                     <span className="font-mono text-[11px] text-muted">{timeAgo(n.created_at)}</span>
-                    <button
-                      type="button"
-                      aria-label="Eliminar nota"
-                      onClick={() => {
-                        const r = removeNote(n.id);
-                        if (r) snackbar.show('Nota eliminada', { undo: () => restoreNote(r) });
-                      }}
-                      className="ml-auto rounded p-1 text-faint opacity-0 hover:text-error group-hover:opacity-100 focus:opacity-100"
-                    >
-                      <Trash2 size={14} />
-                    </button>
                   </div>
                   <p className="mt-1 text-[13.5px] text-body">{n.text}</p>
                 </div>
               ))}
-              {/* ponytail: notas en memoria de la sesión (sin tabla en el backend). */}
             </div>
           )}
         </div>
@@ -621,11 +605,16 @@ function SendMessageModal({
 }) {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const { busy, run } = useAction();
 
-  function submit() {
+  async function submit() {
     if (!subject.trim() || !body.trim()) return;
-    const t = createTicket({ subject: subject.trim(), requester_id: clientId, content: body.trim() });
-    toast.local(`Mensaje registrado · ticket #${t.id}`);
+    const ok = await run(
+      'ticket',
+      () => createTicket({ subject: subject.trim(), requester_id: clientId, content: body.trim() }),
+      'Ticket de soporte creado',
+    );
+    if (!ok) return;
     setSubject('');
     setBody('');
     onClose();
@@ -644,7 +633,7 @@ function SendMessageModal({
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={submit} disabled={!subject.trim() || !body.trim()}>
+          <Button onClick={() => void submit()} loading={!!busy} disabled={!subject.trim() || !body.trim()}>
             Enviar
           </Button>
         </>
@@ -665,7 +654,6 @@ function SendMessageModal({
             placeholder="Escribe el mensaje para el cliente…"
           />
         </Field>
-        {/* ponytail: tickets en memoria de la sesión; sin envío real de push/email. */}
       </div>
     </Modal>
   );

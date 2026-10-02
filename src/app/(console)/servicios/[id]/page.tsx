@@ -17,7 +17,6 @@ import {
   Send,
   ShieldAlert,
   Star,
-  Trash2,
   UserCog,
 } from 'lucide-react';
 import {
@@ -32,16 +31,14 @@ import {
   ScreenSkeleton,
   Select,
   Textarea,
-  snackbar,
   toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import {
-  ADMIN_ID,
   addNote,
   createTicket,
+  fetchOrderMessages,
   getCategories,
-  getMessages,
   getNotes,
   getOrderEvents,
   getPayment,
@@ -49,23 +46,26 @@ import {
   getQuote,
   getQuoteItems,
   getRequest,
+  getTickets,
   getTechByUser,
   getTechniciansWithProfile,
   listOrderEvidence,
   loadWorld,
   reassignRequest,
   refundPayment,
-  removeNote,
-  restoreNote,
+  refundableCents,
   sendMessage,
   setStatus,
   useTick,
   useWorldFailed,
   useWorldReady,
   type OrderEvidence,
+  type OrderMessage,
 } from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { orderCode } from '@/lib/orderCode';
+import { fmtDateTime } from '@/lib/dates';
+import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
@@ -93,6 +93,9 @@ const STEPS: { label: string; statuses: RequestStatus[] }[] = [
 const stepIndex = (s: RequestStatus) =>
   STEPS.findIndex(st => st.statuses.includes(s));
 
+// Estados que el admin puede forzar con transition_service_order. `completed`
+// y `paid` los fijan el flujo de cierre y el pago (close_service_order /
+// webhook): forzarlos dejaba órdenes sin cobro ni evidencia.
 const FORCE_TARGETS: RequestStatus[] = [
   'requested',
   'accepted',
@@ -101,8 +104,6 @@ const FORCE_TARGETS: RequestStatus[] = [
   'quote',
   'working',
   'closing',
-  'completed',
-  'paid',
   'closed',
   'cancelled',
 ];
@@ -130,6 +131,9 @@ export default function ServicioDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
+  const { can } = useAuth();
+  const canFinance = can('finanzas');
+  const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
@@ -226,7 +230,8 @@ export default function ServicioDetailPage() {
     totalCents != null && commissionCents != null
       ? totalCents - commissionCents
       : null;
-  const refundable = payment?.status === 'paid';
+  const refundable = payment?.status === 'paid' && refundableCents(payment) > 0;
+  const refundMax = payment ? refundableCents(payment) : 0;
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
 
   function copyId() {
@@ -236,34 +241,26 @@ export default function ServicioDetailPage() {
     );
   }
 
-  function saveNote() {
+  async function saveNote() {
     const text = note.trim();
     if (!text) return;
-    const n = addNote(req!.id, text);
-    setNote('');
-    snackbar.show('Nota agregada', {
-      undo: () => {
-        removeNote(n.id);
-        setNote(text);
-      },
-    });
+    const ok = await run('note', () => addNote('service_orders', req!.id, text), 'Nota agregada');
+    if (ok) setNote('');
   }
 
-  function deleteNote(noteId: string) {
-    const n = removeNote(noteId);
-    if (n) snackbar.show('Nota eliminada', { undo: () => restoreNote(n) });
-  }
-
-  function openCase() {
+  async function openCase() {
     if (caseTicketId) return router.push('/soporte');
-    const t = createTicket({
-      subject: `Caso de soporte · ${orderCode(req!.id)}`,
-      requester_id: req!.client_id,
-      priority: 'alta',
-      order_id: req!.id,
-    });
-    setCaseTicketId(t.id);
-    toast.local(`Caso de soporte abierto · #${t.id}`);
+    const id = await run('case', () =>
+      createTicket({
+        subject: `Caso de soporte · ${orderCode(req!.id)}`,
+        requester_id: req!.client_id,
+        order_id: req!.id,
+      }),
+    );
+    if (!id) return;
+    const t = getTickets().find(x => x.service_order_id === req!.id);
+    setCaseTicketId(t?.id ?? 'nuevo');
+    toast.success('Caso de soporte abierto', 'Síguelo en Soporte › Tickets.');
   }
 
   return (
@@ -287,7 +284,7 @@ export default function ServicioDetailPage() {
               Soporte.
             </div>
           </div>
-          <Button size="sm" variant="secondary" icon={LifeBuoy} onClick={openCase}>
+          <Button size="sm" variant="secondary" icon={LifeBuoy} loading={busy === 'case'} onClick={() => void openCase()}>
             {caseTicketId ? 'Ver en soporte' : 'Abrir caso'}
           </Button>
         </div>
@@ -467,7 +464,7 @@ export default function ServicioDetailPage() {
                           {STATUS[e.to_status as RequestStatus]?.label ?? e.to_status}
                         </span>
                         <span className="font-mono text-[11px] text-muted">
-                          {new Date(e.created_at).toLocaleString('es-MX', {
+                          {fmtDateTime(e.created_at, {
                             day: '2-digit',
                             month: 'short',
                             hour: '2-digit',
@@ -494,37 +491,28 @@ export default function ServicioDetailPage() {
               rows={3}
               placeholder="Solo visible para el equipo admin…"
               onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveNote();
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void saveNote();
               }}
             />
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-[12px] text-faint">⌘↵ para guardar</span>
-              <Button size="sm" onClick={saveNote} disabled={!note.trim()}>
+              <span className="text-[12px] text-faint">⌘↵ para guardar · queda en la bitácora admin</span>
+              <Button size="sm" onClick={() => void saveNote()} loading={busy === 'note'} disabled={!note.trim()}>
                 Guardar nota
               </Button>
             </div>
             {notes.length > 0 && (
               <ul className="mt-4 flex flex-col gap-2.5">
                 {notes.map(n => (
-                  <li key={n.id} className="group rounded-box border border-line bg-panel p-3">
+                  <li key={n.id} className="rounded-box border border-line bg-panel p-3">
                     <div className="flex items-center gap-2">
                       <span className="font-display text-[13px] font-bold text-navy">{n.author}</span>
                       <span className="font-mono text-[11px] text-muted">{timeAgo(n.created_at)}</span>
-                      <button
-                        type="button"
-                        onClick={() => deleteNote(n.id)}
-                        aria-label="Eliminar nota"
-                        className="ml-auto rounded p-1 text-faint opacity-0 hover:text-error group-hover:opacity-100 focus:opacity-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
                     </div>
                     <p className="mt-1 text-[13.5px] text-body">{n.text}</p>
                   </li>
                 ))}
               </ul>
             )}
-            {/* ponytail: notas en memoria de la sesión (sin tabla en el backend). */}
           </Card>
         </div>
 
@@ -558,7 +546,7 @@ export default function ServicioDetailPage() {
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
               <Kicker>Técnico</Kicker>
-              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal}>
+              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal || !canSupport}>
                 Reasignar
               </Button>
             </div>
@@ -636,18 +624,20 @@ export default function ServicioDetailPage() {
                 }))}
                 value={null}
                 onChange={s => setForceTo(s)}
-                disabled={busy !== null}
+                disabled={busy !== null || !canSupport}
               />
               <Button
                 variant="secondary"
                 icon={RotateCcw}
-                disabled={!refundable}
+                disabled={!refundable || !canFinance}
                 title={
-                  refundable
-                    ? 'Devuelve el cobro al cliente'
-                    : payment?.status === 'refunded'
-                      ? 'Este pago ya fue reembolsado'
-                      : 'No hay un pago cobrado que reembolsar'
+                  !canFinance
+                    ? 'Solo finanzas emite reembolsos'
+                    : refundable
+                      ? 'Devuelve el cobro al cliente'
+                      : payment?.status === 'refunded'
+                        ? 'Este pago ya fue reembolsado'
+                        : 'No hay un pago cobrado que reembolsar'
                 }
                 onClick={() => setRefundOpen(true)}
               >
@@ -656,13 +646,13 @@ export default function ServicioDetailPage() {
               <Button
                 variant="destructive"
                 icon={Ban}
-                disabled={!cancellable}
+                disabled={!cancellable || !canSupport}
                 onClick={() => setCancelOpen(true)}
               >
                 Cancelar servicio
               </Button>
               {!req.is_disputed && (
-                <Button variant="ghost" icon={LifeBuoy} onClick={openCase}>
+                <Button variant="ghost" icon={LifeBuoy} loading={busy === 'case'} onClick={() => void openCase()}>
                   {caseTicketId ? 'Ver caso en soporte' : 'Abrir caso de soporte'}
                 </Button>
               )}
@@ -754,13 +744,13 @@ export default function ServicioDetailPage() {
       <RefundModal
         open={refundOpen}
         onClose={() => setRefundOpen(false)}
-        maxCents={payment?.amount_cents ?? totalCents ?? 0}
+        maxCents={refundMax}
         busy={busy === 'refund'}
-        onConfirm={async reason => {
+        onConfirm={async (reason, amountCents) => {
           const ok = await run(
             'refund',
-            () => refundPayment(req.id, reason || undefined),
-            `Reembolso emitido · ${money(payment?.amount_cents ?? totalCents, true)}`,
+            () => refundPayment(req.id, reason || undefined, amountCents),
+            `Reembolso emitido · ${money(amountCents, true)}`,
           );
           if (ok) setRefundOpen(false);
         }}
@@ -877,7 +867,7 @@ function RefundModal({
   onClose: () => void;
   maxCents: number;
   busy: boolean;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string, amountCents: number) => void;
 }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -888,7 +878,9 @@ function RefundModal({
     }
   }, [open, maxCents]);
   const pesos = Number(amount.replace(/[^\d.]/g, ''));
-  const partial = Number.isFinite(pesos) && Math.round(pesos * 100) < maxCents;
+  const cents = Number.isFinite(pesos) ? Math.round(pesos * 100) : 0;
+  const invalid = cents < 1 || cents > maxCents;
+  const partial = !invalid && cents < maxCents;
 
   return (
     <Modal
@@ -898,14 +890,19 @@ function RefundModal({
       title="Reembolsar"
       icon={RotateCcw}
       tone="danger"
-      description="El dinero regresa al método de pago original y el servicio queda cancelado. No es reversible."
+      description="El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible."
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Volver
           </Button>
-          <Button variant="destructive" loading={busy} onClick={() => onConfirm(reason.trim())}>
-            Reembolsar {money(maxCents, true)}
+          <Button
+            variant="destructive"
+            loading={busy}
+            disabled={invalid}
+            onClick={() => onConfirm(reason.trim(), cents)}
+          >
+            Reembolsar {invalid ? '' : money(cents, true)}
           </Button>
         </>
       }
@@ -917,14 +914,14 @@ function RefundModal({
           inputMode="decimal"
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          hint={`Máximo ${money(maxCents, true)}`}
+          hint={`Queda por reembolsar ${money(maxCents, true)}`}
+          error={invalid && amount !== '' ? `Entre $0.01 y ${money(maxCents, true)}` : null}
         />
         {partial && (
-          <p className="rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-warning-ink">
-            Los reembolsos parciales todavía no están disponibles: se reembolsará el total.
+          <p className="rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+            Reembolso parcial: el resto sigue cobrado y el servicio no se cancela.
           </p>
         )}
-        {/* ponytail: stripe-refund-order solo reembolsa el total; agregar monto al RPC/función para parciales. */}
         <Textarea
           rows={2}
           value={reason}
@@ -950,16 +947,30 @@ function ChatModal({
   clientName: string;
   techName: string;
 }) {
-  useTick();
   const [draft, setDraft] = useState('');
-  const messages = getMessages(requestId);
+  const [messages, setMessages] = useState<OrderMessage[] | null>(null);
+  const [sending, setSending] = useState(false);
+  const load = () =>
+    fetchOrderMessages(requestId).then(setMessages, () => {
+      setMessages([]);
+      toast.error('No se pudo cargar el chat.');
+    });
+  useEffect(() => {
+    if (open) void load();
+    else setMessages(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, requestId]);
 
-  function send() {
+  async function send() {
     const text = draft.trim();
-    if (!text) return;
-    sendMessage(requestId, ADMIN_ID, text);
+    if (!text || sending) return;
+    setSending(true);
+    const ok = await sendMessage(requestId, text);
+    setSending(false);
+    if (!ok) return;
     setDraft('');
-    toast.local('Intervención enviada al chat');
+    await load();
+    toast.success('Intervención enviada al chat');
   }
 
   return (
@@ -972,12 +983,15 @@ function ChatModal({
       width={560}
     >
       <div className="flex max-h-[360px] min-h-[180px] flex-col gap-3 overflow-y-auto rounded-box border border-line bg-panel p-4">
-        {messages.length === 0 && (
+        {messages === null && (
+          <p className="py-8 text-center text-[13px] text-faint">Cargando chat…</p>
+        )}
+        {messages?.length === 0 && (
           <p className="py-8 text-center text-[13px] text-faint">Sin mensajes en este servicio.</p>
         )}
-        {messages.map(m => {
+        {(messages ?? []).map(m => {
           const sender = getProfile(m.sender_id);
-          const isAdmin = m.sender_id === ADMIN_ID;
+          const isAdmin = sender?.role === 'admin';
           const mine = isAdmin || sender?.role === 'technician';
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
@@ -992,7 +1006,7 @@ function ChatModal({
                     isAdmin ? 'bg-warning-soft' : mine ? 'bg-info-soft' : 'border border-line bg-card'
                   }`}
                 >
-                  {m.content}
+                  {m.body}
                 </div>
                 <span className="mt-1 font-mono text-[10.5px] text-faint">
                   {isAdmin ? 'Admin' : (sender?.full_name ?? 'Usuario')} · {clock(m.created_at)}
@@ -1011,7 +1025,7 @@ function ChatModal({
           aria-label="Mensaje"
           className="min-h-[64px]"
         />
-        <Button icon={Send} onClick={send} disabled={!draft.trim()} className="self-end">
+        <Button icon={Send} onClick={() => void send()} loading={sending} disabled={!draft.trim()} className="self-end">
           Enviar
         </Button>
       </div>

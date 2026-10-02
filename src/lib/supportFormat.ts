@@ -6,14 +6,15 @@ export function disputeCode(id: string): string {
   return `DSP-${String(parseInt(hex, 16) % 10000).padStart(4, '0')}`;
 }
 
+/** Outcomes de admin_resolve_dispute (contrato §1). */
 export const RESOLUTIONS = [
-  { value: 'cliente', label: 'A favor del cliente' },
-  { value: 'tecnico', label: 'A favor del técnico' },
-  { value: 'parcial', label: 'Parcial' },
+  { value: 'favor_cliente', label: 'A favor del cliente' },
+  { value: 'favor_tecnico', label: 'A favor del técnico' },
+  { value: 'desestimada', label: 'Desestimada' },
 ] as const;
 export type Resolution = (typeof RESOLUTIONS)[number]['value'];
 
-/** Nota guardada en disputes.resolution_notes: decisión + comentario. */
+/** Nota guardada en disputes.resolution_notes (vía RPC): decisión + comentario. */
 export function resolutionNote(r: Resolution, comment: string): string {
   const label = RESOLUTIONS.find(x => x.value === r)!.label;
   const c = comment.trim();

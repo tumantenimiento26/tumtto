@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Layers, HardHat, Flame, Hexagon, Map as MapIcon } from 'lucide-react';
-import { toast } from './toast';
+import { coverageRing, geometryCenter, type LngLat } from '@/lib/geo';
 
 /**
- * Mapa real de cobertura ZMG (Mapbox GL). Polígonos municipales aproximados
- * con hover/selección por feature-state, capa de calor de demanda (misma
- * config de producción que la lámina del design system: rampa de marca +
- * crossfade a puntos al acercar), anillos de cobertura de técnicos y toggles
- * de capas funcionales. Sincroniza selección en ambos sentidos con la lista.
+ * Mapa de cobertura ZMG (Mapbox GL) con datos reales: zonas de
+ * `coverage_zones` (GeoJSON de la RPC admin_list_coverage_zones), capa de
+ * calor con las solicitudes recientes y anillos de cobertura de los técnicos
+ * con base registrada. Hover/selección por feature-state, sincronizada con la
+ * lista. La geometría se edita importando GeoJSON (ver Regiones), no a mano.
  *
  * Token: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (.env.local, compartido con la app
  * móvil). Sin token renderiza un placeholder utilizable.
@@ -20,60 +20,21 @@ export interface MapZone {
   name: string;
   status: 'ok' | 'warn';
   techs: number;
-  covered: number;
-  colonias: number;
+  active: boolean;
+  geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
 }
 
-// ponytail: polígonos aproximados dibujados a mano sobre la mancha urbana —
-// suficientes para operación visual; sustituir por GeoJSON municipal (INEGI)
-// vía "Importar GeoJSON" cuando exista el flujo.
-export const ZONE_POLYGONS: Record<string, [number, number][]> = {
-  zap: [
-    [-103.52, 20.79],
-    [-103.45, 20.82],
-    [-103.38, 20.8],
-    [-103.36, 20.75],
-    [-103.38, 20.7],
-    [-103.44, 20.67],
-    [-103.5, 20.68],
-    [-103.54, 20.73],
-  ],
-  gdl: [
-    [-103.38, 20.7],
-    [-103.36, 20.75],
-    [-103.3, 20.74],
-    [-103.26, 20.7],
-    [-103.28, 20.65],
-    [-103.33, 20.63],
-    [-103.38, 20.65],
-  ],
-  tlaq: [
-    [-103.33, 20.63],
-    [-103.28, 20.65],
-    [-103.24, 20.62],
-    [-103.26, 20.56],
-    [-103.32, 20.55],
-    [-103.36, 20.58],
-  ],
-  tlaj: [
-    [-103.5, 20.55],
-    [-103.42, 20.57],
-    [-103.36, 20.55],
-    [-103.34, 20.48],
-    [-103.4, 20.42],
-    [-103.48, 20.44],
-    [-103.52, 20.5],
-  ],
-};
+export interface MapTechBase {
+  name: string;
+  center: LngLat;
+  km: number;
+}
 
-const ZMG_CENTER: [number, number] = [-103.38, 20.63];
-
-// ponytail: ediciones de polígonos en localStorage; mover a backend cuando exista tabla de zonas.
-const POLYS_KEY = 'tumtto:zonas:poligonos';
+const ZMG_CENTER: LngLat = [-103.38, 20.63];
 
 // Rampa de calor de marca — misma config de producción de la Lám. 08.
 const HEAT_PAINT = {
-  'heatmap-weight': ['interpolate', ['linear'], ['get', 'w'], 0, 0.4, 1, 1],
+  'heatmap-weight': 1,
   'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 15, 2.4],
   'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 18, 15, 46],
   'heatmap-color': [
@@ -94,104 +55,61 @@ const HEAT_PAINT = {
   'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 16, 0.3],
 } as const;
 
-/** Puntos de demanda demo, deterministas, agrupados por hubs reales. */
-export function demandPoints() {
-  let seed = 20260703;
-  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
-  const hubs: [number, number, number, number][] = [
-    [-103.39, 20.71, 0.03, 90], // Providencia / Zapopan oriente
-    [-103.35, 20.67, 0.025, 70], // GDL centro
-    [-103.43, 20.73, 0.035, 60], // Zapopan norte
-    [-103.3, 20.59, 0.03, 40], // Tlaquepaque
-    [-103.42, 20.5, 0.04, 25], // Tlajomulco
-  ];
-  const feats = [];
-  for (const [cx, cy, spread, count] of hubs) {
-    for (let i = 0; i < count; i++) {
-      const a = rnd() * Math.PI * 2;
-      const r = Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * spread;
-      feats.push({
-        type: 'Feature' as const,
-        properties: { w: 0.4 + rnd() * 0.6 },
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8],
-        },
-      });
-    }
-  }
-  return { type: 'FeatureCollection' as const, features: feats };
-}
-
-/** Anillo de cobertura (círculo geodésico aproximado) alrededor de una base. */
-export function coverageRing(center: [number, number], km: number) {
-  const pts: [number, number][] = [];
-  const kmLat = km / 110.574;
-  const kmLng = km / (111.32 * Math.cos((center[1] * Math.PI) / 180));
-  for (let i = 0; i <= 48; i++) {
-    const a = (i / 48) * Math.PI * 2;
-    pts.push([
-      center[0] + Math.cos(a) * kmLng,
-      center[1] + Math.sin(a) * kmLat,
-    ]);
-  }
-  return pts;
-}
-
-export const TECH_BASES: {
-  name: string;
-  center: [number, number];
-  km: number;
-}[] = [
-  { name: 'Ramón Hernández', center: [-103.4, 20.71], km: 10 },
-  { name: 'Adriana García', center: [-103.34, 20.66], km: 8 },
-  { name: 'Sergio Camarena', center: [-103.3, 20.6], km: 7 },
-];
-
 const LAYER_DEFS = [
-  {
-    key: 'zonas',
-    icon: Hexagon,
-    tint: 'text-success',
-    label: 'Polígonos de zona',
-  },
-  {
-    key: 'demanda',
-    icon: Flame,
-    tint: 'text-warning',
-    label: 'Demanda (heatmap)',
-  },
-  {
-    key: 'tecnicos',
-    icon: HardHat,
-    tint: 'text-primary',
-    label: 'Cobertura de técnicos',
-  },
+  { key: 'zonas', icon: Hexagon, tint: 'text-success', label: 'Zonas de cobertura' },
+  { key: 'demanda', icon: Flame, tint: 'text-warning', label: 'Demanda (30 días)' },
+  { key: 'tecnicos', icon: HardHat, tint: 'text-primary', label: 'Cobertura de técnicos' },
 ] as const;
 type LayerKey = (typeof LAYER_DEFS)[number]['key'];
 
+const zonesGeojson = (zones: MapZone[]) => ({
+  type: 'FeatureCollection' as const,
+  features: zones.map(z => ({
+    type: 'Feature' as const,
+    id: z.id,
+    properties: { name: z.name, status: z.status, techs: z.techs, active: z.active },
+    geometry: z.geometry,
+  })),
+});
+const demandGeojson = (points: LngLat[]) => ({
+  type: 'FeatureCollection' as const,
+  features: points.map(p => ({
+    type: 'Feature' as const,
+    properties: {},
+    geometry: { type: 'Point' as const, coordinates: p },
+  })),
+});
+const techsGeojson = (bases: MapTechBase[]) => ({
+  type: 'FeatureCollection' as const,
+  features: bases.map(t => ({
+    type: 'Feature' as const,
+    properties: { name: t.name, km: t.km },
+    geometry: { type: 'Polygon' as const, coordinates: [coverageRing(t.center, t.km)] },
+  })),
+});
+
 export function CoverageMap({
   zones,
+  demand,
+  techs,
   selected,
   onSelect,
   height = 520,
-  editing = false,
-  onEditingChange,
 }: {
   zones: MapZone[];
+  /** Puntos (lng, lat) de solicitudes recientes para la capa de calor. */
+  demand: LngLat[];
+  techs: MapTechBase[];
   selected: string;
   onSelect: (id: string) => void;
   height?: number;
-  editing?: boolean;
-  onEditingChange?: (v: boolean) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   const selectedRef = useRef(selected);
-  const polysRef = useRef<Record<string, [number, number][]> | null>(null);
-  if (!polysRef.current) polysRef.current = structuredClone(ZONE_POLYGONS);
-  const backupRef = useRef<Record<string, [number, number][]>>({});
+  const zonesRef = useRef(zones);
+  zonesRef.current = zones;
   const [ready, setReady] = useState(false);
   const [noToken, setNoToken] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
@@ -200,30 +118,6 @@ export function CoverageMap({
     tecnicos: false,
   });
   const [panelOpen, setPanelOpen] = useState(false);
-
-  const zonesGeojson = () => ({
-    type: 'FeatureCollection' as const,
-    features: zones.map(z => ({
-      type: 'Feature' as const,
-      id: z.id,
-      properties: { ...z, pct: Math.round((z.covered / z.colonias) * 100) },
-      geometry: {
-        type: 'Polygon' as const,
-        coordinates: [[...polysRef.current![z.id], polysRef.current![z.id][0]]],
-      },
-    })),
-  });
-
-  function exitEdit(save: boolean) {
-    if (save) {
-      localStorage.setItem(POLYS_KEY, JSON.stringify(polysRef.current));
-      toast.success('Polígonos guardados');
-    } else {
-      polysRef.current = backupRef.current;
-      mapRef.current?.getSource('zonas')?.setData(zonesGeojson());
-    }
-    onEditingChange?.(false);
-  }
 
   /* init */
   useEffect(() => {
@@ -250,18 +144,9 @@ export function CoverageMap({
         attributionControl: false,
       });
       mapRef.current = map;
-      map.addControl(
-        new mapboxgl.NavigationControl({ visualizePitch: false }),
-        'bottom-left',
-      );
-      map.addControl(
-        new mapboxgl.ScaleControl({ unit: 'metric' }),
-        'bottom-right',
-      );
-      map.addControl(
-        new mapboxgl.AttributionControl({ compact: true }),
-        'top-left',
-      );
+      map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-left');
+      map.addControl(new mapboxgl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+      map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'top-left');
 
       const hoverPopup = new mapboxgl.Popup({
         closeButton: false,
@@ -271,18 +156,9 @@ export function CoverageMap({
       });
 
       map.on('load', () => {
-        /* ── zonas (con ediciones guardadas encima de los polígonos base) ── */
-        try {
-          Object.assign(
-            polysRef.current!,
-            JSON.parse(localStorage.getItem(POLYS_KEY) ?? '{}'),
-          );
-        } catch {
-          /* JSON corrupto: usa base */
-        }
         map.addSource('zonas', {
           type: 'geojson',
-          data: zonesGeojson(),
+          data: zonesGeojson(zonesRef.current),
           promoteId: 'id',
         });
         map.addLayer({
@@ -290,18 +166,15 @@ export function CoverageMap({
           type: 'fill',
           source: 'zonas',
           paint: {
-            'fill-color': [
-              'case',
-              ['==', ['get', 'status'], 'warn'],
-              '#F59E0B',
-              '#0A6BCF',
-            ],
+            'fill-color': ['case', ['==', ['get', 'status'], 'warn'], '#F59E0B', '#0A6BCF'],
             'fill-opacity': [
               'case',
               ['boolean', ['feature-state', 'selected'], false],
               0.3,
               ['boolean', ['feature-state', 'hover'], false],
               0.2,
+              ['==', ['get', 'active'], false],
+              0.04,
               0.1,
             ],
           },
@@ -311,18 +184,9 @@ export function CoverageMap({
           type: 'line',
           source: 'zonas',
           paint: {
-            'line-color': [
-              'case',
-              ['==', ['get', 'status'], 'warn'],
-              '#B45309',
-              '#0A6BCF',
-            ],
-            'line-width': [
-              'case',
-              ['boolean', ['feature-state', 'selected'], false],
-              3,
-              1.6,
-            ],
+            'line-color': ['case', ['==', ['get', 'status'], 'warn'], '#B45309', '#0A6BCF'],
+            'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 1.6],
+            'line-dasharray': ['case', ['==', ['get', 'active'], false], ['literal', [2, 2]], ['literal', [1, 0]]],
           },
         });
         map.addLayer({
@@ -336,13 +200,7 @@ export function CoverageMap({
               { 'font-scale': 1 },
               '\n',
               {},
-              [
-                'concat',
-                ['to-string', ['get', 'techs']],
-                ' téc · ',
-                ['to-string', ['get', 'pct']],
-                '%',
-              ],
+              ['concat', ['to-string', ['get', 'techs']], ' téc'],
               { 'font-scale': 0.78 },
             ],
             'text-size': 13,
@@ -355,16 +213,10 @@ export function CoverageMap({
           },
         });
 
-        /* ── demanda: heatmap + crossfade a puntos ── */
-        map.addSource('demanda', { type: 'geojson', data: demandPoints() });
+        /* demanda: heatmap + crossfade a puntos */
+        map.addSource('demanda', { type: 'geojson', data: demandGeojson([]) });
         map.addLayer(
-          {
-            id: 'demanda-heat',
-            type: 'heatmap',
-            source: 'demanda',
-            maxzoom: 16,
-            paint: HEAT_PAINT as never,
-          },
+          { id: 'demanda-heat', type: 'heatmap', source: 'demanda', maxzoom: 16, paint: HEAT_PAINT as never },
           'zonas-label',
         );
         map.addLayer(
@@ -378,44 +230,15 @@ export function CoverageMap({
               'circle-color': '#0A6BCF',
               'circle-stroke-color': '#fff',
               'circle-stroke-width': 1.5,
-              'circle-opacity': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                12.5,
-                0,
-                14,
-                0.85,
-              ],
-              'circle-stroke-opacity': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                12.5,
-                0,
-                14,
-                1,
-              ],
+              'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 14, 0.85],
+              'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 14, 1],
             },
           },
           'zonas-label',
         );
 
-        /* ── cobertura de técnicos ── */
-        map.addSource('tecnicos', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: TECH_BASES.map(t => ({
-              type: 'Feature',
-              properties: { name: t.name, km: t.km },
-              geometry: {
-                type: 'Polygon',
-                coordinates: [coverageRing(t.center, t.km)],
-              },
-            })),
-          },
-        });
+        /* cobertura de técnicos */
+        map.addSource('tecnicos', { type: 'geojson', data: techsGeojson([]) });
         map.addLayer(
           {
             id: 'tecnicos-fill',
@@ -432,80 +255,50 @@ export function CoverageMap({
             type: 'line',
             source: 'tecnicos',
             layout: { visibility: 'none' },
-            paint: {
-              'line-color': '#18A66A',
-              'line-width': 1.8,
-              'line-dasharray': [2.2, 1.6],
-            },
+            paint: { 'line-color': '#18A66A', 'line-width': 1.8, 'line-dasharray': [2.2, 1.6] },
           },
           'zonas-label',
         );
 
-        /* ── interacción zonas ── */
+        /* interacción zonas */
         let hovered: string | null = null;
         map.on(
           'mousemove',
           'zonas-fill',
           (e: {
-            features?: Array<{
-              id?: string | number;
-              properties?: Record<string, unknown>;
-            }>;
+            features?: Array<{ id?: string | number; properties?: Record<string, unknown> }>;
             lngLat: unknown;
           }) => {
             const f = e.features?.[0];
             if (!f?.id) return;
             map.getCanvas().style.cursor = 'pointer';
             if (hovered && hovered !== f.id)
-              map.setFeatureState(
-                { source: 'zonas', id: hovered },
-                { hover: false },
-              );
+              map.setFeatureState({ source: 'zonas', id: hovered }, { hover: false });
             hovered = String(f.id);
-            map.setFeatureState(
-              { source: 'zonas', id: hovered },
-              { hover: true },
-            );
-            const p = f.properties as {
-              name?: string;
-              techs?: number;
-              covered?: number;
-              colonias?: number;
-              pct?: number;
-            };
+            map.setFeatureState({ source: 'zonas', id: hovered }, { hover: true });
+            const p = f.properties as { name?: string; techs?: number; active?: boolean };
             hoverPopup
               .setLngLat(e.lngLat as never)
               .setHTML(
                 `<div class="zmg-pop-title">${p.name}</div>` +
-                  `<div class="zmg-pop-row"><b>${p.techs}</b> técnicos · <b>${p.pct}%</b> cobertura</div>` +
-                  `<div class="zmg-pop-row">${p.covered}/${p.colonias} colonias</div>`,
+                  `<div class="zmg-pop-row"><b>${p.techs}</b> técnicos con base · ${p.active === false ? 'pausada' : 'activa'}</div>`,
               )
               .addTo(map);
           },
         );
         map.on('mouseleave', 'zonas-fill', () => {
           map.getCanvas().style.cursor = '';
-          if (hovered)
-            map.setFeatureState(
-              { source: 'zonas', id: hovered },
-              { hover: false },
-            );
+          if (hovered) map.setFeatureState({ source: 'zonas', id: hovered }, { hover: false });
           hovered = null;
           hoverPopup.remove();
         });
-        map.on(
-          'click',
-          'zonas-fill',
-          (e: { features?: Array<{ id?: string | number }> }) => {
-            const id = e.features?.[0]?.id;
-            if (id) onSelect(String(id));
-          },
-        );
+        map.on('click', 'zonas-fill', (e: { features?: Array<{ id?: string | number }> }) => {
+          const id = e.features?.[0]?.id;
+          if (id) onSelect(String(id));
+        });
 
-        map.setFeatureState(
-          { source: 'zonas', id: selectedRef.current },
-          { selected: true },
-        );
+        if (selectedRef.current)
+          map.setFeatureState({ source: 'zonas', id: selectedRef.current }, { selected: true });
         map.resize(); // el contenedor puede medirse tarde (entrada animada del panel)
         setReady(true);
       });
@@ -524,6 +317,25 @@ export function CoverageMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* datos → fuentes (zonas/demanda/técnicos cambian con el snapshot) */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    map.getSource('zonas')?.setData(zonesGeojson(zones));
+    if (selectedRef.current)
+      map.setFeatureState({ source: 'zonas', id: selectedRef.current }, { selected: true });
+  }, [zones, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    map.getSource('demanda')?.setData(demandGeojson(demand));
+  }, [demand, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    map.getSource('tecnicos')?.setData(techsGeojson(techs));
+  }, [techs, ready]);
+
   /* selección externa → feature-state + flyTo (no en el primer render: la vista
      inicial muestra toda la ZMG) */
   const flownOnce = useRef(false);
@@ -532,105 +344,17 @@ export function CoverageMap({
     const prev = selectedRef.current;
     selectedRef.current = selected;
     if (!map || !ready) return;
-    if (prev !== selected)
+    if (prev && prev !== selected)
       map.setFeatureState({ source: 'zonas', id: prev }, { selected: false });
-    map.setFeatureState({ source: 'zonas', id: selected }, { selected: true });
+    if (selected) map.setFeatureState({ source: 'zonas', id: selected }, { selected: true });
     if (!flownOnce.current) {
       flownOnce.current = true;
       return;
     }
-    const poly = polysRef.current?.[selected];
-    if (poly) {
-      const lng = poly.reduce((s, p) => s + p[0], 0) / poly.length;
-      const lat = poly.reduce((s, p) => s + p[1], 0) / poly.length;
-      map.flyTo({
-        center: [lng, lat],
-        zoom: 11.2,
-        duration: 900,
-        essential: false,
-      });
-    }
+    const z = zonesRef.current.find(x => x.id === selected);
+    const c = z && geometryCenter(z.geometry);
+    if (c) map.flyTo({ center: c, zoom: 11.2, duration: 900, essential: false });
   }, [selected, ready]);
-
-  /* modo edición: vértices arrastrables sobre los polígonos */
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !ready || !editing) return;
-    backupRef.current = structuredClone(polysRef.current!);
-
-    const vertsData = () => ({
-      type: 'FeatureCollection',
-      features: Object.entries(polysRef.current!).flatMap(([zone, pts]) =>
-        pts.map((p, idx) => ({
-          type: 'Feature',
-          properties: { zone, idx },
-          geometry: { type: 'Point', coordinates: p },
-        })),
-      ),
-    });
-    map.addSource('verts', { type: 'geojson', data: vertsData() });
-    map.addLayer({
-      id: 'verts-pts',
-      type: 'circle',
-      source: 'verts',
-      paint: {
-        'circle-radius': 6,
-        'circle-color': '#fff',
-        'circle-stroke-color': '#0A6BCF',
-        'circle-stroke-width': 2.5,
-      },
-    });
-
-    let drag: { zone: string; idx: number } | null = null;
-    const onDown = (e: {
-      features?: Array<{ properties?: { zone?: string; idx?: number } }>;
-      preventDefault: () => void;
-    }) => {
-      const p = e.features?.[0]?.properties;
-      if (p?.zone === undefined || p.idx === undefined) return;
-      e.preventDefault(); // sin esto el mapa panea junto con el vértice
-      drag = { zone: p.zone, idx: p.idx };
-      map.getCanvas().style.cursor = 'grabbing';
-    };
-    const onMove = (e: { lngLat: { lng: number; lat: number } }) => {
-      if (!drag) return;
-      polysRef.current![drag.zone][drag.idx] = [e.lngLat.lng, e.lngLat.lat];
-      map.getSource('verts').setData(vertsData());
-      map.getSource('zonas').setData(zonesGeojson());
-    };
-    const onUp = () => {
-      drag = null;
-      map.getCanvas().style.cursor = '';
-    };
-    const onEnter = () => {
-      if (!drag) map.getCanvas().style.cursor = 'move';
-    };
-    const onLeave = () => {
-      if (!drag) map.getCanvas().style.cursor = '';
-    };
-    map.on('mousedown', 'verts-pts', onDown);
-    map.on('mousemove', onMove);
-    map.on('mouseup', onUp);
-    map.on('mouseenter', 'verts-pts', onEnter);
-    map.on('mouseleave', 'verts-pts', onLeave);
-
-    return () => {
-      // try: en unmount el mapa puede estar ya destruido por el cleanup del init
-      try {
-        map.off('mousedown', 'verts-pts', onDown);
-        map.off('mousemove', onMove);
-        map.off('mouseup', onUp);
-        map.off('mouseenter', 'verts-pts', onEnter);
-        map.off('mouseleave', 'verts-pts', onLeave);
-        if (map.getLayer('verts-pts')) map.removeLayer('verts-pts');
-        if (map.getSource('verts')) map.removeSource('verts');
-        map.getCanvas().style.cursor = '';
-      } catch {
-        /* mapa destruido */
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, ready]);
 
   /* toggles de capas */
   useEffect(() => {
@@ -653,14 +377,10 @@ export function CoverageMap({
       >
         <div>
           <MapIcon size={34} className="mx-auto text-primary" />
-          <div className="mt-2 text-[14px] font-semibold text-navy">
-            Mapa no disponible
-          </div>
+          <div className="mt-2 text-[14px] font-semibold text-navy">Mapa no disponible</div>
           <div className="mt-1 text-[12.5px] text-muted">
-            Define{' '}
-            <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code>{' '}
-            en <code className="font-mono">.env.local</code> para ver el mapa
-            real.
+            Define <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> en{' '}
+            <code className="font-mono">.env.local</code> para ver el mapa real.
           </div>
         </div>
       </div>
@@ -668,33 +388,9 @@ export function CoverageMap({
   }
 
   return (
-    <div
-      style={{ height }}
-      className="relative w-full overflow-hidden rounded-xl border border-line"
-    >
+    <div style={{ height }} className="relative w-full overflow-hidden rounded-xl border border-line">
       {/* Mapbox impone position:relative en el contenedor — dimensiona con h-full, no con inset. */}
       <div ref={host} className="h-full w-full" />
-
-      {/* barra de edición de polígonos */}
-      {editing && (
-        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-white/95 py-1.5 pl-4 pr-1.5 shadow-hover backdrop-blur">
-          <span className="text-[12.5px] font-medium text-navy">
-            Arrastra los vértices para ajustar las zonas
-          </span>
-          <button
-            onClick={() => exitEdit(false)}
-            className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-surface"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => exitEdit(true)}
-            className="rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-2"
-          >
-            Guardar
-          </button>
-        </div>
-      )}
 
       {/* capas: pill que abre/cierra el panel */}
       <div className="absolute right-3 top-3 flex flex-col items-end">
@@ -721,14 +417,10 @@ export function CoverageMap({
                   onClick={() => setLayers(s => ({ ...s, [l.key]: !s[l.key] }))}
                   className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-1 py-2 text-left hover:bg-surface"
                 >
-                  <span
-                    className={`grid h-7 w-7 place-items-center rounded-lg bg-info-soft ${l.tint}`}
-                  >
+                  <span className={`grid h-7 w-7 place-items-center rounded-lg bg-info-soft ${l.tint}`}>
                     <l.icon size={13} />
                   </span>
-                  <span
-                    className={`min-w-0 flex-1 text-[12px] font-semibold ${on ? 'text-navy' : 'text-faint'}`}
-                  >
+                  <span className={`min-w-0 flex-1 text-[12px] font-semibold ${on ? 'text-navy' : 'text-faint'}`}>
                     {l.label}
                   </span>
                   <span
@@ -745,8 +437,7 @@ export function CoverageMap({
               <div
                 className="h-2 rounded-full"
                 style={{
-                  background:
-                    'linear-gradient(90deg, rgba(10,107,207,0), #0A6BCF, #18C1FF, #F59E0B, #DC2626)',
+                  background: 'linear-gradient(90deg, rgba(10,107,207,0), #0A6BCF, #18C1FF, #F59E0B, #DC2626)',
                 }}
               />
               <div className="mt-1 flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-faint">

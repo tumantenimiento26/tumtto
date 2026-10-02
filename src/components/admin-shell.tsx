@@ -49,6 +49,7 @@ import {
   getTechniciansWithProfile,
   loadWorld,
   setErrorNotifier,
+  subscribeRealtime,
   useTick,
   useWorldFailed,
 } from '@/lib/data/store';
@@ -131,6 +132,8 @@ interface NavGroup {
 function useNavGroups(): NavGroup[] {
   useTick();
   const { unread } = useNotifications();
+  const { can } = useAuth();
+  const finanzas = can('finanzas');
   return [
     {
       label: 'General',
@@ -161,7 +164,7 @@ function useNavGroups(): NavGroup[] {
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
         {
           href: '/soporte',
           icon: Scale,
@@ -178,8 +181,11 @@ function useNavGroups(): NavGroup[] {
       label: 'Sistema',
       items: [
         { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
-        { href: '/config', icon: Settings, label: 'Configuración' },
-        { href: '/estados', icon: AlertTriangle, label: 'Estados y errores' },
+        ...(finanzas ? [{ href: '/config', icon: Settings, label: 'Configuración' }] : []),
+        // Galería de estados/errores: solo en desarrollo.
+        ...(process.env.NODE_ENV === 'production'
+          ? []
+          : [{ href: '/estados', icon: AlertTriangle, label: 'Estados y errores' }]),
       ],
     },
   ];
@@ -794,10 +800,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return () => applyTheme(null);
   }, [hydrateTheme]);
 
-  // Primer snapshot del backend al montar la consola (el gate ya validó admin).
+  // Primer snapshot del backend al montar la consola (el gate ya validó admin)
+  // + realtime (órdenes, disputas, tickets, retiros) y recarga al volver el foco.
   useEffect(() => {
     setErrorNotifier(m => toast.error(m));
     void loadWorld();
+    return subscribeRealtime();
   }, []);
 
   // Al navegar: cierra cajón/paneles y muestra el skeleton de la pantalla 480 ms.

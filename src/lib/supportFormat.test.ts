@@ -8,10 +8,10 @@ test('código de disputa estable', () => {
 });
 
 test('nota de resolución', () => {
-  expect(resolutionNote('cliente', '  reembolso total ')).toBe(
+  expect(resolutionNote('favor_cliente', '  reembolso total ')).toBe(
     'A favor del cliente: reembolso total',
   );
-  expect(resolutionNote('parcial', '')).toBe('Parcial');
+  expect(resolutionNote('desestimada', '')).toBe('Desestimada');
 });
 
 test('búsqueda sin acentos', () => {

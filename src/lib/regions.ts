@@ -2,6 +2,8 @@
 // regions.test.ts. La demanda sale de service_orders.municipality y la oferta
 // de la base de cada técnico (technician_locations / technicians.zone_id).
 
+import { mxParts } from '@/lib/dates';
+
 const fold = (s: string) =>
   s
     .normalize('NFD')
@@ -127,7 +129,7 @@ export function zoneStats(input: {
   });
 }
 
-/** Solicitudes de hoy por hora (06–23) en el municipio. */
+/** Solicitudes de hoy por hora (06–23, hora de la ZMG) en el municipio. */
 export function hourlyDemand(
   orders: OrderLike[],
   name: string,
@@ -140,7 +142,7 @@ export function hourlyDemand(
     if (canonMunicipality(o.municipality) !== name) continue;
     const d = new Date(o.created_at);
     if (d.getTime() < start.getTime() || d.getTime() > now.getTime()) continue;
-    const h = d.getHours();
+    const h = mxParts(d).hour;
     if (h >= 6) out[h - 6] += 1;
   }
   return out;

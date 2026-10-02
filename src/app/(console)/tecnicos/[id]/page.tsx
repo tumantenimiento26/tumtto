@@ -81,7 +81,8 @@ import {
 } from '../_components/detail-parts';
 
 const DONE = new Set(['completed', 'paid', 'closed']);
-const money = (c: number) => `$${Math.round(c / 100).toLocaleString('es-MX')}`;
+const money = (c: number) =>
+  (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 
 export default function TecnicoDetailPage() {
   useTick();

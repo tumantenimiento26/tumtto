@@ -27,6 +27,7 @@ import {
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import { isValidClabe } from '@/lib/clabe';
+import { fmtDate } from '@/lib/dates';
 import {
   addNote,
   getDocumentUrl,
@@ -42,13 +43,7 @@ import { DOC_LABEL, RATE_MAX, RATE_MIN, rateError } from '@/lib/techConsole';
 type Tech = NonNullable<ReturnType<typeof getTechnician>>;
 
 export const fecha = (iso: string | null | undefined) =>
-  iso
-    ? new Date(iso).toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    : '—';
+  iso ? fmtDate(iso, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 export const fmtClabe = (c?: string | null) =>
   c ? `${c.slice(0, 3)} ${c.slice(3, 6)} •••• •••• ${c.slice(-4)}` : '—';

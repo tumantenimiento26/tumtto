@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
+import { mxDay } from '@/lib/dates';
 import {
   emptyWorld,
   nextId,
@@ -72,12 +73,70 @@ const w = () => world;
 const bump = () => useData.getState().bump();
 const now = () => new Date().toISOString();
 
-async function fetchAll<K extends keyof Database['public']['Tables']>(
+// Consultas sin tipar (tablas/RPC que `supabase.ts` aún no conoce o select
+// dinámico). ponytail: regenerar los tipos (gen:types) y quitar los casts.
+type RawResult = { data: unknown; error: unknown };
+interface RawQuery extends PromiseLike<RawResult> {
+  select(columns?: string): RawQuery;
+  eq(column: string, value: unknown): RawQuery;
+  gte(column: string, value: unknown): RawQuery;
+  in(column: string, values: unknown[]): RawQuery;
+  order(column: string, opts?: { ascending?: boolean }): RawQuery;
+  range(from: number, to: number): RawQuery;
+  insert(values: Record<string, unknown>): RawQuery;
+  update(values: Record<string, unknown>): RawQuery;
+  single(): RawQuery;
+}
+const rawFrom = (table: string) =>
+  (supabase as unknown as { from: (t: string) => RawQuery }).from(table);
+type LooseRpc = (
+  fn: string,
+  args?: Record<string, unknown>,
+) => Promise<RawResult>;
+// Función (no alias) para no tocar el cliente perezoso al importar el módulo.
+const rawRpc: LooseRpc = (fn, args) =>
+  (supabase.rpc as unknown as LooseRpc)(fn, args);
+
+/** Tamaño de página de PostgREST (`max-rows`): una sola consulta nunca trae más. */
+export const PAGE_SIZE = 1000;
+
+/**
+ * Pagina con `.range()` hasta recibir menos de PAGE_SIZE filas. Sin esto el
+ * snapshot quedaba truncado en 1,000 filas por tabla sin avisar.
+ */
+export async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<RawResult>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const chunk = (data ?? []) as T[];
+    rows.push(...chunk);
+    if (chunk.length < PAGE_SIZE) return rows;
+  }
+}
+
+const DAY_MS = 864e5;
+/** ISO de hace `days` días (límite de las tablas de bitácora). */
+const sinceIso = (days: number) =>
+  new Date(Date.now() - days * DAY_MS).toISOString();
+
+/**
+ * Tabla completa (paginada, orden estable por `id`). `since` acota por fecha
+ * las tablas que crecen sin límite (eventos de estado, bitácora admin): la
+ * consola solo necesita los últimos 90 días.
+ */
+export function fetchAll<K extends keyof Database['public']['Tables']>(
   table: K,
+  select = '*',
+  opts: { since?: [column: string, iso: string] } = {},
 ) {
-  const { data, error } = await supabase.from(table).select('*');
-  if (error) throw error;
-  return (data ?? []) as unknown as Database['public']['Tables'][K]['Row'][];
+  return fetchAllRows<Database['public']['Tables'][K]['Row']>((from, to) => {
+    let q = rawFrom(table).select(select).order('id').range(from, to);
+    if (opts.since) q = q.gte(opts.since[0], opts.since[1]);
+    return q;
+  });
 }
 
 let inflight: Promise<void> | null = null;
@@ -128,7 +187,11 @@ export function loadWorld(force = false): Promise<void> {
         fetchAll('service_orders'),
         fetchAll('service_quotes'),
         fetchAll('service_quote_items'),
-        fetchAll('service_order_status_events'),
+        // Bitácora de estados: últimos 90 días (reportes y dashboard no
+        // miran más atrás; la tabla crece con cada transición).
+        fetchAll('service_order_status_events', '*', {
+          since: ['created_at', sinceIso(90)],
+        }),
         fetchAll('payments'),
         fetchAll('ledger_entries'),
         fetchAll('kyc_sessions'),
@@ -180,6 +243,44 @@ export function loadWorld(force = false): Promise<void> {
 
 /** Reload after a write so every view reflects the backend. */
 const refresh = () => loadWorld(true);
+
+// ── Realtime ────────────────────────────────────────────────────────────────
+const LIVE_TABLES = ['service_orders', 'disputes', 'support_tickets', 'payout_requests'];
+let liveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Varios cambios seguidos (un lote de retiros) → una sola recarga. */
+function scheduleLiveReload() {
+  if (liveTimer) clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    liveTimer = null;
+    void loadWorld(true);
+    if (useExtras.getState().loaded) void loadExtras(true);
+  }, 1500);
+}
+/**
+ * Un canal postgres_changes sobre las tablas que mueven la operación y una
+ * recarga (respetando la caché de 15 s) al volver el foco a la pestaña.
+ * Devuelve la función para desuscribirse.
+ */
+export function subscribeRealtime(): () => void {
+  let channel = supabase.channel('console-live');
+  for (const table of LIVE_TABLES)
+    channel = channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table },
+      scheduleLiveReload,
+    );
+  channel.subscribe();
+  const onFocus = () => {
+    if (document.visibilityState === 'visible') void loadWorld();
+  };
+  window.addEventListener('focus', onFocus);
+  document.addEventListener('visibilitychange', onFocus);
+  return () => {
+    void supabase.removeChannel(channel);
+    window.removeEventListener('focus', onFocus);
+    document.removeEventListener('visibilitychange', onFocus);
+  };
+}
 
 /**
  * Wrap a backend write: on error toast + null, on success reload the snapshot.
@@ -396,7 +497,11 @@ export function getMetrics() {
   ];
   const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
   const active = reqs.filter(r => ACTIVE.includes(r.status)).length;
-  const completedToday = reqs.filter(r => DONE.includes(r.status)).length;
+  const today = mxDay(new Date());
+  const completedToday = reqs.filter(
+    r =>
+      DONE.includes(r.status) && r.completed_at && mxDay(r.completed_at) === today,
+  ).length;
   const gmv = pays.reduce((s, p) => s + p.amount_cents, 0);
   const platformFee = pays.reduce((s, p) => s + p.commission_cents, 0);
   const techNet = pays.reduce(
@@ -940,17 +1045,13 @@ export const getReportData = () => ({
 // Las RPC admin_report_* no están en los tipos generados de este repo todavía
 // (regenerar con gen:types tras el deploy); llamada sin tipar y null si falla,
 // para que la pantalla caiga al cálculo desde el snapshot sin mentir.
-type LooseRpc = (
-  fn: string,
-  args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: unknown }>;
 async function reportRpc<T>(
   fn: string,
   from: Date,
   to: Date,
 ): Promise<T | null> {
   try {
-    const { data, error } = await (supabase.rpc as unknown as LooseRpc)(fn, {
+    const { data, error } = await rawRpc(fn, {
       p_from: from.toISOString(),
       p_to: to.toISOString(),
     });
@@ -1149,17 +1250,6 @@ export async function listOrderEvidence(
 // ponytail: tablas sin tipos generados → consulta sin tipar y cast a la fila
 // local; regenerar supabase.ts (gen:types) al desplegar y quitar RawQuery.
 
-type RawResult = { data: unknown; error: unknown };
-interface RawQuery extends PromiseLike<RawResult> {
-  select(columns?: string): RawQuery;
-  eq(column: string, value: unknown): RawQuery;
-  in(column: string, values: unknown[]): RawQuery;
-  order(column: string, opts?: { ascending?: boolean }): RawQuery;
-  update(values: Record<string, unknown>): RawQuery;
-}
-const rawFrom = (table: string) =>
-  (supabase as unknown as { from: (t: string) => RawQuery }).from(table);
-
 export interface TechDocument {
   id: string;
   technician_id: string;
@@ -1236,27 +1326,31 @@ export const useExtras = create<ExtrasState>(() => ({
   loaded: false,
 }));
 
-const EXTRA_QUERIES: Record<ExtraKey, () => PromiseLike<RawResult>> = {
-  docs: () =>
+// Cada dominio es una página `(from, to)`; fetchAllRows encadena las páginas.
+const EXTRA_QUERIES: Record<ExtraKey, (from: number, to: number) => PromiseLike<RawResult>> = {
+  docs: (a, b) =>
     rawFrom('technician_documents')
       .select(
         'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,created_at',
       )
-      .order('created_at', { ascending: false }),
-  payouts: () =>
+      .order('created_at', { ascending: false })
+      .range(a, b),
+  payouts: (a, b) =>
     rawFrom('payout_requests')
       .select(
         'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,approved_at,created_at',
       )
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .range(a, b),
   // geom (PostGIS) no se pide: solo lo que la consola muestra.
-  zones: () => rawFrom('coverage_zones').select('id,slug,name,is_active'),
-  ratings: () =>
+  zones: (a, b) => rawFrom('coverage_zones').select('id,slug,name,is_active').range(a, b),
+  ratings: (a, b) =>
     rawFrom('order_ratings')
       .select('id,service_order_id,reviewer_id,reviewee_id,score,comment,created_at')
-      .order('created_at', { ascending: false }),
-  wallets: () => rawFrom('technician_wallet_summaries').select('*'),
-  locations: () => rawFrom('technician_locations').select('*'),
+      .order('created_at', { ascending: false })
+      .range(a, b),
+  wallets: (a, b) => rawFrom('technician_wallet_summaries').select('*').range(a, b),
+  locations: (a, b) => rawFrom('technician_locations').select('*').range(a, b),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -1270,9 +1364,8 @@ export function loadExtras(force = false): Promise<void> {
     const results = await Promise.all(
       keys.map(async k => {
         try {
-          const { data, error } = await EXTRA_QUERIES[k]();
-          if (error) throw error;
-          return [k, (data ?? []) as unknown[], false] as const;
+          const rows = await fetchAllRows<unknown>(EXTRA_QUERIES[k]);
+          return [k, rows, false] as const;
         } catch (e) {
           console.warn(`[data] extras.${k} no disponible`, e);
           return [k, [] as unknown[], true] as const;

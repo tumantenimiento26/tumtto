@@ -66,6 +66,7 @@ import {
 } from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
 import { orderCode } from '@/lib/orderCode';
+import { fmtDateTime } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
@@ -467,7 +468,7 @@ export default function ServicioDetailPage() {
                           {STATUS[e.to_status as RequestStatus]?.label ?? e.to_status}
                         </span>
                         <span className="font-mono text-[11px] text-muted">
-                          {new Date(e.created_at).toLocaleString('es-MX', {
+                          {fmtDateTime(e.created_at, {
                             day: '2-digit',
                             month: 'short',
                             hour: '2-digit',

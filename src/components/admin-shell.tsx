@@ -49,6 +49,7 @@ import {
   getTechniciansWithProfile,
   loadWorld,
   setErrorNotifier,
+  subscribeRealtime,
   useTick,
   useWorldFailed,
 } from '@/lib/data/store';
@@ -179,7 +180,10 @@ function useNavGroups(): NavGroup[] {
       items: [
         { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
         { href: '/config', icon: Settings, label: 'Configuración' },
-        { href: '/estados', icon: AlertTriangle, label: 'Estados y errores' },
+        // Galería de estados/errores: solo en desarrollo.
+        ...(process.env.NODE_ENV === 'production'
+          ? []
+          : [{ href: '/estados', icon: AlertTriangle, label: 'Estados y errores' }]),
       ],
     },
   ];
@@ -794,10 +798,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return () => applyTheme(null);
   }, [hydrateTheme]);
 
-  // Primer snapshot del backend al montar la consola (el gate ya validó admin).
+  // Primer snapshot del backend al montar la consola (el gate ya validó admin)
+  // + realtime (órdenes, disputas, tickets, retiros) y recarga al volver el foco.
   useEffect(() => {
     setErrorNotifier(m => toast.error(m));
     void loadWorld();
+    return subscribeRealtime();
   }, []);
 
   // Al navegar: cierra cajón/paneles y muestra el skeleton de la pantalla 480 ms.

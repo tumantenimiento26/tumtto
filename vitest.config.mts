@@ -10,6 +10,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // La consola formatea en hora de la ZMG; los tests construyen fechas
+    // locales, así que el proceso corre en esa zona.
+    env: { TZ: 'America/Mexico_City' },
     include: ['src/**/*.test.ts'],
   },
 });

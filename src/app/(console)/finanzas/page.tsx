@@ -39,6 +39,7 @@ import {
   type PayoutRequest,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
+import { fmtDate } from '@/lib/dates';
 import { initials } from '@/lib/techConsole';
 import {
   aggregate,
@@ -80,8 +81,7 @@ const PO_STATUS: Record<PayoutRequest['status'], { label: string; tone: 'success
   cancelled: { label: 'Cancelado', tone: 'neutral' },
   held: { label: 'Retenido', tone: 'warning' },
 };
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+const fechaCorta = (iso: string) => fmtDate(iso, { day: '2-digit', month: 'short' });
 const techName = (id: string) =>
   getProfile(id)?.full_name ?? getTechnician(id)?.display_name ?? 'Técnico';
 

@@ -31,26 +31,7 @@ export type Category = ServiceCategory;
 export type ServiceRequest = ServiceOrder;
 export type RequestStatus = OrderStatus;
 
-// ── Demo-only shapes (no DB table behind them yet) ───────────────────────────
-// ponytail: chat, ratings, payout requests, notes y tickets no tienen tabla en
-// el esquema desplegado — viven solo en el demo world. Migraciones pendientes.
-export type DemoMessage = {
-  id: string;
-  order_id: string;
-  sender_id: string;
-  content: string | null;
-  created_at: string;
-};
-export type DemoRating = {
-  id: string;
-  order_id: string;
-  from_id: string;
-  to_id: string;
-  stars: number;
-  comment: string | null;
-  tags: string[];
-  created_at: string;
-};
+/** Retiro derivado del ledger (entrada `payout`), ver store.getAllPayouts. */
 export type DemoPayout = {
   id: string;
   technician_id: string;
@@ -63,36 +44,6 @@ export type DemoPayout = {
   updated_at: string;
 };
 
-/** Internal admin note attached to any entity (order, técnico, cliente…). */
-export interface Note {
-  id: string;
-  entity_id: string;
-  author: string;
-  text: string;
-  created_at: string;
-}
-
-/** Support-ticket message — keyed by ticket_id. */
-export interface TicketMessage {
-  id: string;
-  ticket_id: string;
-  sender_id: string;
-  content: string | null;
-  created_at: string;
-}
-
-export interface Ticket {
-  id: string;
-  subject: string;
-  requester_id: string;
-  role: 'cliente' | 'tecnico';
-  status: 'open' | 'pending' | 'resolved';
-  priority: 'alta' | 'media' | 'baja';
-  order_id: string | null;
-  created_at: string;
-  messages: TicketMessage[];
-}
-
 const now = () => new Date().toISOString();
 const ts = () => ({ created_at: now(), updated_at: now() });
 let seq = 1000;
@@ -102,7 +53,6 @@ export const nextId = (p: string) => `${p}-${++seq}`;
 // technicians.id === profiles.id in the deployed schema (1:1).
 export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
-export const ADMIN_ID = 'demo-admin';
 
 function profile(
   id: string,
@@ -201,12 +151,6 @@ export interface World {
   ledger: LedgerEntry[];
   kycSessions: KycSession[];
   disputes: Dispute[];
-  // demo-only (no backing tables yet)
-  messages: DemoMessage[];
-  ratings: DemoRating[];
-  payouts: DemoPayout[];
-  notes: Note[];
-  tickets: Ticket[];
 }
 
 function build(): World {
@@ -218,7 +162,6 @@ function build(): World {
       'technician',
       '+52 33 2345 6789',
     ),
-    profile(ADMIN_ID, 'Sofía Admin (demo)', 'admin'),
     profile('u-ag', 'Adriana García Soto', 'technician'),
     profile('u-sc', 'Sergio Camarena R.', 'technician'),
     profile('u-do', 'Daniela Ortega Camacho', 'technician'),
@@ -670,223 +613,6 @@ function build(): World {
     },
   ];
 
-  const messages: DemoMessage[] = [
-    {
-      id: 'm-1',
-      order_id: 'SVC-2851',
-      sender_id: TECH_USER_ID,
-      content: '¡Hola! Ya acepté tu solicitud, voy en camino.',
-      created_at: mins(24),
-    },
-    {
-      id: 'm-2',
-      order_id: 'SVC-2851',
-      sender_id: CLIENT_ID,
-      content: 'Perfecto, te espero. La fuga está en el baño principal.',
-      created_at: mins(22),
-    },
-    {
-      id: 'm-3',
-      order_id: 'SVC-2851',
-      sender_id: TECH_USER_ID,
-      content: 'Entendido, llevo refacciones. Llego en 15 min.',
-      created_at: mins(20),
-    },
-  ];
-
-  const ratings: DemoRating[] = [
-    {
-      id: 'rt-1',
-      order_id: 'SVC-2835',
-      from_id: CLIENT_ID,
-      to_id: TECH_USER_ID,
-      stars: 5,
-      comment: 'Excelente trabajo, muy puntual.',
-      tags: ['Puntual', 'Profesional'],
-      created_at: old,
-    },
-  ];
-
-  const payout = (
-    id: string,
-    technician_id: string,
-    amount_cents: number,
-    status: DemoPayout['status'],
-    clabe: string,
-    batch: string | null = null,
-  ): DemoPayout => ({
-    id,
-    technician_id,
-    amount_cents,
-    status,
-    clabe_snapshot: clabe,
-    batch_id: batch,
-    processed_at: status === 'processed' ? old : null,
-    created_at: old,
-    updated_at: old,
-  });
-  const payouts: DemoPayout[] = [
-    payout(
-      'po-1',
-      TECH_USER_ID,
-      300000,
-      'processed',
-      '012345678901234567',
-      'B-2026-05',
-    ),
-    payout('po-2', 'u-carla', 542000, 'pending', '012180001234567890'),
-    payout('po-3', 'u-ag', 318000, 'pending', '044580009876543210'),
-    payout(
-      'po-4',
-      'u-sc',
-      224000,
-      'processing',
-      '014320005566778899',
-      'B-2026-06',
-    ),
-  ];
-
-  const notes: Note[] = [
-    {
-      id: 'n-1',
-      entity_id: 'SVC-2851',
-      author: 'Sofía Admin',
-      text: 'Servicio monitoreado. Sin incidencias reportadas hasta el momento.',
-      created_at: now(),
-    },
-    {
-      id: 'n-2',
-      entity_id: CLIENT_ID,
-      author: 'Sofía Admin',
-      text: 'Cliente recurrente y puntual con los pagos. Prefiere visitas por la mañana.',
-      created_at: now(),
-    },
-    {
-      id: 'n-3',
-      entity_id: 'u-miguel',
-      author: 'Sofía Admin',
-      text: 'Verifiqué dirección por WhatsApp. Vive en Las Juntas, confirmado. Doc CFE coincide.',
-      created_at: old,
-    },
-    {
-      id: 'n-4',
-      entity_id: 'u-miguel',
-      author: 'Daniel Olvera',
-      text: 'Llamada de bienvenida realizada. Habla claro, entiende el flujo. Le envié liga de tutorial.',
-      created_at: old,
-    },
-  ];
-
-  const tmsg = (
-    id: string,
-    ticket_id: string,
-    sender_id: string,
-    content: string,
-    created_at = now(),
-  ): TicketMessage => ({
-    id,
-    ticket_id,
-    sender_id,
-    content,
-    created_at,
-  });
-  const tickets: Ticket[] = [
-    {
-      id: 'TK-501',
-      subject: 'Cobro duplicado en mi tarjeta',
-      requester_id: CLIENT_ID,
-      role: 'cliente',
-      status: 'open',
-      priority: 'alta',
-      order_id: 'SVC-2835',
-      created_at: old,
-      messages: [
-        tmsg(
-          'tm-1',
-          'TK-501',
-          CLIENT_ID,
-          'Hola, me aparecen dos cargos por el servicio del calentador. ¿Me pueden ayudar?',
-          old,
-        ),
-        tmsg(
-          'tm-2',
-          'TK-501',
-          ADMIN_ID,
-          'Hola María, ya lo estamos revisando con el procesador de pagos. Te confirmo hoy mismo.',
-          old,
-        ),
-      ],
-    },
-    {
-      id: 'TK-502',
-      subject: 'No puedo actualizar mi CLABE',
-      requester_id: TECH_USER_ID,
-      role: 'tecnico',
-      status: 'pending',
-      priority: 'media',
-      order_id: null,
-      created_at: old,
-      messages: [
-        tmsg(
-          'tm-3',
-          'TK-502',
-          TECH_USER_ID,
-          'La app me marca error al guardar mi nueva CLABE de BBVA.',
-        ),
-        tmsg(
-          'tm-4',
-          'TK-502',
-          ADMIN_ID,
-          '¿Nos compartes una captura del error? Con eso lo escalamos a ingeniería.',
-        ),
-      ],
-    },
-    {
-      id: 'TK-503',
-      subject: 'El técnico llegó tarde a la cita',
-      requester_id: 'u-carlos',
-      role: 'cliente',
-      status: 'open',
-      priority: 'baja',
-      order_id: null,
-      created_at: now(),
-      messages: [
-        tmsg(
-          'tm-5',
-          'TK-503',
-          'u-carlos',
-          'La cita era a las 10 y llegó 11:40. Quiero dejar constancia.',
-        ),
-      ],
-    },
-    {
-      id: 'TK-504',
-      subject: '¿Cómo amplío mi zona de cobertura?',
-      requester_id: 'u-ag',
-      role: 'tecnico',
-      status: 'resolved',
-      priority: 'baja',
-      order_id: null,
-      created_at: old,
-      messages: [
-        tmsg(
-          'tm-6',
-          'TK-504',
-          'u-ag',
-          'Quiero cubrir también Tonalá, ¿dónde lo configuro?',
-          old,
-        ),
-        tmsg(
-          'tm-7',
-          'TK-504',
-          ADMIN_ID,
-          'Desde tu perfil > Cobertura puedes agregar zonas. Ya te habilité la opción. ¡Saludos!',
-          old,
-        ),
-      ],
-    },
-  ];
-
   return {
     profiles,
     categories,
@@ -902,11 +628,6 @@ function build(): World {
     ledger,
     kycSessions,
     disputes,
-    messages,
-    ratings,
-    payouts,
-    notes,
-    tickets,
   };
 }
 
@@ -927,11 +648,6 @@ export function emptyWorld(): World {
     ledger: [],
     kycSessions: [],
     disputes: [],
-    messages: [],
-    ratings: [],
-    payouts: [],
-    notes: [],
-    tickets: [],
   };
 }
 

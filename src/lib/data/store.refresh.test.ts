@@ -37,7 +37,7 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 const store = await import('./store');
-const TABLES = 15; // tablas que lee loadWorld
+const TABLES = 18; // tablas que lee loadWorld (15 + tickets, mensajes de ticket, admin_events)
 
 beforeEach(() => {
   calls.selects = 0;

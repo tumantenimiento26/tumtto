@@ -23,7 +23,6 @@ import {
   Modal,
   Sheet,
   Textarea,
-  toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import { isValidClabe } from '@/lib/clabe';
@@ -516,16 +515,16 @@ export function BankCard({ tech }: { tech: Tech }) {
   );
 }
 
-/* ── Notas internas (sesión; sin tabla en backend) ──────────────────────── */
+/* ── Notas internas y bitácora (admin_events vía add_admin_note) ────────── */
 
 export function NotesCard({ techId }: { techId: string }) {
   const [text, setText] = useState('');
+  const { busy, run } = useAction();
   const notes = getNotes(techId);
-  function add() {
-    if (!text.trim()) return;
-    addNote(techId, text.trim());
-    setText('');
-    toast.local('Nota agregada');
+  async function add() {
+    if (!text.trim() || busy) return;
+    const ok = await run('note', () => addNote('technicians', techId, text.trim()), 'Nota agregada');
+    if (ok) setText('');
   }
   return (
     <Card padded>
@@ -534,12 +533,12 @@ export function NotesCard({ techId }: { techId: string }) {
         <Input
           value={text}
           onChange={e => setText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && add()}
+          onKeyDown={e => e.key === 'Enter' && void add()}
           placeholder="Solo visible para el equipo"
           wrapperClassName="flex-1"
           aria-label="Nueva nota"
         />
-        <Button variant="secondary" icon={Send} onClick={add} disabled={!text.trim()}>
+        <Button variant="secondary" icon={Send} onClick={() => void add()} loading={!!busy} disabled={!text.trim()}>
           Agregar
         </Button>
       </div>

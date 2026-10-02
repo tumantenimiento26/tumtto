@@ -8,7 +8,6 @@ import { useAuth } from '@/lib/auth';
 import {
   getAllEvents,
   getAllPayments,
-  getAllRatings,
   getAllRequests,
   getCategories,
   fetchReportKpis,
@@ -17,7 +16,9 @@ import {
   getAllDisputes,
   getProfile,
   getTechnicians,
+  loadExtras,
   loadWorld,
+  useExtras,
   useTick,
   useWorldFailed,
   useWorldReady,
@@ -73,6 +74,11 @@ export default function DashboardPage() {
   // GMV del periodo: misma definición que Reportes y Finanzas (RPC
   // admin_report_kpis); la serie por cubeta sigue saliendo de los pagos.
   const [report, setReport] = useState<ReportKpis | null>(null);
+  // order_ratings reales (serie de calificación); el promedio ponderado sale de technicians.
+  const orderRatings = useExtras(s => s.ratings);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
   useEffect(() => {
     if (!ready) return;
     let live = true;
@@ -117,7 +123,7 @@ export default function DashboardPage() {
         ).length,
     );
     const rating = weightedRating(techs);
-    const ratings = getAllRatings();
+    const ratings = orderRatings.map(r => ({ stars: r.score, created_at: r.created_at }));
     const avgStars = (rs: { stars: number }[]) =>
       rs.length ? sum(rs.map(r => r.stars)) / rs.length : null;
     const ratingSerie = bks.map(
@@ -288,7 +294,7 @@ export default function DashboardPage() {
     };
     // `tick` fuerza el recálculo con cada recarga del snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, range, metric, router, report]);
+  }, [tick, range, metric, router, report, orderRatings]);
 
   if (failed && !ready)
     return (

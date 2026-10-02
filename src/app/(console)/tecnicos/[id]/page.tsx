@@ -164,9 +164,10 @@ export default function TecnicoDetailPage() {
   const latest = data.sessions[0] ?? null;
   const submittedAt = data.docs[0]?.created_at ?? latest?.created_at ?? null;
   const sla = slaLabel(slaRemainingHours(submittedAt));
+  // admin_resolve_kyc('declined') deja el motivo en admin_events (kyc_declined).
   const rejectNote =
     group === 'declined'
-      ? getNotes(tech.id).find(n => n.text.startsWith('KYC rechazado'))?.text.replace('KYC rechazado — ', '')
+      ? (getNotes(tech.id).find(n => n.event_type === 'kyc_declined')?.note ?? null)
       : null;
   const docsMissing = extras.unavailable.docs;
 

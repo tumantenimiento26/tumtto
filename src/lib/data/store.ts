@@ -6,17 +6,13 @@ import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import {
   emptyWorld,
-  nextId,
   CLIENT_ID,
   TECH_USER_ID,
-  ADMIN_ID,
   type World,
   type OrderStatus,
   type ServiceOrder,
   type ServiceCategory,
-  type Note,
   type DemoPayout,
-  type Ticket,
 } from '@/lib/demo/world';
 
 /**
@@ -24,12 +20,9 @@ import {
  * used against the demo world, but the world underneath is a snapshot loaded
  * from Supabase (admin RLS) and mutations write through to the backend.
  *
- * ponytail: fetch-all snapshot + full reload after each mutation — MVP volumes
- * are tiny; paginate per-domain when a table outgrows one request.
- *
- * Domains WITHOUT backend tables (messages, ratings, payouts, notes, tickets)
- * stay session-local in memory, exactly as the demo world had them — pending
- * backend migrations.
+ * ponytail: snapshot paginado + recarga completa tras cada escritura. Soporte
+ * (support_tickets/ticket_messages) y la bitácora admin (admin_events) viajan
+ * en el mismo snapshot; el chat de una orden (messages) se pide al abrirlo.
  */
 type PlatformSetting = Database['public']['Tables']['platform_settings']['Row'];
 type OrderInsert = Database['public']['Tables']['service_orders']['Insert'];
@@ -57,11 +50,81 @@ export const useWorldReady = () => useData(s => s.status === 'ready');
 /** El snapshot falló: la página debe ofrecer reintentar, no tablas vacías. */
 export const useWorldFailed = () => useData(s => s.status === 'error');
 
-// In-memory-only domains survive snapshot reloads (same array refs).
-const mem = emptyWorld();
-let world: World = mem;
+let world: World = emptyWorld();
 let settings: PlatformSetting[] = [];
+let tickets: Ticket[] = [];
+let ticketMessages: TicketMessage[] = [];
+let adminEvents: AdminEvent[] = [];
 let lastFetched = 0;
+
+// ── Soporte y bitácora (tablas sin tipos generados todavía; types: regen) ──
+export type TicketStatus = 'open' | 'pending' | 'in_progress' | 'resolved' | 'closed';
+export interface Ticket {
+  id: string;
+  opened_by: string;
+  client_id: string | null;
+  service_order_id: string | null;
+  assigned_admin_id: string | null;
+  subject: string;
+  status: TicketStatus;
+  created_at: string;
+  updated_at: string;
+}
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+}
+export interface OrderMessage {
+  id: string;
+  service_order_id: string;
+  sender_id: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+}
+export interface AdminEvent {
+  id: string;
+  actor_id: string | null;
+  entity_type: string;
+  entity_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+/** Entrada de bitácora lista para pintar (nota de admin o evento del sistema). */
+export interface Note {
+  id: string;
+  entity_id: string;
+  author: string;
+  event_type: string;
+  /** Texto libre de la nota (payload.note), si lo hay. */
+  note: string | null;
+  /** Lo que se muestra: la nota o la etiqueta del evento. */
+  text: string;
+  created_at: string;
+}
+const EVENT_LABEL: Record<string, string> = {
+  note: 'Nota',
+  user_suspended: 'Usuario suspendido',
+  user_restored: 'Usuario reactivado',
+  kyc_approved: 'KYC aprobado',
+  kyc_declined: 'KYC rechazado',
+  kyc_in_review: 'KYC en revisión',
+  dispute_resolved: 'Disputa resuelta',
+  order_reassigned: 'Servicio reasignado',
+  order_refunded: 'Reembolso emitido',
+  setting_updated: 'Ajuste actualizado',
+  zone_upserted: 'Zona guardada',
+};
+/** Tablas secundarias del snapshot: si fallan (RLS, migración pendiente) no tiran la consola. */
+const optional = <T,>(p: Promise<T[]>, what: string) =>
+  p.catch((e: unknown) => {
+    console.warn(`[data] ${what} no disponible`, e);
+    return [] as T[];
+  });
 
 // Error surface: la consola registra toast.error aqui (admin-shell) — el store
 // no importa componentes para poder correr en tests de node.
@@ -72,7 +135,6 @@ export function setErrorNotifier(fn: (msg: string) => void) {
 
 const w = () => world;
 const bump = () => useData.getState().bump();
-const now = () => new Date().toISOString();
 
 // Consultas sin tipar (tablas/RPC que `supabase.ts` aún no conoce o select
 // dinámico). ponytail: regenerar los tipos (gen:types) y quitar los casts.
@@ -178,6 +240,9 @@ export function loadWorld(force = false): Promise<void> {
         kycSessions,
         disputes,
         platformSettings,
+        ticketRows,
+        ticketMessageRows,
+        adminEventRows,
       ] = await Promise.all([
         fetchAll('profiles'),
         fetchAll('service_categories'),
@@ -198,6 +263,29 @@ export function loadWorld(force = false): Promise<void> {
         fetchAll('kyc_sessions'),
         fetchAll('disputes'),
         fetchAll('platform_settings'),
+        optional(
+          fetchAllRows<Ticket>((a, b) =>
+            rawFrom('support_tickets').select('*').order('id').range(a, b),
+          ),
+          'support_tickets',
+        ),
+        optional(
+          fetchAllRows<TicketMessage>((a, b) =>
+            rawFrom('ticket_messages').select('*').order('id').range(a, b),
+          ),
+          'ticket_messages',
+        ),
+        // Bitácora admin: últimos 90 días (notas, KYC, suspensiones, ajustes).
+        optional(
+          fetchAllRows<AdminEvent>((a, b) =>
+            rawFrom('admin_events')
+              .select('id,actor_id,entity_type,entity_id,event_type,payload,created_at')
+              .gte('created_at', sinceIso(90))
+              .order('id')
+              .range(a, b),
+          ),
+          'admin_events',
+        ),
       ]);
       world = {
         profiles,
@@ -214,14 +302,11 @@ export function loadWorld(force = false): Promise<void> {
         ledger,
         kycSessions,
         disputes,
-        // session-local domains keep their refs across reloads
-        messages: mem.messages,
-        ratings: mem.ratings,
-        payouts: mem.payouts,
-        notes: mem.notes,
-        tickets: mem.tickets,
       };
       settings = platformSettings;
+      tickets = ticketRows;
+      ticketMessages = ticketMessageRows;
+      adminEvents = adminEventRows;
       // service_orders.folio (types: regen) alimenta orderCode() → SVC-<folio>.
       registerFolios(orders as { id: string; folio?: number | null }[]);
       lastFetched = Date.now();
@@ -393,14 +478,8 @@ export const getQuote = (orderId: string) =>
   w().quotes.find(q => q.service_order_id === orderId) ?? null;
 export const getQuoteItems = (quoteId: string) =>
   w().quoteItems.filter(i => i.quote_id === quoteId);
-export const getMessages = (orderId: string) =>
-  w()
-    .messages.filter(m => m.order_id === orderId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 export const getPayment = (orderId: string) =>
   w().payments.find(p => p.service_order_id === orderId) ?? null;
-export const getRating = (orderId: string) =>
-  w().ratings.find(r => r.order_id === orderId) ?? null;
 
 export const getPendingKyc = () =>
   w().technicians.filter(
@@ -446,17 +525,37 @@ export const getTechCategories = (techId: string) =>
   w().technicianCategories.filter(tc => tc.technician_id === techId);
 export const getTechRates = (techId: string) =>
   w().rates.filter(r => r.technician_id === techId);
-export const getNotes = (entityId: string) =>
-  w()
-    .notes.filter(n => n.entity_id === entityId)
+/** Bitácora de una entidad (orden, técnico, cliente, disputa) desde admin_events. */
+export const getNotes = (entityId: string): Note[] =>
+  adminEvents
+    .filter(e => e.entity_id === entityId)
+    .map(e => {
+      const note = typeof e.payload?.note === 'string' ? e.payload.note : null;
+      const label = EVENT_LABEL[e.event_type] ?? e.event_type;
+      return {
+        id: e.id,
+        entity_id: entityId,
+        author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+        event_type: e.event_type,
+        note,
+        text: e.event_type === 'note' && note ? note : note ? `${label} — ${note}` : label,
+        created_at: e.created_at,
+      };
+    })
     .sort(byNewest);
-export const getTickets = () => [...w().tickets].sort(byNewest);
-export const getTicket = (id: string) =>
-  w().tickets.find(t => t.id === id) ?? null;
+export const isTicketOpen = (t: Ticket) => t.status !== 'resolved' && t.status !== 'closed';
+export const getTickets = () => [...tickets].sort(byNewest);
+export const getTicket = (id: string) => tickets.find(t => t.id === id) ?? null;
+/** Quién pidió el ticket: el usuario (client_id) o quien lo abrió. */
+export const ticketRequester = (t: Ticket) => t.client_id ?? t.opened_by;
+export const getTicketMessages = (ticketId: string) =>
+  ticketMessages
+    .filter(m => m.ticket_id === ticketId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 /** Badge del sidebar: disputas no resueltas + tickets sin resolver. */
 export const getOpenSupportCount = () =>
   w().disputes.filter(d => d.status === 'open' || d.status === 'in_review')
-    .length + w().tickets.filter(t => t.status !== 'resolved').length;
+    .length + tickets.filter(isTicketOpen).length;
 
 function byNewest(a: { created_at: string }, b: { created_at: string }) {
   return b.created_at.localeCompare(a.created_at);
@@ -475,8 +574,6 @@ export const getOrderEvents = (orderId: string) =>
 // ── consola-a (dashboard) ─────────────────────────────────────────────────
 /** Todos los eventos de estado (actividad en vivo del dashboard). */
 export const getAllEvents = () => w().events;
-/** Todas las calificaciones (demo-only hasta leer order_ratings). */
-export const getAllRatings = () => w().ratings;
 // ── /consola-a ────────────────────────────────────────────────────────────
 export const getCategoriesWithCounts = () =>
   w().categories.map(c => ({
@@ -683,13 +780,9 @@ export async function resolveKyc(
   );
 }
 
-/** Rechaza el KYC guardando el motivo como nota interna del técnico. */
-export async function rejectKyc(techId: string, reason: string) {
-  const r = await resolveKyc(techId, false, reason);
-  // La nota solo si el rechazo sí quedó guardado.
-  if (r !== null) addNote(techId, `KYC rechazado — ${reason}`);
-  return r;
-}
+/** Rechaza el KYC; admin_resolve_kyc guarda el motivo en admin_events (kyc_declined). */
+export const rejectKyc = (techId: string, reason: string) =>
+  resolveKyc(techId, false, reason);
 
 // Suspensión: profiles.status (+ technicians.is_available al suspender a un
 // técnico) en una sola transacción vía admin_set_user_status.
@@ -918,137 +1011,184 @@ export async function deleteCategory(
 }
 
 // ── Soporte ──────────────────────────────────────────────────────────────────
-export async function resolveDispute(disputeId: string, resolution: string) {
-  return mutate(async () => {
-    const { data: session } = await supabase.auth.getSession();
-    const { error } = await supabase
-      .from('disputes')
-      .update({
-        status: 'resolved',
-        resolution_notes: resolution,
-        resolved_by: session?.session?.user.id ?? null,
-        resolved_at: now(),
-      })
-      .eq('id', disputeId);
-    if (error) throw error;
-    return true;
-  }, 'No se pudo resolver la disputa.');
+export type DisputeOutcome = 'favor_cliente' | 'favor_tecnico' | 'desestimada';
+
+/** Id del usuario con sesión (autor de notas, mensajes y tickets). */
+async function myId(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const id = data.session?.user.id;
+  if (!id) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  return id;
 }
 
-/** Escala la disputa a nivel 2: sigue abierta (in_review), con nota. */
+/**
+ * Resuelve una disputa (RPC admin_resolve_dispute; types: regen): estado,
+ * outcome, notas, libera el hold interno, baja is_disputed de la orden y
+ * notifica a ambas partes en una sola transacción.
+ */
+export async function resolveDispute(
+  disputeId: string,
+  outcome: DisputeOutcome,
+  notes: string,
+) {
+  return mutate(
+    async () => {
+      const { error } = await rawRpc('admin_resolve_dispute', {
+        p_dispute_id: disputeId,
+        p_outcome: outcome,
+        p_notes: notes.trim() || null,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo resolver la disputa.'),
+  );
+}
+
+/** Escala la disputa a nivel 2: sigue abierta (in_review) y queda en la bitácora. */
 export async function escalateDispute(disputeId: string) {
   return mutate(async () => {
     const { error } = await supabase
       .from('disputes')
-      .update({
-        status: 'in_review',
-        resolution_notes: 'Escalado a nivel 2 — pendiente de revisión',
-      })
+      .update({ status: 'in_review' })
       .eq('id', disputeId);
     if (error) throw error;
+    const { error: ne } = await rawRpc('add_admin_note', {
+      p_entity_type: 'disputes',
+      p_entity_id: disputeId,
+      p_note: 'Escalada a nivel 2 — pendiente de revisión',
+    });
+    if (ne) throw ne;
     return true;
   }, 'No se pudo escalar la disputa.');
 }
 
-// ── Session-local domains (sin tabla en el backend todavía) ──────────────────
-// ponytail: messages/ratings/payouts/notes/tickets no tienen tabla desplegada —
-// viven en memoria de la sesión de la consola. Migraciones pendientes en
-// tumtto-backend; al existir, estos mutators pasan a supabase.from(...).
-
-export function sendMessage(
-  orderId: string,
-  senderId: string,
-  content: string,
-) {
-  w().messages.push({
-    id: nextId('m'),
-    order_id: orderId,
-    sender_id: senderId,
-    content,
-    created_at: now(),
-  });
-  bump();
+// ── Chat de una orden (tabla messages; se pide al abrir el chat) ────────────
+export async function fetchOrderMessages(orderId: string): Promise<OrderMessage[]> {
+  const { data, error } = await rawFrom('messages')
+    .select('id,service_order_id,sender_id,body,read_at,created_at')
+    .eq('service_order_id', orderId)
+    .order('created_at');
+  if (error) throw error;
+  return (data ?? []) as OrderMessage[];
 }
 
-export function addNote(
-  entityId: string,
-  text: string,
-  author = 'Admin',
-): Note {
-  const note: Note = {
-    id: nextId('n'),
-    entity_id: entityId,
-    author,
-    text,
-    created_at: now(),
-  };
-  w().notes.unshift(note);
-  bump();
-  return note;
+/** Mensaje del admin en el chat de la orden (RLS: sender_id = auth.uid()). */
+export async function sendMessage(orderId: string, body: string) {
+  const text = body.trim();
+  if (!text) return null;
+  try {
+    const { error } = await rawFrom('messages').insert({
+      service_order_id: orderId,
+      sender_id: await myId(),
+      body: text,
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('[data] sendMessage', e);
+    notifyError('No se pudo enviar el mensaje.');
+    return null;
+  }
 }
 
-export function createTicket(input: {
+// ── Notas internas (add_admin_note → admin_events; bitácora append-only) ────
+export type NoteEntity = 'service_orders' | 'technicians' | 'profiles' | 'disputes';
+
+export async function addNote(entityType: NoteEntity, entityId: string, text: string) {
+  if (!text.trim()) return null;
+  return mutate(
+    async () => {
+      const { error } = await rawRpc('add_admin_note', {
+        p_entity_type: entityType,
+        p_entity_id: entityId,
+        p_note: text.trim(),
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar la nota.'),
+  );
+}
+
+// ── Tickets (support_tickets + ticket_messages) ─────────────────────────────
+export async function createTicket(input: {
   subject: string;
   requester_id: string;
-  role?: Ticket['role'];
-  priority?: Ticket['priority'];
   order_id?: string | null;
   content?: string;
-}): Ticket {
-  const role =
-    input.role ??
-    (getProfile(input.requester_id)?.role === 'technician'
-      ? 'tecnico'
-      : 'cliente');
-  const ticket: Ticket = {
-    id: nextId('TK'),
-    subject: input.subject,
-    requester_id: input.requester_id,
-    role,
-    status: 'open',
-    priority: input.priority ?? 'media',
-    order_id: input.order_id ?? null,
-    created_at: now(),
-    messages: [],
-  };
-  if (input.content) {
-    ticket.messages.push({
-      id: nextId('tm'),
-      ticket_id: ticket.id,
-      sender_id: ADMIN_ID,
-      content: input.content,
-      created_at: now(),
-    });
-  }
-  w().tickets.unshift(ticket);
-  bump();
-  return ticket;
+}): Promise<string | null> {
+  return mutate(
+    async () => {
+      const me = await myId();
+      const { data, error } = await rawFrom('support_tickets')
+        .insert({
+          opened_by: me,
+          client_id: input.requester_id,
+          service_order_id: input.order_id ?? null,
+          subject: input.subject.trim(),
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      const id = (data as { id: string }).id;
+      if (input.content?.trim()) {
+        const { error: me2 } = await rawFrom('ticket_messages').insert({
+          ticket_id: id,
+          author_id: me,
+          body: input.content.trim(),
+        });
+        if (me2) throw me2;
+      }
+      return id;
+    },
+    e => pgMessage(e, 'No se pudo crear el ticket.'),
+  );
 }
 
-export function replyTicket(
-  ticketId: string,
-  senderId: string,
-  content: string,
-) {
-  const t = getTicket(ticketId);
-  if (!t) return;
-  t.messages.push({
-    id: nextId('tm'),
-    ticket_id: ticketId,
-    sender_id: senderId,
-    content,
-    created_at: now(),
-  });
-  if (senderId === ADMIN_ID && t.status === 'open') t.status = 'pending';
-  bump();
+export async function setTicketStatus(ticketId: string, status: TicketStatus) {
+  return mutate(
+    async () => {
+      const { error } = await rawFrom('support_tickets')
+        .update({ status })
+        .eq('id', ticketId);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo actualizar el ticket.'),
+  );
 }
+export const resolveTicket = (ticketId: string) => setTicketStatus(ticketId, 'resolved');
+/** Reabre un ticket (Deshacer de "Marcar resuelto"). */
+export const reopenTicket = (ticketId: string) => setTicketStatus(ticketId, 'pending');
 
-export function resolveTicket(ticketId: string) {
+/** Respuesta del admin: abierto → en espera; resuelto → se reabre. */
+export async function replyTicket(ticketId: string, body: string) {
+  const text = body.trim();
+  if (!text) return null;
   const t = getTicket(ticketId);
-  if (t) {
-    t.status = 'resolved';
-    bump();
-  }
+  return mutate(
+    async () => {
+      const { error } = await rawFrom('ticket_messages').insert({
+        ticket_id: ticketId,
+        author_id: await myId(),
+        body: text,
+      });
+      if (error) throw error;
+      const next: TicketStatus | null =
+        t?.status === 'open' || t?.status === 'resolved' || t?.status === 'closed'
+          ? 'pending'
+          : null;
+      if (next) {
+        const { error: se } = await rawFrom('support_tickets')
+          .update({ status: next })
+          .eq('id', ticketId);
+        if (se) throw se;
+      }
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo enviar la respuesta.'),
+  );
 }
 
 // ── consola-d (catálogo / reportes / soporte / config) — bloque aditivo ─────
@@ -1121,15 +1261,6 @@ export const fetchColdZones = (from: Date, to: Date) =>
     to,
   );
 
-/** Reabre un ticket (Deshacer de "Marcar resuelto"). Tickets: solo sesión. */
-export function reopenTicket(ticketId: string) {
-  const t = getTicket(ticketId);
-  if (t && t.status === 'resolved') {
-    t.status = 'pending';
-    bump();
-  }
-}
-
 /**
  * ¿La sesión actual tiene un factor TOTP verificado? Supabase solo expone los
  * factores propios (listFactors), no los de otros admins. null = no se pudo leer.
@@ -1156,7 +1287,7 @@ export function __setWorldForTests(next: World) {
   useData.setState({ status: 'ready' });
 }
 
-export { CLIENT_ID, TECH_USER_ID, ADMIN_ID };
+export { CLIENT_ID, TECH_USER_ID };
 
 // ── consola-b: Servicios y Clientes (ediciones, notas con Deshacer, evidencia)
 // Bloque aditivo del rediseño; no cambia los mutators de arriba.
@@ -1210,20 +1341,6 @@ export async function updateProfile(
         ? 'El celular no tiene un formato válido (+52 y 10 dígitos).'
         : pgMessage(e, 'No se pudo guardar el perfil.'),
   );
-}
-
-/** Quita una nota (sesión) y la regresa para poder deshacer. */
-export function removeNote(noteId: string): Note | null {
-  const i = w().notes.findIndex(n => n.id === noteId);
-  if (i < 0) return null;
-  const [n] = w().notes.splice(i, 1);
-  bump();
-  return n;
-}
-
-export function restoreNote(note: Note) {
-  if (!w().notes.some(n => n.id === note.id)) w().notes.unshift(note);
-  bump();
 }
 
 export type OrderEvidence = {

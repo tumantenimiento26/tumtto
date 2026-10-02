@@ -1471,6 +1471,9 @@ export interface CoverageZone {
   slug: string;
   name: string;
   is_active: boolean;
+  /** ST_AsGeoJSON(geom) (Polygon/MultiPolygon). */
+  geojson: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } | null;
+  technician_count: number;
 }
 export interface OrderRating {
   id: string;
@@ -1514,31 +1517,38 @@ export const useExtras = create<ExtrasState>(() => ({
   loaded: false,
 }));
 
-// Cada dominio es una página `(from, to)`; fetchAllRows encadena las páginas.
-const EXTRA_QUERIES: Record<ExtraKey, (from: number, to: number) => PromiseLike<RawResult>> = {
-  docs: (a, b) =>
+// Cada dominio es un cargador completo; las tablas pasan por fetchAllRows
+// (páginas `(from, to)`) y las zonas por su RPC (geojson real).
+const paged = (page: (from: number, to: number) => PromiseLike<RawResult>) => () =>
+  fetchAllRows<unknown>(page);
+const EXTRA_QUERIES: Record<ExtraKey, () => Promise<unknown[]>> = {
+  docs: paged((a, b) =>
     rawFrom('technician_documents')
       .select(
         'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,reviewed_at,created_at',
       )
       .order('created_at', { ascending: false })
-      .range(a, b),
-  payouts: (a, b) =>
+      .range(a, b)),
+  payouts: paged((a, b) =>
     rawFrom('payout_requests')
       .select(
         'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,batch_id,approved_at,created_at',
       )
       .order('created_at', { ascending: false })
-      .range(a, b),
-  // geom (PostGIS) no se pide: solo lo que la consola muestra.
-  zones: (a, b) => rawFrom('coverage_zones').select('id,slug,name,is_active').range(a, b),
-  ratings: (a, b) =>
+      .range(a, b)),
+  // Zonas con geometría (RPC admin_list_coverage_zones; types: regen).
+  zones: async () => {
+    const { data, error } = await rawRpc('admin_list_coverage_zones');
+    if (error) throw error;
+    return (data ?? []) as unknown[];
+  },
+  ratings: paged((a, b) =>
     rawFrom('order_ratings')
       .select('id,service_order_id,reviewer_id,reviewee_id,score,comment,created_at')
       .order('created_at', { ascending: false })
-      .range(a, b),
-  wallets: (a, b) => rawFrom('technician_wallet_summaries').select('*').range(a, b),
-  locations: (a, b) => rawFrom('technician_locations').select('*').range(a, b),
+      .range(a, b)),
+  wallets: paged((a, b) => rawFrom('technician_wallet_summaries').select('*').range(a, b)),
+  locations: paged((a, b) => rawFrom('technician_locations').select('*').range(a, b)),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -1552,7 +1562,7 @@ export function loadExtras(force = false): Promise<void> {
     const results = await Promise.all(
       keys.map(async k => {
         try {
-          const rows = await fetchAllRows<unknown>(EXTRA_QUERIES[k]);
+          const rows = await EXTRA_QUERIES[k]();
           return [k, rows, false] as const;
         } catch (e) {
           console.warn(`[data] extras.${k} no disponible`, e);
@@ -1708,18 +1718,60 @@ export const reviewDocument = (
     e => pgMessage(e, 'No se pudo guardar la revisión del documento.'),
   );
 
-/** Activa/desactiva una zona de cobertura (admin; coverage_zones_admin). */
-export const setZoneActive = (id: string, active: boolean) =>
+/** Crea o edita una zona (RPC upsert_coverage_zone: GeoJSON Polygon/MultiPolygon). */
+export const saveZone = (z: {
+  id?: string | null;
+  slug: string;
+  name: string;
+  geojson: unknown;
+  is_active: boolean;
+}) =>
   mutateExtras(
     async () => {
-      const { error } = await rawFrom('coverage_zones')
-        .update({ is_active: active })
-        .eq('id', id);
+      const { error } = await rawRpc('upsert_coverage_zone', {
+        p_slug: z.slug,
+        p_name: z.name,
+        p_geojson: z.geojson,
+        p_is_active: z.is_active,
+        p_id: z.id ?? null,
+      });
       if (error) throw error;
       return true;
     },
-    e => pgMessage(e, 'No se pudo actualizar la zona.'),
+    e =>
+      pgCode(e) === '23505'
+        ? 'Ya existe una zona con ese slug.'
+        : pgMessage(e, 'No se pudo guardar la zona (¿GeoJSON válido?).'),
   );
+
+/** Activa/pausa una zona: mismo upsert con su geometría actual. */
+export const setZoneActive = (id: string, active: boolean) => {
+  const z = useExtras.getState().zones.find(x => x.id === id);
+  if (!z?.geojson) {
+    notifyError('La zona no tiene geometría; edítala e importa su GeoJSON.');
+    return Promise.resolve(null);
+  }
+  return saveZone({ id, slug: z.slug, name: z.name, geojson: z.geojson, is_active: active });
+};
+
+/** Asigna (o quita con null) la zona base de un técnico (RPC assign_technician_zone). */
+export const assignTechZone = (techId: string, zoneId: string | null) =>
+  mutateExtras(
+    async () => {
+      const { error } = await rawRpc('assign_technician_zone', {
+        p_technician_id: techId,
+        p_zone_id: zoneId,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo asignar la zona al técnico.'),
+  );
+
+export type DemandCell = { dow: number; hour: number; order_count: number };
+/** Demanda por día de la semana × hora (RPC admin_report_demand_heatmap, hora ZMG). */
+export const fetchDemandHeatmap = (from: Date, to: Date) =>
+  reportRpc<DemandCell[]>('admin_report_demand_heatmap', from, to);
 
 /** Edita el perfil público del técnico (nombre visible y bio) y su nombre. */
 export async function updateTechnicianProfile(

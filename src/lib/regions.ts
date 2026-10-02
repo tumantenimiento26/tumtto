@@ -28,14 +28,6 @@ export function canonMunicipality(name: string | null | undefined): string | nul
   return CANON[fold(name)] ?? name.trim();
 }
 
-/** Id de polígono del mapa de cobertura para el municipio (si existe). */
-export const MAP_ZONE_ID: Record<string, string> = {
-  Zapopan: 'zap',
-  Guadalajara: 'gdl',
-  Tlaquepaque: 'tlaq',
-  Tlajomulco: 'tlaj',
-};
-
 export interface OrderLike {
   id: string;
   municipality: string | null;

@@ -2,12 +2,84 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Map as MapIcon } from 'lucide-react';
-import {
-  ZONE_POLYGONS,
-  TECH_BASES,
-  demandPoints,
-  coverageRing,
-} from './coverage-map';
+import { coverageRing } from '@/lib/geo';
+
+// ponytail: la landing es marketing — polígonos aproximados, hubs de demanda
+// deterministas y bases de ejemplo (antes vivían en coverage-map.tsx; la
+// consola ya pinta zonas/demanda reales del backend).
+const ZONE_POLYGONS: Record<string, [number, number][]> = {
+  zap: [
+    [-103.52, 20.79],
+    [-103.45, 20.82],
+    [-103.38, 20.8],
+    [-103.36, 20.75],
+    [-103.38, 20.7],
+    [-103.44, 20.67],
+    [-103.5, 20.68],
+    [-103.54, 20.73],
+  ],
+  gdl: [
+    [-103.38, 20.7],
+    [-103.36, 20.75],
+    [-103.3, 20.74],
+    [-103.26, 20.7],
+    [-103.28, 20.65],
+    [-103.33, 20.63],
+    [-103.38, 20.65],
+  ],
+  tlaq: [
+    [-103.33, 20.63],
+    [-103.28, 20.65],
+    [-103.24, 20.62],
+    [-103.26, 20.56],
+    [-103.32, 20.55],
+    [-103.36, 20.58],
+  ],
+  tlaj: [
+    [-103.5, 20.55],
+    [-103.42, 20.57],
+    [-103.36, 20.55],
+    [-103.34, 20.48],
+    [-103.4, 20.42],
+    [-103.48, 20.44],
+    [-103.52, 20.5],
+  ],
+};
+
+/** Puntos de demanda demo, deterministas, agrupados por hubs reales. */
+function demandPoints() {
+  let seed = 20260703;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const hubs: [number, number, number, number][] = [
+    [-103.39, 20.71, 0.03, 90], // Providencia / Zapopan oriente
+    [-103.35, 20.67, 0.025, 70], // GDL centro
+    [-103.43, 20.73, 0.035, 60], // Zapopan norte
+    [-103.3, 20.59, 0.03, 40], // Tlaquepaque
+    [-103.42, 20.5, 0.04, 25], // Tlajomulco
+  ];
+  const feats = [];
+  for (const [cx, cy, spread, count] of hubs) {
+    for (let i = 0; i < count; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * spread;
+      feats.push({
+        type: 'Feature' as const,
+        properties: { w: 0.4 + rnd() * 0.6 },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8],
+        },
+      });
+    }
+  }
+  return { type: 'FeatureCollection' as const, features: feats };
+}
+
+const TECH_BASES: { name: string; center: [number, number]; km: number }[] = [
+  { name: 'Ramón Hernández', center: [-103.4, 20.71], km: 10 },
+  { name: 'Adriana García', center: [-103.34, 20.66], km: 8 },
+  { name: 'Sergio Camarena', center: [-103.3, 20.6], km: 7 },
+];
 
 /**
  * Mapa de cobertura para la landing pública (Mapbox GL, tiles oscuros).

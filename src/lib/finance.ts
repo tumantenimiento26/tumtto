@@ -1,5 +1,7 @@
 // Agregados de Finanzas (puros, en centavos), probados en finance.test.ts.
 
+import { fmtDate } from '@/lib/dates';
+
 export type FinRange = '7d' | '30d' | '90d';
 
 export interface PayLike {
@@ -35,10 +37,7 @@ export function rangeBuckets(range: FinRange, now = new Date()): Bucket[] {
       return {
         from,
         to,
-        label: new Date(from).toLocaleDateString('es-MX', {
-          day: '2-digit',
-          month: 'short',
-        }),
+        label: fmtDate(from, { day: '2-digit', month: 'short' }),
       };
     });
   }
@@ -51,8 +50,8 @@ export function rangeBuckets(range: FinRange, now = new Date()): Bucket[] {
       to: from + DAY,
       label:
         range === '7d'
-          ? d.toLocaleDateString('es-MX', { weekday: 'short' }).replace('.', '')
-          : String(d.getDate()),
+          ? fmtDate(d, { weekday: 'short' }).replace('.', '')
+          : fmtDate(d, { day: 'numeric' }),
     };
   });
 }
@@ -142,7 +141,7 @@ export function monthlySummary(
       { from: d.getTime(), to: next.getTime(), label: '' },
     ]);
     return {
-      label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+      label: fmtDate(d, { month: 'short', year: '2-digit' }),
       ...t,
       goalPct: goalCents ? Math.round((t.gross / goalCents) * 100) : 0,
     };

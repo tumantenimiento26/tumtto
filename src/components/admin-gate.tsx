@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { enforceEphemeralSession } from '@/lib/sessionPrefs';
 import { Spinner } from '@/components/ui';
 
 /**
@@ -29,24 +28,36 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     if (!loading && !session) router.replace('/login');
   }, [loading, session, router]);
 
-  // "Mantener sesión" desmarcado + navegador cerrado → cerrar sesión.
-  useEffect(() => {
-    void enforceEphemeralSession();
-  }, []);
-
-  // Verificación en 2 pasos: si el admin tiene un factor verificado pero esta
-  // sesión sigue en aal1, termina el paso en /login. Sin factor se permite
-  // entrar (el login ofrece activarlo).
-  // ponytail: gate solo en el cliente; exigir aal2 también en RLS si se quiere
-  // blindar la API.
+  // Verificación en 2 pasos obligatoria: sin factor TOTP verificado o con la
+  // sesión todavía en aal1, el paso se termina en /login (?mfa=1), que
+  // enrola o pide el código. Si la consulta falla no se deja un spinner
+  // infinito: se manda al login a reintentar.
+  // ponytail: gate en el cliente; el backend exige aal2 en RLS con la key
+  // admin_require_aal2 (Config › Seguridad). Middleware SSR: pendiente (README).
   const [mfaOk, setMfaOk] = useState<boolean | null>(null);
   useEffect(() => {
     if (!session || !isAdmin) return;
-    void supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
-      const needs = data?.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
-      if (needs) router.replace('/login?mfa=1');
-      setMfaOk(!needs);
-    });
+    let live = true;
+    (async () => {
+      try {
+        const [{ data: aal, error: e1 }, { data: factors, error: e2 }] = await Promise.all([
+          supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+          supabase.auth.mfa.listFactors(),
+        ]);
+        if (e1 || e2) throw e1 ?? e2;
+        const enrolled = (factors?.totp ?? []).some(f => f.status === 'verified');
+        const ok = enrolled && aal?.currentLevel === 'aal2';
+        if (!live) return;
+        if (!ok) router.replace('/login?mfa=1');
+        setMfaOk(ok);
+      } catch (e) {
+        console.error('[gate] mfa', e);
+        if (live) router.replace('/login?mfa=1');
+      }
+    })();
+    return () => {
+      live = false;
+    };
   }, [session, isAdmin, router]);
 
   // Sesión o perfil resolviéndose: spinner, nunca pantalla en blanco (la

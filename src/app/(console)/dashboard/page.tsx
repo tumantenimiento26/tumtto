@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Star, Users, Wallet } from 'lucide-react';
 import { ErrorPage, ScreenSkeleton } from '@/components/ds';
@@ -8,18 +8,21 @@ import { useAuth } from '@/lib/auth';
 import {
   getAllEvents,
   getAllPayments,
-  getAllRatings,
   getAllRequests,
   getCategories,
+  fetchReportKpis,
   getMetrics,
   getPendingKyc,
   getAllDisputes,
   getProfile,
   getTechnicians,
+  loadExtras,
   loadWorld,
+  useExtras,
   useTick,
   useWorldFailed,
   useWorldReady,
+  type ReportKpis,
 } from '@/lib/data/store';
 import {
   activity,
@@ -68,6 +71,24 @@ export default function DashboardPage() {
   const { usuario } = useAuth();
   const [range, setRange] = useState<DashRange>('7d');
   const [metric, setMetric] = useState<DashMetric>('gmv');
+  // GMV del periodo: misma definición que Reportes y Finanzas (RPC
+  // admin_report_kpis); la serie por cubeta sigue saliendo de los pagos.
+  const [report, setReport] = useState<ReportKpis | null>(null);
+  // order_ratings reales (serie de calificación); el promedio ponderado sale de technicians.
+  const orderRatings = useExtras(s => s.ratings);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    const now = Date.now();
+    const from = buckets(range, now)[0].start;
+    void fetchReportKpis(new Date(from), new Date(now)).then(k => live && setReport(k));
+    return () => {
+      live = false;
+    };
+  }, [range, ready, tick]);
 
   const data = useMemo(() => {
     const now = Date.now();
@@ -102,7 +123,7 @@ export default function DashboardPage() {
         ).length,
     );
     const rating = weightedRating(techs);
-    const ratings = getAllRatings();
+    const ratings = orderRatings.map(r => ({ stars: r.score, created_at: r.created_at }));
     const avgStars = (rs: { stars: number }[]) =>
       rs.length ? sum(rs.map(r => r.stars)) / rs.length : null;
     const ratingSerie = bks.map(
@@ -115,7 +136,10 @@ export default function DashboardPage() {
       ratings.filter(r => between(r.created_at, prevBks[0].start, from)),
     );
     const vsYesterday = sameTimeYesterdayDelta(orders, now);
-    const gmvDelta = deltaPct(sum(gmvSerie), sum(gmvPrev));
+    const gmvCur = report ? Number(report.current.gmv_cents) / 100 : sum(gmvSerie);
+    const gmvDelta = report
+      ? deltaPct(Number(report.current.gmv_cents), Number(report.previous.gmv_cents))
+      : deltaPct(sum(gmvSerie), sum(gmvPrev));
 
     const kpis: BandKpi[] = [
       {
@@ -133,7 +157,7 @@ export default function DashboardPage() {
       {
         label: 'GMV del periodo',
         icon: Wallet,
-        value: sum(gmvSerie),
+        value: gmvCur,
         format: n => money(n),
         spark: gmvSerie,
         color: 'green',
@@ -270,7 +294,7 @@ export default function DashboardPage() {
     };
     // `tick` fuerza el recálculo con cada recarga del snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, range, metric, router]);
+  }, [tick, range, metric, router, report, orderRatings]);
 
   if (failed && !ready)
     return (

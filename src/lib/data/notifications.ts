@@ -9,6 +9,8 @@ import {
   getPendingKyc,
   getProfile,
   getTickets,
+  isTicketOpen,
+  ticketRequester,
   useTick,
 } from './store';
 
@@ -79,12 +81,12 @@ export function derive(now = Date.now()): AdminNotification[] {
         href: `/servicios/${d.service_order_id}`,
       });
   for (const t of getTickets())
-    if (t.status !== 'resolved')
+    if (isTicketOpen(t))
       out.push({
         id: `tk-${t.id}`,
         type: 'tickets',
         title: t.subject,
-        body: `${name(t.requester_id)} · prioridad ${t.priority}`,
+        body: `${name(ticketRequester(t))} · ${t.status === 'open' ? 'sin responder' : 'en seguimiento'}`,
         ts: t.created_at,
         href: '/soporte',
       });

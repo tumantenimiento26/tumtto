@@ -6,8 +6,9 @@ import type { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ds';
 import type { BucketTotals } from '@/lib/finance';
 
+/** Centavos → "$1,234.50" (los montos de finanzas se muestran exactos). */
 export const money = (c: number) =>
-  `$${Math.round(c / 100).toLocaleString('es-MX')}`;
+  (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 export const shortMoney = (c: number) => {
   const p = c / 100;
   return p >= 1000 ? `$${(p / 1000).toFixed(p >= 10000 ? 0 : 1)}k` : `$${Math.round(p)}`;

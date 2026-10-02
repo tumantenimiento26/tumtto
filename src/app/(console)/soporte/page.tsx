@@ -33,7 +33,6 @@ import {
   Textarea,
   Chip,
   snackbar,
-  toast,
   type Tone,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
@@ -47,7 +46,10 @@ import {
   getTicket,
   getAllProfiles,
   getClientRequests,
+  getNotes,
   getTechRequests,
+  getTicketMessages,
+  isTicketOpen,
   resolveDispute,
   escalateDispute,
   resolveKyc,
@@ -56,15 +58,17 @@ import {
   replyTicket,
   resolveTicket,
   reopenTicket,
+  ticketRequester,
   useWorldReady,
   useWorldFailed,
   loadWorld,
   useTick,
-  ADMIN_ID,
+  type Ticket,
+  type TicketStatus,
 } from '@/lib/data/store';
-import type { Ticket } from '@/lib/demo/world';
 import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
+import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/data/notifications';
 import {
   RESOLUTIONS,
@@ -76,16 +80,16 @@ import {
 
 type TabKey = 'disputas' | 'tickets' | 'kyc';
 
-const TICKET_STATUS: Record<Ticket['status'], { label: string; tone: Tone }> = {
+const TICKET_STATUS: Record<TicketStatus, { label: string; tone: Tone }> = {
   open: { label: 'Abierto', tone: 'danger' },
   pending: { label: 'En espera', tone: 'warning' },
+  in_progress: { label: 'En proceso', tone: 'info' },
   resolved: { label: 'Resuelto', tone: 'success' },
+  closed: { label: 'Cerrado', tone: 'neutral' },
 };
-const PRIORITY_TONE: Record<Ticket['priority'], Tone> = {
-  alta: 'danger',
-  media: 'warning',
-  baja: 'neutral',
-};
+/** Rol del usuario del ticket (cliente/técnico) a partir de su perfil. */
+const ticketRole = (t: Ticket) =>
+  getProfile(ticketRequester(t))?.role === 'technician' ? 'tecnico' : 'cliente';
 const ORDER_STATUS: Record<string, string> = {
   requested: 'Solicitado',
   accepted: 'Aceptado',
@@ -130,7 +134,7 @@ export default function SoportePage() {
   const activeDisputes = getAllDisputes().filter(
     d => d.status === 'open' || d.status === 'in_review',
   );
-  const openTickets = getTickets().filter(t => t.status !== 'resolved');
+  const openTickets = getTickets().filter(isTicketOpen);
   const pendingKyc = getPendingKyc();
 
   if (failed)
@@ -278,10 +282,14 @@ function DisputeDetail({
   const opener = getProfile(dispute.opened_by);
   const tech = req?.technician_id ? getProfile(req.technician_id) : null;
   const escalated = dispute.status === 'in_review';
-  const [resolution, setResolution] = useState<Resolution>('cliente');
+  const [resolution, setResolution] = useState<Resolution>('favor_cliente');
   const [comment, setComment] = useState('');
   const { busy, run } = useAction();
+  const { can } = useAuth();
+  const canSupport = can('soporte');
   const code = disputeCode(dispute.id);
+  // Bitácora de la disputa (escalaciones y notas) desde admin_events.
+  const log = getNotes(dispute.id);
 
   return (
     <Card padded className="flex flex-col gap-5">
@@ -342,9 +350,13 @@ function DisputeDetail({
         </div>
       )}
 
-      {escalated && dispute.resolution_notes && (
+      {log.length > 0 && (
         <div className="rounded-box border border-warning-ring bg-warning-soft px-4 py-3 font-sans text-[12.5px] text-warning-ink">
-          {dispute.resolution_notes}
+          {log.slice(0, 3).map(n => (
+            <div key={n.id}>
+              {n.text} <span className="opacity-70">· {n.author} · {timeAgo(n.created_at)}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -361,18 +373,18 @@ function DisputeDetail({
           onChange={e => setComment(e.target.value)}
           placeholder="Qué se decidió y por qué (lo verán ambas partes)"
         />
-        {resolution !== 'tecnico' && (
-          <p className="font-sans text-[12px] text-muted">
-            Si hay reembolso, emítelo desde el detalle del servicio: resolver la
-            disputa no mueve dinero.
-          </p>
-        )}
+        <p className="font-sans text-[12px] text-muted">
+          Al resolver se libera el saldo retenido del técnico y se notifica a
+          ambas partes.
+          {resolution === 'favor_cliente' &&
+            ' Si hay reembolso, emítelo desde el detalle del servicio: resolver la disputa no mueve dinero.'}
+        </p>
         <div className="flex flex-wrap justify-end gap-2">
           {!escalated && (
             <Button
               variant="secondary"
               icon={ArrowUpRight}
-              disabled={!!busy}
+              disabled={!!busy || !canSupport}
               loading={busy === 'escalate'}
               onClick={() =>
                 void run(
@@ -388,7 +400,8 @@ function DisputeDetail({
           <Button
             variant="approve"
             icon={Check}
-            disabled={!!busy}
+            disabled={!!busy || !canSupport}
+            title={canSupport ? undefined : 'Tu rol no resuelve disputas'}
             loading={busy === 'resolve'}
             onClick={() =>
               void run(
@@ -396,6 +409,7 @@ function DisputeDetail({
                 () =>
                   resolveDispute(
                     dispute.id,
+                    resolution,
                     resolutionNote(resolution, comment),
                   ),
                 `Disputa resuelta · ${code}`,
@@ -424,9 +438,7 @@ function Party({ name, role }: { name?: string | null; role: string }) {
   );
 }
 
-// ── Tickets ─────────────────────────────────────────────────────────────────
-// ponytail: tickets y sus mensajes viven solo en esta sesión (no hay tabla de
-// soporte en el backend todavía); por eso los avisos usan toast.local.
+// ── Tickets (support_tickets + ticket_messages) ─────────────────────────────
 function TicketsView() {
   useTick();
   const [query, setQuery] = useState('');
@@ -435,7 +447,7 @@ function TicketsView() {
   const filtered = useMemo(
     () =>
       tickets.filter(t =>
-        matches(query, t.subject, t.id, getProfile(t.requester_id)?.full_name),
+        matches(query, t.subject, t.id, getProfile(ticketRequester(t))?.full_name),
       ),
     [tickets, query],
   );
@@ -468,9 +480,10 @@ function TicketsView() {
             </div>
           )}
           {filtered.map(t => {
-            const requester = getProfile(t.requester_id);
-            const st = TICKET_STATUS[t.status];
-            const last = t.messages[t.messages.length - 1];
+            const requester = getProfile(ticketRequester(t));
+            const st = TICKET_STATUS[t.status] ?? TICKET_STATUS.open;
+            const msgs = getTicketMessages(t.id);
+            const last = msgs[msgs.length - 1];
             const active = t.id === selected;
             return (
               <button
@@ -493,11 +506,13 @@ function TicketsView() {
                   </div>
                   <div className="my-1 flex flex-wrap items-center gap-1.5">
                     <Badge tone={st.tone}>{st.label}</Badge>
-                    <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge>
+                    {t.service_order_id && (
+                      <Badge tone="info">{orderCode(t.service_order_id)}</Badge>
+                    )}
                   </div>
                   <div className="line-clamp-2 font-sans text-[12px] text-muted">
                     {t.subject}
-                    {last?.content ? ` — ${last.content}` : ''}
+                    {last?.body ? ` — ${last.body}` : ''}
                   </div>
                 </div>
               </button>
@@ -539,15 +554,16 @@ function TicketThread({
   onBack: () => void;
 }) {
   const [draft, setDraft] = useState('');
-  const requester = getProfile(ticket.requester_id);
-  const st = TICKET_STATUS[ticket.status];
+  const { busy, run } = useAction();
+  const requester = getProfile(ticketRequester(ticket));
+  const st = TICKET_STATUS[ticket.status] ?? TICKET_STATUS.open;
+  const messages = getTicketMessages(ticket.id);
 
-  function send() {
+  async function send() {
     const text = draft.trim();
-    if (!text) return;
-    replyTicket(ticket.id, ADMIN_ID, text);
-    setDraft('');
-    toast.local('Respuesta enviada');
+    if (!text || busy) return;
+    const ok = await run('reply', () => replyTicket(ticket.id, text), 'Respuesta enviada');
+    if (ok) setDraft('');
   }
 
   return (
@@ -570,20 +586,20 @@ function TicketThread({
             <Badge tone={st.tone}>{st.label}</Badge>
           </div>
           <div className="mt-0.5 font-sans text-[12px] capitalize text-muted">
-            {requester?.full_name ?? 'Usuario'} · {ticket.role} ·{' '}
+            {requester?.full_name ?? 'Usuario'} · {ticketRole(ticket)} ·{' '}
             {timeAgo(ticket.created_at)}
           </div>
         </div>
       </div>
 
       <div className="min-h-[260px] flex-1 overflow-y-auto p-4 xl:min-h-0">
-        {ticket.messages.length === 0 && (
+        {messages.length === 0 && (
           <p className="py-8 text-center font-sans text-[12.5px] text-faint">
             Sin mensajes todavía.
           </p>
         )}
-        {ticket.messages.map(m => {
-          const mine = m.sender_id === ADMIN_ID;
+        {messages.map(m => {
+          const mine = getProfile(m.author_id)?.role === 'admin';
           return (
             <div
               key={m.id}
@@ -599,12 +615,12 @@ function TicketThread({
                       : 'rounded-tl-sm border border-line bg-card text-navy'
                   }`}
                 >
-                  {m.content}
+                  {m.body}
                 </div>
                 <span className="mt-1 font-mono text-[10.5px] text-faint">
                   {mine
-                    ? 'Soporte'
-                    : (getProfile(m.sender_id)?.full_name ?? 'Usuario')}{' '}
+                    ? (getProfile(m.author_id)?.full_name ?? 'Soporte')
+                    : (getProfile(m.author_id)?.full_name ?? 'Usuario')}{' '}
                   · {timeAgo(m.created_at)}
                 </span>
               </div>
@@ -620,10 +636,10 @@ function TicketThread({
           rows={2}
           maxLength={1000}
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void send();
           }}
           placeholder={
-            ticket.status === 'resolved'
+            !isTicketOpen(ticket)
               ? 'Ticket resuelto — responder lo reabre.'
               : 'Escribe una respuesta… (⌘↵ para enviar)'
           }
@@ -632,7 +648,7 @@ function TicketThread({
           <span className="font-mono text-[11px] text-faint">
             {draft.length} / 1000
           </span>
-          <Button size="sm" icon={Send} onClick={send} disabled={!draft.trim()}>
+          <Button size="sm" icon={Send} onClick={() => void send()} loading={!!busy} disabled={!draft.trim()}>
             Enviar
           </Button>
         </div>
@@ -643,19 +659,22 @@ function TicketThread({
 
 function TicketContext({ ticket }: { ticket: Ticket }) {
   useTick();
-  const requester = getProfile(ticket.requester_id);
-  const req = ticket.order_id ? getRequest(ticket.order_id) : null;
+  const { busy, run } = useAction();
+  const requester = getProfile(ticketRequester(ticket));
+  const role = ticketRole(ticket);
+  const req = ticket.service_order_id ? getRequest(ticket.service_order_id) : null;
   const services = requester
-    ? ticket.role === 'tecnico'
+    ? role === 'tecnico'
       ? getTechRequests(requester.id)
       : getClientRequests(requester.id)
     : [];
 
-  function markResolved() {
-    resolveTicket(ticket.id);
-    snackbar.show('Ticket marcado como resuelto', {
-      undo: () => reopenTicket(ticket.id),
-    });
+  async function markResolved() {
+    const ok = await run('resolve', () => resolveTicket(ticket.id));
+    if (ok)
+      snackbar.show('Ticket marcado como resuelto', {
+        undo: () => void reopenTicket(ticket.id),
+      });
   }
 
   return (
@@ -669,18 +688,18 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
               {requester?.full_name ?? 'Usuario'}
             </div>
             <div className="font-sans text-[12px] capitalize text-muted">
-              {ticket.role} · {formatPhone(requester?.phone) || '—'}
+              {role} · {formatPhone(requester?.phone) || '—'}
             </div>
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Mini label="Servicios" value={String(services.length)} />
-          <Mini label="Prioridad" value={ticket.priority} />
+          <Mini label="Estado" value={(TICKET_STATUS[ticket.status] ?? TICKET_STATUS.open).label} />
         </div>
         {requester && (
           <Link
             href={
-              ticket.role === 'tecnico'
+              role === 'tecnico'
                 ? `/tecnicos/${requester.id}`
                 : `/clientes/${requester.id}`
             }
@@ -710,8 +729,8 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
       )}
 
       <div className="mt-auto border-t border-divider pt-3.5">
-        {ticket.status !== 'resolved' ? (
-          <Button variant="approve" icon={Check} full onClick={markResolved}>
+        {isTicketOpen(ticket) ? (
+          <Button variant="approve" icon={Check} full loading={!!busy} onClick={() => void markResolved()}>
             Marcar resuelto
           </Button>
         ) : (
@@ -719,9 +738,6 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
             <CheckCircle2 size={14} /> Resuelto
           </div>
         )}
-        <p className="mt-2 text-center font-sans text-[11px] text-faint">
-          Los tickets aún viven solo en esta sesión.
-        </p>
       </div>
     </aside>
   );
@@ -773,6 +789,7 @@ function KycCard({ techId }: { techId: string }) {
   const who = profile?.full_name ?? 'Técnico';
   const sessions = getKycSessions(techId);
   const { busy, run } = useAction();
+  const canKyc = useAuth().can('kyc');
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [other, setOther] = useState('');
@@ -838,7 +855,8 @@ function KycCard({ techId }: { techId: string }) {
           icon={Check}
           className="flex-1"
           loading={busy === 'approve'}
-          disabled={!!busy}
+          disabled={!!busy || !canKyc}
+          title={canKyc ? 'Aprueba desde el expediente si faltan documentos' : 'Tu rol no revisa KYC'}
           onClick={() =>
             void run(
               'approve',
@@ -853,7 +871,7 @@ function KycCard({ techId }: { techId: string }) {
           variant="destructive"
           icon={X}
           className="flex-1"
-          disabled={!!busy}
+          disabled={!!busy || !canKyc}
           onClick={() => setRejecting(true)}
         >
           Rechazar
@@ -921,24 +939,27 @@ function NewTicketModal({
 }) {
   const [subject, setSubject] = useState('');
   const [requesterId, setRequesterId] = useState('');
-  const [priority, setPriority] = useState<Ticket['priority']>('media');
   const [content, setContent] = useState('');
+  const { busy, run } = useAction();
   const people = getAllProfiles().filter(
     p => p.role === 'client' || p.role === 'technician',
   );
 
-  function submit() {
+  async function submit() {
     if (!subject.trim() || !requesterId) return;
-    createTicket({
-      subject: subject.trim(),
-      requester_id: requesterId,
-      priority,
-      content: content.trim() || undefined,
-    });
-    toast.local('Ticket creado');
+    const ok = await run(
+      'create',
+      () =>
+        createTicket({
+          subject: subject.trim(),
+          requester_id: requesterId,
+          content: content.trim() || undefined,
+        }),
+      'Ticket creado',
+    );
+    if (!ok) return;
     setSubject('');
     setRequesterId('');
-    setPriority('media');
     setContent('');
     onClose();
     onCreated();
@@ -957,7 +978,7 @@ function NewTicketModal({
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={submit} disabled={!subject.trim() || !requesterId}>
+          <Button onClick={() => void submit()} loading={!!busy} disabled={!subject.trim() || !requesterId}>
             Crear ticket
           </Button>
         </>
@@ -980,17 +1001,6 @@ function NewTicketModal({
               label: p.full_name ?? 'Usuario',
               hint: p.role === 'technician' ? 'Técnico' : 'Cliente',
             }))}
-          />
-        </Field>
-        <Field label="Prioridad">
-          <Segmented
-            options={[
-              { value: 'alta', label: 'Alta' },
-              { value: 'media', label: 'Media' },
-              { value: 'baja', label: 'Baja' },
-            ]}
-            value={priority}
-            onChange={setPriority}
           />
         </Field>
         <Field label="Primer mensaje (opcional)">

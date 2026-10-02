@@ -7,26 +7,37 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const calls = { selects: 0, fail: false };
 let release: (() => void) | null = null;
 
+// fetchAll encadena select().order().range() (y gte): el mock devuelve un
+// thenable encadenable; cada tabla trae una sola página vacía.
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => {
         calls.selects++;
-        if (calls.fail)
-          return Promise.resolve({ data: null, error: { message: 'x' } });
-        // Solo la primera tabla de cada carga espera a `release`.
-        return new Promise(res => {
-          const done = () => res({ data: [], error: null });
-          if (!release) release = done;
-          else done();
-        });
+        const p: Promise<{ data: unknown; error: unknown }> = calls.fail
+          ? Promise.resolve({ data: null, error: { message: 'x' } })
+          : // Solo la primera tabla de cada carga espera a `release`.
+            new Promise(res => {
+              const done = () => res({ data: [], error: null });
+              if (!release) release = done;
+              else done();
+            });
+        const q = {
+          order: () => q,
+          range: () => q,
+          gte: () => q,
+          then: p.then.bind(p),
+        };
+        return q;
       },
     }),
+    channel: () => ({ on() { return this; }, subscribe() {} }),
+    removeChannel: () => Promise.resolve(),
   },
 }));
 
 const store = await import('./store');
-const TABLES = 15; // tablas que lee loadWorld
+const TABLES = 18; // tablas que lee loadWorld (15 + tickets, mensajes de ticket, admin_events)
 
 beforeEach(() => {
   calls.selects = 0;

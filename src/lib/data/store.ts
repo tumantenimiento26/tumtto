@@ -1,20 +1,20 @@
 'use client';
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
+import type { Database, Json } from '@/types/supabase';
+import { mxDay } from '@/lib/dates';
+import { registerFolios } from '@/lib/orderCode';
+import { wkbPoint } from '@/lib/geo';
+import type { AdminRole } from '@/lib/rbac';
 import {
   emptyWorld,
-  nextId,
   CLIENT_ID,
   TECH_USER_ID,
-  ADMIN_ID,
   type World,
   type OrderStatus,
   type ServiceOrder,
   type ServiceCategory,
-  type Note,
   type DemoPayout,
-  type Ticket,
 } from '@/lib/demo/world';
 
 /**
@@ -22,15 +22,15 @@ import {
  * used against the demo world, but the world underneath is a snapshot loaded
  * from Supabase (admin RLS) and mutations write through to the backend.
  *
- * ponytail: fetch-all snapshot + full reload after each mutation — MVP volumes
- * are tiny; paginate per-domain when a table outgrows one request.
- *
- * Domains WITHOUT backend tables (messages, ratings, payouts, notes, tickets)
- * stay session-local in memory, exactly as the demo world had them — pending
- * backend migrations.
+ * ponytail: snapshot paginado + recarga completa tras cada escritura. Soporte
+ * (support_tickets/ticket_messages) y la bitácora admin (admin_events) viajan
+ * en el mismo snapshot; el chat de una orden (messages) se pide al abrirlo.
  */
-type PlatformSetting = Database['public']['Tables']['platform_settings']['Row'];
-type OrderInsert = Database['public']['Tables']['service_orders']['Insert'];
+type Tables = Database['public']['Tables'];
+type Row<K extends keyof Tables> = Tables[K]['Row'];
+type Fn = Database['public']['Functions'];
+type PlatformSetting = Row<'platform_settings'>;
+type OrderInsert = Tables['service_orders']['Insert'];
 
 interface DataState {
   tick: number;
@@ -55,11 +55,50 @@ export const useWorldReady = () => useData(s => s.status === 'ready');
 /** El snapshot falló: la página debe ofrecer reintentar, no tablas vacías. */
 export const useWorldFailed = () => useData(s => s.status === 'error');
 
-// In-memory-only domains survive snapshot reloads (same array refs).
-const mem = emptyWorld();
-let world: World = mem;
+let world: World = emptyWorld();
 let settings: PlatformSetting[] = [];
+let tickets: Ticket[] = [];
+let ticketMessages: TicketMessage[] = [];
+let adminEvents: AdminEvent[] = [];
 let lastFetched = 0;
+
+// ── Soporte y bitácora ───────────────────────────────────────────────────────
+export type TicketStatus = Database['public']['Enums']['ticket_status'];
+export type Ticket = Row<'support_tickets'>;
+export type TicketMessage = Row<'ticket_messages'>;
+export type OrderMessage = Row<'messages'>;
+export type AdminEvent = Row<'admin_events'>;
+/** Entrada de bitácora lista para pintar (nota de admin o evento del sistema). */
+export interface Note {
+  id: string;
+  entity_id: string;
+  author: string;
+  event_type: string;
+  /** Texto libre de la nota (payload.note), si lo hay. */
+  note: string | null;
+  /** Lo que se muestra: la nota o la etiqueta del evento. */
+  text: string;
+  created_at: string;
+}
+const EVENT_LABEL: Record<string, string> = {
+  note: 'Nota',
+  user_suspended: 'Usuario suspendido',
+  user_restored: 'Usuario reactivado',
+  kyc_approved: 'KYC aprobado',
+  kyc_declined: 'KYC rechazado',
+  kyc_in_review: 'KYC en revisión',
+  dispute_resolved: 'Disputa resuelta',
+  order_reassigned: 'Servicio reasignado',
+  order_refunded: 'Reembolso emitido',
+  setting_updated: 'Ajuste actualizado',
+  zone_upserted: 'Zona guardada',
+};
+/** Tablas secundarias del snapshot: si fallan (RLS, migración pendiente) no tiran la consola. */
+const optional = <T,>(p: Promise<T[]>, what: string) =>
+  p.catch((e: unknown) => {
+    console.warn(`[data] ${what} no disponible`, e);
+    return [] as T[];
+  });
 
 // Error surface: la consola registra toast.error aqui (admin-shell) — el store
 // no importa componentes para poder correr en tests de node.
@@ -70,14 +109,45 @@ export function setErrorNotifier(fn: (msg: string) => void) {
 
 const w = () => world;
 const bump = () => useData.getState().bump();
-const now = () => new Date().toISOString();
 
-async function fetchAll<K extends keyof Database['public']['Tables']>(
-  table: K,
-) {
-  const { data, error } = await supabase.from(table).select('*');
-  if (error) throw error;
-  return (data ?? []) as unknown as Database['public']['Tables'][K]['Row'][];
+/** Tamaño de página de PostgREST (`max-rows`): una sola consulta nunca trae más. */
+export const PAGE_SIZE = 1000;
+
+/**
+ * Pagina con `.range()` hasta recibir menos de PAGE_SIZE filas. Sin esto el
+ * snapshot quedaba truncado en 1,000 filas por tabla sin avisar. El tipo de
+ * fila se infiere del builder tipado que devuelve `page`.
+ */
+export async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const chunk = data ?? [];
+    rows.push(...chunk);
+    if (chunk.length < PAGE_SIZE) return rows;
+  }
+}
+
+const DAY_MS = 864e5;
+/** ISO de hace `days` días (límite de las tablas de bitácora). */
+const sinceIso = (days: number) =>
+  new Date(Date.now() - days * DAY_MS).toISOString();
+
+/**
+ * Tabla completa (paginada, orden estable por `id`). Las tablas que crecen sin
+ * límite (eventos de estado, bitácora admin) se cargan aparte acotadas a 90 días.
+ */
+export function fetchAll<K extends keyof Tables & string>(table: K) {
+  return fetchAllRows<Row<K>>(
+    (from, to) =>
+      supabase.from(table).select('*').order('id').range(from, to) as unknown as PromiseLike<{
+        data: Row<K>[] | null;
+        error: unknown;
+      }>,
+  );
 }
 
 let inflight: Promise<void> | null = null;
@@ -118,6 +188,9 @@ export function loadWorld(force = false): Promise<void> {
         kycSessions,
         disputes,
         platformSettings,
+        ticketRows,
+        ticketMessageRows,
+        adminEventRows,
       ] = await Promise.all([
         fetchAll('profiles'),
         fetchAll('service_categories'),
@@ -128,12 +201,35 @@ export function loadWorld(force = false): Promise<void> {
         fetchAll('service_orders'),
         fetchAll('service_quotes'),
         fetchAll('service_quote_items'),
-        fetchAll('service_order_status_events'),
+        // Bitácora de estados: últimos 90 días (reportes y dashboard no
+        // miran más atrás; la tabla crece con cada transición).
+        fetchAllRows((a, b) =>
+          supabase
+            .from('service_order_status_events')
+            .select('*')
+            .gte('created_at', sinceIso(90))
+            .order('id')
+            .range(a, b),
+        ),
         fetchAll('payments'),
         fetchAll('ledger_entries'),
         fetchAll('kyc_sessions'),
         fetchAll('disputes'),
         fetchAll('platform_settings'),
+        optional(fetchAll('support_tickets'), 'support_tickets'),
+        optional(fetchAll('ticket_messages'), 'ticket_messages'),
+        // Bitácora admin: últimos 90 días (notas, KYC, suspensiones, ajustes).
+        optional(
+          fetchAllRows((a, b) =>
+            supabase
+              .from('admin_events')
+              .select('*')
+              .gte('created_at', sinceIso(90))
+              .order('id')
+              .range(a, b),
+          ),
+          'admin_events',
+        ),
       ]);
       world = {
         profiles,
@@ -150,14 +246,13 @@ export function loadWorld(force = false): Promise<void> {
         ledger,
         kycSessions,
         disputes,
-        // session-local domains keep their refs across reloads
-        messages: mem.messages,
-        ratings: mem.ratings,
-        payouts: mem.payouts,
-        notes: mem.notes,
-        tickets: mem.tickets,
       };
       settings = platformSettings;
+      tickets = ticketRows;
+      ticketMessages = ticketMessageRows;
+      adminEvents = adminEventRows;
+      // service_orders.folio alimenta orderCode() → SVC-<folio>.
+      registerFolios(orders);
       lastFetched = Date.now();
       useData.setState({ status: 'ready' });
     } catch (e) {
@@ -180,6 +275,44 @@ export function loadWorld(force = false): Promise<void> {
 
 /** Reload after a write so every view reflects the backend. */
 const refresh = () => loadWorld(true);
+
+// ── Realtime ────────────────────────────────────────────────────────────────
+const LIVE_TABLES = ['service_orders', 'disputes', 'support_tickets', 'payout_requests'];
+let liveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Varios cambios seguidos (un lote de retiros) → una sola recarga. */
+function scheduleLiveReload() {
+  if (liveTimer) clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    liveTimer = null;
+    void loadWorld(true);
+    if (useExtras.getState().loaded) void loadExtras(true);
+  }, 1500);
+}
+/**
+ * Un canal postgres_changes sobre las tablas que mueven la operación y una
+ * recarga (respetando la caché de 15 s) al volver el foco a la pestaña.
+ * Devuelve la función para desuscribirse.
+ */
+export function subscribeRealtime(): () => void {
+  let channel = supabase.channel('console-live');
+  for (const table of LIVE_TABLES)
+    channel = channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table },
+      scheduleLiveReload,
+    );
+  channel.subscribe();
+  const onFocus = () => {
+    if (document.visibilityState === 'visible') void loadWorld();
+  };
+  window.addEventListener('focus', onFocus);
+  document.addEventListener('visibilitychange', onFocus);
+  return () => {
+    void supabase.removeChannel(channel);
+    window.removeEventListener('focus', onFocus);
+    document.removeEventListener('visibilitychange', onFocus);
+  };
+}
 
 /**
  * Wrap a backend write: on error toast + null, on success reload the snapshot.
@@ -214,21 +347,6 @@ const pgMessage = (e: unknown, fallback: string) =>
 export const pgCode = (e: unknown) =>
   typeof e === 'object' && e && 'code' in e ? String(e.code) : null;
 
-/**
- * Escritura secundaria (bitácora de eventos): si falla no se revierte la
- * principal, pero se avisa en vez de tragarse el error.
- */
-async function sideWrite(
-  p: PromiseLike<{ error: unknown }>,
-  what: string,
-): Promise<void> {
-  const { error } = await p;
-  if (error) {
-    console.error('[data]', what, error);
-    notifyError(`Se guardó, pero no se registró ${what}.`);
-  }
-}
-
 // ── Platform settings ────────────────────────────────────────────────────────
 export const getSettings = () => settings;
 export function getSettingInt(key: string, fallback: number): number {
@@ -243,20 +361,27 @@ export function getSettingStr(key: string, fallback: string): string {
   const v = settings.find(s => s.key === key)?.value;
   return typeof v === 'string' ? v : fallback;
 }
-/** Guarda un lote de settings en una sola llamada (upsert: crea la key si no existe). */
+export function getSettingList(key: string, fallback: string[]): string[] {
+  const v = settings.find(s => s.key === key)?.value;
+  return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
+}
+/**
+ * Guarda settings vía upsert_platform_setting (RPC: valida, registra
+ * admin_events y crea la key si no existe). Una llamada por key; si una falla
+ * se detiene ahí y se avisa cuál.
+ */
 export async function saveSettings(
-  entries: Record<string, number | string | boolean>,
+  entries: Record<string, number | string | boolean | string[]>,
 ) {
   return mutate(
     async () => {
-      const rows = Object.entries(entries).map(([key, value]) => ({
-        key,
-        value,
-      }));
-      const { error } = await supabase
-        .from('platform_settings')
-        .upsert(rows, { onConflict: 'key' });
-      if (error) throw error;
+      for (const [key, value] of Object.entries(entries)) {
+        const { error } = await supabase.rpc('upsert_platform_setting', {
+          p_key: key,
+          p_value: value,
+        });
+        if (error) throw error;
+      }
       return true;
     },
     e => pgMessage(e, 'No se pudo guardar la configuración.'),
@@ -289,14 +414,8 @@ export const getQuote = (orderId: string) =>
   w().quotes.find(q => q.service_order_id === orderId) ?? null;
 export const getQuoteItems = (quoteId: string) =>
   w().quoteItems.filter(i => i.quote_id === quoteId);
-export const getMessages = (orderId: string) =>
-  w()
-    .messages.filter(m => m.order_id === orderId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 export const getPayment = (orderId: string) =>
   w().payments.find(p => p.service_order_id === orderId) ?? null;
-export const getRating = (orderId: string) =>
-  w().ratings.find(r => r.order_id === orderId) ?? null;
 
 export const getPendingKyc = () =>
   w().technicians.filter(
@@ -342,17 +461,38 @@ export const getTechCategories = (techId: string) =>
   w().technicianCategories.filter(tc => tc.technician_id === techId);
 export const getTechRates = (techId: string) =>
   w().rates.filter(r => r.technician_id === techId);
-export const getNotes = (entityId: string) =>
-  w()
-    .notes.filter(n => n.entity_id === entityId)
+/** Bitácora de una entidad (orden, técnico, cliente, disputa) desde admin_events. */
+export const getNotes = (entityId: string): Note[] =>
+  adminEvents
+    .filter(e => e.entity_id === entityId)
+    .map(e => {
+      const raw = (e.payload as { note?: unknown } | null)?.note;
+      const note = typeof raw === 'string' ? raw : null;
+      const label = EVENT_LABEL[e.event_type] ?? e.event_type;
+      return {
+        id: e.id,
+        entity_id: entityId,
+        author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+        event_type: e.event_type,
+        note,
+        text: e.event_type === 'note' && note ? note : note ? `${label} — ${note}` : label,
+        created_at: e.created_at,
+      };
+    })
     .sort(byNewest);
-export const getTickets = () => [...w().tickets].sort(byNewest);
-export const getTicket = (id: string) =>
-  w().tickets.find(t => t.id === id) ?? null;
+export const isTicketOpen = (t: Ticket) => t.status !== 'resolved' && t.status !== 'closed';
+export const getTickets = () => [...tickets].sort(byNewest);
+export const getTicket = (id: string) => tickets.find(t => t.id === id) ?? null;
+/** Quién pidió el ticket: el usuario (client_id) o quien lo abrió. */
+export const ticketRequester = (t: Ticket) => t.client_id ?? t.opened_by;
+export const getTicketMessages = (ticketId: string) =>
+  ticketMessages
+    .filter(m => m.ticket_id === ticketId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 /** Badge del sidebar: disputas no resueltas + tickets sin resolver. */
 export const getOpenSupportCount = () =>
   w().disputes.filter(d => d.status === 'open' || d.status === 'in_review')
-    .length + w().tickets.filter(t => t.status !== 'resolved').length;
+    .length + tickets.filter(isTicketOpen).length;
 
 function byNewest(a: { created_at: string }, b: { created_at: string }) {
   return b.created_at.localeCompare(a.created_at);
@@ -371,8 +511,6 @@ export const getOrderEvents = (orderId: string) =>
 // ── consola-a (dashboard) ─────────────────────────────────────────────────
 /** Todos los eventos de estado (actividad en vivo del dashboard). */
 export const getAllEvents = () => w().events;
-/** Todas las calificaciones (demo-only hasta leer order_ratings). */
-export const getAllRatings = () => w().ratings;
 // ── /consola-a ────────────────────────────────────────────────────────────
 export const getCategoriesWithCounts = () =>
   w().categories.map(c => ({
@@ -396,7 +534,11 @@ export function getMetrics() {
   ];
   const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
   const active = reqs.filter(r => ACTIVE.includes(r.status)).length;
-  const completedToday = reqs.filter(r => DONE.includes(r.status)).length;
+  const today = mxDay(new Date());
+  const completedToday = reqs.filter(
+    r =>
+      DONE.includes(r.status) && r.completed_at && mxDay(r.completed_at) === today,
+  ).length;
   const gmv = pays.reduce((s, p) => s + p.amount_cents, 0);
   const platformFee = pays.reduce((s, p) => s + p.commission_cents, 0);
   const techNet = pays.reduce(
@@ -434,51 +576,50 @@ function toGeography(loc: unknown): string {
   return `SRID=4326;POINT(${c?.[0] ?? -103.3773} ${c?.[1] ?? 20.7062})`;
 }
 
+/**
+ * Alta desde la consola con la misma RPC que la app (create_service_request:
+ * TTL, comisión, recargo urgente y evento inicial los pone el backend; el
+ * INSERT directo de eventos ya no está permitido). `p_technician_id` deja la
+ * solicitud dirigida a ese técnico (routing tech-first); `p_client_id` indica
+ * a nombre de quién se crea (solo admin).
+ */
 export async function createRequest(
-  input: Partial<OrderInsert> & { client_id: string; category_id: string },
+  input: Partial<OrderInsert> & {
+    client_id: string;
+    category_id: string;
+    technician_id?: string | null;
+    scheduled_for?: string | null;
+    scheduled_until?: string | null;
+  },
 ): Promise<ServiceOrder | null> {
-  return mutate(async () => {
-    const addr = w().addresses.find(a => a.id === input.client_address_id);
-    const ttlMin = getSettingInt('request_ttl_minutes', 30);
-    const insert: OrderInsert = {
-      client_id: input.client_id,
-      category_id: input.category_id,
-      client_address_id: input.client_address_id ?? null,
-      status: 'requested',
-      title: input.title ?? null,
-      description: input.description ?? null,
-      is_urgent: input.is_urgent ?? false,
-      urgent_surcharge_bps: input.is_urgent
-        ? getSettingInt('urgent_surcharge_bps', 2000)
-        : 0,
-      commission_bps: getSettingInt('commission_bps', 1500),
-      location: toGeography(addr?.location ?? input.location),
-      place_name: addr?.place_name ?? null,
-      address_line: addr?.address_line ?? input.address_line ?? null,
-      neighborhood: addr?.neighborhood ?? null,
-      municipality: addr?.municipality ?? 'Guadalajara',
-      state: addr?.state ?? 'Jalisco',
-      postal_code: addr?.postal_code ?? null,
-      expires_at: new Date(Date.now() + ttlMin * 60_000).toISOString(),
-    };
-    const { data, error } = await supabase
-      .from('service_orders')
-      .insert(insert)
-      .select()
-      .single();
-    if (error) throw error;
-    await sideWrite(
-      supabase.from('service_order_status_events').insert({
-        service_order_id: data.id,
-        from_status: null,
-        to_status: 'requested',
-        actor_id: input.client_id,
-        note: 'Creado por admin desde la consola',
-      }),
-      'el evento de creación',
-    );
-    return data;
-  }, 'No se pudo crear el servicio.');
+  return mutate(
+    async () => {
+      const addr = w().addresses.find(a => a.id === input.client_address_id);
+      const [lng, lat] = wkbPoint(addr?.location) ?? [-103.3773, 20.7062];
+      const { data, error } = await supabase.rpc('create_service_request', {
+        p_category_id: input.category_id,
+        p_lng: lng,
+        p_lat: lat,
+        p_place_name: addr?.place_name ?? undefined,
+        p_neighborhood: addr?.neighborhood ?? undefined,
+        p_municipality: addr?.municipality ?? 'Guadalajara',
+        p_postal_code: addr?.postal_code ?? undefined,
+        p_state: addr?.state ?? 'Jalisco',
+        p_address_line: addr?.address_line ?? input.address_line ?? undefined,
+        p_client_address_id: input.client_address_id ?? undefined,
+        p_title: input.title ?? undefined,
+        p_description: input.description ?? undefined,
+        p_is_urgent: input.is_urgent ?? false,
+        p_scheduled_for: input.scheduled_for ?? undefined,
+        p_scheduled_until: input.scheduled_until ?? undefined,
+        p_technician_id: input.technician_id ?? undefined,
+        p_client_id: input.client_id,
+      });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo crear el servicio.'),
+  );
 }
 
 export async function setStatus(
@@ -494,7 +635,7 @@ export async function setStatus(
     });
     if (error) throw error;
     return true;
-  }, 'No se pudo cambiar el estado.');
+  }, e => pgMessage(e, 'No se pudo cambiar el estado.'));
 }
 
 export async function reassignRequest(orderId: string, techUserId: string) {
@@ -521,18 +662,38 @@ export async function reassignRequest(orderId: string, techUserId: string) {
  * orden. En efectivo solo aplica el ajuste contable. Antes solo cambiaba el
  * estado del pago en dos escrituras sueltas y no devolvía dinero.
  */
-export async function refundPayment(orderId: string, reason?: string) {
+export async function refundPayment(
+  orderId: string,
+  reason?: string,
+  amountCents?: number,
+) {
   const pay = getPayment(orderId);
   if (!pay || pay.status !== 'paid') return null;
+  const max = refundableCents(pay);
+  if (amountCents != null && (amountCents < 1 || amountCents > max)) {
+    notifyError('El monto a reembolsar excede lo que queda por reembolsar.');
+    return null;
+  }
   return mutate(async () => {
     const { data, error } = await supabase.functions.invoke(
       'stripe-refund-order',
-      { body: { service_order_id: orderId, reason } },
+      {
+        body: {
+          service_order_id: orderId,
+          reason,
+          // Omitido = todo lo que queda; parcial = acumula en refunded_cents.
+          ...(amountCents != null && amountCents < max ? { amount_cents: amountCents } : {}),
+        },
+      },
     );
     if (error) throw error;
     return data ?? pay;
   }, 'No se pudo emitir el reembolso. Nada se cobró ni se canceló; reintenta.');
 }
+
+/** Lo que aún se puede reembolsar: amount - refunded_cents (acumulado de parciales). */
+export const refundableCents = (pay: { amount_cents: number; refunded_cents: number }) =>
+  pay.amount_cents - pay.refunded_cents;
 
 export async function resolveKyc(
   techId: string,
@@ -554,22 +715,21 @@ export async function resolveKyc(
   );
 }
 
-/** Rechaza el KYC guardando el motivo como nota interna del técnico. */
-export async function rejectKyc(techId: string, reason: string) {
-  const r = await resolveKyc(techId, false, reason);
-  // La nota solo si el rechazo sí quedó guardado.
-  if (r !== null) addNote(techId, `KYC rechazado — ${reason}`);
-  return r;
-}
+/** Rechaza el KYC; admin_resolve_kyc guarda el motivo en admin_events (kyc_declined). */
+export const rejectKyc = (techId: string, reason: string) =>
+  resolveKyc(techId, false, reason);
 
-// Suspensión: profiles.status (+ technicians.is_available al suspender a un
-// técnico) en una sola transacción vía admin_set_user_status.
-const setUserStatus = (
+// Suspensión en dos pasos: admin_set_user_status (profiles.status +
+// technicians.is_available + admin_events, una transacción) y luego la Edge
+// Function admin-users, que banea/desbanea la cuenta en Auth para que de
+// verdad no pueda iniciar sesión. Si el segundo paso falla se avisa (el
+// estado ya quedó guardado) en vez de fingir que todo salió bien.
+const setUserStatus = async (
   userId: string,
   status: 'active' | 'suspended',
   errMsg: string,
-) =>
-  mutate(
+) => {
+  const r = await mutate(
     async () => {
       const { error } = await supabase.rpc('admin_set_user_status', {
         p_user_id: userId,
@@ -580,6 +740,20 @@ const setUserStatus = (
     },
     e => pgMessage(e, errMsg),
   );
+  if (r === null) return null;
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: status === 'suspended' ? 'suspend' : 'restore', user_id: userId },
+  });
+  if (error) {
+    console.error('[data] admin-users', error);
+    notifyError(
+      status === 'suspended'
+        ? 'Quedó suspendido en la plataforma, pero no se pudo bloquear su inicio de sesión. Reintenta.'
+        : 'Quedó activo, pero no se pudo desbloquear su inicio de sesión. Reintenta.',
+    );
+  }
+  return true;
+};
 
 export const suspendTechnician = (techId: string) =>
   setUserStatus(techId, 'suspended', 'No se pudo suspender al técnico.');
@@ -626,14 +800,51 @@ export async function updateTechnicianBank(
 export const getAdmins = () => w().profiles.filter(p => p.role === 'admin');
 
 /** Invita a un admin por correo vía la Edge Function admin-users (service role). */
-export async function inviteAdmin(email: string, fullName: string) {
+export async function inviteAdmin(email: string, fullName: string, adminRole?: AdminRole) {
   return mutate(async () => {
     const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'invite', email, full_name: fullName || undefined },
+      body: {
+        action: 'invite',
+        email,
+        full_name: fullName || undefined,
+        admin_role: adminRole,
+      },
     });
     if (error) throw error;
     return data ?? true;
   }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
+}
+
+/** Roles de consola de todos los admins (RPC admin_list_admin_roles; solo super_admin). */
+export async function fetchAdminRoles(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.rpc('admin_list_admin_roles');
+  if (error) {
+    console.warn('[data] admin_list_admin_roles', error);
+    return {};
+  }
+  return Object.fromEntries((data ?? []).map(r => [r.user_id, r.admin_role]));
+}
+
+/** Cambia el rol de consola de otro admin (admin-users set_admin_role; solo super_admin). */
+export async function setAdminRole(userId: string, adminRole: AdminRole) {
+  return mutate(async () => {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'set_admin_role', user_id: userId, admin_role: adminRole },
+    });
+    if (error) throw error;
+    return data ?? true;
+  }, 'No se pudo cambiar el rol.');
+}
+
+/** Invita a un cliente (admin-users invite_client): recibe correo para crear su cuenta. */
+export async function inviteClient(email: string, fullName: string, phone: string | null) {
+  return mutate(async () => {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'invite_client', email, full_name: fullName, phone: phone ?? undefined },
+    });
+    if (error) throw error;
+    return data ?? true;
+  }, 'No se pudo enviar la invitación. Revisa el correo (¿ya tiene cuenta?).');
 }
 
 // ── Direcciones del cliente ──────────────────────────────────────────────────
@@ -789,137 +1000,188 @@ export async function deleteCategory(
 }
 
 // ── Soporte ──────────────────────────────────────────────────────────────────
-export async function resolveDispute(disputeId: string, resolution: string) {
-  return mutate(async () => {
-    const { data: session } = await supabase.auth.getSession();
-    const { error } = await supabase
-      .from('disputes')
-      .update({
-        status: 'resolved',
-        resolution_notes: resolution,
-        resolved_by: session?.session?.user.id ?? null,
-        resolved_at: now(),
-      })
-      .eq('id', disputeId);
-    if (error) throw error;
-    return true;
-  }, 'No se pudo resolver la disputa.');
+export type DisputeOutcome = 'favor_cliente' | 'favor_tecnico' | 'desestimada';
+
+/** Id del usuario con sesión (autor de notas, mensajes y tickets). */
+async function myId(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const id = data.session?.user.id;
+  if (!id) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  return id;
 }
 
-/** Escala la disputa a nivel 2: sigue abierta (in_review), con nota. */
+/**
+ * Resuelve una disputa (RPC admin_resolve_dispute): estado, outcome, notas,
+ * libera el hold interno, baja is_disputed de la orden y notifica a ambas
+ * partes en una sola transacción.
+ */
+export async function resolveDispute(
+  disputeId: string,
+  outcome: DisputeOutcome,
+  notes: string,
+) {
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_resolve_dispute', {
+        p_dispute_id: disputeId,
+        p_outcome: outcome,
+        p_notes: notes.trim() || undefined,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo resolver la disputa.'),
+  );
+}
+
+/** Escala la disputa a nivel 2: sigue abierta (in_review) y queda en la bitácora. */
 export async function escalateDispute(disputeId: string) {
   return mutate(async () => {
     const { error } = await supabase
       .from('disputes')
-      .update({
-        status: 'in_review',
-        resolution_notes: 'Escalado a nivel 2 — pendiente de revisión',
-      })
+      .update({ status: 'in_review' })
       .eq('id', disputeId);
     if (error) throw error;
+    const { error: ne } = await supabase.rpc('add_admin_note', {
+      p_entity_type: 'disputes',
+      p_entity_id: disputeId,
+      p_note: 'Escalada a nivel 2 — pendiente de revisión',
+    });
+    if (ne) throw ne;
     return true;
   }, 'No se pudo escalar la disputa.');
 }
 
-// ── Session-local domains (sin tabla en el backend todavía) ──────────────────
-// ponytail: messages/ratings/payouts/notes/tickets no tienen tabla desplegada —
-// viven en memoria de la sesión de la consola. Migraciones pendientes en
-// tumtto-backend; al existir, estos mutators pasan a supabase.from(...).
-
-export function sendMessage(
-  orderId: string,
-  senderId: string,
-  content: string,
-) {
-  w().messages.push({
-    id: nextId('m'),
-    order_id: orderId,
-    sender_id: senderId,
-    content,
-    created_at: now(),
-  });
-  bump();
+// ── Chat de una orden (tabla messages; se pide al abrir el chat) ────────────
+export async function fetchOrderMessages(orderId: string): Promise<OrderMessage[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('service_order_id', orderId)
+    .order('created_at');
+  if (error) throw error;
+  return data ?? [];
 }
 
-export function addNote(
-  entityId: string,
-  text: string,
-  author = 'Admin',
-): Note {
-  const note: Note = {
-    id: nextId('n'),
-    entity_id: entityId,
-    author,
-    text,
-    created_at: now(),
-  };
-  w().notes.unshift(note);
-  bump();
-  return note;
+/** Mensaje del admin en el chat de la orden (RLS: sender_id = auth.uid()). */
+export async function sendMessage(orderId: string, body: string) {
+  const text = body.trim();
+  if (!text) return null;
+  try {
+    const { error } = await supabase.from('messages').insert({
+      service_order_id: orderId,
+      sender_id: await myId(),
+      body: text,
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('[data] sendMessage', e);
+    notifyError('No se pudo enviar el mensaje.');
+    return null;
+  }
 }
 
-export function createTicket(input: {
+// ── Notas internas (add_admin_note → admin_events; bitácora append-only) ────
+export type NoteEntity = 'service_orders' | 'technicians' | 'profiles' | 'disputes';
+
+export async function addNote(entityType: NoteEntity, entityId: string, text: string) {
+  if (!text.trim()) return null;
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('add_admin_note', {
+        p_entity_type: entityType,
+        p_entity_id: entityId,
+        p_note: text.trim(),
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar la nota.'),
+  );
+}
+
+// ── Tickets (support_tickets + ticket_messages) ─────────────────────────────
+export async function createTicket(input: {
   subject: string;
   requester_id: string;
-  role?: Ticket['role'];
-  priority?: Ticket['priority'];
   order_id?: string | null;
   content?: string;
-}): Ticket {
-  const role =
-    input.role ??
-    (getProfile(input.requester_id)?.role === 'technician'
-      ? 'tecnico'
-      : 'cliente');
-  const ticket: Ticket = {
-    id: nextId('TK'),
-    subject: input.subject,
-    requester_id: input.requester_id,
-    role,
-    status: 'open',
-    priority: input.priority ?? 'media',
-    order_id: input.order_id ?? null,
-    created_at: now(),
-    messages: [],
-  };
-  if (input.content) {
-    ticket.messages.push({
-      id: nextId('tm'),
-      ticket_id: ticket.id,
-      sender_id: ADMIN_ID,
-      content: input.content,
-      created_at: now(),
-    });
-  }
-  w().tickets.unshift(ticket);
-  bump();
-  return ticket;
+}): Promise<string | null> {
+  return mutate(
+    async () => {
+      const me = await myId();
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert({
+          opened_by: me,
+          client_id: input.requester_id,
+          service_order_id: input.order_id ?? null,
+          subject: input.subject.trim(),
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      const id = data.id;
+      if (input.content?.trim()) {
+        const { error: me2 } = await supabase.from('ticket_messages').insert({
+          ticket_id: id,
+          author_id: me,
+          body: input.content.trim(),
+        });
+        if (me2) throw me2;
+      }
+      return id;
+    },
+    e => pgMessage(e, 'No se pudo crear el ticket.'),
+  );
 }
 
-export function replyTicket(
-  ticketId: string,
-  senderId: string,
-  content: string,
-) {
-  const t = getTicket(ticketId);
-  if (!t) return;
-  t.messages.push({
-    id: nextId('tm'),
-    ticket_id: ticketId,
-    sender_id: senderId,
-    content,
-    created_at: now(),
-  });
-  if (senderId === ADMIN_ID && t.status === 'open') t.status = 'pending';
-  bump();
+export async function setTicketStatus(ticketId: string, status: TicketStatus) {
+  return mutate(
+    async () => {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ status })
+        .eq('id', ticketId);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo actualizar el ticket.'),
+  );
 }
+export const resolveTicket = (ticketId: string) => setTicketStatus(ticketId, 'resolved');
+/** Reabre un ticket (Deshacer de "Marcar resuelto"). */
+export const reopenTicket = (ticketId: string) => setTicketStatus(ticketId, 'pending');
 
-export function resolveTicket(ticketId: string) {
+/** Respuesta del admin: abierto → en espera; resuelto → se reabre. */
+export async function replyTicket(ticketId: string, body: string) {
+  const text = body.trim();
+  if (!text) return null;
   const t = getTicket(ticketId);
-  if (t) {
-    t.status = 'resolved';
-    bump();
-  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.from('ticket_messages').insert({
+        ticket_id: ticketId,
+        author_id: await myId(),
+        body: text,
+      });
+      if (error) throw error;
+      const next: TicketStatus | null =
+        t?.status === 'open' || t?.status === 'resolved' || t?.status === 'closed'
+          ? 'pending'
+          : null;
+      if (next) {
+        const { error: se } = await supabase
+          .from('support_tickets')
+          .update({ status: next })
+          .eq('id', ticketId);
+        if (se) throw se;
+      }
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo enviar la respuesta.'),
+  );
 }
 
 // ── consola-d (catálogo / reportes / soporte / config) — bloque aditivo ─────
@@ -937,20 +1199,20 @@ export const getReportData = () => ({
   technicians: w().technicians,
 });
 
-// Las RPC admin_report_* no están en los tipos generados de este repo todavía
-// (regenerar con gen:types tras el deploy); llamada sin tipar y null si falla,
-// para que la pantalla caiga al cálculo desde el snapshot sin mentir.
-type LooseRpc = (
-  fn: string,
-  args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: unknown }>;
-async function reportRpc<T>(
-  fn: string,
+// RPC de reportes: null si falla, para que la pantalla caiga al cálculo desde
+// el snapshot sin mentir.
+type ReportFn =
+  | 'admin_report_kpis'
+  | 'admin_report_ticket_by_category'
+  | 'admin_report_cold_zones'
+  | 'admin_report_demand_heatmap';
+async function reportRpc<F extends ReportFn>(
+  fn: F,
   from: Date,
   to: Date,
-): Promise<T | null> {
+): Promise<Fn[F]['Returns'] | null> {
   try {
-    const { data, error } = await (supabase.rpc as unknown as LooseRpc)(fn, {
+    const { data, error } = await supabase.rpc(fn, {
       p_from: from.toISOString(),
       p_to: to.toISOString(),
     });
@@ -958,7 +1220,7 @@ async function reportRpc<T>(
       console.warn('[data]', fn, error);
       return null;
     }
-    return data as T;
+    return data as Fn[F]['Returns'];
   } catch (e) {
     console.warn('[data]', fn, e);
     return null;
@@ -978,32 +1240,13 @@ export type ReportKpis = {
     avg_arrival_seconds: number;
   };
 };
-export const fetchReportKpis = (from: Date, to: Date) =>
-  reportRpc<ReportKpis>('admin_report_kpis', from, to);
+/** admin_report_kpis devuelve jsonb: su forma es la de ReportKpis. */
+export const fetchReportKpis = async (from: Date, to: Date) =>
+  (await reportRpc('admin_report_kpis', from, to)) as ReportKpis | null;
 export const fetchTicketByCategory = (from: Date, to: Date) =>
-  reportRpc<
-    {
-      category_id: string;
-      category_name: string;
-      paid_orders: number;
-      avg_ticket_cents: number;
-    }[]
-  >('admin_report_ticket_by_category', from, to);
+  reportRpc('admin_report_ticket_by_category', from, to);
 export const fetchColdZones = (from: Date, to: Date) =>
-  reportRpc<{ zone_id: string; zone_name: string; order_count: number }[]>(
-    'admin_report_cold_zones',
-    from,
-    to,
-  );
-
-/** Reabre un ticket (Deshacer de "Marcar resuelto"). Tickets: solo sesión. */
-export function reopenTicket(ticketId: string) {
-  const t = getTicket(ticketId);
-  if (t && t.status === 'resolved') {
-    t.status = 'pending';
-    bump();
-  }
-}
+  reportRpc('admin_report_cold_zones', from, to);
 
 /**
  * ¿La sesión actual tiene un factor TOTP verificado? Supabase solo expone los
@@ -1031,7 +1274,7 @@ export function __setWorldForTests(next: World) {
   useData.setState({ status: 'ready' });
 }
 
-export { CLIENT_ID, TECH_USER_ID, ADMIN_ID };
+export { CLIENT_ID, TECH_USER_ID };
 
 // ── consola-b: Servicios y Clientes (ediciones, notas con Deshacer, evidencia)
 // Bloque aditivo del rediseño; no cambia los mutators de arriba.
@@ -1087,20 +1330,6 @@ export async function updateProfile(
   );
 }
 
-/** Quita una nota (sesión) y la regresa para poder deshacer. */
-export function removeNote(noteId: string): Note | null {
-  const i = w().notes.findIndex(n => n.id === noteId);
-  if (i < 0) return null;
-  const [n] = w().notes.splice(i, 1);
-  bump();
-  return n;
-}
-
-export function restoreNote(note: Note) {
-  if (!w().notes.some(n => n.id === note.id)) w().notes.unshift(note);
-  bump();
-}
-
 export type OrderEvidence = {
   id: string;
   kind: string;
@@ -1140,77 +1369,21 @@ export async function listOrderEvidence(
 // ── fin consola-b ────────────────────────────────────────────────────────────
 
 // ══ consola-c · extras (técnicos / regiones / finanzas) ═════════════════════
-// Tablas que el snapshot principal no carga y que el tipado generado aún no
-// incluye (technician_documents, payout_requests, coverage_zones,
-// order_ratings, technician_wallet_summaries, technician_locations). Cada
-// dominio carga por separado: si una tabla no existe en el entorno (p. ej.
-// producción sin las migraciones del PR #4) solo ese bloque queda
-// "no disponible" y el resto de la consola sigue funcionando.
-// ponytail: tablas sin tipos generados → consulta sin tipar y cast a la fila
-// local; regenerar supabase.ts (gen:types) al desplegar y quitar RawQuery.
+// Tablas que el snapshot principal no carga. Cada dominio carga por separado:
+// si una falla (RLS, migración pendiente) solo ese bloque queda "no disponible"
+// y el resto de la consola sigue funcionando.
 
-type RawResult = { data: unknown; error: unknown };
-interface RawQuery extends PromiseLike<RawResult> {
-  select(columns?: string): RawQuery;
-  eq(column: string, value: unknown): RawQuery;
-  in(column: string, values: unknown[]): RawQuery;
-  order(column: string, opts?: { ascending?: boolean }): RawQuery;
-  update(values: Record<string, unknown>): RawQuery;
-}
-const rawFrom = (table: string) =>
-  (supabase as unknown as { from: (t: string) => RawQuery }).from(table);
-
-export interface TechDocument {
-  id: string;
-  technician_id: string;
-  kind: 'criminal_record' | 'proof_of_address' | 'bank_statement';
-  bucket_id: string;
-  storage_path: string;
-  issued_on: string | null;
-  review_status: 'pending' | 'approved' | 'rejected';
-  review_notes: string | null;
-  created_at: string;
-}
-export interface PayoutRequest {
-  id: string;
-  technician_id: string;
-  amount_cents: number;
-  status:
-    | 'pending'
-    | 'approved'
-    | 'processing'
-    | 'paid'
-    | 'failed'
-    | 'cancelled'
-    | 'held';
-  stripe_account_id: string | null;
-  failure_reason: string | null;
-  approved_at: string | null;
-  created_at: string;
-}
-export interface CoverageZone {
-  id: string;
-  slug: string;
-  name: string;
-  is_active: boolean;
-}
-export interface OrderRating {
-  id: string;
-  service_order_id: string;
-  reviewer_id: string;
-  reviewee_id: string;
-  score: number;
-  comment: string | null;
-  created_at: string;
-}
-export interface WalletSummary {
-  technician_id: string;
-  balance_cents: number;
-  held_cents: number;
-  paid_out_cents: number;
-  available_cents: number;
-}
-export type TechLocation = Database['public']['Tables']['technician_locations']['Row'];
+export type TechDocument = Row<'technician_documents'>;
+export type PayoutRequest = Row<'payout_requests'>;
+export type OrderRating = Row<'order_ratings'>;
+export type WalletSummary = Database['public']['Views']['technician_wallet_summaries']['Row'];
+export type TechLocation = Row<'technician_locations'>;
+export type ZoneGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
+/** Fila de admin_list_coverage_zones con el geojson (jsonb) ya acotado a su forma. */
+export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][number], 'geojson'> & {
+  /** ST_AsGeoJSON(geom): Polygon/MultiPolygon. */
+  geojson: ZoneGeometry | null;
+};
 
 type ExtraKey = 'docs' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations';
 interface ExtrasState {
@@ -1236,27 +1409,43 @@ export const useExtras = create<ExtrasState>(() => ({
   loaded: false,
 }));
 
-const EXTRA_QUERIES: Record<ExtraKey, () => PromiseLike<RawResult>> = {
+// Cada dominio es un cargador completo; las tablas pasan por fetchAllRows
+// (páginas `(from, to)`) y las zonas por su RPC (geojson real).
+const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
   docs: () =>
-    rawFrom('technician_documents')
-      .select(
-        'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,created_at',
-      )
-      .order('created_at', { ascending: false }),
+    fetchAllRows((a, b) =>
+      supabase
+        .from('technician_documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
   payouts: () =>
-    rawFrom('payout_requests')
-      .select(
-        'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,approved_at,created_at',
-      )
-      .order('created_at', { ascending: false }),
-  // geom (PostGIS) no se pide: solo lo que la consola muestra.
-  zones: () => rawFrom('coverage_zones').select('id,slug,name,is_active'),
+    fetchAllRows((a, b) =>
+      supabase
+        .from('payout_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
+  zones: async () => {
+    const { data, error } = await supabase.rpc('admin_list_coverage_zones');
+    if (error) throw error;
+    // geojson llega como jsonb: la RPC garantiza Polygon/MultiPolygon (o null).
+    return (data ?? []).map(z => ({ ...z, geojson: z.geojson as ZoneGeometry | null }));
+  },
   ratings: () =>
-    rawFrom('order_ratings')
-      .select('id,service_order_id,reviewer_id,reviewee_id,score,comment,created_at')
-      .order('created_at', { ascending: false }),
-  wallets: () => rawFrom('technician_wallet_summaries').select('*'),
-  locations: () => rawFrom('technician_locations').select('*'),
+    fetchAllRows((a, b) =>
+      supabase
+        .from('order_ratings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
+  wallets: () =>
+    fetchAllRows((a, b) => supabase.from('technician_wallet_summaries').select('*').range(a, b)),
+  locations: () =>
+    fetchAllRows((a, b) => supabase.from('technician_locations').select('*').range(a, b)),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -1270,9 +1459,8 @@ export function loadExtras(force = false): Promise<void> {
     const results = await Promise.all(
       keys.map(async k => {
         try {
-          const { data, error } = await EXTRA_QUERIES[k]();
-          if (error) throw error;
-          return [k, (data ?? []) as unknown[], false] as const;
+          const rows: unknown[] = await EXTRA_QUERIES[k]();
+          return [k, rows, false] as const;
         } catch (e) {
           console.warn(`[data] extras.${k} no disponible`, e);
           return [k, [] as unknown[], true] as const;
@@ -1300,21 +1488,16 @@ export const getTechRatings = (techId: string) =>
 export const getWallet = (techId: string) =>
   useExtras.getState().wallets.find(x => x.technician_id === techId) ?? null;
 
-/** Radio de servicio del técnico en km (columna del PR #4; default del setting). */
+/** Radio de servicio del técnico en km (service_radius_m o el setting por defecto). */
 export function getTechRadiusKm(techId: string): number {
-  const t = getTechnician(techId) as
-    | (ReturnType<typeof getTechnician> & { service_radius_m?: number | null })
-    | null;
   const m =
-    t?.service_radius_m ?? getSettingInt('default_match_radius_m', 15000);
+    getTechnician(techId)?.service_radius_m ?? getSettingInt('default_match_radius_m', 15000);
   return Math.round(m / 100) / 10;
 }
 
 /** Municipio base: zona asignada (technicians.zone_id) o ubicación registrada. */
 export function getTechMunicipality(techId: string): string | null {
-  const t = getTechnician(techId) as
-    | (ReturnType<typeof getTechnician> & { zone_id?: string | null })
-    | null;
+  const t = getTechnician(techId);
   const zone = t?.zone_id
     ? useExtras.getState().zones.find(z => z.id === t.zone_id)
     : null;
@@ -1343,28 +1526,45 @@ async function mutateExtras<R>(
   return r;
 }
 
-/** Aprueba un retiro pendiente (admin; RLS payout_requests_admin_update). */
-export const approvePayout = (id: string) =>
+export type PayoutBatch = Row<'payout_batches'>;
+
+/**
+ * Aprueba retiros pendientes en un lote (RPC approve_payout_requests). Los técnicos con fondos en disputa quedan `held` dentro del mismo
+ * lote en vez de aprobarse: por eso el envío por Stripe se decide después,
+ * leyendo el estado real de cada solicitud.
+ */
+export const approvePayouts = (ids: string[], note?: string) =>
   mutateExtras(
     async () => {
-      const { data: auth } = await supabase.auth.getSession();
-      const { error } = await rawFrom('payout_requests')
-        .update({
-          status: 'approved',
-          approved_by: auth.session?.user.id ?? null,
-          approved_at: now(),
-        })
-        .eq('id', id)
-        .eq('status', 'pending');
+      const { data, error } = await supabase.rpc('approve_payout_requests', {
+        p_request_ids: ids,
+        p_note: note,
+      });
       if (error) throw error;
-      return true;
+      return data;
     },
     e => pgMessage(e, 'No se pudo aprobar el retiro.'),
   );
 
-/** Envía un retiro aprobado por Stripe (edge function stripe-create-payout). */
-export const sendPayout = (id: string) =>
+/** Rechaza (cancela) una solicitud pendiente o retenida. */
+export const rejectPayout = (id: string) =>
   mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('cancel_payout_request', { p_request_id: id });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo rechazar el retiro.'),
+  );
+
+/** Envía por Stripe un retiro ya `approved` (edge function stripe-create-payout). */
+export const sendPayout = (id: string) => {
+  const req = useExtras.getState().payouts.find(p => p.id === id);
+  if (req && req.status !== 'approved') {
+    notifyError('Solo se envían retiros aprobados (los retenidos esperan a la disputa).');
+    return Promise.resolve(null);
+  }
+  return mutateExtras(
     async () => {
       const { data, error } = await supabase.functions.invoke(
         'stripe-create-payout',
@@ -1375,19 +1575,91 @@ export const sendPayout = (id: string) =>
     },
     'No se pudo enviar el retiro por Stripe. Revisa la cuenta conectada del técnico.',
   );
+};
 
-/** Activa/desactiva una zona de cobertura (admin; coverage_zones_admin). */
-export const setZoneActive = (id: string, active: boolean) =>
+/**
+ * Revisión por documento (antecedentes, domicilio, carátula): escribe
+ * review_status/review_notes/reviewed_by/reviewed_at en technician_documents
+ * antes de resolver el KYC del técnico.
+ */
+export const reviewDocument = (
+  docId: string,
+  status: 'approved' | 'rejected',
+  notes?: string,
+) =>
   mutateExtras(
     async () => {
-      const { error } = await rawFrom('coverage_zones')
-        .update({ is_active: active })
-        .eq('id', id);
+      const { data: auth } = await supabase.auth.getSession();
+      const { error } = await supabase
+        .from('technician_documents')
+        .update({
+          review_status: status,
+          review_notes: notes?.trim() || null,
+          reviewed_by: auth.session?.user.id ?? null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', docId);
       if (error) throw error;
       return true;
     },
-    e => pgMessage(e, 'No se pudo actualizar la zona.'),
+    e => pgMessage(e, 'No se pudo guardar la revisión del documento.'),
   );
+
+/** Crea o edita una zona (RPC upsert_coverage_zone: GeoJSON Polygon/MultiPolygon). */
+export const saveZone = (z: {
+  id?: string | null;
+  slug: string;
+  name: string;
+  geojson: ZoneGeometry;
+  is_active: boolean;
+}) =>
+  mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('upsert_coverage_zone', {
+        p_slug: z.slug,
+        p_name: z.name,
+        // GeoJSON es Json válido; el tipo generado solo conoce `Json`.
+        p_geojson: z.geojson as unknown as Json,
+        p_is_active: z.is_active,
+        p_id: z.id ?? undefined,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e =>
+      pgCode(e) === '23505'
+        ? 'Ya existe una zona con ese slug.'
+        : pgMessage(e, 'No se pudo guardar la zona (¿GeoJSON válido?).'),
+  );
+
+/** Activa/pausa una zona: mismo upsert con su geometría actual. */
+export const setZoneActive = (id: string, active: boolean) => {
+  const z = useExtras.getState().zones.find(x => x.id === id);
+  if (!z?.geojson) {
+    notifyError('La zona no tiene geometría; edítala e importa su GeoJSON.');
+    return Promise.resolve(null);
+  }
+  return saveZone({ id, slug: z.slug, name: z.name, geojson: z.geojson, is_active: active });
+};
+
+/** Asigna la zona base de un técnico (RPC assign_technician_zone). */
+export const assignTechZone = (techId: string, zoneId: string) =>
+  mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('assign_technician_zone', {
+        p_technician_id: techId,
+        p_zone_id: zoneId,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo asignar la zona al técnico.'),
+  );
+
+export type DemandCell = Fn['admin_report_demand_heatmap']['Returns'][number];
+/** Demanda por día de la semana × hora (RPC admin_report_demand_heatmap, hora ZMG). */
+export const fetchDemandHeatmap = (from: Date, to: Date) =>
+  reportRpc('admin_report_demand_heatmap', from, to);
 
 /** Edita el perfil público del técnico (nombre visible y bio) y su nombre. */
 export async function updateTechnicianProfile(

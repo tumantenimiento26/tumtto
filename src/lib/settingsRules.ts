@@ -1,37 +1,19 @@
-// Reglas de platform_settings. El backend las lee como enteros
-// (`(value #>> '{}')::integer`): un "2.5" o un vacío rompía la creación de
-// servicios. Mismos rangos que el CHECK del backend.
+// Reglas de platform_settings (solo las keys que el backend lee de verdad).
+// El trigger app.validate_platform_setting exige enteros en *_bps/*_minutes/
+// *_cents/*_days/*_m y booleanos en *_enabled / admin_require_aal2; estos son
+// los mismos rangos para avisar antes de llamar a upsert_platform_setting.
 
-export type SettingValue = number | string | boolean;
+export type SettingValue = number | string | boolean | string[];
 export type Settings = Record<string, SettingValue>;
 
 type Rule = { min: number; max: number; label: string };
 
 const INT_RULES: Record<string, Rule> = {
   request_ttl_minutes: { min: 1, max: 1440, label: 'La ventana de aceptación' },
-  sla_first_response_minutes: {
-    min: 1,
-    max: 1440,
-    label: 'La primera respuesta',
-  },
-  sla_dispute_hours: { min: 1, max: 720, label: 'La resolución de disputas' },
-  intro_program_days: { min: 1, max: 3650, label: 'La duración del programa' },
-  cancel_free_window_hours: { min: 0, max: 720, label: 'La ventana sin costo' },
-  tech_max_cancellations_30d: {
-    min: 0,
-    max: 100,
-    label: 'El máximo de cancelaciones',
-  },
-  noshow_wait_minutes: { min: 1, max: 240, label: 'El tiempo de espera' },
-  quiet_start_hours: {
-    min: 0,
-    max: 23,
-    label: 'El inicio del horario silencioso',
-  },
-  quiet_end_hours: { min: 0, max: 23, label: 'El fin del horario silencioso' },
+  default_match_radius_m: { min: 500, max: 100_000, label: 'El radio de búsqueda' },
+  stripe_fee_estimate_fixed_cents: { min: 0, max: 100_000, label: 'La comisión fija de Stripe' },
+  account_deletion_grace_days: { min: 1, max: 365, label: 'El periodo de gracia de baja' },
 };
-
-const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 /** Mensaje por key inválida; objeto vacío = todo bien. */
 export function validateSettings(s: Settings): Record<string, string> {
@@ -50,21 +32,23 @@ export function validateSettings(s: Settings): Record<string, string> {
       )
         errs[key] =
           `${r.label} debe ser un número entero entre ${r.min} y ${r.max}.`;
+    } else if (key === 'enabled_payment_methods') {
+      if (!Array.isArray(v) || v.length === 0)
+        errs[key] = 'Deja al menos un método de pago activo.';
     }
   }
-  if ('platform_name' in s && !String(s.platform_name).trim())
-    errs.platform_name = 'Escribe el nombre comercial.';
-  if ('support_email' in s && !EMAIL_RE.test(String(s.support_email).trim()))
-    errs.support_email = 'Correo de soporte no válido.';
-  if ('support_phone' in s && !String(s.support_phone).trim())
-    errs.support_phone = 'Escribe el teléfono de soporte.';
   return errs;
 }
+
+const same = (a: SettingValue | undefined, b: SettingValue | undefined) =>
+  Array.isArray(a) || Array.isArray(b)
+    ? JSON.stringify(a) === JSON.stringify(b)
+    : a === b;
 
 /** Solo las keys que cambiaron respecto a lo cargado de la base. */
 export function changedSettings(next: Settings, base: Settings): Settings {
   return Object.fromEntries(
-    Object.entries(next).filter(([k, v]) => base[k] !== v),
+    Object.entries(next).filter(([k, v]) => !same(v, base[k])),
   );
 }
 

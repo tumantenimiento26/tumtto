@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Smartphone,
 } from 'lucide-react';
-import { Button, Checkbox, Field, Input, Kicker } from '@/components/ds';
+import { Button, Field, Input, Kicker } from '@/components/ds';
 import { AsideReview, AuthShell } from '@/components/auth-shell';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -28,10 +28,6 @@ import {
   registerFailure,
   type LockState,
 } from '@/lib/authForms';
-import {
-  enforceEphemeralSession,
-  setRememberSession,
-} from '@/lib/sessionPrefs';
 
 // Login unificado (handoff web A2). Staff → verificación en dos pasos (MFA
 // TOTP real de Supabase) → consola. Clientes y técnicos → "continúa en la
@@ -74,7 +70,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<{ email?: string; pass?: string }>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,9 +83,17 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    // Invitaciones de admin y enlaces de recuperación (implicit flow) aterrizan
+    // aquí con #access_token…&type=invite|recovery: la contraseña se fija en
+    // /restablecer, que toma la sesión del hash. Recarga completa para que el
+    // cliente de Supabase procese el hash en esa página.
+    const { hash } = window.location;
+    if (/type=(invite|recovery|magiclink)/.test(hash)) {
+      window.location.replace(`/restablecer${hash}`);
+      return;
+    }
     const qs = new URLSearchParams(window.location.search);
     setSignedOut(qs.has('out'));
-    void enforceEphemeralSession();
     router.prefetch('/dashboard');
     // La consola manda aquí (?mfa=1) a un admin con verificación en 2 pasos
     // activada que aún no la cumplió en esta sesión: seguimos en el código.
@@ -139,7 +142,6 @@ export default function LoginPage() {
       return fail(authMessage(error));
     }
     setLock({ attempts: 0, lockUntil: 0 });
-    setRememberSession(remember);
     await routeAfterSignIn();
   }
 
@@ -386,16 +388,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            <Checkbox
-              checked={remember}
-              onChange={setRemember}
-              label={
-                <span className="text-[14px] text-body">
-                  Mantener sesión iniciada
-                </span>
-              }
-            />
-
             {(authError || lockLeft > 0) && (
               <div
                 role="alert"
@@ -487,8 +479,9 @@ export default function LoginPage() {
           {!enroll ? (
             <>
               <p className="mt-1.5 text-[14.5px] text-muted">
-                Protege la consola con un código de tu app autenticadora (Google
-                Authenticator, 1Password, Authy). Toma un minuto.
+                La consola exige verificación en dos pasos. Configura tu app
+                autenticadora (Google Authenticator, 1Password, Authy); toma un
+                minuto y solo se hace una vez.
               </p>
               {codeErr && <ErrorBox>{codeErr}</ErrorBox>}
               <div className="mt-6 flex flex-col gap-3">
@@ -500,11 +493,6 @@ export default function LoginPage() {
                   onClick={() => void startEnroll()}
                 >
                   Configurar ahora
-                </Button>
-                {/* ponytail: aún no es obligatorio; hacerlo obligatorio =
-                    exigir aal2 en AdminGate. */}
-                <Button variant="ghost" size="lg" full onClick={enterConsole}>
-                  Más tarde
                 </Button>
               </div>
             </>

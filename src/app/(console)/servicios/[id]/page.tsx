@@ -55,6 +55,7 @@ import {
   loadWorld,
   reassignRequest,
   refundPayment,
+  refundableCents,
   removeNote,
   restoreNote,
   sendMessage,
@@ -227,7 +228,8 @@ export default function ServicioDetailPage() {
     totalCents != null && commissionCents != null
       ? totalCents - commissionCents
       : null;
-  const refundable = payment?.status === 'paid';
+  const refundable = payment?.status === 'paid' && refundableCents(payment) > 0;
+  const refundMax = payment ? refundableCents(payment) : 0;
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
 
   function copyId() {
@@ -755,13 +757,13 @@ export default function ServicioDetailPage() {
       <RefundModal
         open={refundOpen}
         onClose={() => setRefundOpen(false)}
-        maxCents={payment?.amount_cents ?? totalCents ?? 0}
+        maxCents={refundMax}
         busy={busy === 'refund'}
-        onConfirm={async reason => {
+        onConfirm={async (reason, amountCents) => {
           const ok = await run(
             'refund',
-            () => refundPayment(req.id, reason || undefined),
-            `Reembolso emitido · ${money(payment?.amount_cents ?? totalCents, true)}`,
+            () => refundPayment(req.id, reason || undefined, amountCents),
+            `Reembolso emitido · ${money(amountCents, true)}`,
           );
           if (ok) setRefundOpen(false);
         }}
@@ -878,7 +880,7 @@ function RefundModal({
   onClose: () => void;
   maxCents: number;
   busy: boolean;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string, amountCents: number) => void;
 }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -889,7 +891,9 @@ function RefundModal({
     }
   }, [open, maxCents]);
   const pesos = Number(amount.replace(/[^\d.]/g, ''));
-  const partial = Number.isFinite(pesos) && Math.round(pesos * 100) < maxCents;
+  const cents = Number.isFinite(pesos) ? Math.round(pesos * 100) : 0;
+  const invalid = cents < 1 || cents > maxCents;
+  const partial = !invalid && cents < maxCents;
 
   return (
     <Modal
@@ -899,14 +903,19 @@ function RefundModal({
       title="Reembolsar"
       icon={RotateCcw}
       tone="danger"
-      description="El dinero regresa al método de pago original y el servicio queda cancelado. No es reversible."
+      description="El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible."
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Volver
           </Button>
-          <Button variant="destructive" loading={busy} onClick={() => onConfirm(reason.trim())}>
-            Reembolsar {money(maxCents, true)}
+          <Button
+            variant="destructive"
+            loading={busy}
+            disabled={invalid}
+            onClick={() => onConfirm(reason.trim(), cents)}
+          >
+            Reembolsar {invalid ? '' : money(cents, true)}
           </Button>
         </>
       }
@@ -918,14 +927,14 @@ function RefundModal({
           inputMode="decimal"
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          hint={`Máximo ${money(maxCents, true)}`}
+          hint={`Queda por reembolsar ${money(maxCents, true)}`}
+          error={invalid && amount !== '' ? `Entre $0.01 y ${money(maxCents, true)}` : null}
         />
         {partial && (
-          <p className="rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-warning-ink">
-            Los reembolsos parciales todavía no están disponibles: se reembolsará el total.
+          <p className="rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+            Reembolso parcial: el resto sigue cobrado y el servicio no se cancela.
           </p>
         )}
-        {/* ponytail: stripe-refund-order solo reembolsa el total; agregar monto al RPC/función para parciales. */}
         <Textarea
           rows={2}
           value={reason}

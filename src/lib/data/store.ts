@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
 import { mxDay } from '@/lib/dates';
+import { registerFolios } from '@/lib/orderCode';
 import {
   emptyWorld,
   nextId,
@@ -221,6 +222,8 @@ export function loadWorld(force = false): Promise<void> {
         tickets: mem.tickets,
       };
       settings = platformSettings;
+      // service_orders.folio (types: regen) alimenta orderCode() → SVC-<folio>.
+      registerFolios(orders as { id: string; folio?: number | null }[]);
       lastFetched = Date.now();
       useData.setState({ status: 'ready' });
     } catch (e) {
@@ -626,18 +629,39 @@ export async function reassignRequest(orderId: string, techUserId: string) {
  * orden. En efectivo solo aplica el ajuste contable. Antes solo cambiaba el
  * estado del pago en dos escrituras sueltas y no devolvía dinero.
  */
-export async function refundPayment(orderId: string, reason?: string) {
+export async function refundPayment(
+  orderId: string,
+  reason?: string,
+  amountCents?: number,
+) {
   const pay = getPayment(orderId);
   if (!pay || pay.status !== 'paid') return null;
+  const max = refundableCents(pay);
+  if (amountCents != null && (amountCents < 1 || amountCents > max)) {
+    notifyError('El monto a reembolsar excede lo que queda por reembolsar.');
+    return null;
+  }
   return mutate(async () => {
     const { data, error } = await supabase.functions.invoke(
       'stripe-refund-order',
-      { body: { service_order_id: orderId, reason } },
+      {
+        body: {
+          service_order_id: orderId,
+          reason,
+          // Omitido = todo lo que queda; parcial = acumula en refunded_cents.
+          ...(amountCents != null && amountCents < max ? { amount_cents: amountCents } : {}),
+        },
+      },
     );
     if (error) throw error;
     return data ?? pay;
   }, 'No se pudo emitir el reembolso. Nada se cobró ni se canceló; reintenta.');
 }
+
+/** Lo que aún se puede reembolsar: amount - refunded_cents (columna del PR #4; types: regen). */
+export const refundableCents = (pay: { amount_cents: number }) =>
+  pay.amount_cents -
+  Number((pay as { refunded_cents?: number | null }).refunded_cents ?? 0);
 
 export async function resolveKyc(
   techId: string,
@@ -1275,6 +1299,7 @@ export interface PayoutRequest {
     | 'held';
   stripe_account_id: string | null;
   failure_reason: string | null;
+  batch_id: string | null;
   approved_at: string | null;
   created_at: string;
 }
@@ -1338,7 +1363,7 @@ const EXTRA_QUERIES: Record<ExtraKey, (from: number, to: number) => PromiseLike<
   payouts: (a, b) =>
     rawFrom('payout_requests')
       .select(
-        'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,approved_at,created_at',
+        'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,batch_id,approved_at,created_at',
       )
       .order('created_at', { ascending: false })
       .range(a, b),
@@ -1436,28 +1461,51 @@ async function mutateExtras<R>(
   return r;
 }
 
-/** Aprueba un retiro pendiente (admin; RLS payout_requests_admin_update). */
-export const approvePayout = (id: string) =>
+export interface PayoutBatch {
+  id: string;
+  status: string;
+  note: string | null;
+  created_at: string;
+}
+
+/**
+ * Aprueba retiros pendientes en un lote (RPC approve_payout_requests; types:
+ * regen). Los técnicos con fondos en disputa quedan `held` dentro del mismo
+ * lote en vez de aprobarse: por eso el envío por Stripe se decide después,
+ * leyendo el estado real de cada solicitud.
+ */
+export const approvePayouts = (ids: string[], note?: string) =>
   mutateExtras(
     async () => {
-      const { data: auth } = await supabase.auth.getSession();
-      const { error } = await rawFrom('payout_requests')
-        .update({
-          status: 'approved',
-          approved_by: auth.session?.user.id ?? null,
-          approved_at: now(),
-        })
-        .eq('id', id)
-        .eq('status', 'pending');
+      const { data, error } = await rawRpc('approve_payout_requests', {
+        p_request_ids: ids,
+        p_note: note ?? null,
+      });
       if (error) throw error;
-      return true;
+      return data as PayoutBatch;
     },
     e => pgMessage(e, 'No se pudo aprobar el retiro.'),
   );
 
-/** Envía un retiro aprobado por Stripe (edge function stripe-create-payout). */
-export const sendPayout = (id: string) =>
+/** Rechaza (cancela) una solicitud pendiente o retenida. */
+export const rejectPayout = (id: string) =>
   mutateExtras(
+    async () => {
+      const { error } = await rawRpc('cancel_payout_request', { p_request_id: id });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo rechazar el retiro.'),
+  );
+
+/** Envía por Stripe un retiro ya `approved` (edge function stripe-create-payout). */
+export const sendPayout = (id: string) => {
+  const req = useExtras.getState().payouts.find(p => p.id === id);
+  if (req && req.status !== 'approved') {
+    notifyError('Solo se envían retiros aprobados (los retenidos esperan a la disputa).');
+    return Promise.resolve(null);
+  }
+  return mutateExtras(
     async () => {
       const { data, error } = await supabase.functions.invoke(
         'stripe-create-payout',
@@ -1468,6 +1516,7 @@ export const sendPayout = (id: string) =>
     },
     'No se pudo enviar el retiro por Stripe. Revisa la cuenta conectada del técnico.',
   );
+};
 
 /** Activa/desactiva una zona de cobertura (admin; coverage_zones_admin). */
 export const setZoneActive = (id: string, active: boolean) =>

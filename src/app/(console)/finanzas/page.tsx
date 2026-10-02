@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Send, Check, Wallet, ExternalLink } from 'lucide-react';
+import { Download, Send, Check, Wallet, ExternalLink, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -22,7 +22,8 @@ import {
 import { exportCsv } from '@/components/admin';
 import { useAction } from '@/components/use-action';
 import {
-  approvePayout,
+  approvePayouts,
+  fetchReportKpis,
   getAllLedger,
   getAllPayments,
   getProfile,
@@ -31,12 +32,14 @@ import {
   getTechnician,
   loadExtras,
   loadWorld,
+  rejectPayout,
   sendPayout,
   useExtras,
   useTick,
   useWorldFailed,
   useWorldReady,
   type PayoutRequest,
+  type ReportKpis,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
 import { fmtDate } from '@/lib/dates';
@@ -107,10 +110,23 @@ export default function FinanzasPage() {
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
   const [batchOpen, setBatchOpen] = useState(false);
+  // GMV del periodo: una sola definición (RPC admin_report_kpis, la misma de
+  // Reportes); los pagos del snapshot solo alimentan la gráfica por día.
+  const [kpis, setKpis] = useState<ReportKpis | null>(null);
 
   useEffect(() => {
     void loadExtras();
   }, []);
+  useEffect(() => {
+    let live = true;
+    const b = rangeBuckets(range, new Date());
+    void fetchReportKpis(new Date(b[0].from), new Date(b[b.length - 1].to)).then(
+      k => live && setKpis(k),
+    );
+    return () => {
+      live = false;
+    };
+  }, [range, tick]);
 
   const m = useMemo(() => {
     const now = new Date();
@@ -194,6 +210,9 @@ export default function FinanzasPage() {
   const txRows = m.tx.filter(t => method === 'all' || t.method === method);
   const payouts = extras.payouts;
   const pendingPO = payouts.filter(p => p.status === 'pending');
+  const heldPO = payouts.filter(p => p.status === 'held');
+  const gmv = kpis ? Number(kpis.current.gmv_cents) : m.cur.gross;
+  const gmvPrev = kpis ? Number(kpis.previous.gmv_cents) : m.prev.gross;
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
   const labels = m.buckets.map(b => b.label);
 
@@ -255,18 +274,29 @@ export default function FinanzasPage() {
   };
 
   async function processPending() {
-    const ok = await run(
-      'batch',
-      async () => {
-        for (const p of pendingPO) {
-          // El mutator ya mostró el error; se detiene el lote sin tocar el resto.
-          if ((await approvePayout(p.id)) === null) return false;
-          if ((await sendPayout(p.id)) === null) return false;
-        }
-        return true;
-      },
-      `${pendingPO.length} retiros enviados`,
-    );
+    const ok = await run('batch', async () => {
+      // Un solo lote: el backend aprueba o retiene (held) cada solicitud según
+      // tenga fondos en disputa; solo las aprobadas se envían por Stripe.
+      const batch = await approvePayouts(
+        pendingPO.map(p => p.id),
+        'Lote desde la consola',
+      );
+      if (!batch) return false;
+      const inBatch = useExtras.getState().payouts.filter(p => p.batch_id === batch.id);
+      const approved = inBatch.filter(p => p.status === 'approved');
+      const held = inBatch.length - approved.length;
+      let sent = 0;
+      for (const p of approved) {
+        // El mutator ya mostró el error; se detiene el lote sin tocar el resto.
+        if ((await sendPayout(p.id)) === null) break;
+        sent++;
+      }
+      toast.success(
+        `${sent} de ${approved.length} retiros enviados`,
+        held ? `${held} retenidos por disputa abierta (lote ${batch.id.slice(0, 6).toUpperCase()})` : undefined,
+      );
+      return sent === approved.length;
+    });
     if (ok) setBatchOpen(false);
   }
 
@@ -294,7 +324,7 @@ export default function FinanzasPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard index={0} label="GMV" value={money(m.cur.gross)} delta={deltaLabel(pctDelta(m.cur.gross, m.prev.gross))} />
+        <KpiCard index={0} label="GMV" value={money(gmv)} delta={deltaLabel(pctDelta(gmv, gmvPrev))} />
         <KpiCard index={1} label="Comisión plataforma" value={money(m.cur.commission)} delta={deltaLabel(pctDelta(m.cur.commission, m.prev.commission))} />
         <KpiCard index={2} label="Pagado a técnicos" value={money(m.paid[0])} delta={deltaLabel(pctDelta(m.paid[0], m.paid[1]))} />
         <KpiCard index={3} label="Por cobrar · efectivo" value={money(m.owed[0])} delta={deltaLabel(pctDelta(m.owed[0], m.owed[1]))} negative />
@@ -336,7 +366,7 @@ export default function FinanzasPage() {
           <Tabs
             tabs={[
               { value: 'tx', label: 'Transacciones', count: m.tx.length },
-              { value: 'po', label: 'Retiros', count: pendingPO.length },
+              { value: 'po', label: 'Retiros', count: pendingPO.length + heldPO.length },
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
             ]}
@@ -377,7 +407,8 @@ export default function FinanzasPage() {
           <div className="p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="font-sans text-[13px] text-muted">
-                Los técnicos solicitan retiros desde su app · se aprueban aquí y se envían por Stripe Connect a su cuenta.
+                Los técnicos solicitan retiros desde su app · se aprueban aquí (en lote) y se envían por Stripe Connect.
+                Los técnicos con una disputa abierta quedan <b>retenidos</b> hasta resolverla.
               </p>
               {payoutsReal && pendingPO.length > 0 && (
                 <Button icon={Send} onClick={() => setBatchOpen(true)} disabled={!!busy}>
@@ -407,14 +438,37 @@ export default function FinanzasPage() {
                       <div className="min-w-0 flex-1">
                         <div className="font-sans text-[13.5px] font-semibold text-navy">{techName(p.technician_id)}</div>
                         <div className="font-mono text-[11.5px] text-muted">
-                          RET-{p.id.slice(0, 6).toUpperCase()} · CLABE {tech?.clabe ? `•••• ${tech.clabe.slice(-4)}` : 'sin registrar'} · {fechaCorta(p.created_at)}
+                          RET-{p.id.slice(0, 6).toUpperCase()}
+                          {p.batch_id ? ` · lote ${p.batch_id.slice(0, 6).toUpperCase()}` : ''} · CLABE{' '}
+                          {tech?.clabe ? `•••• ${tech.clabe.slice(-4)}` : 'sin registrar'} · {fechaCorta(p.created_at)}
                         </div>
                         {p.failure_reason && <div className="font-sans text-[12px] text-error">{p.failure_reason}</div>}
                       </div>
                       <span className="font-display text-[15px] font-extrabold text-navy tabular">{money(p.amount_cents)}</span>
                       <Badge tone={st.tone}>{st.label}</Badge>
+                      {(p.status === 'pending' || p.status === 'held') && (
+                        <Button size="sm" variant="ghost" icon={X} loading={busy === `rj-${p.id}`} disabled={!!busy} onClick={() => void run(`rj-${p.id}`, () => rejectPayout(p.id), 'Retiro rechazado')}>
+                          Rechazar
+                        </Button>
+                      )}
                       {p.status === 'pending' && (
-                        <Button size="sm" variant="approve" icon={Check} loading={busy === `ap-${p.id}`} disabled={!!busy} onClick={() => void run(`ap-${p.id}`, () => approvePayout(p.id), 'Retiro aprobado')}>
+                        <Button
+                          size="sm"
+                          variant="approve"
+                          icon={Check}
+                          loading={busy === `ap-${p.id}`}
+                          disabled={!!busy}
+                          onClick={() =>
+                            void run(`ap-${p.id}`, async () => {
+                              const batch = await approvePayouts([p.id]);
+                              if (!batch) return null;
+                              const after = useExtras.getState().payouts.find(x => x.id === p.id);
+                              if (after?.status === 'held')
+                                toast.warning('Retiro retenido', 'El técnico tiene una disputa abierta; se libera al resolverla.');
+                              return true;
+                            }, 'Retiro procesado')
+                          }
+                        >
                           Aprobar
                         </Button>
                       )}

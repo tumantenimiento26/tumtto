@@ -132,6 +132,8 @@ interface NavGroup {
 function useNavGroups(): NavGroup[] {
   useTick();
   const { unread } = useNotifications();
+  const { can } = useAuth();
+  const finanzas = can('finanzas');
   return [
     {
       label: 'General',
@@ -162,7 +164,7 @@ function useNavGroups(): NavGroup[] {
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
         {
           href: '/soporte',
           icon: Scale,
@@ -179,7 +181,7 @@ function useNavGroups(): NavGroup[] {
       label: 'Sistema',
       items: [
         { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
-        { href: '/config', icon: Settings, label: 'Configuración' },
+        ...(finanzas ? [{ href: '/config', icon: Settings, label: 'Configuración' }] : []),
         // Galería de estados/errores: solo en desarrollo.
         ...(process.env.NODE_ENV === 'production'
           ? []

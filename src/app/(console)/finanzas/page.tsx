@@ -43,6 +43,7 @@ import {
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
 import { fmtDate } from '@/lib/dates';
+import { useAuth } from '@/lib/auth';
 import { initials } from '@/lib/techConsole';
 import {
   aggregate,
@@ -106,6 +107,7 @@ export default function FinanzasPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
+  const canFinance = useAuth().can('finanzas');
   const [range, setRange] = useState<FinRange>('30d');
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
@@ -216,6 +218,8 @@ export default function FinanzasPage() {
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
   const labels = m.buckets.map(b => b.label);
 
+  if (!canFinance)
+    return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed)
     return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
   if (!ready) return <ScreenSkeleton kind="dashboard" />;

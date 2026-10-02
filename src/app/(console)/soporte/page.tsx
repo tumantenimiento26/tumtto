@@ -68,6 +68,7 @@ import {
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
+import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/data/notifications';
 import {
   RESOLUTIONS,
@@ -284,6 +285,8 @@ function DisputeDetail({
   const [resolution, setResolution] = useState<Resolution>('favor_cliente');
   const [comment, setComment] = useState('');
   const { busy, run } = useAction();
+  const { can } = useAuth();
+  const canSupport = can('soporte');
   const code = disputeCode(dispute.id);
   // Bitácora de la disputa (escalaciones y notas) desde admin_events.
   const log = getNotes(dispute.id);
@@ -381,7 +384,7 @@ function DisputeDetail({
             <Button
               variant="secondary"
               icon={ArrowUpRight}
-              disabled={!!busy}
+              disabled={!!busy || !canSupport}
               loading={busy === 'escalate'}
               onClick={() =>
                 void run(
@@ -397,7 +400,8 @@ function DisputeDetail({
           <Button
             variant="approve"
             icon={Check}
-            disabled={!!busy}
+            disabled={!!busy || !canSupport}
+            title={canSupport ? undefined : 'Tu rol no resuelve disputas'}
             loading={busy === 'resolve'}
             onClick={() =>
               void run(
@@ -785,6 +789,7 @@ function KycCard({ techId }: { techId: string }) {
   const who = profile?.full_name ?? 'Técnico';
   const sessions = getKycSessions(techId);
   const { busy, run } = useAction();
+  const canKyc = useAuth().can('kyc');
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [other, setOther] = useState('');
@@ -850,7 +855,8 @@ function KycCard({ techId }: { techId: string }) {
           icon={Check}
           className="flex-1"
           loading={busy === 'approve'}
-          disabled={!!busy}
+          disabled={!!busy || !canKyc}
+          title={canKyc ? 'Aprueba desde el expediente si faltan documentos' : 'Tu rol no revisa KYC'}
           onClick={() =>
             void run(
               'approve',
@@ -865,7 +871,7 @@ function KycCard({ techId }: { techId: string }) {
           variant="destructive"
           icon={X}
           className="flex-1"
-          disabled={!!busy}
+          disabled={!!busy || !canKyc}
           onClick={() => setRejecting(true)}
         >
           Rechazar

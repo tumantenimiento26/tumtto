@@ -24,9 +24,12 @@ import {
   Modal,
   PageHeader,
   ScreenSkeleton,
+  Select,
   Toggle,
   toast,
 } from '@/components/ds';
+import { useAuth } from '@/lib/auth';
+import { ADMIN_ROLES, PERMISSIONS, type AdminRole } from '@/lib/rbac';
 import {
   useTick,
   useWorldReady,
@@ -38,9 +41,11 @@ import {
   saveSettings,
   getAdmins,
   inviteAdmin,
+  setAdminRole,
   getMyMfaVerified,
   getSessionUserId,
 } from '@/lib/data/store';
+import { useAction } from '@/components/use-action';
 import {
   changedSettings,
   pctToBps,
@@ -127,6 +132,7 @@ export default function ConfigPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
+  const canFinance = useAuth().can('finanzas');
   const [active, setActive] = useState<SectionId>('general');
   // /config?tab=notificaciones (p. ej. desde Notificaciones → Configurar).
   useEffect(() => {
@@ -201,6 +207,8 @@ export default function ConfigPage() {
     setErrs({});
   }
 
+  if (!canFinance)
+    return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed)
     return (
       <ErrorPage
@@ -677,19 +685,15 @@ function NotificationsSection({
 }
 
 // ── Equipo y permisos ────────────────────────────────────────────────────────
-const MODULES = [
-  'Dashboard',
-  'Clientes y técnicos',
-  'Servicios',
-  'Finanzas y reembolsos',
-  'Soporte y disputas',
-  'Catálogo',
-  'Configuración',
-];
+const ROLE_OPTS = ADMIN_ROLES.map(r => ({ value: r.value, label: r.label, hint: r.desc }));
+const roleLabel = (r: AdminRole) => ADMIN_ROLES.find(x => x.value === r)?.label ?? r;
 
 function TeamSection() {
   useTick();
   const admins = getAdmins();
+  const { adminRole, can } = useAuth();
+  const canUsers = can('usuarios');
+  const { busy, run } = useAction();
   const [me, setMe] = useState<string | null>(null);
   const [myMfa, setMyMfa] = useState<boolean | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -711,9 +715,11 @@ function TeamSection() {
               {admins.length} con acceso a la consola.
             </p>
           </div>
-          <Button icon={Mail} onClick={() => setInviteOpen(true)}>
-            Invitar
-          </Button>
+          {canUsers && (
+            <Button icon={Mail} onClick={() => setInviteOpen(true)}>
+              Invitar
+            </Button>
+          )}
         </div>
         <ul className="divide-y divide-divider">
           {admins.map(a => {
@@ -737,7 +743,26 @@ function TeamSection() {
                     {a.status === 'active' ? 'Activo' : 'Suspendido'}
                   </div>
                 </div>
-                <Badge tone="navy">Admin</Badge>
+                {mine ? (
+                  <Badge tone="navy">{roleLabel(adminRole)}</Badge>
+                ) : canUsers ? (
+                  // El rol de otros admins vive en app_metadata (solo lo lee el
+                  // backend); aquí se asigna, no se muestra el actual.
+                  <div className="w-44">
+                    <Select
+                      options={ROLE_OPTS}
+                      value={null}
+                      placeholder="Asignar rol…"
+                      disabled={busy === a.id}
+                      aria-label={`Rol de ${a.full_name ?? 'admin'}`}
+                      onChange={r =>
+                        void run(a.id, () => setAdminRole(a.id, r), `Rol actualizado · ${roleLabel(r)}`)
+                      }
+                    />
+                  </div>
+                ) : (
+                  <Badge tone="navy">Admin</Badge>
+                )}
                 <span className="w-24 text-right font-sans text-[12px]">
                   {mine && myMfa != null ? (
                     myMfa ? (
@@ -770,57 +795,47 @@ function TeamSection() {
             Matriz de permisos
           </div>
           <p className="mt-0.5 font-sans text-[12.5px] text-muted">
-            Hoy existe un solo rol de consola (admin) con acceso total. Los
-            roles granulares se habilitarán cuando el backend los soporte.
+            Solo lectura: es el mismo mapa que aplica el backend
+            (app.has_permission). Todo admin puede leer la consola.
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] border-collapse">
+          <table className="w-full min-w-[520px] border-collapse">
             <thead>
               <tr className="bg-panel">
-                {['Módulo', 'Ver', 'Editar'].map((h, i) => (
+                <th className="px-5 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
+                  Permiso
+                </th>
+                {ADMIN_ROLES.map(r => (
                   <th
-                    key={h}
-                    className={`px-5 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted ${
-                      i ? 'text-center' : 'text-left'
-                    }`}
+                    key={r.value}
+                    className="px-3 py-2.5 text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted"
                   >
-                    {h}
+                    {r.label}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {MODULES.map(m => (
-                <tr key={m} className="border-t border-divider">
-                  <td className="px-5 py-3 font-sans text-[13.5px] text-navy">
-                    {m}
+              {(Object.keys(PERMISSIONS) as (keyof typeof PERMISSIONS)[]).map(k => (
+                <tr key={k} className="border-t border-divider">
+                  <td className="px-5 py-3">
+                    <div className="font-sans text-[13.5px] font-semibold text-navy">
+                      {PERMISSIONS[k].label}
+                    </div>
+                    <div className="font-sans text-[12px] text-muted">{PERMISSIONS[k].desc}</div>
                   </td>
-                  {[0, 1].map(i => (
-                    <td key={i} className="px-5 py-3 text-center">
-                      <Check
-                        size={16}
-                        className="inline text-success"
-                        aria-label="Permitido"
-                      />
+                  {ADMIN_ROLES.map(r => (
+                    <td key={r.value} className="px-3 py-3 text-center">
+                      {PERMISSIONS[k].roles.includes(r.value) ? (
+                        <Check size={16} className="inline text-success" aria-label="Permitido" />
+                      ) : (
+                        <Minus size={16} className="inline text-faint" aria-label="Sin permiso" />
+                      )}
                     </td>
                   ))}
                 </tr>
               ))}
-              <tr className="border-t border-divider">
-                <td className="px-5 py-3 font-sans text-[13.5px] text-muted">
-                  Soporte (solo lectura)
-                </td>
-                {[0, 1].map(i => (
-                  <td key={i} className="px-5 py-3 text-center">
-                    <Minus
-                      size={16}
-                      className="inline text-faint"
-                      aria-label="No disponible"
-                    />
-                  </td>
-                ))}
-              </tr>
             </tbody>
           </table>
         </div>
@@ -840,13 +855,14 @@ function InviteModal({
 }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState<AdminRole>('soporte');
   const [sending, setSending] = useState(false);
   const invalid = !/^\S+@\S+\.\S+$/.test(email.trim());
 
   async function send() {
     if (invalid || sending) return;
     setSending(true);
-    const ok = await inviteAdmin(email.trim(), name.trim());
+    const ok = await inviteAdmin(email.trim(), name.trim(), role);
     setSending(false);
     if (ok === null) return; // el store ya mostró el error; el modal sigue
     toast.success('Invitación enviada', email.trim());
@@ -894,7 +910,10 @@ function InviteModal({
           onChange={e => setName(e.target.value)}
           placeholder="Nombre y apellido"
         />
-        <Kicker>Se invita con rol admin</Kicker>
+        <div>
+          <Kicker className="mb-1.5">Rol en la consola</Kicker>
+          <Select options={ROLE_OPTS} value={role} onChange={setRole} aria-label="Rol" />
+        </div>
       </div>
     </Modal>
   );

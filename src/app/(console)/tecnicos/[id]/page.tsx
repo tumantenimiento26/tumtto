@@ -56,10 +56,12 @@ import {
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
+import { useAuth } from '@/lib/auth';
 import {
   KYC_GROUP_META,
   ORDER_STATUS,
   ago,
+  backgroundCheckOk,
   diditChecks,
   initials,
   kycGroup,
@@ -92,6 +94,11 @@ export default function TecnicoDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
+  const { can } = useAuth();
+  const canKyc = can('kyc');
+  const canSupport = can('soporte');
+  // CURP/RFC/CLABE: solo quien revisa KYC o finanzas.
+  const canSensitive = canKyc || can('finanzas');
   const [rejectOpen, setRejectOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
@@ -170,6 +177,11 @@ export default function TecnicoDetailPage() {
       ? (getNotes(tech.id).find(n => n.event_type === 'kyc_declined')?.note ?? null)
       : null;
   const docsMissing = extras.unavailable.docs;
+  // admin_resolve_kyc('approved') se bloquea hasta tener antecedentes aprobados y vigentes.
+  const bgOk = backgroundCheckOk(data.docs);
+  const approveTitle = bgOk
+    ? undefined
+    : 'Primero aprueba la carta de antecedentes (vigente, menos de 3 meses).';
 
   const approve = () =>
     void run('approve', () => resolveKyc(tech.id, true), `Técnico aprobado · ${name}`);
@@ -218,18 +230,18 @@ export default function TecnicoDetailPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {group === 'in_review' && (
+            {group === 'in_review' && canKyc && (
               <>
                 <Button variant="destructive" disabled={!!busy} onClick={() => setRejectOpen(true)}>
                   Rechazar
                 </Button>
-                <Button variant="approve" loading={busy === 'approve'} disabled={!!busy} onClick={approve}>
+                <Button variant="approve" loading={busy === 'approve'} disabled={!!busy || !bgOk} title={approveTitle} onClick={approve}>
                   Aprobar técnico
                 </Button>
               </>
             )}
-            {group === 'declined' && (
-              <Button variant="approve" icon={Check} loading={busy === 'approve'} disabled={!!busy} onClick={approve}>
+            {group === 'declined' && canKyc && (
+              <Button variant="approve" icon={Check} loading={busy === 'approve'} disabled={!!busy || !bgOk} title={approveTitle} onClick={approve}>
                 Aprobar técnico
               </Button>
             )}
@@ -248,12 +260,14 @@ export default function TecnicoDetailPage() {
                 >
                   Ajustar cartera
                 </Button>
-                <Button variant="destructive" icon={Ban} disabled={!!busy} onClick={() => setSuspendOpen(true)}>
-                  Suspender
-                </Button>
+                {canSupport && (
+                  <Button variant="destructive" icon={Ban} disabled={!!busy} onClick={() => setSuspendOpen(true)}>
+                    Suspender
+                  </Button>
+                )}
               </>
             )}
-            {group === 'suspended' && (
+            {group === 'suspended' && canSupport && (
               <Button
                 icon={RotateCcw}
                 loading={busy === 'reactivate'}
@@ -277,9 +291,14 @@ export default function TecnicoDetailPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <IneTile status={latest?.status ?? null} />
               {data.docs.map(d => (
-                <DocTile key={d.id} doc={d} />
+                <DocTile key={d.id} doc={d} canReview={canKyc} />
               ))}
             </div>
+            {!bgOk && !docsMissing && (
+              <p className="mt-3 font-sans text-[12.5px] text-warning-ink">
+                Para aprobar al técnico la carta de antecedentes debe estar aprobada y vigente (3 meses).
+              </p>
+            )}
             {docsMissing ? (
               <p className="mt-3 font-sans text-[12.5px] text-muted">
                 Los documentos adicionales (antecedentes, domicilio) aún no están disponibles en
@@ -298,8 +317,8 @@ export default function TecnicoDetailPage() {
             <Card padded className="animate-up">
               <CardHead title="Datos personales" />
               <KV label="Teléfono" value={formatPhone(profile.phone) || '—'} mono />
-              <KV label="CURP" value={tech.curp ?? '—'} mono />
-              <KV label="RFC" value={tech.rfc ?? '—'} mono />
+              {canSensitive && <KV label="CURP" value={tech.curp ?? '—'} mono />}
+              {canSensitive && <KV label="RFC" value={tech.rfc ?? '—'} mono />}
               <KV label="Domicilio" value={tech.home_address ?? '—'} />
               <KV label="Registro" value={fecha(profile.created_at)} />
             </Card>
@@ -347,7 +366,7 @@ export default function TecnicoDetailPage() {
                 <MapPin size={13} /> Radio de servicio: {data.radius} km
               </p>
             </Card>
-            <BankCard tech={tech} />
+            {canSensitive && <BankCard tech={tech} />}
           </div>
           <NotesCard techId={tech.id} />
         </>
@@ -441,7 +460,7 @@ export default function TecnicoDetailPage() {
                   ))
                 )}
               </Card>
-              <BankCard tech={tech} />
+              {canSensitive && <BankCard tech={tech} />}
               <NotesCard techId={tech.id} />
             </div>
           </div>

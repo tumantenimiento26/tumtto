@@ -65,6 +65,7 @@ import {
 import type { RequestStatus } from '@/lib/demo/world';
 import { orderCode } from '@/lib/orderCode';
 import { fmtDateTime } from '@/lib/dates';
+import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
@@ -129,6 +130,9 @@ export default function ServicioDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
+  const { can } = useAuth();
+  const canFinance = can('finanzas');
+  const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
@@ -541,7 +545,7 @@ export default function ServicioDetailPage() {
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
               <Kicker>Técnico</Kicker>
-              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal}>
+              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal || !canSupport}>
                 Reasignar
               </Button>
             </div>
@@ -619,18 +623,20 @@ export default function ServicioDetailPage() {
                 }))}
                 value={null}
                 onChange={s => setForceTo(s)}
-                disabled={busy !== null}
+                disabled={busy !== null || !canSupport}
               />
               <Button
                 variant="secondary"
                 icon={RotateCcw}
-                disabled={!refundable}
+                disabled={!refundable || !canFinance}
                 title={
-                  refundable
-                    ? 'Devuelve el cobro al cliente'
-                    : payment?.status === 'refunded'
-                      ? 'Este pago ya fue reembolsado'
-                      : 'No hay un pago cobrado que reembolsar'
+                  !canFinance
+                    ? 'Solo finanzas emite reembolsos'
+                    : refundable
+                      ? 'Devuelve el cobro al cliente'
+                      : payment?.status === 'refunded'
+                        ? 'Este pago ya fue reembolsado'
+                        : 'No hay un pago cobrado que reembolsar'
                 }
                 onClick={() => setRefundOpen(true)}
               >
@@ -639,7 +645,7 @@ export default function ServicioDetailPage() {
               <Button
                 variant="destructive"
                 icon={Ban}
-                disabled={!cancellable}
+                disabled={!cancellable || !canSupport}
                 onClick={() => setCancelOpen(true)}
               >
                 Cancelar servicio

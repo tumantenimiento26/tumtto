@@ -66,6 +66,32 @@ export function rateError(raw: string): string | null {
   return null;
 }
 
+/** Vigencia de la carta de antecedentes: 3 meses desde su expedición. */
+export const CRIMINAL_RECORD_VALID_MONTHS = 3;
+
+/** Vence/venció: solo aplica a antecedentes con fecha de expedición. */
+export function docValidity(
+  doc: { kind: string; issued_on: string | null },
+  now: Date = new Date(),
+): { expiresAt: Date; expired: boolean; daysLeft: number } | null {
+  if (doc.kind !== 'criminal_record' || !doc.issued_on) return null;
+  const expiresAt = new Date(doc.issued_on + 'T00:00:00');
+  expiresAt.setMonth(expiresAt.getMonth() + CRIMINAL_RECORD_VALID_MONTHS);
+  const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / 864e5);
+  return { expiresAt, expired: daysLeft < 0, daysLeft };
+}
+
+/** ¿El técnico puede aprobarse? Antecedentes aprobados y vigentes. */
+export function backgroundCheckOk(
+  docs: { kind: string; issued_on: string | null; review_status: string }[],
+  now: Date = new Date(),
+): boolean {
+  const bg = docs.find(d => d.kind === 'criminal_record');
+  if (!bg || bg.review_status !== 'approved') return false;
+  const v = docValidity(bg, now);
+  return !v || !v.expired;
+}
+
 export const DOC_LABEL: Record<string, string> = {
   criminal_record: 'Antecedentes no penales',
   proof_of_address: 'Comprobante de domicilio',

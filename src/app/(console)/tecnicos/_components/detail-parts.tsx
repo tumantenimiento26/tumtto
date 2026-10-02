@@ -32,12 +32,13 @@ import {
   getDocumentUrl,
   getNotes,
   getTechnician,
+  reviewDocument,
   updateTechnicianBank,
   updateTechnicianProfile,
   upsertTechRate,
   type TechDocument,
 } from '@/lib/data/store';
-import { DOC_LABEL, RATE_MAX, RATE_MIN, rateError } from '@/lib/techConsole';
+import { DOC_LABEL, RATE_MAX, RATE_MIN, docValidity, rateError } from '@/lib/techConsole';
 
 type Tech = NonNullable<ReturnType<typeof getTechnician>>;
 
@@ -92,24 +93,41 @@ const REVIEW_TONE = {
   rejected: { label: 'Rechazado', tone: 'danger' },
 } as const;
 
-/** Tile de documento: previsualización rayada + estado; abre URL firmada. */
-export function DocTile({ doc }: { doc: TechDocument }) {
+/**
+ * Tile de documento: previsualización (abre URL firmada), vigencia de los
+ * antecedentes (3 meses) y, con permiso `kyc`, aprobar/rechazar por documento
+ * (technician_documents.review_*). Rechazar pide el motivo.
+ */
+export function DocTile({ doc, canReview }: { doc: TechDocument; canReview: boolean }) {
   const [opening, setOpening] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [notes, setNotes] = useState('');
+  const { busy, run } = useAction();
   const meta = REVIEW_TONE[doc.review_status] ?? REVIEW_TONE.pending;
+  const validity = docValidity(doc);
   async function open() {
     setOpening(true);
     const url = await getDocumentUrl(doc);
     setOpening(false);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   }
+  const review = async (status: 'approved' | 'rejected') => {
+    const ok = await run(
+      status,
+      () => reviewDocument(doc.id, status, status === 'rejected' ? notes : undefined),
+      status === 'approved' ? 'Documento aprobado' : 'Documento rechazado',
+    );
+    if (ok) {
+      setRejecting(false);
+      setNotes('');
+    }
+  };
   return (
-    <button
-      type="button"
-      onClick={() => void open()}
-      className="group flex flex-col overflow-hidden rounded-box border border-line bg-card text-left transition-shadow hover:shadow-kpi focus-visible:shadow-focus focus-visible:outline-none"
-    >
-      <div
-        className="grid h-36 place-items-center border-b border-line"
+    <div className="flex flex-col overflow-hidden rounded-box border border-line bg-card">
+      <button
+        type="button"
+        onClick={() => void open()}
+        className="group grid h-36 place-items-center border-b border-line text-left focus-visible:shadow-focus focus-visible:outline-none"
         style={{
           backgroundImage:
             'repeating-linear-gradient(135deg, var(--color-panel) 0 10px, var(--color-card) 10px 20px)',
@@ -119,7 +137,7 @@ export function DocTile({ doc }: { doc: TechDocument }) {
           <FileText size={14} /> {opening ? 'Abriendo…' : 'Ver documento'}
           <ExternalLink size={12} className="opacity-0 transition-opacity group-hover:opacity-100" />
         </span>
-      </div>
+      </button>
       <div className="flex items-center justify-between gap-2 px-3.5 py-3">
         <div className="min-w-0">
           <div className="truncate font-sans text-[13px] font-semibold text-navy">
@@ -128,10 +146,62 @@ export function DocTile({ doc }: { doc: TechDocument }) {
           <div className="font-mono text-[11px] text-muted">
             {doc.issued_on ? `Expedido ${fecha(doc.issued_on)}` : `Subido ${fecha(doc.created_at)}`}
           </div>
+          {validity && (
+            <div className={`font-mono text-[11px] ${validity.expired ? 'text-error' : validity.daysLeft <= 14 ? 'text-warning-ink' : 'text-muted'}`}>
+              {validity.expired
+                ? `Vencida el ${fecha(validity.expiresAt.toISOString())}`
+                : `Vigente hasta ${fecha(validity.expiresAt.toISOString())}`}
+            </div>
+          )}
+          {doc.review_notes && doc.review_status === 'rejected' && (
+            <div className="mt-0.5 font-sans text-[11.5px] text-error">{doc.review_notes}</div>
+          )}
         </div>
-        <Badge tone={meta.tone}>{meta.label}</Badge>
+        <Badge tone={validity?.expired && doc.review_status !== 'rejected' ? 'danger' : meta.tone}>
+          {validity?.expired && doc.review_status !== 'rejected' ? 'Vencido' : meta.label}
+        </Badge>
       </div>
-    </button>
+      {canReview && doc.review_status === 'pending' && (
+        <div className="flex flex-col gap-2 border-t border-divider px-3.5 py-2.5">
+          {rejecting && (
+            <Input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Motivo del rechazo (lo verá el técnico)"
+              aria-label="Motivo del rechazo"
+            />
+          )}
+          <div className="flex justify-end gap-2">
+            {rejecting ? (
+              <>
+                <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => setRejecting(false)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" variant="destructive" loading={busy === 'rejected'} disabled={!notes.trim()} onClick={() => void review('rejected')}>
+                  Confirmar rechazo
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setRejecting(true)}>
+                  Rechazar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="approve"
+                  loading={busy === 'approved'}
+                  disabled={!!busy || !!validity?.expired}
+                  title={validity?.expired ? 'La carta está vencida: pide una nueva' : undefined}
+                  onClick={() => void review('approved')}
+                >
+                  Aprobar
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

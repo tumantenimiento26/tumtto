@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
 import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
+import type { AdminRole } from '@/lib/rbac';
 import {
   emptyWorld,
   CLIENT_ID,
@@ -784,14 +785,17 @@ export async function resolveKyc(
 export const rejectKyc = (techId: string, reason: string) =>
   resolveKyc(techId, false, reason);
 
-// Suspensión: profiles.status (+ technicians.is_available al suspender a un
-// técnico) en una sola transacción vía admin_set_user_status.
-const setUserStatus = (
+// Suspensión en dos pasos: admin_set_user_status (profiles.status +
+// technicians.is_available + admin_events, una transacción) y luego la Edge
+// Function admin-users, que banea/desbanea la cuenta en Auth para que de
+// verdad no pueda iniciar sesión. Si el segundo paso falla se avisa (el
+// estado ya quedó guardado) en vez de fingir que todo salió bien.
+const setUserStatus = async (
   userId: string,
   status: 'active' | 'suspended',
   errMsg: string,
-) =>
-  mutate(
+) => {
+  const r = await mutate(
     async () => {
       const { error } = await supabase.rpc('admin_set_user_status', {
         p_user_id: userId,
@@ -802,6 +806,20 @@ const setUserStatus = (
     },
     e => pgMessage(e, errMsg),
   );
+  if (r === null) return null;
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: status === 'suspended' ? 'suspend' : 'restore', user_id: userId },
+  });
+  if (error) {
+    console.error('[data] admin-users', error);
+    notifyError(
+      status === 'suspended'
+        ? 'Quedó suspendido en la plataforma, pero no se pudo bloquear su inicio de sesión. Reintenta.'
+        : 'Quedó activo, pero no se pudo desbloquear su inicio de sesión. Reintenta.',
+    );
+  }
+  return true;
+};
 
 export const suspendTechnician = (techId: string) =>
   setUserStatus(techId, 'suspended', 'No se pudo suspender al técnico.');
@@ -848,14 +866,41 @@ export async function updateTechnicianBank(
 export const getAdmins = () => w().profiles.filter(p => p.role === 'admin');
 
 /** Invita a un admin por correo vía la Edge Function admin-users (service role). */
-export async function inviteAdmin(email: string, fullName: string) {
+export async function inviteAdmin(email: string, fullName: string, adminRole?: AdminRole) {
   return mutate(async () => {
     const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'invite', email, full_name: fullName || undefined },
+      body: {
+        action: 'invite',
+        email,
+        full_name: fullName || undefined,
+        admin_role: adminRole,
+      },
     });
     if (error) throw error;
     return data ?? true;
   }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
+}
+
+/** Cambia el rol de consola de otro admin (admin-users set_admin_role; solo super_admin). */
+export async function setAdminRole(userId: string, adminRole: AdminRole) {
+  return mutate(async () => {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'set_admin_role', user_id: userId, admin_role: adminRole },
+    });
+    if (error) throw error;
+    return data ?? true;
+  }, 'No se pudo cambiar el rol.');
+}
+
+/** Invita a un cliente (admin-users invite_client): recibe correo para crear su cuenta. */
+export async function inviteClient(email: string, fullName: string, phone: string | null) {
+  return mutate(async () => {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'invite_client', email, full_name: fullName, phone: phone ?? undefined },
+    });
+    if (error) throw error;
+    return data ?? true;
+  }, 'No se pudo enviar la invitación. Revisa el correo (¿ya tiene cuenta?).');
 }
 
 // ── Direcciones del cliente ──────────────────────────────────────────────────
@@ -1400,6 +1445,7 @@ export interface TechDocument {
   issued_on: string | null;
   review_status: 'pending' | 'approved' | 'rejected';
   review_notes: string | null;
+  reviewed_at: string | null;
   created_at: string;
 }
 export interface PayoutRequest {
@@ -1473,7 +1519,7 @@ const EXTRA_QUERIES: Record<ExtraKey, (from: number, to: number) => PromiseLike<
   docs: (a, b) =>
     rawFrom('technician_documents')
       .select(
-        'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,created_at',
+        'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,reviewed_at,created_at',
       )
       .order('created_at', { ascending: false })
       .range(a, b),
@@ -1634,6 +1680,33 @@ export const sendPayout = (id: string) => {
     'No se pudo enviar el retiro por Stripe. Revisa la cuenta conectada del técnico.',
   );
 };
+
+/**
+ * Revisión por documento (antecedentes, domicilio, carátula): escribe
+ * review_status/review_notes/reviewed_by/reviewed_at en technician_documents
+ * antes de resolver el KYC del técnico.
+ */
+export const reviewDocument = (
+  docId: string,
+  status: 'approved' | 'rejected',
+  notes?: string,
+) =>
+  mutateExtras(
+    async () => {
+      const { data: auth } = await supabase.auth.getSession();
+      const { error } = await rawFrom('technician_documents')
+        .update({
+          review_status: status,
+          review_notes: notes?.trim() || null,
+          reviewed_by: auth.session?.user.id ?? null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', docId);
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo guardar la revisión del documento.'),
+  );
 
 /** Activa/desactiva una zona de cobertura (admin; coverage_zones_admin). */
 export const setZoneActive = (id: string, active: boolean) =>

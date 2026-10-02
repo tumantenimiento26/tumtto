@@ -6,43 +6,43 @@ describe('validateSettings', () => {
     expect(
       validateSettings({
         commission_bps: 1500,
+        urgent_surcharge_bps: 2000,
         request_ttl_minutes: 30,
-        cancel_free_window_hours: 0,
-        support_email: 'soporte@tumtto.mx',
-        platform_name: 'Tumtto',
+        default_match_radius_m: 15000,
+        account_deletion_grace_days: 30,
+        enabled_payment_methods: ['card', 'cash'],
+        admin_require_aal2: true,
       }),
     ).toEqual({});
   });
 
-  it('rechaza decimales, vacíos, negativos y > 100 %', () => {
+  it('rechaza decimales, vacíos, negativos, > 100 % y sin métodos de pago', () => {
     const e = validateSettings({
       request_ttl_minutes: 2.5,
-      noshow_wait_minutes: NaN,
+      default_match_radius_m: NaN,
       commission_bps: -500,
-      cancel_penalty_bps: 12000,
-      sla_dispute_hours: 0,
-      support_email: 'nope',
-      platform_name: '  ',
+      urgent_surcharge_bps: 12000,
+      account_deletion_grace_days: 0,
+      enabled_payment_methods: [],
     });
     expect(Object.keys(e).sort()).toEqual(
       [
-        'cancel_penalty_bps',
+        'account_deletion_grace_days',
         'commission_bps',
-        'noshow_wait_minutes',
-        'platform_name',
+        'default_match_radius_m',
+        'enabled_payment_methods',
         'request_ttl_minutes',
-        'sla_dispute_hours',
-        'support_email',
+        'urgent_surcharge_bps',
       ].sort(),
     );
   });
 });
 
-it('changedSettings solo devuelve lo modificado', () => {
+it('changedSettings solo devuelve lo modificado (arreglos por valor)', () => {
   expect(
     changedSettings(
-      { commission_bps: 1600, notif_sms: false, request_ttl_minutes: 30 },
-      { commission_bps: 1500, notif_sms: false, request_ttl_minutes: 30 },
+      { commission_bps: 1600, admin_require_aal2: false, enabled_payment_methods: ['card'] },
+      { commission_bps: 1500, admin_require_aal2: false, enabled_payment_methods: ['card'] },
     ),
   ).toEqual({ commission_bps: 1600 });
 });

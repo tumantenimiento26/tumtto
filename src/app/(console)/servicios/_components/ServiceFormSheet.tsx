@@ -20,7 +20,6 @@ import {
   getClients,
   getProfile,
   getTechniciansWithProfile,
-  reassignRequest,
   updateOrder,
 } from '@/lib/data/store';
 import type { ServiceRequest } from '@/lib/demo/world';
@@ -35,6 +34,16 @@ const SLOTS = [
   '16:00 – 18:00',
   '18:00 – 20:00',
 ];
+
+/** "10:00 – 12:00" + fecha → [inicio, fin] ISO en hora de la ZMG (sin horario de verano). */
+function slotRange(date: Date | null, slot: string | null): [string | null, string | null] {
+  if (!date || !slot) return [null, null];
+  const hs = [...slot.matchAll(/(\d{1,2}):(\d{2})/g)];
+  if (hs.length < 2) return [null, null];
+  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const at = (m: RegExpMatchArray) => `${ymd}T${m[1].padStart(2, '0')}:${m[2]}:00-06:00`;
+  return [new Date(at(hs[0])).toISOString(), new Date(at(hs[1])).toISOString()];
+}
 
 type Values = {
   clientId: string | null;
@@ -185,29 +194,21 @@ export function ServiceFormSheet({
         }
         return;
       }
-      // ponytail: el esquema no tiene columna de agenda en service_orders;
-      // la visita preferida viaja en la descripción (igual que la app).
-      const when =
-        v.date && v.slot
-          ? `\n[Visita preferida: ${v.date.toLocaleDateString('es-MX', { weekday: 'short', day: '2-digit', month: 'short' })} · ${v.slot}]`
-          : '';
+      // Agenda: la franja viaja como scheduled_for/until (hora ZMG, UTC-6 fijo).
+      const [from, until] = slotRange(v.date, v.slot);
       const created = await createRequest({
         client_id: v.clientId!,
         category_id: v.categoryId!,
         client_address_id: v.addressId,
         title: v.title.trim() || null,
-        description: v.description.trim() + when,
+        description: v.description.trim(),
         is_urgent: v.urgent,
+        // Técnico elegido: la solicitud queda dirigida a él (requested_technician_id).
+        technician_id: v.techId || null,
+        scheduled_for: from,
+        scheduled_until: until,
       });
       if (!created) return; // el store ya mostró el error
-      if (v.techId) {
-        const r = await reassignRequest(created.id, v.techId);
-        if (r === null)
-          toast.warning(
-            'Servicio creado sin técnico',
-            'No se pudo asignar; hazlo desde el detalle con Reasignar.',
-          );
-      }
       toast.success(
         'Servicio creado',
         `${orderCode(created.id)} · ${getProfile(v.clientId!)?.full_name ?? ''}`,

@@ -93,6 +93,9 @@ const STEPS: { label: string; statuses: RequestStatus[] }[] = [
 const stepIndex = (s: RequestStatus) =>
   STEPS.findIndex(st => st.statuses.includes(s));
 
+// Estados que el admin puede forzar con transition_service_order. `completed`
+// y `paid` los fijan el flujo de cierre y el pago (close_service_order /
+// webhook): forzarlos dejaba órdenes sin cobro ni evidencia.
 const FORCE_TARGETS: RequestStatus[] = [
   'requested',
   'accepted',
@@ -101,8 +104,6 @@ const FORCE_TARGETS: RequestStatus[] = [
   'quote',
   'working',
   'closing',
-  'completed',
-  'paid',
   'closed',
   'cancelled',
 ];

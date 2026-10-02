@@ -8,7 +8,6 @@ import {
   CheckCheck,
   Inbox,
   MailOpen,
-  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -223,13 +222,6 @@ export default function NotificacionesPage() {
               onClick={() => markRead(items.map(n => n.id))}
             >
               Marcar todas como leídas
-            </Button>
-            <Button
-              variant="secondary"
-              icon={SlidersHorizontal}
-              href="/config?tab=notificaciones"
-            >
-              Configurar
             </Button>
           </>
         }

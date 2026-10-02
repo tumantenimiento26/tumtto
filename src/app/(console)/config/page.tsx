@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Home,
   Banknote,
   Clock,
-  X as XIcon,
-  Bell,
   Users,
   Mail,
   ShieldCheck,
+  ShieldAlert,
   Check,
   Minus,
   type LucideIcon,
@@ -37,7 +35,7 @@ import {
   loadWorld,
   getSettingInt,
   getSettingBool,
-  getSettingStr,
+  getSettingList,
   saveSettings,
   getAdmins,
   inviteAdmin,
@@ -52,80 +50,52 @@ import {
   validateSettings,
   type Settings as SettingsMap,
 } from '@/lib/settingsRules';
-import {
-  NOTIF_CHANNELS,
-  mutedTypes,
-  notifKey,
-  readMatrix,
-  type PrefMatrix,
-} from '@/lib/notifPrefs';
-import { NOTIF_TYPES, useNotifState } from '@/lib/data/notifications';
 
-type SectionId =
-  'general' | 'commission' | 'sla' | 'cancel' | 'notifications' | 'team';
+type SectionId = 'commission' | 'ops' | 'security' | 'team';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
-  { id: 'general', label: 'General', icon: Home },
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
-  { id: 'sla', label: 'Tiempos y SLA', icon: Clock },
-  { id: 'cancel', label: 'Cancelaciones', icon: XIcon },
-  { id: 'notifications', label: 'Notificaciones', icon: Bell },
+  { id: 'ops', label: 'Operación', icon: Clock },
+  { id: 'security', label: 'Seguridad', icon: ShieldCheck },
   { id: 'team', label: 'Equipo y permisos', icon: Users },
 ];
 
-// Comisión por método de pago → key de platform_settings (en bps).
+// Métodos que las apps muestran (platform_settings.enabled_payment_methods).
 const METHODS = [
-  { key: 'card', label: 'Tarjeta', note: 'Visa / Mastercard' },
-  { key: 'oxxo', label: 'OXXO Pay', note: 'Comisión OXXO + IVA' },
+  { key: 'card', label: 'Tarjeta', note: 'Stripe · Visa / Mastercard' },
+  { key: 'oxxo', label: 'OXXO Pay', note: 'Stripe · referencia' },
   { key: 'wallet', label: 'Monedero', note: 'Saldo en cuenta' },
-  { key: 'cash', label: 'Efectivo', note: 'Sin comisión adicional' },
+  { key: 'cash', label: 'Efectivo', note: 'El técnico cobra y adeuda la comisión' },
 ] as const;
 
-const TYPE_KEYS = NOTIF_TYPES.map(t => t.type);
-
-/** Lee todo el formulario desde platform_settings. */
+/**
+ * Solo las keys que el backend lee (app.get_setting_int / is_admin / apps):
+ * las demás pantallas de ajustes de antes guardaban valores sin efecto.
+ */
 function readForm(): SettingsMap {
-  const m = readMatrix(TYPE_KEYS, getSettingBool);
   return {
-    platform_name: getSettingStr('platform_name', 'Tumantenimiento'),
-    support_email: getSettingStr('support_email', 'soporte@tumantenimiento.mx'),
-    support_phone: getSettingStr('support_phone', '+52 33 0000 0000'),
-    base_city: getSettingStr('base_city', 'Guadalajara, ZMG'),
-    rfc: getSettingStr('rfc', ''),
-    maintenance_mode: getSettingBool('maintenance_mode', false),
-    signups_enabled: getSettingBool('signups_enabled', true),
     commission_bps: getSettingInt('commission_bps', 1500),
-    fee_card_bps: getSettingInt('fee_card_bps', 350),
-    fee_oxxo_bps: getSettingInt('fee_oxxo_bps', 380),
-    fee_wallet_bps: getSettingInt('fee_wallet_bps', 150),
-    fee_cash_bps: getSettingInt('fee_cash_bps', 0),
-    intro_program_enabled: getSettingBool('intro_program_enabled', true),
-    intro_commission_bps: getSettingInt('intro_commission_bps', 1000),
-    intro_program_days: getSettingInt('intro_program_days', 90),
+    urgent_surcharge_bps: getSettingInt('urgent_surcharge_bps', 2000),
+    stripe_fee_estimate_bps: getSettingInt('stripe_fee_estimate_bps', 360),
+    stripe_fee_estimate_fixed_cents: getSettingInt('stripe_fee_estimate_fixed_cents', 300),
     request_ttl_minutes: getSettingInt('request_ttl_minutes', 30),
-    sla_first_response_minutes: getSettingInt('sla_first_response_minutes', 15),
-    sla_dispute_hours: getSettingInt('sla_dispute_hours', 4),
-    auto_reassign_enabled: getSettingBool('auto_reassign_enabled', true),
-    cancel_free_window_hours: getSettingInt('cancel_free_window_hours', 4),
-    cancel_penalty_bps: getSettingInt('cancel_penalty_bps', 1500),
-    cancel_auto_charge: getSettingBool('cancel_auto_charge', true),
-    tech_max_cancellations_30d: getSettingInt('tech_max_cancellations_30d', 3),
-    noshow_wait_minutes: getSettingInt('noshow_wait_minutes', 20),
-    quiet_hours_enabled: getSettingBool('quiet_hours_enabled', false),
-    quiet_start_hours: getSettingInt('quiet_start_hours', 22),
-    quiet_end_hours: getSettingInt('quiet_end_hours', 7),
-    ...m,
+    default_match_radius_m: getSettingInt('default_match_radius_m', 15000),
+    account_deletion_grace_days: getSettingInt('account_deletion_grace_days', 30),
+    enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
+    admin_require_aal2: getSettingBool('admin_require_aal2', false),
   };
 }
 
 const LABELS: Record<string, string> = {
-  platform_name: 'Nombre comercial',
-  support_email: 'Correo de soporte',
-  support_phone: 'Teléfono de soporte',
-  base_city: 'Ciudad base',
-  rfc: 'RFC',
   commission_bps: 'Comisión global',
+  urgent_surcharge_bps: 'Recargo urgente',
+  stripe_fee_estimate_bps: 'Comisión Stripe (%)',
+  stripe_fee_estimate_fixed_cents: 'Comisión Stripe (fija)',
   request_ttl_minutes: 'Ventana de aceptación',
+  default_match_radius_m: 'Radio de búsqueda',
+  account_deletion_grace_days: 'Gracia para baja de cuenta',
+  enabled_payment_methods: 'Métodos de pago',
+  admin_require_aal2: 'Exigir 2 pasos en la API',
 };
 
 export default function ConfigPage() {
@@ -133,15 +103,14 @@ export default function ConfigPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const canFinance = useAuth().can('finanzas');
-  const [active, setActive] = useState<SectionId>('general');
-  // /config?tab=notificaciones (p. ej. desde Notificaciones → Configurar).
+  const [active, setActive] = useState<SectionId>('commission');
+  // /config?tab=equipo (p. ej. desde la invitación).
   useEffect(() => {
     const raw = new URLSearchParams(window.location.search).get('tab') ?? '';
     const alias: Record<string, SectionId> = {
-      notificaciones: 'notifications',
       equipo: 'team',
       comisiones: 'commission',
-      cancelaciones: 'cancel',
+      seguridad: 'security',
     };
     const t = alias[raw] ?? raw;
     if (SECTIONS.some(x => x.id === t)) setActive(t as SectionId);
@@ -151,7 +120,6 @@ export default function ConfigPage() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const setMuted = useNotifState(s => s.setMuted);
 
   // Solo se edita con el snapshot listo: si no, se mostrarían (y guardarían)
   // los defaults del código como si fueran los valores reales.
@@ -160,8 +128,7 @@ export default function ConfigPage() {
     const f = readForm();
     setForm(f);
     setBaseline(f);
-    setMuted(mutedTypes(TYPE_KEYS, f as PrefMatrix));
-  }, [ready, setMuted]);
+  }, [ready]);
 
   const changes = useMemo(
     () => changedSettings(form, baseline),
@@ -169,11 +136,11 @@ export default function ConfigPage() {
   );
   const dirty = Object.keys(changes).length;
 
-  const set = (key: string, value: string | number | boolean) =>
+  const set = (key: string, value: string | number | boolean | string[]) =>
     setForm(f => ({ ...f, [key]: value }));
   const num = (key: string) => form[key] as number;
   const bool = (key: string) => form[key] as boolean;
-  const str = (key: string) => (form[key] as string) ?? '';
+  const methods = (form.enabled_payment_methods as string[] | undefined) ?? [];
 
   function requestSave() {
     const e = validateSettings(form);
@@ -198,7 +165,6 @@ export default function ConfigPage() {
     if (!ok) return;
     setBaseline(form);
     setConfirm(false);
-    setMuted(mutedTypes(TYPE_KEYS, form as PrefMatrix));
     toast.success('Configuración guardada', `${dirty} cambio(s) aplicados`);
   }
 
@@ -261,16 +227,6 @@ export default function ConfigPage() {
       />
     </Row>
   );
-  const textField = (key: string, label: string, desc?: string) => (
-    <Row label={label} desc={desc} error={errs[key]}>
-      <Input
-        value={str(key)}
-        onChange={e => set(key, e.target.value)}
-        error={!!errs[key]}
-        aria-label={label}
-      />
-    </Row>
-  );
   const toggleField = (key: string, label: string, desc?: string) => (
     <Row label={label} desc={desc}>
       <div className="flex justify-end">
@@ -283,7 +239,7 @@ export default function ConfigPage() {
     <div className="flex flex-col gap-6 pb-28">
       <PageHeader
         title="Configuración del sistema"
-        description="Reglas globales de la plataforma. Los cambios aplican a solicitudes nuevas."
+        description="Reglas globales que lee el backend (platform_settings). Los cambios aplican a solicitudes nuevas."
       />
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -314,120 +270,103 @@ export default function ConfigPage() {
         </nav>
 
         <div key={active} className="animate-up flex min-w-0 flex-col gap-4">
-          {active === 'general' && (
-            <>
-              <Section title="Datos de la plataforma">
-                {textField(
-                  'platform_name',
-                  'Nombre comercial',
-                  'Aparece en recibos y notificaciones.',
-                )}
-                {textField(
-                  'support_email',
-                  'Correo de soporte',
-                  'Destino de respuestas de clientes y técnicos.',
-                )}
-                {textField('support_phone', 'Teléfono de soporte')}
-                {textField('rfc', 'RFC', 'Para facturación CFDI.')}
-                {textField('base_city', 'Ciudad base')}
-              </Section>
-              <Section title="Estado del servicio">
-                {toggleField(
-                  'maintenance_mode',
-                  'Modo mantenimiento',
-                  'Suspende temporalmente las solicitudes nuevas en toda la plataforma.',
-                )}
-                {toggleField(
-                  'signups_enabled',
-                  'Aceptar nuevos registros',
-                  'Permite que clientes y técnicos creen cuentas.',
-                )}
-              </Section>
-            </>
-          )}
-
           {active === 'commission' && (
             <>
               <Section title="Comisión de la plataforma">
                 {pctField(
                   'commission_bps',
                   'Comisión global',
-                  'Aplica a categorías sin comisión específica (se edita en Catálogo).',
+                  'Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
+                )}
+                {pctField(
+                  'urgent_surcharge_bps',
+                  'Recargo urgente',
+                  'Porcentaje extra sobre el total cuando el cliente marca la solicitud como urgente.',
                 )}
               </Section>
-              <Section title="Comisión por método de pago">
-                {METHODS.map(m => (
-                  <div key={m.key}>
-                    {pctField(`fee_${m.key}_bps`, m.label, m.note)}
-                  </div>
-                ))}
-              </Section>
-              <Section title="Programa de comisión reducida">
-                {toggleField(
-                  'intro_program_enabled',
-                  'Programa activo',
-                  'Comisión menor para técnicos nuevos durante su primer periodo.',
+              <Section title="Costo estimado de Stripe">
+                {pctField(
+                  'stripe_fee_estimate_bps',
+                  'Comisión Stripe (%)',
+                  'Se usa para estimar el neto del técnico en cobros con tarjeta.',
                 )}
-                {bool('intro_program_enabled') && (
-                  <>
-                    {pctField('intro_commission_bps', 'Comisión del programa')}
-                    {intField('intro_program_days', 'Duración', 'días')}
-                  </>
+                {intField(
+                  'stripe_fee_estimate_fixed_cents',
+                  'Comisión Stripe (fija)',
+                  'centavos',
+                  'Parte fija por transacción (p. ej. 300 = $3.00).',
                 )}
               </Section>
             </>
           )}
 
-          {active === 'sla' && (
-            <Section title="Tiempos y SLA">
-              {intField(
-                'request_ttl_minutes',
-                'Ventana de aceptación',
-                'min',
-                'Tiempo que una solicitud espera técnico antes de expirar.',
-              )}
-              {intField(
-                'sla_first_response_minutes',
-                'Primera respuesta de soporte',
-                'min',
-              )}
-              {intField('sla_dispute_hours', 'Resolución de disputas', 'h')}
-              {toggleField(
-                'auto_reassign_enabled',
-                'Reasignación automática',
-                'Si el técnico no llega a tiempo, se ofrece la orden a otro.',
-              )}
-            </Section>
+          {active === 'ops' && (
+            <>
+              <Section title="Solicitudes">
+                {intField(
+                  'request_ttl_minutes',
+                  'Ventana de aceptación',
+                  'min',
+                  'Tiempo que una solicitud espera técnico antes de expirar.',
+                )}
+                {intField(
+                  'default_match_radius_m',
+                  'Radio de búsqueda',
+                  'm',
+                  'Radio por defecto para encontrar técnicos cercanos (si el técnico no define el suyo).',
+                )}
+              </Section>
+              <Section title="Métodos de pago en las apps">
+                {METHODS.map(m => (
+                  <Row key={m.key} label={m.label} desc={m.note}>
+                    <div className="flex justify-end">
+                      <Toggle
+                        checked={methods.includes(m.key)}
+                        onChange={on =>
+                          set(
+                            'enabled_payment_methods',
+                            on ? [...methods, m.key] : methods.filter(x => x !== m.key),
+                          )
+                        }
+                        label={<span className="sr-only">{m.label}</span>}
+                      />
+                    </div>
+                  </Row>
+                ))}
+                {errs.enabled_payment_methods && (
+                  <p role="alert" className="px-5 py-3 font-sans text-[12px] text-error">
+                    {errs.enabled_payment_methods}
+                  </p>
+                )}
+              </Section>
+              <Section title="Cuentas">
+                {intField(
+                  'account_deletion_grace_days',
+                  'Gracia para baja de cuenta',
+                  'días',
+                  'Tiempo que el usuario puede cancelar su solicitud de borrado antes de que se ejecute.',
+                )}
+              </Section>
+            </>
           )}
 
-          {active === 'cancel' && (
-            <Section title="Cancelaciones y penalizaciones">
-              {intField(
-                'cancel_free_window_hours',
-                'Ventana sin costo',
-                'h',
-                'Antes de la cita el cliente cancela sin cargo.',
-              )}
-              {pctField(
-                'cancel_penalty_bps',
-                'Penalización',
-                'Porcentaje de la visita que se cobra fuera de la ventana.',
-              )}
+          {active === 'security' && (
+            <Section title="Verificación en dos pasos">
               {toggleField(
-                'cancel_auto_charge',
-                'Cobro automático de penalización',
+                'admin_require_aal2',
+                'Exigir 2 pasos también en la API',
+                'app.is_admin() deja de reconocer sesiones de admin sin TOTP verificado (aal2).',
               )}
-              {intField(
-                'tech_max_cancellations_30d',
-                'Máximo de cancelaciones del técnico',
-                'en 30 días',
-              )}
-              {intField('noshow_wait_minutes', 'Espera por no-show', 'min')}
+              <div className="flex items-start gap-2.5 px-5 py-4 font-sans text-[12.5px] text-warning-ink">
+                <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+                <p>
+                  La consola ya obliga a enrolar TOTP. Al activar esta opción, cualquier admin
+                  que todavía no haya configurado su autenticador (o que use la API fuera de la
+                  consola con una sesión aal1) perderá acceso a los datos hasta completarlo.
+                  Actívala solo cuando todo el equipo tenga MFA.
+                </p>
+              </div>
             </Section>
-          )}
-
-          {active === 'notifications' && (
-            <NotificationsSection form={form} set={set} errs={errs} />
           )}
 
           {active === 'team' && <TeamSection />}
@@ -502,7 +441,9 @@ export default function ConfigPage() {
 
 function fmt(key: string, v: unknown) {
   if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+  if (Array.isArray(v)) return v.join(', ') || '—';
   if (key.endsWith('_bps') && typeof v === 'number') return `${v / 100}%`;
+  if (key.endsWith('_cents') && typeof v === 'number') return `$${(v / 100).toFixed(2)}`;
   return String(v);
 }
 
@@ -555,132 +496,6 @@ function Row({
         )}
       </div>
     </div>
-  );
-}
-
-// ── Notificaciones ───────────────────────────────────────────────────────────
-function NotificationsSection({
-  form,
-  set,
-  errs,
-}: {
-  form: SettingsMap;
-  set: (key: string, v: string | number | boolean) => void;
-  errs: Record<string, string>;
-}) {
-  const muted = mutedTypes(TYPE_KEYS, form as PrefMatrix);
-  const hours = Array.from({ length: 24 }, (_, h) => h);
-  return (
-    <>
-      <Card className="overflow-hidden">
-        <div className="border-b border-divider px-5 py-4">
-          <div className="font-display text-[16px] font-bold text-navy">
-            Tipos y canales
-          </div>
-          <p className="mt-0.5 font-sans text-[12.5px] text-muted">
-            Un tipo con todos los canales apagados deja de aparecer en la
-            campana de la consola.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse">
-            <thead>
-              <tr className="bg-panel">
-                <th className="px-5 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
-                  Tipo
-                </th>
-                {NOTIF_CHANNELS.map(c => (
-                  <th
-                    key={c.key}
-                    className="px-3 py-2.5 text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted"
-                  >
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {NOTIF_TYPES.map(t => (
-                <tr key={t.type} className="border-t border-divider">
-                  <td className="px-5 py-3 font-sans text-[14px] font-semibold text-navy">
-                    {t.label}
-                    {muted.includes(t.type) && (
-                      <Badge tone="neutral" className="ml-2">
-                        Silenciado
-                      </Badge>
-                    )}
-                  </td>
-                  {NOTIF_CHANNELS.map(c => {
-                    const k = notifKey(t.type, c.key);
-                    return (
-                      <td key={c.key} className="px-3 py-3">
-                        <div className="flex justify-center">
-                          <Toggle
-                            checked={form[k] === true}
-                            onChange={v => set(k, v)}
-                            label={
-                              <span className="sr-only">
-                                {t.label} por {c.label}
-                              </span>
-                            }
-                          />
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="border-t border-divider px-5 py-3 font-sans text-[12px] text-muted">
-          Push, correo y SMS a administradores se envían cuando el backend tenga
-          notificaciones de admin; hoy estas preferencias ya filtran la campana
-          y el sonido de la consola.
-        </p>
-      </Card>
-
-      <Section title="No molestar">
-        <Row
-          label="Horario silencioso"
-          desc="Sin sonido ni push fuera del horario laboral."
-        >
-          <div className="flex justify-end">
-            <Toggle
-              checked={form.quiet_hours_enabled === true}
-              onChange={v => set('quiet_hours_enabled', v)}
-            />
-          </div>
-        </Row>
-        {form.quiet_hours_enabled === true && (
-          <Row
-            label="De / hasta"
-            desc="Puede cruzar la medianoche (p. ej. 22:00 a 07:00)."
-            error={errs.quiet_start_hours ?? errs.quiet_end_hours}
-          >
-            <div className="flex items-center gap-2">
-              {(['quiet_start_hours', 'quiet_end_hours'] as const).map(
-                (k, i) => (
-                  <select
-                    key={k}
-                    value={String(form[k])}
-                    onChange={e => set(k, Number(e.target.value))}
-                    aria-label={i ? 'Hasta' : 'Desde'}
-                    className="h-10 flex-1 rounded-btn border border-line bg-card px-3 font-mono text-[13px] text-navy outline-none focus:border-primary focus:shadow-focus"
-                  >
-                    {hours.map(h => (
-                      <option key={h} value={h}>
-                        {String(h).padStart(2, '0')}:00
-                      </option>
-                    ))}
-                  </select>
-                ),
-              )}
-            </div>
-          </Row>
-        )}
-      </Section>
-    </>
   );
 }
 

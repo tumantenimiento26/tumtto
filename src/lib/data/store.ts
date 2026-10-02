@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
 import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
+import { wkbPoint } from '@/lib/geo';
 import type { AdminRole } from '@/lib/rbac';
 import {
   emptyWorld,
@@ -404,21 +405,6 @@ const pgMessage = (e: unknown, fallback: string) =>
 export const pgCode = (e: unknown) =>
   typeof e === 'object' && e && 'code' in e ? String(e.code) : null;
 
-/**
- * Escritura secundaria (bitácora de eventos): si falla no se revierte la
- * principal, pero se avisa en vez de tragarse el error.
- */
-async function sideWrite(
-  p: PromiseLike<{ error: unknown }>,
-  what: string,
-): Promise<void> {
-  const { error } = await p;
-  if (error) {
-    console.error('[data]', what, error);
-    notifyError(`Se guardó, pero no se registró ${what}.`);
-  }
-}
-
 // ── Platform settings ────────────────────────────────────────────────────────
 export const getSettings = () => settings;
 export function getSettingInt(key: string, fallback: number): number {
@@ -433,20 +419,28 @@ export function getSettingStr(key: string, fallback: string): string {
   const v = settings.find(s => s.key === key)?.value;
   return typeof v === 'string' ? v : fallback;
 }
-/** Guarda un lote de settings en una sola llamada (upsert: crea la key si no existe). */
+export function getSettingList(key: string, fallback: string[]): string[] {
+  const v = settings.find(s => s.key === key)?.value;
+  return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
+}
+/**
+ * Guarda settings vía upsert_platform_setting (RPC: valida, registra
+ * admin_events y crea la key si no existe). Una llamada por key; si una falla
+ * se detiene ahí y se avisa cuál.
+ */
 export async function saveSettings(
-  entries: Record<string, number | string | boolean>,
+  entries: Record<string, number | string | boolean | string[]>,
 ) {
   return mutate(
     async () => {
-      const rows = Object.entries(entries).map(([key, value]) => ({
-        key,
-        value,
-      }));
-      const { error } = await supabase
-        .from('platform_settings')
-        .upsert(rows, { onConflict: 'key' });
-      if (error) throw error;
+      for (const [key, value] of Object.entries(entries)) {
+        const { error } = await rawRpc('upsert_platform_setting', {
+          p_key: key,
+          p_value: value,
+          p_description: null,
+        });
+        if (error) throw error;
+      }
       return true;
     },
     e => pgMessage(e, 'No se pudo guardar la configuración.'),
@@ -640,51 +634,53 @@ function toGeography(loc: unknown): string {
   return `SRID=4326;POINT(${c?.[0] ?? -103.3773} ${c?.[1] ?? 20.7062})`;
 }
 
+/**
+ * Alta desde la consola con la misma RPC que la app (create_service_request:
+ * TTL, comisión, recargo urgente y evento inicial los pone el backend; el
+ * INSERT directo de eventos ya no está permitido). `p_technician_id` deja la
+ * solicitud dirigida a ese técnico (routing tech-first); `p_client_id` indica
+ * a nombre de quién se crea (solo admin; types: regen).
+ */
 export async function createRequest(
-  input: Partial<OrderInsert> & { client_id: string; category_id: string },
+  input: Partial<OrderInsert> & {
+    client_id: string;
+    category_id: string;
+    technician_id?: string | null;
+    scheduled_for?: string | null;
+    scheduled_until?: string | null;
+  },
 ): Promise<ServiceOrder | null> {
-  return mutate(async () => {
-    const addr = w().addresses.find(a => a.id === input.client_address_id);
-    const ttlMin = getSettingInt('request_ttl_minutes', 30);
-    const insert: OrderInsert = {
-      client_id: input.client_id,
-      category_id: input.category_id,
-      client_address_id: input.client_address_id ?? null,
-      status: 'requested',
-      title: input.title ?? null,
-      description: input.description ?? null,
-      is_urgent: input.is_urgent ?? false,
-      urgent_surcharge_bps: input.is_urgent
-        ? getSettingInt('urgent_surcharge_bps', 2000)
-        : 0,
-      commission_bps: getSettingInt('commission_bps', 1500),
-      location: toGeography(addr?.location ?? input.location),
-      place_name: addr?.place_name ?? null,
-      address_line: addr?.address_line ?? input.address_line ?? null,
-      neighborhood: addr?.neighborhood ?? null,
-      municipality: addr?.municipality ?? 'Guadalajara',
-      state: addr?.state ?? 'Jalisco',
-      postal_code: addr?.postal_code ?? null,
-      expires_at: new Date(Date.now() + ttlMin * 60_000).toISOString(),
-    };
-    const { data, error } = await supabase
-      .from('service_orders')
-      .insert(insert)
-      .select()
-      .single();
-    if (error) throw error;
-    await sideWrite(
-      supabase.from('service_order_status_events').insert({
-        service_order_id: data.id,
-        from_status: null,
-        to_status: 'requested',
-        actor_id: input.client_id,
-        note: 'Creado por admin desde la consola',
-      }),
-      'el evento de creación',
-    );
-    return data;
-  }, 'No se pudo crear el servicio.');
+  return mutate(
+    async () => {
+      const addr = w().addresses.find(a => a.id === input.client_address_id);
+      const [lng, lat] = wkbPoint(addr?.location) ?? [-103.3773, 20.7062];
+      const { data, error } = await rawRpc('create_service_request', {
+        p_category_id: input.category_id,
+        p_lng: lng,
+        p_lat: lat,
+        p_place_name: addr?.place_name ?? null,
+        p_neighborhood: addr?.neighborhood ?? null,
+        p_municipality: addr?.municipality ?? 'Guadalajara',
+        p_postal_code: addr?.postal_code ?? null,
+        p_state: addr?.state ?? 'Jalisco',
+        p_address_line: addr?.address_line ?? input.address_line ?? null,
+        p_client_address_id: input.client_address_id ?? null,
+        p_title: input.title ?? null,
+        p_description: input.description ?? null,
+        p_is_urgent: input.is_urgent ?? false,
+        p_scheduled_for: input.scheduled_for ?? null,
+        p_scheduled_until: input.scheduled_until ?? null,
+        p_technician_id: input.technician_id ?? null,
+        p_client_id: input.client_id,
+      });
+      if (error) throw error;
+      return data as ServiceOrder;
+    },
+    e =>
+      pgCode(e) === 'PGRST202'
+        ? 'El backend aún no acepta crear servicios a nombre de un cliente (create_service_request sin p_client_id).'
+        : pgMessage(e, 'No se pudo crear el servicio.'),
+  );
 }
 
 export async function setStatus(
@@ -700,7 +696,7 @@ export async function setStatus(
     });
     if (error) throw error;
     return true;
-  }, 'No se pudo cambiar el estado.');
+  }, e => pgMessage(e, 'No se pudo cambiar el estado.'));
 }
 
 export async function reassignRequest(orderId: string, techUserId: string) {

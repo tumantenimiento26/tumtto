@@ -1,7 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
+import type { Database, Json } from '@/types/supabase';
 import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import { wkbPoint } from '@/lib/geo';
@@ -26,8 +26,11 @@ import {
  * (support_tickets/ticket_messages) y la bitácora admin (admin_events) viajan
  * en el mismo snapshot; el chat de una orden (messages) se pide al abrirlo.
  */
-type PlatformSetting = Database['public']['Tables']['platform_settings']['Row'];
-type OrderInsert = Database['public']['Tables']['service_orders']['Insert'];
+type Tables = Database['public']['Tables'];
+type Row<K extends keyof Tables> = Tables[K]['Row'];
+type Fn = Database['public']['Functions'];
+type PlatformSetting = Row<'platform_settings'>;
+type OrderInsert = Tables['service_orders']['Insert'];
 
 interface DataState {
   tick: number;
@@ -59,43 +62,12 @@ let ticketMessages: TicketMessage[] = [];
 let adminEvents: AdminEvent[] = [];
 let lastFetched = 0;
 
-// ── Soporte y bitácora (tablas sin tipos generados todavía; types: regen) ──
-export type TicketStatus = 'open' | 'pending' | 'in_progress' | 'resolved' | 'closed';
-export interface Ticket {
-  id: string;
-  opened_by: string;
-  client_id: string | null;
-  service_order_id: string | null;
-  assigned_admin_id: string | null;
-  subject: string;
-  status: TicketStatus;
-  created_at: string;
-  updated_at: string;
-}
-export interface TicketMessage {
-  id: string;
-  ticket_id: string;
-  author_id: string;
-  body: string;
-  created_at: string;
-}
-export interface OrderMessage {
-  id: string;
-  service_order_id: string;
-  sender_id: string;
-  body: string;
-  read_at: string | null;
-  created_at: string;
-}
-export interface AdminEvent {
-  id: string;
-  actor_id: string | null;
-  entity_type: string;
-  entity_id: string | null;
-  event_type: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
+// ── Soporte y bitácora ───────────────────────────────────────────────────────
+export type TicketStatus = Database['public']['Enums']['ticket_status'];
+export type Ticket = Row<'support_tickets'>;
+export type TicketMessage = Row<'ticket_messages'>;
+export type OrderMessage = Row<'messages'>;
+export type AdminEvent = Row<'admin_events'>;
 /** Entrada de bitácora lista para pintar (nota de admin o evento del sistema). */
 export interface Note {
   id: string;
@@ -138,45 +110,22 @@ export function setErrorNotifier(fn: (msg: string) => void) {
 const w = () => world;
 const bump = () => useData.getState().bump();
 
-// Consultas sin tipar (tablas/RPC que `supabase.ts` aún no conoce o select
-// dinámico). ponytail: regenerar los tipos (gen:types) y quitar los casts.
-type RawResult = { data: unknown; error: unknown };
-interface RawQuery extends PromiseLike<RawResult> {
-  select(columns?: string): RawQuery;
-  eq(column: string, value: unknown): RawQuery;
-  gte(column: string, value: unknown): RawQuery;
-  in(column: string, values: unknown[]): RawQuery;
-  order(column: string, opts?: { ascending?: boolean }): RawQuery;
-  range(from: number, to: number): RawQuery;
-  insert(values: Record<string, unknown>): RawQuery;
-  update(values: Record<string, unknown>): RawQuery;
-  single(): RawQuery;
-}
-const rawFrom = (table: string) =>
-  (supabase as unknown as { from: (t: string) => RawQuery }).from(table);
-type LooseRpc = (
-  fn: string,
-  args?: Record<string, unknown>,
-) => Promise<RawResult>;
-// Función (no alias) para no tocar el cliente perezoso al importar el módulo.
-const rawRpc: LooseRpc = (fn, args) =>
-  (supabase.rpc as unknown as LooseRpc)(fn, args);
-
 /** Tamaño de página de PostgREST (`max-rows`): una sola consulta nunca trae más. */
 export const PAGE_SIZE = 1000;
 
 /**
  * Pagina con `.range()` hasta recibir menos de PAGE_SIZE filas. Sin esto el
- * snapshot quedaba truncado en 1,000 filas por tabla sin avisar.
+ * snapshot quedaba truncado en 1,000 filas por tabla sin avisar. El tipo de
+ * fila se infiere del builder tipado que devuelve `page`.
  */
 export async function fetchAllRows<T>(
-  page: (from: number, to: number) => PromiseLike<RawResult>,
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
 ): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await page(from, from + PAGE_SIZE - 1);
     if (error) throw error;
-    const chunk = (data ?? []) as T[];
+    const chunk = data ?? [];
     rows.push(...chunk);
     if (chunk.length < PAGE_SIZE) return rows;
   }
@@ -188,20 +137,17 @@ const sinceIso = (days: number) =>
   new Date(Date.now() - days * DAY_MS).toISOString();
 
 /**
- * Tabla completa (paginada, orden estable por `id`). `since` acota por fecha
- * las tablas que crecen sin límite (eventos de estado, bitácora admin): la
- * consola solo necesita los últimos 90 días.
+ * Tabla completa (paginada, orden estable por `id`). Las tablas que crecen sin
+ * límite (eventos de estado, bitácora admin) se cargan aparte acotadas a 90 días.
  */
-export function fetchAll<K extends keyof Database['public']['Tables']>(
-  table: K,
-  select = '*',
-  opts: { since?: [column: string, iso: string] } = {},
-) {
-  return fetchAllRows<Database['public']['Tables'][K]['Row']>((from, to) => {
-    let q = rawFrom(table).select(select).order('id').range(from, to);
-    if (opts.since) q = q.gte(opts.since[0], opts.since[1]);
-    return q;
-  });
+export function fetchAll<K extends keyof Tables & string>(table: K) {
+  return fetchAllRows<Row<K>>(
+    (from, to) =>
+      supabase.from(table).select('*').order('id').range(from, to) as unknown as PromiseLike<{
+        data: Row<K>[] | null;
+        error: unknown;
+      }>,
+  );
 }
 
 let inflight: Promise<void> | null = null;
@@ -257,31 +203,27 @@ export function loadWorld(force = false): Promise<void> {
         fetchAll('service_quote_items'),
         // Bitácora de estados: últimos 90 días (reportes y dashboard no
         // miran más atrás; la tabla crece con cada transición).
-        fetchAll('service_order_status_events', '*', {
-          since: ['created_at', sinceIso(90)],
-        }),
+        fetchAllRows((a, b) =>
+          supabase
+            .from('service_order_status_events')
+            .select('*')
+            .gte('created_at', sinceIso(90))
+            .order('id')
+            .range(a, b),
+        ),
         fetchAll('payments'),
         fetchAll('ledger_entries'),
         fetchAll('kyc_sessions'),
         fetchAll('disputes'),
         fetchAll('platform_settings'),
-        optional(
-          fetchAllRows<Ticket>((a, b) =>
-            rawFrom('support_tickets').select('*').order('id').range(a, b),
-          ),
-          'support_tickets',
-        ),
-        optional(
-          fetchAllRows<TicketMessage>((a, b) =>
-            rawFrom('ticket_messages').select('*').order('id').range(a, b),
-          ),
-          'ticket_messages',
-        ),
+        optional(fetchAll('support_tickets'), 'support_tickets'),
+        optional(fetchAll('ticket_messages'), 'ticket_messages'),
         // Bitácora admin: últimos 90 días (notas, KYC, suspensiones, ajustes).
         optional(
-          fetchAllRows<AdminEvent>((a, b) =>
-            rawFrom('admin_events')
-              .select('id,actor_id,entity_type,entity_id,event_type,payload,created_at')
+          fetchAllRows((a, b) =>
+            supabase
+              .from('admin_events')
+              .select('*')
               .gte('created_at', sinceIso(90))
               .order('id')
               .range(a, b),
@@ -309,8 +251,8 @@ export function loadWorld(force = false): Promise<void> {
       tickets = ticketRows;
       ticketMessages = ticketMessageRows;
       adminEvents = adminEventRows;
-      // service_orders.folio (types: regen) alimenta orderCode() → SVC-<folio>.
-      registerFolios(orders as { id: string; folio?: number | null }[]);
+      // service_orders.folio alimenta orderCode() → SVC-<folio>.
+      registerFolios(orders);
       lastFetched = Date.now();
       useData.setState({ status: 'ready' });
     } catch (e) {
@@ -434,10 +376,9 @@ export async function saveSettings(
   return mutate(
     async () => {
       for (const [key, value] of Object.entries(entries)) {
-        const { error } = await rawRpc('upsert_platform_setting', {
+        const { error } = await supabase.rpc('upsert_platform_setting', {
           p_key: key,
           p_value: value,
-          p_description: null,
         });
         if (error) throw error;
       }
@@ -525,7 +466,8 @@ export const getNotes = (entityId: string): Note[] =>
   adminEvents
     .filter(e => e.entity_id === entityId)
     .map(e => {
-      const note = typeof e.payload?.note === 'string' ? e.payload.note : null;
+      const raw = (e.payload as { note?: unknown } | null)?.note;
+      const note = typeof raw === 'string' ? raw : null;
       const label = EVENT_LABEL[e.event_type] ?? e.event_type;
       return {
         id: e.id,
@@ -639,7 +581,7 @@ function toGeography(loc: unknown): string {
  * TTL, comisión, recargo urgente y evento inicial los pone el backend; el
  * INSERT directo de eventos ya no está permitido). `p_technician_id` deja la
  * solicitud dirigida a ese técnico (routing tech-first); `p_client_id` indica
- * a nombre de quién se crea (solo admin; types: regen).
+ * a nombre de quién se crea (solo admin).
  */
 export async function createRequest(
   input: Partial<OrderInsert> & {
@@ -654,32 +596,29 @@ export async function createRequest(
     async () => {
       const addr = w().addresses.find(a => a.id === input.client_address_id);
       const [lng, lat] = wkbPoint(addr?.location) ?? [-103.3773, 20.7062];
-      const { data, error } = await rawRpc('create_service_request', {
+      const { data, error } = await supabase.rpc('create_service_request', {
         p_category_id: input.category_id,
         p_lng: lng,
         p_lat: lat,
-        p_place_name: addr?.place_name ?? null,
-        p_neighborhood: addr?.neighborhood ?? null,
+        p_place_name: addr?.place_name ?? undefined,
+        p_neighborhood: addr?.neighborhood ?? undefined,
         p_municipality: addr?.municipality ?? 'Guadalajara',
-        p_postal_code: addr?.postal_code ?? null,
+        p_postal_code: addr?.postal_code ?? undefined,
         p_state: addr?.state ?? 'Jalisco',
-        p_address_line: addr?.address_line ?? input.address_line ?? null,
-        p_client_address_id: input.client_address_id ?? null,
-        p_title: input.title ?? null,
-        p_description: input.description ?? null,
+        p_address_line: addr?.address_line ?? input.address_line ?? undefined,
+        p_client_address_id: input.client_address_id ?? undefined,
+        p_title: input.title ?? undefined,
+        p_description: input.description ?? undefined,
         p_is_urgent: input.is_urgent ?? false,
-        p_scheduled_for: input.scheduled_for ?? null,
-        p_scheduled_until: input.scheduled_until ?? null,
-        p_technician_id: input.technician_id ?? null,
+        p_scheduled_for: input.scheduled_for ?? undefined,
+        p_scheduled_until: input.scheduled_until ?? undefined,
+        p_technician_id: input.technician_id ?? undefined,
         p_client_id: input.client_id,
       });
       if (error) throw error;
-      return data as ServiceOrder;
+      return data;
     },
-    e =>
-      pgCode(e) === 'PGRST202'
-        ? 'El backend aún no acepta crear servicios a nombre de un cliente (create_service_request sin p_client_id).'
-        : pgMessage(e, 'No se pudo crear el servicio.'),
+    e => pgMessage(e, 'No se pudo crear el servicio.'),
   );
 }
 
@@ -752,10 +691,9 @@ export async function refundPayment(
   }, 'No se pudo emitir el reembolso. Nada se cobró ni se canceló; reintenta.');
 }
 
-/** Lo que aún se puede reembolsar: amount - refunded_cents (columna del PR #4; types: regen). */
-export const refundableCents = (pay: { amount_cents: number }) =>
-  pay.amount_cents -
-  Number((pay as { refunded_cents?: number | null }).refunded_cents ?? 0);
+/** Lo que aún se puede reembolsar: amount - refunded_cents (acumulado de parciales). */
+export const refundableCents = (pay: { amount_cents: number; refunded_cents: number }) =>
+  pay.amount_cents - pay.refunded_cents;
 
 export async function resolveKyc(
   techId: string,
@@ -875,6 +813,16 @@ export async function inviteAdmin(email: string, fullName: string, adminRole?: A
     if (error) throw error;
     return data ?? true;
   }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
+}
+
+/** Roles de consola de todos los admins (RPC admin_list_admin_roles; solo super_admin). */
+export async function fetchAdminRoles(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.rpc('admin_list_admin_roles');
+  if (error) {
+    console.warn('[data] admin_list_admin_roles', error);
+    return {};
+  }
+  return Object.fromEntries((data ?? []).map(r => [r.user_id, r.admin_role]));
 }
 
 /** Cambia el rol de consola de otro admin (admin-users set_admin_role; solo super_admin). */
@@ -1063,9 +1011,9 @@ async function myId(): Promise<string> {
 }
 
 /**
- * Resuelve una disputa (RPC admin_resolve_dispute; types: regen): estado,
- * outcome, notas, libera el hold interno, baja is_disputed de la orden y
- * notifica a ambas partes en una sola transacción.
+ * Resuelve una disputa (RPC admin_resolve_dispute): estado, outcome, notas,
+ * libera el hold interno, baja is_disputed de la orden y notifica a ambas
+ * partes en una sola transacción.
  */
 export async function resolveDispute(
   disputeId: string,
@@ -1074,10 +1022,10 @@ export async function resolveDispute(
 ) {
   return mutate(
     async () => {
-      const { error } = await rawRpc('admin_resolve_dispute', {
+      const { error } = await supabase.rpc('admin_resolve_dispute', {
         p_dispute_id: disputeId,
         p_outcome: outcome,
-        p_notes: notes.trim() || null,
+        p_notes: notes.trim() || undefined,
       });
       if (error) throw error;
       return true;
@@ -1094,7 +1042,7 @@ export async function escalateDispute(disputeId: string) {
       .update({ status: 'in_review' })
       .eq('id', disputeId);
     if (error) throw error;
-    const { error: ne } = await rawRpc('add_admin_note', {
+    const { error: ne } = await supabase.rpc('add_admin_note', {
       p_entity_type: 'disputes',
       p_entity_id: disputeId,
       p_note: 'Escalada a nivel 2 — pendiente de revisión',
@@ -1106,12 +1054,13 @@ export async function escalateDispute(disputeId: string) {
 
 // ── Chat de una orden (tabla messages; se pide al abrir el chat) ────────────
 export async function fetchOrderMessages(orderId: string): Promise<OrderMessage[]> {
-  const { data, error } = await rawFrom('messages')
-    .select('id,service_order_id,sender_id,body,read_at,created_at')
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
     .eq('service_order_id', orderId)
     .order('created_at');
   if (error) throw error;
-  return (data ?? []) as OrderMessage[];
+  return data ?? [];
 }
 
 /** Mensaje del admin en el chat de la orden (RLS: sender_id = auth.uid()). */
@@ -1119,7 +1068,7 @@ export async function sendMessage(orderId: string, body: string) {
   const text = body.trim();
   if (!text) return null;
   try {
-    const { error } = await rawFrom('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       service_order_id: orderId,
       sender_id: await myId(),
       body: text,
@@ -1140,7 +1089,7 @@ export async function addNote(entityType: NoteEntity, entityId: string, text: st
   if (!text.trim()) return null;
   return mutate(
     async () => {
-      const { error } = await rawRpc('add_admin_note', {
+      const { error } = await supabase.rpc('add_admin_note', {
         p_entity_type: entityType,
         p_entity_id: entityId,
         p_note: text.trim(),
@@ -1162,7 +1111,8 @@ export async function createTicket(input: {
   return mutate(
     async () => {
       const me = await myId();
-      const { data, error } = await rawFrom('support_tickets')
+      const { data, error } = await supabase
+        .from('support_tickets')
         .insert({
           opened_by: me,
           client_id: input.requester_id,
@@ -1172,9 +1122,9 @@ export async function createTicket(input: {
         .select('id')
         .single();
       if (error) throw error;
-      const id = (data as { id: string }).id;
+      const id = data.id;
       if (input.content?.trim()) {
-        const { error: me2 } = await rawFrom('ticket_messages').insert({
+        const { error: me2 } = await supabase.from('ticket_messages').insert({
           ticket_id: id,
           author_id: me,
           body: input.content.trim(),
@@ -1190,7 +1140,8 @@ export async function createTicket(input: {
 export async function setTicketStatus(ticketId: string, status: TicketStatus) {
   return mutate(
     async () => {
-      const { error } = await rawFrom('support_tickets')
+      const { error } = await supabase
+        .from('support_tickets')
         .update({ status })
         .eq('id', ticketId);
       if (error) throw error;
@@ -1210,7 +1161,7 @@ export async function replyTicket(ticketId: string, body: string) {
   const t = getTicket(ticketId);
   return mutate(
     async () => {
-      const { error } = await rawFrom('ticket_messages').insert({
+      const { error } = await supabase.from('ticket_messages').insert({
         ticket_id: ticketId,
         author_id: await myId(),
         body: text,
@@ -1221,7 +1172,8 @@ export async function replyTicket(ticketId: string, body: string) {
           ? 'pending'
           : null;
       if (next) {
-        const { error: se } = await rawFrom('support_tickets')
+        const { error: se } = await supabase
+          .from('support_tickets')
           .update({ status: next })
           .eq('id', ticketId);
         if (se) throw se;
@@ -1247,16 +1199,20 @@ export const getReportData = () => ({
   technicians: w().technicians,
 });
 
-// Las RPC admin_report_* no están en los tipos generados de este repo todavía
-// (regenerar con gen:types tras el deploy); llamada sin tipar y null si falla,
-// para que la pantalla caiga al cálculo desde el snapshot sin mentir.
-async function reportRpc<T>(
-  fn: string,
+// RPC de reportes: null si falla, para que la pantalla caiga al cálculo desde
+// el snapshot sin mentir.
+type ReportFn =
+  | 'admin_report_kpis'
+  | 'admin_report_ticket_by_category'
+  | 'admin_report_cold_zones'
+  | 'admin_report_demand_heatmap';
+async function reportRpc<F extends ReportFn>(
+  fn: F,
   from: Date,
   to: Date,
-): Promise<T | null> {
+): Promise<Fn[F]['Returns'] | null> {
   try {
-    const { data, error } = await rawRpc(fn, {
+    const { data, error } = await supabase.rpc(fn, {
       p_from: from.toISOString(),
       p_to: to.toISOString(),
     });
@@ -1264,7 +1220,7 @@ async function reportRpc<T>(
       console.warn('[data]', fn, error);
       return null;
     }
-    return data as T;
+    return data as Fn[F]['Returns'];
   } catch (e) {
     console.warn('[data]', fn, e);
     return null;
@@ -1284,23 +1240,13 @@ export type ReportKpis = {
     avg_arrival_seconds: number;
   };
 };
-export const fetchReportKpis = (from: Date, to: Date) =>
-  reportRpc<ReportKpis>('admin_report_kpis', from, to);
+/** admin_report_kpis devuelve jsonb: su forma es la de ReportKpis. */
+export const fetchReportKpis = async (from: Date, to: Date) =>
+  (await reportRpc('admin_report_kpis', from, to)) as ReportKpis | null;
 export const fetchTicketByCategory = (from: Date, to: Date) =>
-  reportRpc<
-    {
-      category_id: string;
-      category_name: string;
-      paid_orders: number;
-      avg_ticket_cents: number;
-    }[]
-  >('admin_report_ticket_by_category', from, to);
+  reportRpc('admin_report_ticket_by_category', from, to);
 export const fetchColdZones = (from: Date, to: Date) =>
-  reportRpc<{ zone_id: string; zone_name: string; order_count: number }[]>(
-    'admin_report_cold_zones',
-    from,
-    to,
-  );
+  reportRpc('admin_report_cold_zones', from, to);
 
 /**
  * ¿La sesión actual tiene un factor TOTP verificado? Supabase solo expone los
@@ -1423,71 +1369,21 @@ export async function listOrderEvidence(
 // ── fin consola-b ────────────────────────────────────────────────────────────
 
 // ══ consola-c · extras (técnicos / regiones / finanzas) ═════════════════════
-// Tablas que el snapshot principal no carga y que el tipado generado aún no
-// incluye (technician_documents, payout_requests, coverage_zones,
-// order_ratings, technician_wallet_summaries, technician_locations). Cada
-// dominio carga por separado: si una tabla no existe en el entorno (p. ej.
-// producción sin las migraciones del PR #4) solo ese bloque queda
-// "no disponible" y el resto de la consola sigue funcionando.
-// ponytail: tablas sin tipos generados → consulta sin tipar y cast a la fila
-// local; regenerar supabase.ts (gen:types) al desplegar y quitar RawQuery.
+// Tablas que el snapshot principal no carga. Cada dominio carga por separado:
+// si una falla (RLS, migración pendiente) solo ese bloque queda "no disponible"
+// y el resto de la consola sigue funcionando.
 
-export interface TechDocument {
-  id: string;
-  technician_id: string;
-  kind: 'criminal_record' | 'proof_of_address' | 'bank_statement';
-  bucket_id: string;
-  storage_path: string;
-  issued_on: string | null;
-  review_status: 'pending' | 'approved' | 'rejected';
-  review_notes: string | null;
-  reviewed_at: string | null;
-  created_at: string;
-}
-export interface PayoutRequest {
-  id: string;
-  technician_id: string;
-  amount_cents: number;
-  status:
-    | 'pending'
-    | 'approved'
-    | 'processing'
-    | 'paid'
-    | 'failed'
-    | 'cancelled'
-    | 'held';
-  stripe_account_id: string | null;
-  failure_reason: string | null;
-  batch_id: string | null;
-  approved_at: string | null;
-  created_at: string;
-}
-export interface CoverageZone {
-  id: string;
-  slug: string;
-  name: string;
-  is_active: boolean;
-  /** ST_AsGeoJSON(geom) (Polygon/MultiPolygon). */
-  geojson: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } | null;
-  technician_count: number;
-}
-export interface OrderRating {
-  id: string;
-  service_order_id: string;
-  reviewer_id: string;
-  reviewee_id: string;
-  score: number;
-  comment: string | null;
-  created_at: string;
-}
-export interface WalletSummary {
-  technician_id: string;
-  balance_cents: number;
-  held_cents: number;
-  paid_out_cents: number;
-  available_cents: number;
-}
-export type TechLocation = Database['public']['Tables']['technician_locations']['Row'];
+export type TechDocument = Row<'technician_documents'>;
+export type PayoutRequest = Row<'payout_requests'>;
+export type OrderRating = Row<'order_ratings'>;
+export type WalletSummary = Database['public']['Views']['technician_wallet_summaries']['Row'];
+export type TechLocation = Row<'technician_locations'>;
+export type ZoneGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
+/** Fila de admin_list_coverage_zones con el geojson (jsonb) ya acotado a su forma. */
+export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][number], 'geojson'> & {
+  /** ST_AsGeoJSON(geom): Polygon/MultiPolygon. */
+  geojson: ZoneGeometry | null;
+};
 
 type ExtraKey = 'docs' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations';
 interface ExtrasState {
@@ -1515,36 +1411,41 @@ export const useExtras = create<ExtrasState>(() => ({
 
 // Cada dominio es un cargador completo; las tablas pasan por fetchAllRows
 // (páginas `(from, to)`) y las zonas por su RPC (geojson real).
-const paged = (page: (from: number, to: number) => PromiseLike<RawResult>) => () =>
-  fetchAllRows<unknown>(page);
-const EXTRA_QUERIES: Record<ExtraKey, () => Promise<unknown[]>> = {
-  docs: paged((a, b) =>
-    rawFrom('technician_documents')
-      .select(
-        'id,technician_id,kind,bucket_id,storage_path,issued_on,review_status,review_notes,reviewed_at,created_at',
-      )
-      .order('created_at', { ascending: false })
-      .range(a, b)),
-  payouts: paged((a, b) =>
-    rawFrom('payout_requests')
-      .select(
-        'id,technician_id,amount_cents,status,stripe_account_id,failure_reason,batch_id,approved_at,created_at',
-      )
-      .order('created_at', { ascending: false })
-      .range(a, b)),
-  // Zonas con geometría (RPC admin_list_coverage_zones; types: regen).
+const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
+  docs: () =>
+    fetchAllRows((a, b) =>
+      supabase
+        .from('technician_documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
+  payouts: () =>
+    fetchAllRows((a, b) =>
+      supabase
+        .from('payout_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
   zones: async () => {
-    const { data, error } = await rawRpc('admin_list_coverage_zones');
+    const { data, error } = await supabase.rpc('admin_list_coverage_zones');
     if (error) throw error;
-    return (data ?? []) as unknown[];
+    // geojson llega como jsonb: la RPC garantiza Polygon/MultiPolygon (o null).
+    return (data ?? []).map(z => ({ ...z, geojson: z.geojson as ZoneGeometry | null }));
   },
-  ratings: paged((a, b) =>
-    rawFrom('order_ratings')
-      .select('id,service_order_id,reviewer_id,reviewee_id,score,comment,created_at')
-      .order('created_at', { ascending: false })
-      .range(a, b)),
-  wallets: paged((a, b) => rawFrom('technician_wallet_summaries').select('*').range(a, b)),
-  locations: paged((a, b) => rawFrom('technician_locations').select('*').range(a, b)),
+  ratings: () =>
+    fetchAllRows((a, b) =>
+      supabase
+        .from('order_ratings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
+  wallets: () =>
+    fetchAllRows((a, b) => supabase.from('technician_wallet_summaries').select('*').range(a, b)),
+  locations: () =>
+    fetchAllRows((a, b) => supabase.from('technician_locations').select('*').range(a, b)),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -1558,7 +1459,7 @@ export function loadExtras(force = false): Promise<void> {
     const results = await Promise.all(
       keys.map(async k => {
         try {
-          const rows = await EXTRA_QUERIES[k]();
+          const rows: unknown[] = await EXTRA_QUERIES[k]();
           return [k, rows, false] as const;
         } catch (e) {
           console.warn(`[data] extras.${k} no disponible`, e);
@@ -1587,21 +1488,16 @@ export const getTechRatings = (techId: string) =>
 export const getWallet = (techId: string) =>
   useExtras.getState().wallets.find(x => x.technician_id === techId) ?? null;
 
-/** Radio de servicio del técnico en km (columna del PR #4; default del setting). */
+/** Radio de servicio del técnico en km (service_radius_m o el setting por defecto). */
 export function getTechRadiusKm(techId: string): number {
-  const t = getTechnician(techId) as
-    | (ReturnType<typeof getTechnician> & { service_radius_m?: number | null })
-    | null;
   const m =
-    t?.service_radius_m ?? getSettingInt('default_match_radius_m', 15000);
+    getTechnician(techId)?.service_radius_m ?? getSettingInt('default_match_radius_m', 15000);
   return Math.round(m / 100) / 10;
 }
 
 /** Municipio base: zona asignada (technicians.zone_id) o ubicación registrada. */
 export function getTechMunicipality(techId: string): string | null {
-  const t = getTechnician(techId) as
-    | (ReturnType<typeof getTechnician> & { zone_id?: string | null })
-    | null;
+  const t = getTechnician(techId);
   const zone = t?.zone_id
     ? useExtras.getState().zones.find(z => z.id === t.zone_id)
     : null;
@@ -1630,28 +1526,22 @@ async function mutateExtras<R>(
   return r;
 }
 
-export interface PayoutBatch {
-  id: string;
-  status: string;
-  note: string | null;
-  created_at: string;
-}
+export type PayoutBatch = Row<'payout_batches'>;
 
 /**
- * Aprueba retiros pendientes en un lote (RPC approve_payout_requests; types:
- * regen). Los técnicos con fondos en disputa quedan `held` dentro del mismo
+ * Aprueba retiros pendientes en un lote (RPC approve_payout_requests). Los técnicos con fondos en disputa quedan `held` dentro del mismo
  * lote en vez de aprobarse: por eso el envío por Stripe se decide después,
  * leyendo el estado real de cada solicitud.
  */
 export const approvePayouts = (ids: string[], note?: string) =>
   mutateExtras(
     async () => {
-      const { data, error } = await rawRpc('approve_payout_requests', {
+      const { data, error } = await supabase.rpc('approve_payout_requests', {
         p_request_ids: ids,
-        p_note: note ?? null,
+        p_note: note,
       });
       if (error) throw error;
-      return data as PayoutBatch;
+      return data;
     },
     e => pgMessage(e, 'No se pudo aprobar el retiro.'),
   );
@@ -1660,7 +1550,7 @@ export const approvePayouts = (ids: string[], note?: string) =>
 export const rejectPayout = (id: string) =>
   mutateExtras(
     async () => {
-      const { error } = await rawRpc('cancel_payout_request', { p_request_id: id });
+      const { error } = await supabase.rpc('cancel_payout_request', { p_request_id: id });
       if (error) throw error;
       return true;
     },
@@ -1700,7 +1590,8 @@ export const reviewDocument = (
   mutateExtras(
     async () => {
       const { data: auth } = await supabase.auth.getSession();
-      const { error } = await rawFrom('technician_documents')
+      const { error } = await supabase
+        .from('technician_documents')
         .update({
           review_status: status,
           review_notes: notes?.trim() || null,
@@ -1719,17 +1610,18 @@ export const saveZone = (z: {
   id?: string | null;
   slug: string;
   name: string;
-  geojson: unknown;
+  geojson: ZoneGeometry;
   is_active: boolean;
 }) =>
   mutateExtras(
     async () => {
-      const { error } = await rawRpc('upsert_coverage_zone', {
+      const { error } = await supabase.rpc('upsert_coverage_zone', {
         p_slug: z.slug,
         p_name: z.name,
-        p_geojson: z.geojson,
+        // GeoJSON es Json válido; el tipo generado solo conoce `Json`.
+        p_geojson: z.geojson as unknown as Json,
         p_is_active: z.is_active,
-        p_id: z.id ?? null,
+        p_id: z.id ?? undefined,
       });
       if (error) throw error;
       return true;
@@ -1750,11 +1642,11 @@ export const setZoneActive = (id: string, active: boolean) => {
   return saveZone({ id, slug: z.slug, name: z.name, geojson: z.geojson, is_active: active });
 };
 
-/** Asigna (o quita con null) la zona base de un técnico (RPC assign_technician_zone). */
-export const assignTechZone = (techId: string, zoneId: string | null) =>
+/** Asigna la zona base de un técnico (RPC assign_technician_zone). */
+export const assignTechZone = (techId: string, zoneId: string) =>
   mutateExtras(
     async () => {
-      const { error } = await rawRpc('assign_technician_zone', {
+      const { error } = await supabase.rpc('assign_technician_zone', {
         p_technician_id: techId,
         p_zone_id: zoneId,
       });
@@ -1764,10 +1656,10 @@ export const assignTechZone = (techId: string, zoneId: string | null) =>
     e => pgMessage(e, 'No se pudo asignar la zona al técnico.'),
   );
 
-export type DemandCell = { dow: number; hour: number; order_count: number };
+export type DemandCell = Fn['admin_report_demand_heatmap']['Returns'][number];
 /** Demanda por día de la semana × hora (RPC admin_report_demand_heatmap, hora ZMG). */
 export const fetchDemandHeatmap = (from: Date, to: Date) =>
-  reportRpc<DemandCell[]>('admin_report_demand_heatmap', from, to);
+  reportRpc('admin_report_demand_heatmap', from, to);
 
 /** Edita el perfil público del técnico (nombre visible y bio) y su nombre. */
 export async function updateTechnicianProfile(

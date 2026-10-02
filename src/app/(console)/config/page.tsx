@@ -37,6 +37,7 @@ import {
   getSettingBool,
   getSettingList,
   saveSettings,
+  fetchAdminRoles,
   getAdmins,
   inviteAdmin,
   setAdminRole,
@@ -512,11 +513,14 @@ function TeamSection() {
   const [me, setMe] = useState<string | null>(null);
   const [myMfa, setMyMfa] = useState<boolean | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Rol actual de cada admin (app_metadata) vía admin_list_admin_roles.
+  const [roles, setRoles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void getSessionUserId().then(setMe);
     void getMyMfaVerified().then(setMyMfa);
-  }, []);
+    if (canUsers) void fetchAdminRoles().then(setRoles);
+  }, [canUsers]);
 
   return (
     <>
@@ -561,17 +565,19 @@ function TeamSection() {
                 {mine ? (
                   <Badge tone="navy">{roleLabel(adminRole)}</Badge>
                 ) : canUsers ? (
-                  // El rol de otros admins vive en app_metadata (solo lo lee el
-                  // backend); aquí se asigna, no se muestra el actual.
                   <div className="w-44">
                     <Select
                       options={ROLE_OPTS}
-                      value={null}
+                      value={(roles[a.id] as AdminRole | undefined) ?? null}
                       placeholder="Asignar rol…"
                       disabled={busy === a.id}
                       aria-label={`Rol de ${a.full_name ?? 'admin'}`}
                       onChange={r =>
-                        void run(a.id, () => setAdminRole(a.id, r), `Rol actualizado · ${roleLabel(r)}`)
+                        void run(a.id, async () => {
+                          const ok = await setAdminRole(a.id, r);
+                          if (ok) setRoles(s => ({ ...s, [a.id]: r }));
+                          return ok;
+                        }, `Rol actualizado · ${roleLabel(r)}`)
                       }
                     />
                   </div>

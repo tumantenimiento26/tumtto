@@ -188,7 +188,7 @@ export default function FinanzasPage() {
         }),
       wallets: (() => {
         const ids = new Set<string>([
-          ...extras.wallets.map(w => w.technician_id),
+          ...extras.wallets.flatMap(w => (w.technician_id ? [w.technician_id] : [])),
           ...ledger.map(e => e.technician_id),
         ]);
         return [...ids].map(id => {

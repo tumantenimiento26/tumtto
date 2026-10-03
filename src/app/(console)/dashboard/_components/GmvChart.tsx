@@ -306,9 +306,14 @@ export function GmvChart({
                 className="pointer-events-none absolute -ml-1.5 -mt-1.5 h-[11px] w-[11px] animate-pop rounded-full border-[2.5px] border-primary bg-card"
                 style={{ left: `${xPct(peak)}%`, top: yPx(values[peak]) }}
               />
+              {/* Cerca de los bordes la etiqueta se ancla hacia adentro para no desbordar. */}
               <div
-                className="pointer-events-none absolute -translate-x-1/2 -translate-y-[34px] animate-pop whitespace-nowrap rounded-full bg-action px-2.5 py-0.5 font-mono text-[10.5px] font-semibold text-white"
-                style={{ left: `${xPct(peak)}%`, top: yPx(values[peak]) }}
+                className="pointer-events-none absolute -translate-y-[34px] animate-pop whitespace-nowrap rounded-full bg-action px-2.5 py-0.5 font-mono text-[10.5px] font-semibold text-white"
+                style={{
+                  left: `${xPct(peak)}%`,
+                  top: yPx(values[peak]),
+                  translate: xPct(peak) > 80 ? '-100% 0' : xPct(peak) < 20 ? '0 0' : '-50% 0',
+                }}
               >
                 Máx. {fmt(values[peak])}
               </div>

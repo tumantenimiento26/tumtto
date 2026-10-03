@@ -2,8 +2,9 @@
 
 import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Download, Send, Check, Wallet, ExternalLink, X } from 'lucide-react';
+import { Download, Send, Check, Wallet, ExternalLink, X, Gavel, ChevronRight } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -71,10 +72,10 @@ import {
   money,
   shortMoney,
 } from './_components/fin-parts';
-import { CashByTechnician, CashReviewQueue, PaymentsReport } from './_components/CashPanels';
+import { CashByTechnician, PaymentsReport } from './_components/CashPanels';
 
-type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'rev' | 'cash' | 'svc';
-const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'rev', 'cash', 'svc'];
+type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'cash' | 'svc';
+const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'cash', 'svc'];
 type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
 const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
@@ -126,8 +127,6 @@ export default function FinanzasPage() {
   const { busy, run } = useAction();
   const { can } = useAuth();
   const canFinance = can('finanzas');
-  // Soporte también resuelve revisiones de efectivo (backend: soporte o finanzas).
-  const canCash = canFinance || can('soporte');
   const [range, setRange] = useState<NonNullable<DateRange>>(() => rangePreset('30d')!);
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
@@ -141,7 +140,7 @@ export default function FinanzasPage() {
 
   useEffect(() => {
     void loadExtras();
-    // /finanzas?tab=rev|cash|svc (Dashboard y Notificaciones enlazan a la cola).
+    // /finanzas?tab=cash|svc
     const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
     if (t && TABS.includes(t)) {
       setTab(t);
@@ -255,21 +254,11 @@ export default function FinanzasPage() {
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
   const labels = m.buckets.map(b => b.label);
 
-  if (!canCash)
+  if (!canFinance)
     return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed)
     return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
   if (!ready) return <ScreenSkeleton kind="dashboard" />;
-
-  if (!canFinance)
-    return (
-      <div className="flex flex-col gap-5">
-        <PageHeader title="Revisión de efectivo" description="Efectivo que no cuadra entre el técnico y el cliente." />
-        <Card padded={false} className="overflow-hidden">
-          <CashReviewQueue canResolve />
-        </Card>
-      </div>
-    );
 
   const txCols: DataColumn<TxRow>[] = [
     { key: 'id', header: 'Pago', render: r => <span className="font-mono text-[12px] text-muted">PAY-{orderCode(r.orderId).slice(4)}</span> },
@@ -416,6 +405,23 @@ export default function FinanzasPage() {
         </Card>
       </div>
 
+      {getCashReviewOrders().length > 0 && (
+        <Link
+          href="/revision-efectivo"
+          className="flex items-center gap-3 rounded-xl border border-line bg-error-soft px-4 py-3 hover:border-error"
+        >
+          <Gavel size={16} className="text-error" aria-hidden />
+          <span className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
+            {getCashReviewOrders().length}{' '}
+            {getCashReviewOrders().length === 1 ? 'revisión de efectivo abierta' : 'revisiones de efectivo abiertas'}
+            <span className="ml-2 font-normal text-muted">El efectivo no cuadra entre técnico y cliente</span>
+          </span>
+          <span className="inline-flex items-center gap-1 font-sans text-[13px] font-semibold text-primary">
+            Revisar <ChevronRight size={14} aria-hidden />
+          </span>
+        </Link>
+      )}
+
       <div ref={tabsRef} className="scroll-mt-4">
       <Card padded={false} className="overflow-hidden">
         <div className="border-b border-line px-5 pt-3">
@@ -425,7 +431,6 @@ export default function FinanzasPage() {
               { value: 'po', label: 'Retiros', count: pendingPO.length + heldPO.length },
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
-              { value: 'rev', label: 'Revisión de efectivo', count: getCashReviewOrders().length },
               { value: 'cash', label: 'Efectivo por técnico' },
               { value: 'svc', label: 'Pagos por servicio' },
             ]}
@@ -577,7 +582,6 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'rev' && <CashReviewQueue canResolve />}
         {tab === 'cash' && <CashByTechnician from={period.from} to={period.to} label={periodLabel(range)} />}
         {tab === 'svc' && <PaymentsReport from={period.from} to={period.to} label={periodLabel(range)} />}
 

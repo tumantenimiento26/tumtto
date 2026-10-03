@@ -139,8 +139,8 @@ function useNavGroups(): NavGroup[] {
   const { unread } = useNotifications();
   const { can } = useAuth();
   const finanzas = can('finanzas');
-  // Soporte resuelve revisiones de efectivo sin ver todo Finanzas.
-  const efectivo = !finanzas && can('soporte');
+  // Soporte o finanzas resuelven revisiones de efectivo (página propia).
+  const efectivo = finanzas || can('soporte');
   return [
     {
       label: 'General',
@@ -172,8 +172,8 @@ function useNavGroups(): NavGroup[] {
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas', badge: () => getCashReviewOrders().length }] : []),
-        ...(efectivo ? [{ href: '/finanzas', icon: Wallet, label: 'Efectivo', badge: () => getCashReviewOrders().length }] : []),
+        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
+        ...(efectivo ? [{ href: '/revision-efectivo', icon: Banknote, label: 'Revisión de efectivo', badge: () => getCashReviewOrders().length }] : []),
         {
           href: '/soporte',
           icon: Scale,
@@ -211,6 +211,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
   '/soporte': ['Operación', 'Soporte'],
+  '/revision-efectivo': ['Operación', 'Revisión de efectivo'],
   '/reportes': ['Analítica', 'Reportes'],
   '/catalogo': ['Sistema', 'Catálogo'],
   '/config': ['Sistema', 'Configuración'],

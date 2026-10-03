@@ -13,6 +13,9 @@ import {
   cashDiff,
   cashReviews,
   cashTotals,
+  EMPTY_CASH_REVIEW_FILTERS,
+  activeCashReviewFilters,
+  filterCashReviews,
   groupByOrder,
   isFailedCharge,
   kpiWindow,
@@ -292,3 +295,22 @@ describe('cola de revisiones', () => {
 // sanidad de tipos: PayRow exportado
 const _row: PayRow | undefined = demo.payments[0];
 void _row;
+
+describe('filtros de la cola de revisión de efectivo', () => {
+  const rows = [
+    { review_reason: 'amount_mismatch', review_opened_at: new Date(NOW - 2 * 864e5).toISOString(), technician_id: 't1' },
+    { review_reason: 'client_not_paid', review_opened_at: new Date(NOW - 3600e3).toISOString(), technician_id: 't2' },
+    { review_reason: 'client_amount_mismatch', review_opened_at: new Date(NOW - 8 * 864e5).toISOString(), technician_id: 't1' },
+  ];
+  const f = EMPTY_CASH_REVIEW_FILTERS;
+  it('sin filtros devuelve todo y cuenta 0', () => {
+    expect(filterCashReviews(rows, f, NOW)).toHaveLength(3);
+    expect(activeCashReviewFilters(f)).toBe(0);
+  });
+  it('filtra por motivo, antigüedad y técnico', () => {
+    expect(filterCashReviews(rows, { ...f, reason: 'client_not_paid' }, NOW)).toHaveLength(1);
+    expect(filterCashReviews(rows, { ...f, minDays: 7 }, NOW)).toHaveLength(1);
+    expect(filterCashReviews(rows, { ...f, minDays: 1, technicianId: 't1' }, NOW)).toHaveLength(2);
+    expect(activeCashReviewFilters({ reason: 'amount_mismatch', minDays: 3, technicianId: 't1' })).toBe(3);
+  });
+});

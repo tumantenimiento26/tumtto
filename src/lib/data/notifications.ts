@@ -133,7 +133,7 @@ export function derive(now = Date.now()): AdminNotification[] {
         title: 'Revisión de efectivo abierta',
         body: reviewReason(p.review_reason),
         ts: p.review_opened_at ?? p.updated_at ?? p.created_at,
-        href: '/finanzas?tab=rev',
+        href: '/revision-efectivo',
       });
   }
   for (const o of getAllRequests())

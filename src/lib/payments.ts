@@ -90,6 +90,31 @@ export const REVIEW_REASON_LABEL: Record<string, string> = {
 export const reviewReason = (r: string | null | undefined) =>
   r ? (REVIEW_REASON_LABEL[r] ?? r) : '—';
 
+/** Filtros de la cola «Revisión de efectivo». */
+export interface CashReviewFilters {
+  reason: 'all' | 'amount_mismatch' | 'client_amount_mismatch' | 'client_not_paid';
+  /** Antigüedad mínima en días (0 = todas). */
+  minDays: 0 | 1 | 3 | 7;
+  /** '' = todos los técnicos. */
+  technicianId: string;
+}
+export const EMPTY_CASH_REVIEW_FILTERS: CashReviewFilters = { reason: 'all', minDays: 0, technicianId: '' };
+export const activeCashReviewFilters = (f: CashReviewFilters) =>
+  (f.reason !== 'all' ? 1 : 0) + (f.minDays ? 1 : 0) + (f.technicianId ? 1 : 0);
+
+type ReviewFilterRow = Pick<CashReviewRow, 'review_reason' | 'review_opened_at' | 'technician_id'>;
+export function filterCashReviews<T extends ReviewFilterRow>(rows: T[], f: CashReviewFilters, now = Date.now()): T[] {
+  return rows.filter(r => {
+    if (f.reason !== 'all' && r.review_reason !== f.reason) return false;
+    if (f.technicianId && r.technician_id !== f.technicianId) return false;
+    if (f.minDays) {
+      const t = r.review_opened_at ? new Date(r.review_opened_at).getTime() : now;
+      if (now - t < f.minDays * 864e5) return false;
+    }
+    return true;
+  });
+}
+
 /** Etiqueta corta del concepto de un pago. */
 export const KIND_LABEL: Record<string, string> = {
   base_fee: 'Tarifa base',

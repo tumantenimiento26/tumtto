@@ -223,7 +223,7 @@ export default function DashboardPage() {
         title: `${cashReviews.length} ${cashReviews.length === 1 ? 'revisión' : 'revisiones'} de efectivo`,
         sub: `${cashReviews.map(o => orderCode(o.id)).slice(0, 3).join(', ')}${cashReviews.length > 3 ? '…' : ''} · el cliente y el técnico no coinciden`,
         cta: 'Revisar',
-        onClick: () => router.push('/finanzas?tab=rev'),
+        onClick: () => router.push('/revision-efectivo'),
       });
     // Solicitudes sin técnico (el cliente pidió que Tumtto asigne) que superan unassigned_alert_minutes.
     const alertMin = getUnassignedAlertMinutes();

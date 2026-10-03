@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Download, Gavel } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -16,8 +16,7 @@ import {
   type DataColumn,
 } from '@/components/ds';
 import { exportCsv } from '@/components/admin';
-import { CashReviewModal } from '@/components/cash-review-modal';
-import { fetchCashByTechnician, fetchCashReviews, fetchPaymentsReport, useTick } from '@/lib/data/store';
+import { fetchCashByTechnician, fetchPaymentsReport, useTick } from '@/lib/data/store';
 import { fmtDate } from '@/lib/dates';
 import { orderCode } from '@/lib/orderCode';
 import {
@@ -29,100 +28,12 @@ import {
   cashTotals,
   methodName,
   paymentsReportCsvRows,
-  reviewReason,
-  type CashReviewRow,
   type CashStatus,
   type CashTechRow,
   type MethodFilter,
   type PaymentsReportRow,
 } from '@/lib/payments';
 import { money } from './fin-parts';
-
-const ago = (iso: string | null) => {
-  if (!iso) return '—';
-  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-  return m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
-};
-
-/* ── Revisión de efectivo ─────────────────────────────────────────────── */
-
-export function CashReviewQueue({ canResolve }: { canResolve: boolean }) {
-  const tick = useTick();
-  const router = useRouter();
-  const [rows, setRows] = useState<CashReviewRow[] | null | undefined>(undefined);
-  const [target, setTarget] = useState<string | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    void fetchCashReviews().then(r => live && setRows(r));
-    return () => {
-      live = false;
-    };
-  }, [tick]);
-
-  return (
-    <div className="p-5">
-      <p className="mb-4 font-sans text-[13px] text-muted">
-        Servicios donde el efectivo no cuadra (el cliente dice que no pagó o pagó otro monto, o el técnico reportó
-        un monto distinto al presupuesto). Al resolver se avisa a ambas partes y queda en la bitácora.
-      </p>
-      {rows === undefined ? (
-        <p className="font-sans text-[13px] text-muted">Cargando…</p>
-      ) : rows === null ? (
-        <EmptyState kind="no-results" compact title="Cola no disponible" description="El servidor no respondió. Reintenta en un momento." />
-      ) : rows.length === 0 ? (
-        <EmptyState kind="all-clear" compact title="Sin revisiones abiertas" description="Todo el efectivo está conciliado." />
-      ) : (
-        <ul className="flex flex-col divide-y divide-divider" aria-label="Revisiones de efectivo abiertas">
-          {rows.map(r => (
-            <li key={r.payment_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
-              <div className="min-w-[200px] flex-1">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/servicios/${r.order_id}`)}
-                  className="font-mono text-[12.5px] font-semibold text-primary hover:underline"
-                >
-                  {orderCode(r.order_id)}
-                </button>
-                <div className="font-sans text-[13.5px] font-semibold text-navy">{reviewReason(r.review_reason)}</div>
-                <div className="font-sans text-[12.5px] text-muted">
-                  {r.technician_name ?? 'Técnico'} · {r.client_name ?? 'Cliente'} · {ago(r.review_opened_at)}
-                </div>
-                {r.client_dispute_reason && (
-                  <div className="mt-0.5 font-sans text-[12.5px] italic text-muted">“{r.client_dispute_reason}”</div>
-                )}
-              </div>
-              <dl className="grid grid-cols-3 gap-3 text-right">
-                {[
-                  ['Presupuesto', r.expected_cents],
-                  ['Técnico', r.received_cents],
-                  ['Cliente', r.client_reported_cents],
-                ].map(([label, v]) => (
-                  <div key={label as string}>
-                    <dt className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted">{label}</dt>
-                    <dd className="font-mono text-[13px] font-semibold text-navy tabular">
-                      {v == null ? '—' : money(Number(v))}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <Button
-                size="sm"
-                icon={Gavel}
-                disabled={!canResolve}
-                title={canResolve ? undefined : 'Solo soporte o finanzas resuelven la revisión'}
-                onClick={() => setTarget(r.order_id)}
-              >
-                Resolver
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <CashReviewModal orderId={target} open={target !== null} onClose={() => setTarget(null)} />
-    </div>
-  );
-}
 
 /* ── Efectivo por técnico ─────────────────────────────────────────────── */
 

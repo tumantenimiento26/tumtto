@@ -124,7 +124,7 @@ export default function DashboardPage() {
         ).length,
     );
     const rating = weightedRating(techs);
-    const ratings = orderRatings.map(r => ({ stars: r.score, created_at: r.created_at }));
+    const ratings = orderRatings.filter(r => !r.is_hidden).map(r => ({ stars: r.score, created_at: r.created_at }));
     const avgStars = (rs: { stars: number }[]) =>
       rs.length ? sum(rs.map(r => r.stars)) / rs.length : null;
     const ratingSerie = bks.map(

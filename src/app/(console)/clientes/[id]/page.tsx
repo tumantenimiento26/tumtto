@@ -125,7 +125,8 @@ export default function ClientDetailPage() {
   );
   const spentCents = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0);
   const ticketCents = requests.length ? Math.round(spentCents / requests.length) : null;
-  const ratings = orderRatings.filter(r => r.reviewer_id === id);
+  // Las ocultas por moderación no cuentan en el promedio.
+  const ratings = orderRatings.filter(r => r.reviewer_id === id && !r.is_hidden);
   const avgRating = ratings.length
     ? ratings.reduce((s, r) => s + r.score, 0) / ratings.length
     : null;

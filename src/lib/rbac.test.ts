@@ -11,6 +11,13 @@ test('mapa de permisos del contrato §3', () => {
   expect(can('super_admin', 'usuarios')).toBe(true);
 });
 
+test('calificaciones: solo super_admin y soporte', () => {
+  expect(can('super_admin', 'calificaciones')).toBe(true);
+  expect(can('soporte', 'calificaciones')).toBe(true);
+  expect(can('onboarding', 'calificaciones')).toBe(false);
+  expect(can('legal', 'calificaciones')).toBe(false);
+});
+
 test('rol desde app_metadata con fallback super_admin', () => {
   expect(roleFromMetadata({ admin_role: 'legal' })).toBe('legal');
   expect(roleFromMetadata({ role: 'admin' })).toBe('super_admin');

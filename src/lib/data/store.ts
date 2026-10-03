@@ -9,6 +9,7 @@ import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
 import { rejectionNotes } from '@/lib/clientDocs';
 import { typeChangeText, typeCompanyValid, type TechType } from '@/lib/techType';
+import { ratingNoteRequired, ratingReasonLabel, type RatingReason } from '@/lib/ratingModeration';
 import { isValidPlate, normalizePlate, vehicleEventText } from '@/lib/vehicles';
 import {
   countCatalogTechs,
@@ -123,6 +124,8 @@ const EVENT_LABEL: Record<string, string> = {
   tool_added: 'Herramienta agregada',
   tool_updated: 'Herramienta actualizada',
   tool_removed: 'Herramienta eliminada',
+  rating_hidden: 'Calificación oculta',
+  rating_restored: 'Calificación restaurada',
 };
 /** Tablas secundarias del snapshot: si fallan (RLS, migración pendiente) no tiran la consola. */
 const optional = <T,>(p: Promise<T[]>, what: string) =>
@@ -545,6 +548,14 @@ export const getTechCategories = (techId: string) =>
   w().technicianCategories.filter(tc => tc.technician_id === techId);
 export const getTechRates = (techId: string) =>
   w().rates.filter(r => r.technician_id === techId);
+function ratingEventText(type: string, payload: Json): string {
+  const p = (payload ?? {}) as { score?: unknown; reason?: unknown; note?: unknown };
+  const stars = typeof p.score === 'number' ? ` de ${p.score}★` : '';
+  const note = typeof p.note === 'string' && p.note ? ` — ${p.note}` : '';
+  if (type === 'rating_restored') return `Calificación${stars} restaurada${note}`;
+  const reason = typeof p.reason === 'string' ? ` · ${ratingReasonLabel(p.reason as RatingReason)}` : '';
+  return `Calificación${stars} oculta${reason}${note}`;
+}
 /** Bitácora de una entidad (orden, técnico, cliente, disputa) desde admin_events. */
 export const getNotes = (entityId: string): Note[] =>
   adminEvents
@@ -571,6 +582,16 @@ export const getNotes = (entityId: string): Note[] =>
           event_type: e.event_type,
           note,
           text: toolEventText(e.event_type, e.payload, id => getCatalogTool(id)?.name ?? null),
+          created_at: e.created_at,
+        };
+      if (e.event_type === 'rating_hidden' || e.event_type === 'rating_restored')
+        return {
+          id: e.id,
+          entity_id: entityId,
+          author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Admin',
+          event_type: e.event_type,
+          note,
+          text: ratingEventText(e.event_type, e.payload),
           created_at: e.created_at,
         };
       if (e.event_type === 'technician_type_changed')
@@ -2545,4 +2566,84 @@ export async function updateTechnicianProfile(
   );
 }
 
+/** Nombre de quien moderó (fallback si el perfil no está en el snapshot). */
+export const getModeratorName = (id: string | null) =>
+  (id && getProfile(id)?.full_name) || 'Admin';
+
+/** Mock: ajusta rating_avg/count del técnico sin tocar el resto (sale/entra una calificación). */
+function mockAdjustTechRating(techId: string, score: number, delta: 1 | -1) {
+  world.technicians = world.technicians.map(t => {
+    if (t.id !== techId) return t;
+    const count = t.rating_count + delta;
+    const sum = t.rating_avg * t.rating_count + score * delta;
+    return { ...t, rating_count: Math.max(count, 0), rating_avg: count > 0 ? sum / count : 0 };
+  });
+}
+
+function mockModerateRating(id: string, hide: { reason: RatingReason; note: string | null } | null): true | null {
+  const list = useExtras.getState().ratings;
+  const prev = list.find(r => r.id === id);
+  if (!prev || !!prev.is_hidden === !!hide) return null;
+  const now = new Date().toISOString();
+  const next: OrderRating = hide
+    ? { ...prev, is_hidden: true, hidden_reason: hide.reason, hidden_note: hide.note, hidden_by: 'demo-admin', hidden_at: now, updated_at: now }
+    : { ...prev, is_hidden: false, hidden_reason: null, hidden_note: null, hidden_by: null, hidden_at: null, updated_at: now };
+  useExtras.setState({ ratings: list.map(r => (r.id === id ? next : r)) });
+  mockAdjustTechRating(prev.reviewee_id, prev.score, hide ? -1 : 1);
+  adminEvents = [
+    ...adminEvents,
+    {
+      id: `mock-ae-${Date.now()}-${adminEvents.length}`,
+      actor_id: 'demo-admin',
+      entity_type: 'technician',
+      entity_id: prev.reviewee_id,
+      event_type: hide ? 'rating_hidden' : 'rating_restored',
+      payload: {
+        rating_id: id,
+        service_order_id: prev.service_order_id,
+        score: prev.score,
+        reason: hide?.reason ?? null,
+        note: hide?.note ?? null,
+        actor_id: 'demo-admin',
+      },
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+  bump();
+  return true;
+}
+
+/** Oculta una calificación (admin_hide_rating, permiso calificaciones). Nunca se borra. «Otro» exige nota. */
+export async function hideRating(id: string, reason: RatingReason, note?: string): Promise<true | null> {
+  const n = note?.trim() || null;
+  if (ratingNoteRequired(reason) && !n) {
+    notifyError('Escribe una nota para el motivo «Otro».');
+    return null;
+  }
+  if (MOCK) return mockModerateRating(id, { reason, note: n });
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_hide_rating', {
+      p_rating_id: id,
+      p_reason: reason,
+      ...(n ? { p_note: n } : {}),
+    });
+    if (error) throw error;
+    return true as const;
+  }, e => pgMessage(e, 'No se pudo ocultar la calificación.'));
+}
+
+/** Restaura una calificación oculta (admin_restore_rating). */
+export async function restoreRating(id: string, note?: string): Promise<true | null> {
+  const n = note?.trim() || null;
+  if (MOCK) return mockModerateRating(id, null);
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_restore_rating', {
+      p_rating_id: id,
+      ...(n ? { p_note: n } : {}),
+    });
+    if (error) throw error;
+    return true as const;
+  }, e => pgMessage(e, 'No se pudo restaurar la calificación.'));
+}
 // ══ fin consola-c · extras ══════════════════════════════════════════════════

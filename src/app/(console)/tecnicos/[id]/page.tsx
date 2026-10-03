@@ -20,7 +20,6 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
   ErrorPage,
   Modal,
   ScreenSkeleton,
@@ -84,6 +83,8 @@ import {
 import { TechTypeBadge, TechTypeCard } from '../_components/TechTypeParts';
 import { VehiclesCard } from '../_components/VehiclesCard';
 import { ToolsCard } from '../_components/ToolsCard';
+import { RatingsCard } from '../_components/RatingsCard';
+import { ratingSummary } from '@/lib/ratingModeration';
 
 const DONE = new Set(['completed', 'paid', 'closed']);
 const money = (c: number) =>
@@ -147,7 +148,7 @@ export default function TecnicoDetailPage() {
         b.created_at.localeCompare(a.created_at),
       ),
       docs: getTechDocuments(tech.id),
-      ratings: getTechRatings(tech.id).slice(0, 4),
+      ratings: getTechRatings(tech.id),
       zone: getTechMunicipality(tech.id),
       radius: getTechRadiusKm(tech.id),
     };
@@ -185,6 +186,10 @@ export default function TecnicoDetailPage() {
   const approveTitle = bgOk
     ? undefined
     : 'Primero aprueba la carta de antecedentes (vigente, menos de 3 meses).';
+
+  // Promedio mostrado: solo calificaciones visibles (el servidor hace lo mismo en technicians).
+  const shown =
+    data.ratings.length > 0 ? ratingSummary(data.ratings) : { avg: tech.rating_avg, count: tech.rating_count };
 
   const approve = () =>
     void run('approve', () => resolveKyc(tech.id, true), `Técnico aprobado · ${name}`);
@@ -385,8 +390,8 @@ export default function TecnicoDetailPage() {
               { l: 'Trabajos completados', v: String(data.jobs), i: Briefcase },
               {
                 l: 'Rating',
-                v: tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : '—',
-                sub: `${tech.rating_count} reseñas`,
+                v: shown.avg > 0 ? shown.avg.toFixed(1) : '—',
+                sub: `${shown.count} reseñas`,
                 i: Star,
               },
               { l: 'Ingresos netos · 30 d', v: money(data.income30), i: TrendingUp },
@@ -440,33 +445,7 @@ export default function TecnicoDetailPage() {
               </Card>
             </div>
             <div className="flex flex-col gap-4">
-              <Card padded>
-                <CardHead title="Reseñas recientes" />
-                {extras.unavailable.ratings ? (
-                  <p className="font-sans text-[13px] text-muted">
-                    Las reseñas por servicio aún no están disponibles en este entorno.
-                  </p>
-                ) : data.ratings.length === 0 ? (
-                  <EmptyState kind="first-use" title="Sin reseñas" description="Aparecerán cuando los clientes califiquen sus servicios." compact />
-                ) : (
-                  data.ratings.map(r => (
-                    <div key={r.id} className="border-t border-divider py-2.5 first:border-t-0">
-                      <div className="flex items-center justify-between">
-                        <span className="font-sans text-[13px] font-semibold text-navy">
-                          {getProfile(r.reviewer_id)?.full_name ?? 'Cliente'}
-                        </span>
-                        <span className="inline-flex items-center gap-0.5 text-warning" aria-label={`${r.score} de 5`}>
-                          {Array.from({ length: 5 }, (_, i) => (
-                            <Star key={i} size={12} className={i < r.score ? 'fill-current' : 'opacity-30'} />
-                          ))}
-                        </span>
-                      </div>
-                      {r.comment && <p className="mt-1 font-sans text-[13px] text-body">{r.comment}</p>}
-                      <p className="mt-0.5 font-mono text-[11px] text-faint">{fecha(r.created_at)}</p>
-                    </div>
-                  ))
-                )}
-              </Card>
+              <RatingsCard techId={tech.id} />
               {canSensitive && <BankCard tech={tech} />}
               <TechTypeCard techId={tech.id} />
               <VehiclesCard techId={tech.id} />

@@ -438,11 +438,48 @@ export function withHistory(w: World): {
             comment: null,
             created_at: paidAt,
             updated_at: paidAt,
+            is_hidden: false,
+            hidden_reason: null,
+            hidden_note: null,
+            hidden_by: null,
+            hidden_at: null,
           });
         }
       }
     }
   }
+
+  // Moderación: comentarios de muestra y algunas calificaciones ocultas con motivo
+  // (el admin demo las ocultó hace unos días). Determinista: primeras N del técnico.
+  const COMMENTS = ['Llegó puntual y dejó todo limpio.', 'Buen trabajo, lo recomiendo.', 'Resolvió el problema a la primera.', 'Atento y profesional.'];
+  const mine = (t: string) => ratings.filter(x => x.reviewee_id === t);
+  mine('u-ag').slice(0, 8).forEach((x, i) => {
+    x.comment = COMMENTS[i % COMMENTS.length];
+  });
+  const hide = (
+    x: Row<'order_ratings'> | undefined,
+    score: number,
+    comment: string,
+    reason: Row<'order_ratings'>['hidden_reason'],
+    note: string | null,
+    daysAgo: number,
+  ) => {
+    if (!x) return;
+    const at = new Date(now - daysAgo * DAY).toISOString();
+    Object.assign(x, {
+      score,
+      comment,
+      is_hidden: true,
+      hidden_reason: reason,
+      hidden_note: note,
+      hidden_by: 'demo-admin',
+      hidden_at: at,
+    });
+  };
+  hide(mine('u-ag')[9], 1, 'Pésimo, es un ladrón y un idiota.', 'offensive', null, 3);
+  hide(mine('u-ag')[12], 2, 'No fue el técnico que pedí.', 'other', 'El cliente confirmó por teléfono que se equivocó de servicio.', 6);
+  hide(mine('u-sc')[2], 1, 'Reseña repetida.', 'duplicate', null, 9);
+  hide(mine(TECH_USER_ID)[3], 1, 'El servicio nunca se realizó.', 'cancelled_service', 'El servicio fue cancelado antes de la visita.', 4);
 
   // Emergencias (reemplazan al «urgente»): varias ya asignadas con su historial de
   // despacho (rondas con radio creciente, técnicos notificados y tiempo de respuesta),

@@ -666,7 +666,14 @@ export type Database = {
         Row: {
           comment: string | null
           created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id: string
+          is_hidden: boolean
           reviewee_id: string
           reviewer_id: string
           score: number
@@ -676,7 +683,14 @@ export type Database = {
         Insert: {
           comment?: string | null
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_note?: string | null
+          hidden_reason?:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id?: string
+          is_hidden?: boolean
           reviewee_id: string
           reviewer_id: string
           score: number
@@ -686,7 +700,14 @@ export type Database = {
         Update: {
           comment?: string | null
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_note?: string | null
+          hidden_reason?:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id?: string
+          is_hidden?: boolean
           reviewee_id?: string
           reviewer_id?: string
           score?: number
@@ -694,6 +715,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "order_ratings_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_ratings_reviewee_id_fkey"
             columns: ["reviewee_id"]
@@ -2861,6 +2889,62 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_hide_rating: {
+        Args: {
+          p_note?: string
+          p_rating_id: string
+          p_reason: Database["public"]["Enums"]["rating_moderation_reason"]
+        }
+        Returns: {
+          comment: string | null
+          created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
+          id: string
+          is_hidden: boolean
+          reviewee_id: string
+          reviewer_id: string
+          score: number
+          service_order_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_ratings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_restore_rating: {
+        Args: { p_note?: string; p_rating_id: string }
+        Returns: {
+          comment: string | null
+          created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
+          id: string
+          is_hidden: boolean
+          reviewee_id: string
+          reviewer_id: string
+          score: number
+          service_order_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_ratings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_set_user_status: {
         Args: {
           p_status: Database["public"]["Enums"]["profile_status"]
@@ -3808,6 +3892,13 @@ export type Database = {
         | "cancelled"
         | "held"
       profile_status: "active" | "suspended" | "deleted"
+      rating_moderation_reason:
+        | "offensive"
+        | "fraudulent"
+        | "duplicate"
+        | "cancelled_service"
+        | "client_error"
+        | "other"
       service_priority: "normal" | "emergency"
       service_order_status:
         | "requested"
@@ -4016,6 +4107,14 @@ export const Constants = {
         "held",
       ],
       profile_status: ["active", "suspended", "deleted"],
+      rating_moderation_reason: [
+        "offensive",
+        "fraudulent",
+        "duplicate",
+        "cancelled_service",
+        "client_error",
+        "other",
+      ],
       service_priority: ["normal", "emergency"],
       service_order_status: [
         "requested",

@@ -1,7 +1,7 @@
 'use client';
 
 import { UserIcon } from '@/components/profile-icon';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Send, Check, Wallet, ExternalLink, X } from 'lucide-react';
 import {
@@ -21,6 +21,7 @@ import {
   type DataColumn,
   PeriodFilters,
   periodLabel,
+  toPeriod,
   Chip,
 } from '@/components/ds';
 import { exportCsv } from '@/components/admin';
@@ -30,6 +31,7 @@ import {
   fetchReportKpis,
   getAllLedger,
   getAllPayments,
+  getCashReviewOrders,
   getProfile,
   getRequest,
   getSettingInt,
@@ -46,6 +48,7 @@ import {
   type ReportKpis,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
+import { kindLabel } from '@/lib/payments';
 import { fmtDate } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { rangePreset, type DateRange } from '@/lib/calendar';
@@ -68,8 +71,10 @@ import {
   money,
   shortMoney,
 } from './_components/fin-parts';
+import { CashByTechnician, CashReviewQueue, PaymentsReport } from './_components/CashPanels';
 
-type Tab = 'tx' | 'po' | 'wal' | 'mes';
+type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'rev' | 'cash' | 'svc';
+const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'rev', 'cash', 'svc'];
 type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
 const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
@@ -103,6 +108,7 @@ const techName = (id: string) =>
 interface TxRow {
   id: string;
   orderId: string;
+  kind: string;
   client: string;
   method: string;
   amount: number;
@@ -118,10 +124,16 @@ export default function FinanzasPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const canFinance = useAuth().can('finanzas');
+  const { can } = useAuth();
+  const canFinance = can('finanzas');
+  // Soporte también resuelve revisiones de efectivo (backend: soporte o finanzas).
+  const canCash = canFinance || can('soporte');
   const [range, setRange] = useState<NonNullable<DateRange>>(() => rangePreset('30d')!);
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
+  const period = useMemo(() => toPeriod(range), [range]);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const deepLinked = useRef(false);
   const [batchOpen, setBatchOpen] = useState(false);
   // GMV del periodo: una sola definición (RPC admin_report_kpis, la misma de
   // Reportes); los pagos del snapshot solo alimentan la gráfica por día.
@@ -129,7 +141,20 @@ export default function FinanzasPage() {
 
   useEffect(() => {
     void loadExtras();
+    // /finanzas?tab=rev|cash|svc (Dashboard y Notificaciones enlazan a la cola).
+    const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+    if (t && TABS.includes(t)) {
+      setTab(t);
+      deepLinked.current = true;
+    }
   }, []);
+  // Con ?tab= el contenido queda bajo los KPIs: llévalo a la vista al cargar.
+  useEffect(() => {
+    if (ready && deepLinked.current) {
+      deepLinked.current = false;
+      tabsRef.current?.scrollIntoView({ block: 'start' });
+    }
+  }, [ready]);
   useEffect(() => {
     let live = true;
     const b = rangeBuckets(range, new Date());
@@ -189,6 +214,7 @@ export default function FinanzasPage() {
           return {
             id: p.id,
             orderId: p.service_order_id,
+            kind: p.kind,
             client: o ? getProfile(o.client_id)?.full_name ?? 'Cliente' : 'Cliente',
             method: p.method,
             amount: p.amount_cents,
@@ -229,11 +255,21 @@ export default function FinanzasPage() {
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
   const labels = m.buckets.map(b => b.label);
 
-  if (!canFinance)
+  if (!canCash)
     return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed)
     return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
   if (!ready) return <ScreenSkeleton kind="dashboard" />;
+
+  if (!canFinance)
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader title="Revisión de efectivo" description="Efectivo que no cuadra entre el técnico y el cliente." />
+        <Card padded={false} className="overflow-hidden">
+          <CashReviewQueue canResolve />
+        </Card>
+      </div>
+    );
 
   const txCols: DataColumn<TxRow>[] = [
     { key: 'id', header: 'Pago', render: r => <span className="font-mono text-[12px] text-muted">PAY-{orderCode(r.orderId).slice(4)}</span> },
@@ -242,6 +278,12 @@ export default function FinanzasPage() {
       header: 'Servicio',
       sortValue: r => orderCode(r.orderId),
       render: r => <span className="font-mono text-[12.5px] font-semibold text-primary">{orderCode(r.orderId)}</span>,
+    },
+    {
+      key: 'kind',
+      header: 'Concepto',
+      sortValue: r => r.kind,
+      render: r => <span className="font-sans text-[12.5px] text-body">{kindLabel(r.kind)}</span>,
     },
     { key: 'client', header: 'Cliente', sortValue: r => r.client, render: r => <span className="font-sans text-[13px] text-navy">{r.client}</span> },
     {
@@ -277,6 +319,7 @@ export default function FinanzasPage() {
       txRows.map(t => ({
         Pago: t.id,
         Servicio: orderCode(t.orderId),
+        Concepto: kindLabel(t.kind),
         Cliente: t.client,
         Método: methodMeta(t.method).label,
         Monto: t.amount / 100,
@@ -319,7 +362,7 @@ export default function FinanzasPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Finanzas"
-        description="Cobros con tarjeta (Stripe) y efectivo, comisión de plataforma y retiros a técnicos."
+        description="Tarifa base con tarjeta (Stripe), presupuestos en efectivo, comisión de plataforma y retiros a técnicos."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <PeriodFilters value={range} onChange={setRange} kicker="Finanzas">
@@ -373,6 +416,7 @@ export default function FinanzasPage() {
         </Card>
       </div>
 
+      <div ref={tabsRef} className="scroll-mt-4">
       <Card padded={false} className="overflow-hidden">
         <div className="border-b border-line px-5 pt-3">
           <Tabs
@@ -381,6 +425,9 @@ export default function FinanzasPage() {
               { value: 'po', label: 'Retiros', count: pendingPO.length + heldPO.length },
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
+              { value: 'rev', label: 'Revisión de efectivo', count: getCashReviewOrders().length },
+              { value: 'cash', label: 'Efectivo por técnico' },
+              { value: 'svc', label: 'Pagos por servicio' },
             ]}
             value={tab}
             onChange={setTab}
@@ -530,6 +577,10 @@ export default function FinanzasPage() {
           </div>
         )}
 
+        {tab === 'rev' && <CashReviewQueue canResolve />}
+        {tab === 'cash' && <CashByTechnician from={period.from} to={period.to} label={periodLabel(range)} />}
+        {tab === 'svc' && <PaymentsReport from={period.from} to={period.to} label={periodLabel(range)} />}
+
         {tab === 'mes' && (
           <div className="p-5">
             <div className="flex flex-col gap-3">
@@ -557,6 +608,7 @@ export default function FinanzasPage() {
           </div>
         )}
       </Card>
+      </div>
 
       <Modal
         open={batchOpen}

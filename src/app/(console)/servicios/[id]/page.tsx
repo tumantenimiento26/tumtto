@@ -59,6 +59,7 @@ import {
   getCategories,
   getNotes,
   getOrderEvents,
+  getOrderPayments,
   getPayment,
   getProfile,
   getQuote,
@@ -73,7 +74,6 @@ import {
   assignOrder,
   rejectRequest,
   refundPayment,
-  refundableCents,
   sendMessage,
   setStatus,
   useTick,
@@ -97,6 +97,8 @@ import {
   timeAgo,
 } from '../_components/shared';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
+import { PaymentBreakdown } from '../_components/PaymentBreakdown';
+import { paymentLabel, refundablePayments, type PayRow } from '@/lib/payments';
 import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
 import { includedSurchargeCents, isEmergency, surchargeLabel } from '@/lib/emergency';
 
@@ -266,8 +268,9 @@ export default function ServicioDetailPage() {
     totalCents != null && commissionCents != null
       ? totalCents - commissionCents
       : null;
-  const refundable = payment?.status === 'paid' && refundableCents(payment) > 0;
-  const refundMax = payment ? refundableCents(payment) : 0;
+  const refundOptions = refundablePayments(getOrderPayments(req.id));
+  const refundable = refundOptions.length > 0;
+  const refundedAny = getOrderPayments(req.id).some(p => p.status === 'refunded');
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
 
   const address = [req.address_line, req.neighborhood, req.municipality].filter(Boolean).join(', ');
@@ -741,6 +744,9 @@ export default function ServicioDetailPage() {
             )}
           </Card>
 
+          {req.payment_model === 'base_cash' ? (
+            <PaymentBreakdown order={req} />
+          ) : (
           <Card padded>
             <Kicker className="mb-3">Cobro y comisión</Kicker>
             <dl className="flex flex-col gap-2 text-[13.5px]">
@@ -771,6 +777,7 @@ export default function ServicioDetailPage() {
               )}
             </div>
           </Card>
+          )}
 
           <Card padded>
             <Kicker className="mb-3">Acciones del admin</Kicker>
@@ -795,13 +802,13 @@ export default function ServicioDetailPage() {
                     ? 'Solo finanzas emite reembolsos'
                     : refundable
                       ? 'Devuelve el cobro al cliente'
-                      : payment?.status === 'refunded'
+                      : refundedAny
                         ? 'Este pago ya fue reembolsado'
                         : 'No hay un pago cobrado que reembolsar'
                 }
                 onClick={() => setRefundOpen(true)}
               >
-                {payment?.status === 'refunded' ? 'Reembolso emitido' : 'Reembolsar'}
+                {!refundable && refundedAny ? 'Reembolso emitido' : 'Reembolsar'}
               </Button>
               <Button
                 variant="destructive"
@@ -920,12 +927,12 @@ export default function ServicioDetailPage() {
       <RefundModal
         open={refundOpen}
         onClose={() => setRefundOpen(false)}
-        maxCents={refundMax}
+        payments={refundOptions}
         busy={busy === 'refund'}
-        onConfirm={async (reason, amountCents) => {
+        onConfirm={async (paymentId, reason, amountCents) => {
           const ok = await run(
             'refund',
-            () => refundPayment(req.id, reason || undefined, amountCents),
+            () => refundPayment(req.id, reason || undefined, amountCents, paymentId),
             `Reembolso emitido · ${money(amountCents, true)}`,
           );
           if (ok) setRefundOpen(false);
@@ -957,28 +964,36 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 function RefundModal({
   open,
   onClose,
-  maxCents,
+  payments,
   busy,
   onConfirm,
 }: {
   open: boolean;
   onClose: () => void;
-  maxCents: number;
+  /** Pagos cobrados con saldo por devolver (tarifa base, presupuesto, legado). */
+  payments: PayRow[];
   busy: boolean;
-  onConfirm: (reason: string, amountCents: number) => void;
+  onConfirm: (paymentId: string, reason: string, amountCents: number) => void;
 }) {
+  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const pay = payments.find(p => p.id === paymentId) ?? payments[0] ?? null;
+  const maxCents = pay ? pay.amount_cents - pay.refunded_cents : 0;
   useEffect(() => {
     if (open) {
-      setAmount(String(maxCents / 100));
+      setPaymentId(null);
       setReason('');
     }
-  }, [open, maxCents]);
+  }, [open]);
+  useEffect(() => {
+    if (open) setAmount(String(maxCents / 100));
+  }, [open, maxCents, pay?.id]);
   const pesos = Number(amount.replace(/[^\d.]/g, ''));
   const cents = Number.isFinite(pesos) ? Math.round(pesos * 100) : 0;
-  const invalid = cents < 1 || cents > maxCents;
+  const invalid = !pay || cents < 1 || cents > maxCents;
   const partial = !invalid && cents < maxCents;
+  const isBase = pay?.kind === 'base_fee';
 
   return (
     <Modal
@@ -988,7 +1003,11 @@ function RefundModal({
       title="Reembolsar"
       icon={RotateCcw}
       tone="danger"
-      description="El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible."
+      description={
+        isBase
+          ? 'La tarifa base regresa a la tarjeta del cliente. El servicio no se cancela y se reajusta el saldo del técnico. No es reversible.'
+          : 'El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible.'
+      }
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -998,7 +1017,7 @@ function RefundModal({
             variant="destructive"
             loading={busy}
             disabled={invalid}
-            onClick={() => onConfirm(reason.trim(), cents)}
+            onClick={() => pay && onConfirm(pay.id, reason.trim(), cents)}
           >
             Reembolsar {invalid ? '' : money(cents, true)}
           </Button>
@@ -1006,6 +1025,20 @@ function RefundModal({
       }
     >
       <div className="flex flex-col gap-3">
+        {payments.length > 1 && (
+          <Select
+            aria-label="Pago a reembolsar"
+            options={payments.map(p => ({
+              value: p.id,
+              label: `${paymentLabel(p)} · ${money(p.amount_cents - p.refunded_cents, true)}`,
+            }))}
+            value={pay?.id ?? null}
+            onChange={v => setPaymentId(v)}
+          />
+        )}
+        {payments.length === 1 && pay && (
+          <p className="rounded-btn bg-panel px-3 py-2 text-[12.5px] text-body">{paymentLabel(pay)}</p>
+        )}
         <Input
           label="Monto"
           prefix="$"

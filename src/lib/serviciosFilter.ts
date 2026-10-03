@@ -107,6 +107,8 @@ export interface ServiceRow {
   zone: string;
   totalCents: number | null;
   method: string | null; // card | cash | …
+  /** Todos los métodos de la orden (tarifa base en tarjeta + presupuesto en efectivo). */
+  methods?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -175,7 +177,7 @@ export function filterServices(
     if (!opts.ignoreTab && !serviceTabOf(r, f.tab)) return false;
     if (f.categoryId && r.categoryId !== f.categoryId) return false;
     if (f.zones.length && !f.zones.includes(r.zone)) return false;
-    if (f.method && r.method !== f.method) return false;
+    if (f.method && !(r.methods ?? (r.method ? [r.method] : [])).includes(f.method)) return false;
     const pesos = r.totalCents == null ? null : r.totalCents / 100;
     if (f.minPesos != null && (pesos == null || pesos < f.minPesos))
       return false;

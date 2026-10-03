@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 import { needsManualAssignment } from '@/lib/emergency';
+import { awaitingBasePayment, isFailedCharge, reviewReason } from '@/lib/payments';
 import { ageLabel, inUnassignedInbox, isAdminRequest } from '@/lib/unassigned';
 import {
   getAllPayments,
@@ -111,16 +112,30 @@ export function derive(now = Date.now()): AdminNotification[] {
         ts: c.created_at,
         href: '/soporte?tab=contacto',
       });
-  for (const p of getAllPayments())
-    if (p.status === 'failed')
+  for (const p of getAllPayments()) {
+    if (isFailedCharge(p))
       out.push({
         id: `pay-${p.id}`,
         type: 'pagos',
-        title: 'Pago rechazado',
-        body: 'El cobro de una orden falló; revisa el método del cliente.',
+        title: p.kind === 'base_fee' ? 'Tarifa base rechazada' : 'Pago rechazado',
+        body:
+          p.kind === 'base_fee'
+            ? 'El cliente no pudo pagar la visita; puede reintentar o puedes exonerarla.'
+            : 'El cobro de una orden falló; revisa el método del cliente.',
         ts: p.updated_at ?? p.created_at,
         href: `/servicios/${p.service_order_id}`,
       });
+    // Backend: notificación a admins `cash_review_opened`.
+    if (p.kind === 'quote' && p.review_status === 'open')
+      out.push({
+        id: `cash-${p.id}`,
+        type: 'pagos',
+        title: 'Revisión de efectivo abierta',
+        body: reviewReason(p.review_reason),
+        ts: p.review_opened_at ?? p.updated_at ?? p.created_at,
+        href: '/finanzas?tab=rev',
+      });
+  }
   for (const o of getAllRequests())
     if (needsManualAssignment(o))
       out.push({
@@ -151,6 +166,7 @@ export function derive(now = Date.now()): AdminNotification[] {
     if (
       o.status === 'requested' &&
       o.priority !== 'emergency' &&
+      !awaitingBasePayment(o) &&
       !inUnassignedInbox(o) &&
       now - new Date(o.created_at).getTime() > STALE_REQUEST_MIN * 60_000
     )

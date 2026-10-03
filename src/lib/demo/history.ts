@@ -3,6 +3,7 @@
 // Determinista (semilla fija) para que cada recarga muestre lo mismo.
 import type { Database } from '@/types/supabase';
 import { demoInventory } from './inventory';
+import { paymentModelDemo } from './payments';
 import { TECH_USER_ID, type World, type OrderStatus } from './world';
 
 type Row<T extends keyof Database['public']['Tables']> =
@@ -793,7 +794,22 @@ export function withHistory(w: World): {
   });
 
   return {
-    world: { ...w, profiles, technicians, technicianCategories, orders, events, payments, ledger, disputes },
+    world: {
+      ...w,
+      profiles,
+      technicians,
+      technicianCategories,
+      ...paymentModelDemo(
+        { orders, events, payments, ledger },
+        {
+          clientIds,
+          techIds: [...new Set(CATS.flatMap(c => c[2]))],
+          catIds: CATS.map(c => c[0]),
+          now,
+        },
+      ),
+      disputes,
+    },
     ratings,
     payouts,
     zones,

@@ -14,6 +14,7 @@ import {
   ScreenSkeleton,
   toast,
   Chip,
+  Segmented,
   Select,
   PeriodFilters,
   periodLabel,
@@ -45,6 +46,7 @@ import {
   type Kpi,
 } from '@/lib/reportMetrics';
 import { TECH_TYPES, TECH_TYPE_LABEL, type TechType } from '@/lib/techType';
+import { METHOD_FILTER_OPTIONS, groupByOrder, orderHasMethod, type MethodFilter } from '@/lib/payments';
 import { Heatmap } from './_components/Heatmap';
 import { rangePreset, type DateRange } from '@/lib/calendar';
 
@@ -75,7 +77,10 @@ export default function ReportesPage() {
   useEffect(() => {
     void loadExtras();
   }, []);
-  const filtered = !!typeF;
+  // Forma de pago (tarjeta = tarifa base / pagos con tarjeta · efectivo = presupuestos): va al servidor
+  // como p_method y filtra también lo calculado en local.
+  const [payMethod, setPayMethod] = useState<MethodFilter>('all');
+  const filtered = !!typeF || payMethod !== 'all';
 
   const [rpc, setRpc] = useState<{
     kpis: ReportKpis | null;
@@ -88,8 +93,8 @@ export default function ReportesPage() {
     let live = true;
     setRpc(r => ({ ...r, loading: true }));
     void Promise.all([
-      fetchReportKpis(period.from, period.to),
-      fetchTicketByCategory(period.from, period.to),
+      fetchReportKpis(period.from, period.to, payMethod),
+      fetchTicketByCategory(period.from, period.to, payMethod),
       fetchColdZones(period.from, period.to),
     ]).then(([kpis, tickets, cold]) => {
       if (live) setRpc({ kpis, tickets, cold, loading: false });
@@ -97,15 +102,20 @@ export default function ReportesPage() {
     return () => {
       live = false;
     };
-  }, [period]);
+  }, [period, payMethod]);
 
   const all = getReportData();
   const technicians = all.technicians.filter(
     t => !typeF || (t.technician_type === typeF && (!companyF || t.company_id === companyF)),
   );
   const techIds = new Set(technicians.map(t => t.id));
+  const payByOrder = groupByOrder(all.payments);
   const orders = filtered
-    ? all.orders.filter(o => !!o.technician_id && techIds.has(o.technician_id))
+    ? all.orders.filter(
+        o =>
+          (!typeF || (!!o.technician_id && techIds.has(o.technician_id))) &&
+          orderHasMethod(payByOrder.get(o.id), payMethod),
+      )
     : all.orders;
   const orderIds = new Set(orders.map(o => o.id));
   const events = filtered ? all.events.filter(e => orderIds.has(e.service_order_id)) : all.events;
@@ -217,6 +227,20 @@ export default function ReportesPage() {
           <div className="flex flex-wrap items-center gap-2.5">
             <PeriodFilters value={range} onChange={setRange} kicker="Reportes">
               <section>
+                <Kicker className="mb-2.5">Forma de pago</Kicker>
+                <Segmented
+                  size="sm"
+                  aria-label="Forma de pago"
+                  options={METHOD_FILTER_OPTIONS}
+                  value={payMethod}
+                  onChange={setPayMethod}
+                />
+                <p className="mt-2 font-sans text-[12px] text-muted">
+                  Tarjeta: tarifa base en la app · Efectivo: presupuesto pagado al técnico. Un servicio con ambas
+                  aparece en los dos filtros; el GMV se reparte por método.
+                </p>
+              </section>
+              <section>
                 <Kicker className="mb-2.5">Tipo de técnico</Kicker>
                 <div className="flex flex-wrap gap-2">
                   <Chip
@@ -296,7 +320,14 @@ export default function ReportesPage() {
           loading={rpc.loading}
         />
       </div>
-      {filtered && (
+      {payMethod !== 'all' && (
+        <p className="-mt-3 font-sans text-[12px] text-muted">
+          Forma de pago: {METHOD_FILTER_OPTIONS.find(o => o.value === payMethod)?.label}. El GMV, los servicios
+          pagados, el ticket por categoría, las metas, el embudo, la demanda y el ranking se calculan solo con
+          los servicios que tienen un pago vigente con ese método.
+        </p>
+      )}
+      {typeF && (
         <p className="-mt-3 font-sans text-[12px] text-muted">
           Filtrado por{' '}
           {typeF === 'third_party' && companyF

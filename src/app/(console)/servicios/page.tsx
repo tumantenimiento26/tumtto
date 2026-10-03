@@ -113,9 +113,14 @@ export default function ServiciosPage() {
     [tick],
   );
   const rows: ServiceRow[] = useMemo(() => {
-    const payByOrder = new Map(
-      getAllPayments().map(p => [p.service_order_id, p]),
-    );
+    // Un pedido puede tener varios pagos (tarifa base en tarjeta + efectivo).
+    const methodsByOrder = new Map<string, string[]>();
+    for (const p of getAllPayments()) {
+      if (p.status === 'failed' || p.status === 'cancelled') continue;
+      const a = methodsByOrder.get(p.service_order_id) ?? [];
+      if (!a.includes(p.method)) a.push(p.method);
+      methodsByOrder.set(p.service_order_id, a);
+    }
     const catName = new Map(cats.map(c => [c.id, c.name]));
     return getAllRequests().map(r => ({
       id: r.id,
@@ -137,7 +142,8 @@ export default function ServiciosPage() {
         : null,
       zone: r.municipality ?? '—',
       totalCents: r.quoted_total_cents,
-      method: payByOrder.get(r.id)?.method ?? null,
+      method: methodsByOrder.get(r.id)?.[0] ?? null,
+      methods: methodsByOrder.get(r.id) ?? [],
       createdAt: r.created_at,
       updatedAt: r.updated_at,
     }));
@@ -170,7 +176,7 @@ export default function ServiciosPage() {
           Estado: STATUS[r.status].label,
           Emergencia: r.is_emergency ? 'Sí' : 'No',
           Disputa: r.is_disputed ? 'Sí' : 'No',
-          Método: r.method ? (METHOD_LABEL[r.method] ?? r.method) : '',
+          Método: (r.methods ?? []).map(m => METHOD_LABEL[m] ?? m).join(' + '),
           Total: r.totalCents != null ? r.totalCents / 100 : '',
           Creado: r.createdAt,
           Actualizado: r.updatedAt,

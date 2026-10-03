@@ -48,6 +48,7 @@ import {
   getAllRequests,
   getClients,
   getOpenSupportCount,
+  getCashReviewOrders,
   getPendingKyc,
   getProfile,
   getTechniciansWithProfile,
@@ -138,6 +139,8 @@ function useNavGroups(): NavGroup[] {
   const { unread } = useNotifications();
   const { can } = useAuth();
   const finanzas = can('finanzas');
+  // Soporte resuelve revisiones de efectivo sin ver todo Finanzas.
+  const efectivo = !finanzas && can('soporte');
   return [
     {
       label: 'General',
@@ -169,7 +172,8 @@ function useNavGroups(): NavGroup[] {
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
+        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas', badge: () => getCashReviewOrders().length }] : []),
+        ...(efectivo ? [{ href: '/finanzas', icon: Wallet, label: 'Efectivo', badge: () => getCashReviewOrders().length }] : []),
         {
           href: '/soporte',
           icon: Scale,

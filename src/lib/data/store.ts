@@ -8,6 +8,26 @@ import { distanceM, wkbPoint } from '@/lib/geo';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
 import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
+import {
+  applyCashResolution,
+  buildPaymentSummary,
+  cashByTechnician,
+  cashReviews,
+  groupByOrder,
+  kpiWindow,
+  parsePaymentSummary,
+  paymentsReport,
+  quotePayment,
+  ticketByCategory,
+  validateResolution,
+  type CashReviewRow,
+  type CashTechRow,
+  type MethodFilter,
+  type PaymentSummary,
+  type PaymentsReportFilters,
+  type PaymentsReportRow,
+  type ReviewOutcome,
+} from '@/lib/payments';
 import { rejectionNotes } from '@/lib/clientDocs';
 import { typeChangeText, typeCompanyValid, type TechType } from '@/lib/techType';
 import { ratingNoteRequired, ratingReasonLabel, type RatingReason } from '@/lib/ratingModeration';
@@ -521,8 +541,18 @@ export const getQuote = (orderId: string) =>
   w().quotes.find(q => q.service_order_id === orderId) ?? null;
 export const getQuoteItems = (quoteId: string) =>
   w().quoteItems.filter(i => i.quote_id === quoteId);
-export const getPayment = (orderId: string) =>
-  w().payments.find(p => p.service_order_id === orderId) ?? null;
+/** Todos los pagos de una orden (tarifa base, presupuesto en efectivo o legado). */
+export const getOrderPayments = (orderId: string) =>
+  w().payments.filter(p => p.service_order_id === orderId);
+/** Pago principal: el del presupuesto/legado; si aún no existe, el de la tarifa base. */
+export const getPayment = (orderId: string) => {
+  const all = getOrderPayments(orderId);
+  return quotePayment(all) ?? all[0] ?? null;
+};
+/** Pago del presupuesto (efectivo) o legado de una orden. */
+export const quotePaymentOf = (orderId: string) => quotePayment(getOrderPayments(orderId));
+/** Órdenes con una revisión de efectivo abierta (cola de soporte/finanzas). */
+export const getCashReviewOrders = () => w().orders.filter(o => o.cash_review_open);
 
 export const getPendingKyc = () =>
   w().technicians.filter(
@@ -1050,13 +1080,39 @@ export async function refundPayment(
   orderId: string,
   reason?: string,
   amountCents?: number,
+  paymentId?: string,
 ) {
-  const pay = getPayment(orderId);
-  if (!pay || pay.status !== 'paid') return null;
+  // Con varios pagos (tarifa base + efectivo) el admin elige cuál; por omisión
+  // el principal. El backend usa el mismo `payment_id`.
+  const pay = paymentId ? w().payments.find(p => p.id === paymentId) : getPayment(orderId);
+  if (!pay || pay.service_order_id !== orderId || pay.status !== 'paid') return null;
   const max = refundableCents(pay);
   if (amountCents != null && (amountCents < 1 || amountCents > max)) {
     notifyError('El monto a reembolsar excede lo que queda por reembolsar.');
     return null;
+  }
+  if (MOCK) {
+    const now = new Date().toISOString();
+    const cents = amountCents ?? max;
+    const total = pay.refunded_cents + cents >= pay.amount_cents;
+    const k = w().payments.findIndex(p => p.id === pay.id);
+    w().payments[k] = {
+      ...pay,
+      refunded_cents: pay.refunded_cents + cents,
+      status: total ? 'refunded' : pay.status,
+      updated_at: now,
+    };
+    const i = w().orders.findIndex(o => o.id === orderId);
+    const o = w().orders[i];
+    if (o && total) {
+      // La tarifa base reembolsada no cancela el servicio; el resto sí (como el backend).
+      w().orders[i] =
+        pay.kind === 'base_fee'
+          ? { ...o, base_fee_status: 'refunded', base_fee_refunded_at: now, updated_at: now }
+          : { ...o, status: 'cancelled', cancelled_at: now, cancellation_reason: reason ?? 'Reembolso total', updated_at: now };
+    }
+    bump();
+    return w().payments[k];
   }
   return mutate(async () => {
     const { data, error } = await supabase.functions.invoke(
@@ -1065,6 +1121,7 @@ export async function refundPayment(
         body: {
           service_order_id: orderId,
           reason,
+          payment_id: pay.id,
           // Omitido = todo lo que queda; parcial = acumula en refunded_cents.
           ...(amountCents != null && amountCents < max ? { amount_cents: amountCents } : {}),
         },
@@ -1579,6 +1636,7 @@ export const getCatalogData = () => ({
 /** Órdenes, eventos y técnicos para Reportes (se filtran por periodo en lib). */
 export const getReportData = () => ({
   orders: w().orders,
+  payments: w().payments,
   events: w().events,
   technicians: w().technicians,
 });
@@ -1594,15 +1652,20 @@ async function reportRpc<F extends ReportFn>(
   fn: F,
   from: Date,
   to: Date,
+  method: MethodFilter = 'all',
 ): Promise<Fn[F]['Returns'] | null> {
   if (MOCK) {
     await loadWorld(); // el reporte puede pedirse antes de que cargue el snapshot
-    return mockReport(fn, from, to) as Fn[F]['Returns'] | null;
+    return mockReport(fn, from, to, method) as Fn[F]['Returns'] | null;
   }
   try {
+    // p_method solo existe en kpis / ticket por categoría (null = todas).
+    const withMethod =
+      method !== 'all' && (fn === 'admin_report_kpis' || fn === 'admin_report_ticket_by_category');
     const { data, error } = await supabase.rpc(fn, {
       p_from: from.toISOString(),
       p_to: to.toISOString(),
+      ...(withMethod ? { p_method: method } : {}),
     });
     if (error) {
       console.warn('[data]', fn, error);
@@ -1615,23 +1678,28 @@ async function reportRpc<F extends ReportFn>(
   }
 }
 /** Modo maqueta: los RPC de reportes calculados sobre el snapshot local. */
-function mockReport(fn: ReportFn, from: Date, to: Date) {
+function mockReport(fn: ReportFn, from: Date, to: Date, method: MethodFilter) {
   const span = to.getTime() - from.getTime();
+  const byOrder = groupByOrder(w().payments);
   const kpis = (a: number, b: number) => {
-    const paid = w().orders.filter(o => {
-      const t = o.paid_at ? Date.parse(o.paid_at) : NaN;
-      return t >= a && t < b;
-    });
-    const arrivals = paid.flatMap(o => {
-      const ev = (st: string) => w().events.find(e => e.service_order_id === o.id && e.to_status === st);
-      const acc = ev('accepted');
-      const ons = ev('onsite');
-      return acc && ons ? [(Date.parse(ons.created_at) - Date.parse(acc.created_at)) / 1000] : [];
-    });
+    const k = kpiWindow(w().orders, byOrder, a, b, method);
+    const arrivals = w()
+      .orders.filter(
+        o =>
+          ['paid', 'closed'].includes(o.status) &&
+          o.paid_at &&
+          Date.parse(o.paid_at) >= a &&
+          Date.parse(o.paid_at) < b &&
+          kpiWindow([o], byOrder, a, b, method).paid_orders > 0,
+      )
+      .flatMap(o => {
+        const ev = (st: string) => w().events.find(e => e.service_order_id === o.id && e.to_status === st);
+        const acc = ev('accepted');
+        const ons = ev('onsite');
+        return acc && ons ? [(Date.parse(ons.created_at) - Date.parse(acc.created_at)) / 1000] : [];
+      });
     return {
-      orders: w().orders.filter(o => Date.parse(o.created_at) >= a && Date.parse(o.created_at) < b).length,
-      paid_orders: paid.length,
-      gmv_cents: paid.reduce((s, o) => s + (o.quoted_total_cents ?? 0), 0),
+      ...k,
       avg_arrival_seconds: arrivals.length ? arrivals.reduce((s, x) => s + x, 0) / arrivals.length : 0,
     };
   };
@@ -1641,17 +1709,7 @@ function mockReport(fn: ReportFn, from: Date, to: Date) {
       previous: kpis(from.getTime() - span, from.getTime()),
     };
   if (fn === 'admin_report_ticket_by_category')
-    return w().categories.map(c => {
-      const paid = w().orders.filter(
-        o => o.category_id === c.id && o.paid_at && Date.parse(o.paid_at) >= from.getTime() && Date.parse(o.paid_at) < to.getTime(),
-      );
-      return {
-        category_id: c.id,
-        category_name: c.name,
-        paid_orders: paid.length,
-        avg_ticket_cents: paid.length ? Math.round(paid.reduce((s, o) => s + (o.quoted_total_cents ?? 0), 0) / paid.length) : 0,
-      };
-    });
+    return ticketByCategory(w().orders, byOrder, w().categories, from.getTime(), to.getTime(), method);
   if (fn === 'admin_report_cold_zones') return [];
   return null; // heatmap: la pantalla cae al cálculo desde el snapshot.
 }
@@ -1670,12 +1728,203 @@ export type ReportKpis = {
   };
 };
 /** admin_report_kpis devuelve jsonb: su forma es la de ReportKpis. */
-export const fetchReportKpis = async (from: Date, to: Date) =>
-  (await reportRpc('admin_report_kpis', from, to)) as ReportKpis | null;
-export const fetchTicketByCategory = (from: Date, to: Date) =>
-  reportRpc('admin_report_ticket_by_category', from, to);
+export const fetchReportKpis = async (from: Date, to: Date, method: MethodFilter = 'all') =>
+  (await reportRpc('admin_report_kpis', from, to, method)) as ReportKpis | null;
+export const fetchTicketByCategory = (from: Date, to: Date, method: MethodFilter = 'all') =>
+  reportRpc('admin_report_ticket_by_category', from, to, method);
 export const fetchColdZones = (from: Date, to: Date) =>
   reportRpc('admin_report_cold_zones', from, to);
+
+// ── Pagos: tarifa base + efectivo ────────────────────────────────────────────
+const personOrNull = (id: string | null) =>
+  (id && (getProfile(id)?.full_name ?? getTechByUser(id)?.display_name)) || null;
+
+/**
+ * «Formas de pago» de una orden (RPC get_order_payment_summary). Si el RPC
+ * falla (o en maqueta) se calcula con la orden y sus pagos del snapshot.
+ */
+export async function fetchOrderPaymentSummary(orderId: string): Promise<PaymentSummary | null> {
+  const local = () => {
+    const o = getRequest(orderId);
+    return o ? buildPaymentSummary(o, getOrderPayments(orderId)) : null;
+  };
+  if (MOCK) return local();
+  try {
+    const { data, error } = await supabase.rpc('get_order_payment_summary', { p_order_id: orderId });
+    if (error) throw error;
+    return parsePaymentSummary(data) ?? local();
+  } catch (e) {
+    console.warn('[data] get_order_payment_summary', e);
+    return local();
+  }
+}
+
+/** Cola «Revisión de efectivo» (RPC admin_list_cash_reviews). null = no disponible. */
+export async function fetchCashReviews(): Promise<CashReviewRow[] | null> {
+  if (MOCK) {
+    await loadWorld();
+    return cashReviews(w().orders, groupByOrder(w().payments), personOrNull);
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_list_cash_reviews');
+    if (error) throw error;
+    return data ?? [];
+  } catch (e) {
+    console.warn('[data] admin_list_cash_reviews', e);
+    return null;
+  }
+}
+
+/** Reporte «Efectivo por técnico» (finanzas). null = no disponible. */
+export async function fetchCashByTechnician(from: Date, to: Date): Promise<CashTechRow[] | null> {
+  if (MOCK) {
+    await loadWorld();
+    return cashByTechnician(w().payments, from.getTime(), to.getTime(), personOrNull);
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_report_cash_by_technician', {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+    });
+    if (error) throw error;
+    return data ?? [];
+  } catch (e) {
+    console.warn('[data] admin_report_cash_by_technician', e);
+    return null;
+  }
+}
+
+/** Reporte de pagos por servicio, paginado (`total` = total_count del servidor). */
+export async function fetchPaymentsReport(
+  from: Date,
+  to: Date,
+  f: PaymentsReportFilters,
+  page: number,
+  pageSize: number,
+): Promise<{ rows: PaymentsReportRow[]; total: number } | null> {
+  if (MOCK) {
+    await loadWorld();
+    const all = paymentsReport(
+      w().orders,
+      groupByOrder(w().payments),
+      { category: id => w().categories.find(c => c.id === id)?.name ?? 'Servicio', person: personOrNull },
+      from.getTime(),
+      to.getTime(),
+      f,
+      pageSize,
+      page * pageSize,
+    );
+    return { rows: all, total: all[0]?.total_count ?? 0 };
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_report_payments', {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+      p_only_review: f.onlyReview,
+      p_limit: pageSize,
+      p_offset: page * pageSize,
+      ...(f.method !== 'all' ? { p_method: f.method } : {}),
+      ...(f.cashStatus ? { p_cash_status: f.cashStatus } : {}),
+    });
+    if (error) throw error;
+    const rows = data ?? [];
+    return { rows, total: Number(rows[0]?.total_count ?? 0) };
+  } catch (e) {
+    console.warn('[data] admin_report_payments', e);
+    return null;
+  }
+}
+
+/** Exonera la tarifa base de una solicitud sin pagar (soporte; abre el despacho). */
+export async function waiveBaseFee(orderId: string, reason: string) {
+  const text = reason.trim();
+  if (!text) {
+    notifyError('Escribe el motivo de la exoneración.');
+    return null;
+  }
+  if (MOCK) {
+    const i = w().orders.findIndex(o => o.id === orderId);
+    const o = w().orders[i];
+    if (!o || o.status !== 'requested' || !['pending', 'failed'].includes(o.base_fee_status)) {
+      notifyError('La orden no tiene una visita pendiente de pago.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    w().orders[i] = {
+      ...o,
+      base_fee_status: 'waived',
+      dispatch_status: o.dispatch_status === 'awaiting_payment' ? 'searching' : o.dispatch_status,
+      updated_at: now,
+    };
+    w().payments.forEach((p, k) => {
+      if (p.service_order_id === orderId && p.kind === 'base_fee' && ['pending', 'failed'].includes(p.status))
+        w().payments[k] = { ...p, status: 'cancelled', updated_at: now };
+    });
+    bump();
+    return true as const;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_waive_base_fee', { p_order_id: orderId, p_reason: text });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo exonerar la tarifa base.'),
+  );
+}
+
+/**
+ * Resuelve una revisión de efectivo (soporte o finanzas): confirmar lo del
+ * técnico, ajustar el monto o «no se cobró» (el técnico asume el faltante).
+ */
+export async function resolveCashReview(
+  orderId: string,
+  outcome: ReviewOutcome,
+  notes: string,
+  receivedCents: number | null = null,
+) {
+  const problem = validateResolution({ outcome, notes, amountCents: receivedCents });
+  if (problem) {
+    notifyError(problem);
+    return null;
+  }
+  if (MOCK) {
+    const i = w().orders.findIndex(o => o.id === orderId);
+    const pi = w().payments.findIndex(
+      p => p.service_order_id === orderId && p.kind === 'quote' && p.review_status === 'open',
+    );
+    if (i < 0 || pi < 0) {
+      notifyError('La orden no tiene una revisión de efectivo abierta.');
+      return null;
+    }
+    const r = applyCashResolution(
+      w().orders[i],
+      w().payments[pi],
+      outcome,
+      notes,
+      receivedCents,
+      new Date().toISOString(),
+      MOCK_ADMIN_ID,
+    );
+    w().orders[i] = r.order;
+    w().payments[pi] = r.payment;
+    bump();
+    return r.payment;
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_resolve_cash_review', {
+        p_order_id: orderId,
+        p_outcome: outcome,
+        p_notes: notes.trim(),
+        ...(outcome === 'adjust_amount' && receivedCents != null ? { p_received_cents: receivedCents } : {}),
+      });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo resolver la revisión de efectivo.'),
+  );
+}
 
 /**
  * ¿La sesión actual tiene un factor TOTP verificado? Supabase solo expone los

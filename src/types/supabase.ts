@@ -821,6 +821,23 @@ export type Database = {
           cash_debt_recovered_cents: number
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_received_cents: number | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_reported_cents: number | null
+          kind: string
+          refund_reason: string | null
+          refund_requested_at: string | null
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          tech_credit_cents: number
           client_id: string
           commission_cents: number
           created_at: string
@@ -854,6 +871,23 @@ export type Database = {
           cash_debt_recovered_cents?: number
           cash_reported_at?: string | null
           cash_reported_by?: string | null
+          cash_received_cents?: number | null
+          cash_status?: string | null
+          client_cash_responded_at?: string | null
+          client_cash_response?: string | null
+          client_dispute_reason?: string | null
+          client_reported_cents?: number | null
+          kind?: string
+          refund_reason?: string | null
+          refund_requested_at?: string | null
+          review_notes?: string | null
+          review_opened_at?: string | null
+          review_outcome?: string | null
+          review_reason?: string | null
+          review_resolved_at?: string | null
+          review_resolved_by?: string | null
+          review_status?: string | null
+          tech_credit_cents?: number
           client_id: string
           commission_cents?: number
           created_at?: string
@@ -887,6 +921,23 @@ export type Database = {
           cash_debt_recovered_cents?: number
           cash_reported_at?: string | null
           cash_reported_by?: string | null
+          cash_received_cents?: number | null
+          cash_status?: string | null
+          client_cash_responded_at?: string | null
+          client_cash_response?: string | null
+          client_dispute_reason?: string | null
+          client_reported_cents?: number | null
+          kind?: string
+          refund_reason?: string | null
+          refund_requested_at?: string | null
+          review_notes?: string | null
+          review_opened_at?: string | null
+          review_outcome?: string | null
+          review_reason?: string | null
+          review_resolved_at?: string | null
+          review_resolved_by?: string | null
+          review_status?: string | null
+          tech_credit_cents?: number
           client_id?: string
           commission_cents?: number
           created_at?: string
@@ -1397,6 +1448,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -1447,6 +1507,14 @@ export type Database = {
           technician_id?: string | null
           title?: string | null
           updated_at?: string
+          base_fee_cents?: number
+          base_fee_credited_at?: string | null
+          base_fee_paid_at?: string | null
+          base_fee_refunded_at?: string | null
+          base_fee_status?: string
+          base_surcharge_cents?: number
+          cash_review_open?: boolean
+          payment_model?: string
           assignment_mode?: string
           schedule_surcharge_bps?: number
           unassigned_alerted_at?: string | null
@@ -1497,6 +1565,14 @@ export type Database = {
           technician_id?: string | null
           title?: string | null
           updated_at?: string
+          base_fee_cents?: number
+          base_fee_credited_at?: string | null
+          base_fee_paid_at?: string | null
+          base_fee_refunded_at?: string | null
+          base_fee_status?: string
+          base_surcharge_cents?: number
+          cash_review_open?: boolean
+          payment_model?: string
           assignment_mode?: string
           schedule_surcharge_bps?: number
           unassigned_alerted_at?: string | null
@@ -2734,6 +2810,103 @@ export type Database = {
         Args: { p_note?: string; p_order_id: string; p_technician_id: string }
         Returns: Database["public"]["Tables"]["service_orders"]["Row"]
       }
+      admin_waive_base_fee: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      admin_resolve_cash_review: {
+        Args: {
+          p_notes?: string
+          p_order_id: string
+          p_outcome: string
+          p_received_cents?: number
+        }
+        Returns: Database["public"]["Tables"]["payments"]["Row"]
+      }
+      admin_list_cash_reviews: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          client_dispute_reason: string | null
+          client_id: string | null
+          client_name: string | null
+          client_reported_cents: number | null
+          expected_cents: number | null
+          folio: number
+          order_id: string
+          payment_id: string
+          received_cents: number | null
+          review_opened_at: string | null
+          review_reason: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          technician_name: string | null
+        }[]
+      }
+      admin_report_payments: {
+        Args: {
+          p_cash_status?: string
+          p_from: string
+          p_limit?: number
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_offset?: number
+          p_only_review?: boolean
+          p_to: string
+        }
+        Returns: {
+          base_fee_cents: number
+          base_fee_status: string
+          base_method: string | null
+          base_refunded_cents: number
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_expected_cents: number | null
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_review_open: boolean
+          cash_status: string | null
+          category_name: string
+          client_id: string
+          client_name: string | null
+          client_response: string | null
+          commission_cents: number
+          created_at: string
+          folio: number
+          order_id: string
+          payment_model: string
+          quote_method: string | null
+          quote_total_cents: number | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          technician_name: string | null
+          total_count: number
+          total_cents: number
+        }[]
+      }
+      admin_report_cash_by_technician: {
+        Args: { p_from: string; p_technician_id?: string; p_to: string }
+        Returns: {
+          cash_awaiting_client_cents: number
+          cash_client_confirmed_cents: number
+          cash_disputed_cents: number
+          cash_expected_cents: number
+          cash_reported_cents: number
+          commission_generated_cents: number
+          commission_pending_cents: number
+          commission_recovered_cents: number
+          reviews_open: number
+          services_count: number
+          technician_id: string
+          technician_name: string | null
+        }[]
+      }
+      get_order_payment_summary: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      get_technician_cash_summary: {
+        Args: { p_technician_id?: string }
+        Returns: Json
+      }
       admin_reject_request: {
         Args: { p_order_id: string; p_reason: string }
         Returns: Database["public"]["Tables"]["service_orders"]["Row"]
@@ -2937,6 +3110,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -2987,6 +3169,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -3075,6 +3266,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -3091,6 +3291,7 @@ export type Database = {
         Args: {
           p_amount_cents?: number
           p_order_id: string
+          p_payment_id?: string
           p_reason?: string
           p_stripe_refund_id?: string
         }
@@ -3101,6 +3302,23 @@ export type Database = {
           cash_debt_recovered_cents: number
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_received_cents: number | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_reported_cents: number | null
+          kind: string
+          refund_reason: string | null
+          refund_requested_at: string | null
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          tech_credit_cents: number
           client_id: string
           commission_cents: number
           created_at: string
@@ -3151,11 +3369,19 @@ export type Database = {
         }[]
       }
       admin_report_kpis: {
-        Args: { p_from: string; p_to: string }
+        Args: {
+          p_from: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_to: string
+        }
         Returns: Json
       }
       admin_report_ticket_by_category: {
-        Args: { p_from: string; p_to: string }
+        Args: {
+          p_from: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_to: string
+        }
         Returns: {
           avg_ticket_cents: number
           category_id: string
@@ -3515,6 +3741,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -3540,6 +3775,23 @@ export type Database = {
           cash_debt_recovered_cents: number
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_received_cents: number | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_reported_cents: number | null
+          kind: string
+          refund_reason: string | null
+          refund_requested_at: string | null
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          tech_credit_cents: number
           client_id: string
           commission_cents: number
           created_at: string
@@ -3783,6 +4035,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null
@@ -3804,6 +4065,23 @@ export type Database = {
           cash_debt_recovered_cents: number
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_received_cents: number | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_reported_cents: number | null
+          kind: string
+          refund_reason: string | null
+          refund_requested_at: string | null
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          tech_credit_cents: number
           client_id: string
           commission_cents: number
           created_at: string
@@ -4049,6 +4327,15 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_review_open: boolean
+          payment_model: string
           assignment_mode: string
           schedule_surcharge_bps: number
           unassigned_alerted_at: string | null

@@ -39,7 +39,7 @@ import {
   getCategories,
   getClientRequests,
   getNotes,
-  getPayment,
+  getOrderPayments,
   getProfile,
   loadExtras,
   loadWorld,
@@ -52,12 +52,12 @@ import {
   useWorldReady,
 } from '@/lib/data/store';
 import type { Payment, ServiceRequest } from '@/lib/demo/world';
+import { paymentLabel } from '@/lib/payments';
 import { orderCode } from '@/lib/orderCode';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
   CategoryTile,
-  METHOD_LABEL,
   STATUS,
   money,
   timeAgo,
@@ -118,7 +118,7 @@ export default function ClientDetailPage() {
   const cats = getCategories();
   const catOf = (cid: string) => cats.find(c => c.id === cid);
   const payments = requests
-    .map(r => ({ req: r, pay: getPayment(r.id) }))
+    .flatMap(r => getOrderPayments(r.id).map(pay => ({ req: r, pay })))
     .filter((x): x is { req: ServiceRequest; pay: Payment } => x.pay != null);
   const disputes = getAllDisputes().filter(
     d => d.opened_by === id || requests.some(r => r.id === d.service_order_id),
@@ -325,7 +325,7 @@ export default function ClientDetailPage() {
                   <li key={pay.id} className="flex items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="font-display text-[14px] font-bold text-navy">
-                        {METHOD_LABEL[pay.method] ?? pay.method}
+                        {paymentLabel(pay)}
                       </div>
                       <div className="font-mono text-[11.5px] text-muted">
                         {orderCode(req.id)} · {timeAgo(pay.paid_at ?? pay.created_at)}

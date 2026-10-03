@@ -133,6 +133,7 @@ export function emergencyPinRank(o: EmergencyOrderLike): number | null {
 }
 
 export const DISPATCH_LABEL: Record<string, string> = {
+  awaiting_payment: 'Esperando pago de tarifa base',
   searching: 'Buscando técnico',
   assigned: 'Asignada',
   timed_out: 'Sin técnico · asignación manual',

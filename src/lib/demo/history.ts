@@ -2,6 +2,7 @@
 // de servicios, pagos, eventos y calificaciones para que la analítica tenga forma.
 // Determinista (semilla fija) para que cada recarga muestre lo mismo.
 import type { Database } from '@/types/supabase';
+import { demoInventory } from './inventory';
 import { TECH_USER_ID, type World, type OrderStatus } from './world';
 
 type Row<T extends keyof Database['public']['Tables']> =
@@ -89,6 +90,9 @@ export function withHistory(w: World): {
   vehicles: Row<'technician_vehicles'>[];
   toolCatalog: Row<'tool_catalog'>[];
   techTools: Row<'technician_tools'>[];
+  companyTools: Row<'company_tools'>[];
+  toolAssignments: Row<'company_tool_assignments'>[];
+  inventoryEvents: Row<'admin_events'>[];
   dispatchLog: Row<'emergency_dispatch_log'>[];
 } {
   const r = rng(2026);
@@ -486,6 +490,11 @@ export function withHistory(w: World): {
   // Emergencias (reemplazan al «urgente»): varias ya asignadas con su historial de
   // despacho (rondas con radio creciente, técnicos notificados y tiempo de respuesta),
   // una buscando técnico y una en `timed_out` esperando asignación manual.
+  const inv = demoInventory(
+    now,
+    id => w.profiles.find(p => p.id === id)?.full_name ?? null,
+    name => toolCatalog.find(t => t.name === name)?.id ?? null,
+  );
   const dispatchLog: Row<'emergency_dispatch_log'>[] = [];
   const pool = Object.keys(BASES);
   const R0 = 3000;
@@ -794,6 +803,9 @@ export function withHistory(w: World): {
     vehicles,
     toolCatalog,
     techTools,
+    companyTools: inv.tools,
+    toolAssignments: inv.assignments,
+    inventoryEvents: inv.events,
     dispatchLog,
   };
 }

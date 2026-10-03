@@ -2173,6 +2173,144 @@ export type Database = {
           },
         ]
       }
+      company_tools: {
+        Row: {
+          acquired_on: string | null
+          acquisition_cost_cents: number | null
+          brand: string | null
+          catalog_id: string | null
+          category_id: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          photo_path: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_note: string | null
+          retired_reason: Database["public"]["Enums"]["inventory_retire_reason"] | null
+          serial_or_code: string
+          status: Database["public"]["Enums"]["inventory_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          acquisition_cost_cents?: number | null
+          brand?: string | null
+          catalog_id?: string | null
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name: string
+          photo_path?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_note?: string | null
+          retired_reason?: Database["public"]["Enums"]["inventory_retire_reason"] | null
+          serial_or_code: string
+          status?: Database["public"]["Enums"]["inventory_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          acquisition_cost_cents?: number | null
+          brand?: string | null
+          catalog_id?: string | null
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name?: string
+          photo_path?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_note?: string | null
+          retired_reason?: Database["public"]["Enums"]["inventory_retire_reason"] | null
+          serial_or_code?: string
+          status?: Database["public"]["Enums"]["inventory_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_tools_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "tool_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tools_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_tool_assignments: {
+        Row: {
+          assign_note: string | null
+          assigned_at: string
+          assigned_by: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at: string
+          id: string
+          return_note: string | null
+          returned_at: string | null
+          returned_by: string | null
+          returned_condition: Database["public"]["Enums"]["inventory_condition"] | null
+          technician_id: string
+          tool_id: string
+          updated_at: string
+        }
+        Insert: {
+          assign_note?: string | null
+          assigned_at: string
+          assigned_by?: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at?: string
+          id?: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          returned_condition?: Database["public"]["Enums"]["inventory_condition"] | null
+          technician_id: string
+          tool_id: string
+          updated_at?: string
+        }
+        Update: {
+          assign_note?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          assigned_condition?: Database["public"]["Enums"]["inventory_condition"]
+          created_at?: string
+          id?: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          returned_condition?: Database["public"]["Enums"]["inventory_condition"] | null
+          technician_id?: string
+          tool_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_tool_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tool_assignments_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "company_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_catalog: {
         Row: {
           category_id: string | null
@@ -2654,6 +2792,78 @@ export type Database = {
           plate: string
           technician_id: string
           year: number
+        }[]
+      }
+      admin_upsert_company_tool: {
+        Args: {
+          p_acquired_on?: string
+          p_acquisition_cost_cents?: number
+          p_brand?: string
+          p_catalog_id?: string
+          p_category_id?: string
+          p_id?: string
+          p_model?: string
+          p_name?: string
+          p_photo_path?: string
+          p_serial_or_code?: string
+        }
+        Returns: Database["public"]["Tables"]["company_tools"]["Row"]
+      }
+      admin_assign_company_tool: {
+        Args: {
+          p_assigned_at?: string
+          p_condition?: Database["public"]["Enums"]["inventory_condition"]
+          p_note?: string
+          p_technician_id: string
+          p_tool_id: string
+        }
+        Returns: Database["public"]["Tables"]["company_tool_assignments"]["Row"]
+      }
+      admin_return_company_tool: {
+        Args: {
+          p_condition?: Database["public"]["Enums"]["inventory_condition"]
+          p_note?: string
+          p_returned_at?: string
+          p_to_repair?: boolean
+          p_tool_id: string
+        }
+        Returns: Database["public"]["Tables"]["company_tool_assignments"]["Row"]
+      }
+      admin_set_company_tool_repair: {
+        Args: { p_in_repair: boolean; p_note?: string; p_tool_id: string }
+        Returns: Database["public"]["Tables"]["company_tools"]["Row"]
+      }
+      admin_retire_company_tool: {
+        Args: {
+          p_note?: string
+          p_reason: Database["public"]["Enums"]["inventory_retire_reason"]
+          p_tool_id: string
+        }
+        Returns: Database["public"]["Tables"]["company_tools"]["Row"]
+      }
+      admin_company_tools_by_technician: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          technician_id: string
+          technician_name: string
+          tools_count: number
+          total_value_cents: number
+          tools: Json
+        }[]
+      }
+      admin_company_tools_outstanding: {
+        Args: { p_older_than_days?: number }
+        Returns: {
+          acquisition_cost_cents: number | null
+          assigned_at: string
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          assignment_id: string
+          days_held: number
+          serial_or_code: string
+          technician_id: string
+          technician_name: string
+          tool_id: string
+          tool_name: string
         }[]
       }
       admin_custom_tools: {
@@ -3963,6 +4173,9 @@ export type Database = {
     }
     Enums: {
       client_document_kind: "proof_of_address"
+      inventory_condition: "new" | "good" | "fair" | "damaged"
+      inventory_retire_reason: "damage" | "loss" | "theft" | "end_of_life"
+      inventory_status: "available" | "assigned" | "in_repair" | "retired"
       contact_status: "new" | "handled" | "archived"
       contact_type: "client" | "company" | "technician" | "other"
       deletion_request_status:
@@ -4174,6 +4387,9 @@ export const Constants = {
   public: {
     Enums: {
       client_document_kind: ["proof_of_address"],
+      inventory_condition: ["new", "good", "fair", "damaged"],
+      inventory_retire_reason: ["damage", "loss", "theft", "end_of_life"],
+      inventory_status: ["available", "assigned", "in_repair", "retired"],
       contact_status: ["new", "handled", "archived"],
       contact_type: ["client", "company", "technician", "other"],
       deletion_request_status: [

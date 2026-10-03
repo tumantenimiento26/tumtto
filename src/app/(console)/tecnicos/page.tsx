@@ -43,6 +43,8 @@ import {
   getCompany,
   getAllVehicles,
   getAllTechTools,
+  getCompanyTools,
+  getAllToolAssignments,
   getCatalogTool,
   getTechMunicipality,
   loadExtras,
@@ -128,6 +130,9 @@ export default function TecnicosPage() {
     const orders = getAllRequests();
     const vehicles = getAllVehicles();
     const techTools = getAllTechTools();
+    // Herramienta de la empresa ligada al catálogo y hoy en manos del técnico.
+    const lent = new Map(getCompanyTools().map(t => [t.id, t.catalog_id]));
+    const held = getAllToolAssignments().filter(a => a.returned_at === null);
     return getTechniciansWithProfile().map(({ tech, profile }) => {
       const names = [
         ...new Set(
@@ -152,9 +157,14 @@ export default function TecnicosPage() {
         type: tech.technician_type,
         companyId: tech.company_id,
         plates: vehicles.filter(v => v.technician_id === tech.id).map(v => v.plate),
-        toolIds: techTools
-          .filter(t => t.technician_id === tech.id && t.catalog_id)
-          .map(t => t.catalog_id as string),
+        toolIds: [
+          ...techTools
+            .filter(t => t.technician_id === tech.id && t.catalog_id)
+            .map(t => t.catalog_id as string),
+          ...held
+            .filter(a => a.technician_id === tech.id && lent.get(a.tool_id))
+            .map(a => lent.get(a.tool_id) as string),
+        ],
       };
     });
     // `tick`/extras: el snapshot vive en el módulo del store.

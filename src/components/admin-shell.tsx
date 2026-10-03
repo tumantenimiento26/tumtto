@@ -35,6 +35,7 @@ import {
   Banknote,
   CreditCard,
   Info,
+  Package,
   type LucideIcon,
   Menu as MenuIcon,
 } from 'lucide-react';
@@ -166,6 +167,7 @@ function useNavGroups(): NavGroup[] {
       label: 'Operación',
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
+        { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
         ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
         {
@@ -201,6 +203,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/clientes': ['Usuarios', 'Clientes'],
   '/tecnicos': ['Usuarios', 'Técnicos'],
   '/servicios': ['Operación', 'Servicios'],
+  '/inventario': ['Operación', 'Inventario'],
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
   '/soporte': ['Operación', 'Soporte'],
@@ -211,6 +214,7 @@ const CRUMB: Record<string, [string, string]> = {
 };
 const DETAIL_TITLE: Record<string, string> = {
   '/servicios': 'Detalle de servicio',
+  '/inventario': 'Detalle de herramienta',
   '/clientes': 'Detalle de cliente',
   '/tecnicos': 'Detalle de técnico',
 };

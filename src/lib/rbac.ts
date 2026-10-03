@@ -2,7 +2,7 @@
 // `app_metadata.admin_role`; si falta (admins anteriores) se trata como
 // super_admin. El backend aplica el mismo mapa en app.has_permission().
 export type AdminRole = 'super_admin' | 'soporte' | 'onboarding' | 'legal';
-export type Permission = 'finanzas' | 'kyc' | 'soporte' | 'usuarios' | 'calificaciones';
+export type Permission = 'finanzas' | 'kyc' | 'soporte' | 'usuarios' | 'calificaciones' | 'inventario';
 
 export const ADMIN_ROLES: { value: AdminRole; label: string; desc: string }[] = [
   { value: 'super_admin', label: 'Super admin', desc: 'Acceso total: finanzas, configuración y equipo.' },
@@ -36,6 +36,11 @@ export const PERMISSIONS: Record<Permission, { label: string; desc: string; role
     label: 'Moderar calificaciones',
     desc: 'Ocultar y restaurar calificaciones de técnicos.',
     roles: ['super_admin', 'soporte'],
+  },
+  inventario: {
+    label: 'Inventario de herramientas',
+    desc: 'Alta, asignación y baja de la herramienta de la empresa.',
+    roles: ['super_admin', 'onboarding'],
   },
 };
 

@@ -83,6 +83,7 @@ import {
 import { TechTypeBadge, TechTypeCard } from '../_components/TechTypeParts';
 import { VehiclesCard } from '../_components/VehiclesCard';
 import { ToolsCard } from '../_components/ToolsCard';
+import { CompanyToolsCard } from '../_components/CompanyToolsCard';
 import { RatingsCard } from '../_components/RatingsCard';
 import { ratingSummary } from '@/lib/ratingModeration';
 
@@ -380,6 +381,7 @@ export default function TecnicoDetailPage() {
           <TechTypeCard techId={tech.id} />
           <VehiclesCard techId={tech.id} />
           <ToolsCard techId={tech.id} />
+          <CompanyToolsCard techId={tech.id} />
           <NotesCard techId={tech.id} />
         </>
       ) : (
@@ -450,6 +452,7 @@ export default function TecnicoDetailPage() {
               <TechTypeCard techId={tech.id} />
               <VehiclesCard techId={tech.id} />
               <ToolsCard techId={tech.id} />
+              <CompanyToolsCard techId={tech.id} />
               <NotesCard techId={tech.id} />
             </div>
           </div>

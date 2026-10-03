@@ -22,6 +22,20 @@ import {
 } from '@/lib/tools';
 import { withHistory } from '@/lib/demo/history';
 import {
+  byTechnician,
+  inventoryEventText,
+  isInventoryEvent,
+  normalizeSerial,
+  outstanding,
+  openAssignment,
+  type ByTechnicianRow,
+  type CompanyTool,
+  type InventoryCondition,
+  type OutstandingRow,
+  type RetireReason,
+  type ToolAssignment,
+} from '@/lib/inventory';
+import {
   EMERGENCY_DEFAULTS,
   EMERGENCY_KEYS,
   buildHistory,
@@ -198,7 +212,7 @@ export function loadWorld(force = false): Promise<void> {
     if (mockHistory && world === mockHistory.world) return Promise.resolve();
     mockHistory ??= withHistory(demoWorld());
     world = mockHistory.world;
-    adminEvents = mockHistory.vehicles.map(v => ({
+    adminEvents = [...mockHistory.inventoryEvents, ...mockHistory.vehicles.map(v => ({
       id: `mock-ae-${v.id}`,
       actor_id: v.technician_id,
       entity_type: 'technician',
@@ -207,7 +221,7 @@ export function loadWorld(force = false): Promise<void> {
       payload: { before: null, after: { make: v.make, model: v.model, year: v.year, color: v.color, plate: v.plate } },
       created_at: v.created_at,
       updated_at: v.created_at,
-    }));
+    }))];
     registerFolios(world.orders);
     useData.setState({ status: 'ready' });
     bump();
@@ -570,6 +584,16 @@ export const getNotes = (entityId: string): Note[] =>
       const raw = (e.payload as { note?: unknown } | null)?.note;
       const note = typeof raw === 'string' ? raw : null;
       const label = EVENT_LABEL[e.event_type] ?? e.event_type;
+      if (isInventoryEvent(e.entity_type, e.event_type))
+        return {
+          id: e.id,
+          entity_id: entityId,
+          author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+          event_type: e.event_type,
+          note,
+          text: inventoryEventText(e.event_type, e.payload),
+          created_at: e.created_at,
+        };
       if (e.event_type.startsWith('vehicle_'))
         return {
           id: e.id,
@@ -1807,7 +1831,7 @@ export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][numbe
   geojson: ZoneGeometry | null;
 };
 
-type ExtraKey = 'docs' | 'clientDocs' | 'companies' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations' | 'vehicles' | 'toolCatalog' | 'techTools';
+type ExtraKey = 'docs' | 'clientDocs' | 'companies' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations' | 'vehicles' | 'toolCatalog' | 'techTools' | 'companyTools' | 'toolAssignments';
 interface ExtrasState {
   docs: TechDocument[];
   clientDocs: ClientDocument[];
@@ -1820,6 +1844,8 @@ interface ExtrasState {
   vehicles: TechVehicle[];
   toolCatalog: ToolCatalogItem[];
   techTools: TechToolRow[];
+  companyTools: CompanyTool[];
+  toolAssignments: ToolAssignment[];
   /** Dominios que no se pudieron leer (tabla ausente o sin permiso). */
   unavailable: Partial<Record<ExtraKey, boolean>>;
   loaded: boolean;
@@ -1837,6 +1863,8 @@ export const useExtras = create<ExtrasState>(() => ({
   vehicles: [],
   toolCatalog: [],
   techTools: [],
+  companyTools: [],
+  toolAssignments: [],
   unavailable: {},
   loaded: false,
 }));
@@ -1902,6 +1930,14 @@ const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
     fetchAllRows((a, b) =>
       supabase.from('technician_tools').select('*').order('created_at').range(a, b),
     ),
+  companyTools: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('company_tools').select('*').order('created_at', { ascending: false }).range(a, b),
+    ),
+  toolAssignments: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('company_tool_assignments').select('*').order('assigned_at', { ascending: false }).range(a, b),
+    ),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -1922,6 +1958,8 @@ export function loadExtras(force = false): Promise<void> {
       vehicles: mockHistory.vehicles,
       toolCatalog: mockHistory.toolCatalog,
       techTools: mockHistory.techTools,
+      companyTools: mockHistory.companyTools,
+      toolAssignments: mockHistory.toolAssignments,
     });
     return Promise.resolve();
   }
@@ -2795,3 +2833,405 @@ export async function restoreRating(id: string, note?: string): Promise<true | n
   }, e => pgMessage(e, 'No se pudo restaurar la calificación.'));
 }
 // ══ fin consola-c · extras ══════════════════════════════════════════════════
+
+// ── Inventario de herramienta de la empresa ──────────────────────────────────
+export type { CompanyTool, ToolAssignment, ByTechnicianRow, OutstandingRow } from '@/lib/inventory';
+
+export const getCompanyTools = () => useExtras.getState().companyTools;
+export const getCompanyTool = (id: string | null | undefined) =>
+  id ? (useExtras.getState().companyTools.find(t => t.id === id) ?? null) : null;
+const byAssigned = (a: ToolAssignment, b: ToolAssignment) => b.assigned_at.localeCompare(a.assigned_at);
+export const getAllToolAssignments = () => useExtras.getState().toolAssignments;
+/** Historial de una herramienta (más reciente primero). */
+export const getToolAssignments = (toolId: string) =>
+  useExtras.getState().toolAssignments.filter(a => a.tool_id === toolId).sort(byAssigned);
+/** Lo que un técnico tiene (o tuvo) de la empresa (más reciente primero). */
+export const getTechToolAssignments = (techId: string) =>
+  useExtras.getState().toolAssignments.filter(a => a.technician_id === techId).sort(byAssigned);
+export const getOpenToolAssignment = (toolId: string) =>
+  openAssignment(useExtras.getState().toolAssignments, toolId);
+export const personName = (id: string | null | undefined) =>
+  (id && (getProfile(id)?.full_name ?? getTechByUser(id)?.display_name)) || null;
+/** Técnicos a los que se puede asignar herramienta (no suspendidos). */
+export const getAssignableTechnicians = () =>
+  getTechniciansWithProfile()
+    .filter(x => x.profile && x.profile.status !== 'suspended')
+    .map(x => ({ id: x.tech.id, name: x.profile!.full_name ?? x.tech.display_name ?? 'Técnico' }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+// Fotos de la maqueta: ruta → URL (las subidas de la sesión usan object URL).
+const mockPhotos = new Map<string, string>();
+const mockPhotoSvg = (name: string) =>
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="100%" height="100%" fill="#e8eefb"/><text x="50%" y="54%" text-anchor="middle" font-family="sans-serif" font-size="56" font-weight="700" fill="#2b4fb4">${name
+      .trim()
+      .charAt(0)
+      .toUpperCase()}</text></svg>`,
+  );
+
+/** URL firmada (10 min) de la foto en el bucket privado `company-tools`. */
+export async function getToolPhotoUrl(path: string | null | undefined): Promise<string | null> {
+  if (!path) return null;
+  if (MOCK) {
+    const t = useExtras.getState().companyTools.find(x => x.photo_path === path);
+    return mockPhotos.get(path) ?? mockPhotoSvg(t?.name ?? '?');
+  }
+  const { data, error } = await supabase.storage.from('company-tools').createSignedUrl(path, 600);
+  return error || !data?.signedUrl ? null : data.signedUrl;
+}
+
+export interface CompanyToolInput {
+  name: string;
+  category_id: string | null;
+  catalog_id: string | null;
+  brand: string;
+  model: string;
+  serial_or_code: string;
+  /** YYYY-MM-DD */
+  acquired_on: string | null;
+  acquisition_cost_cents: number | null;
+}
+
+const MAX_PHOTO = 5 * 1024 * 1024;
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const invErr = (fallback: string) => (e: unknown) => {
+  const code = pgCode(e);
+  if (code === '23505') return 'Ese número de serie/código ya existe.';
+  if (code === '42501') return 'Tu rol no puede operar el inventario.';
+  if ((code === '22023' || code === '55000' || code === 'P0002') && typeof e === 'object' && e && 'message' in e)
+    return String(e.message);
+  return fallback;
+};
+
+function mockInvEvent(
+  entity: 'company_tool' | 'technician',
+  entityId: string,
+  type: string,
+  payload: Record<string, unknown>,
+) {
+  const now = new Date().toISOString();
+  adminEvents = [
+    ...adminEvents,
+    {
+      id: mockToolId('ae'),
+      actor_id: MOCK_ADMIN_ID,
+      entity_type: entity,
+      entity_id: entityId,
+      event_type: type,
+      payload: payload as Json,
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+}
+
+const patchTool = (id: string, patch: Partial<CompanyTool>) =>
+  useExtras.setState(s => ({
+    companyTools: s.companyTools.map(t => (t.id === id ? { ...t, ...patch, updated_at: new Date().toISOString() } : t)),
+  }));
+
+/**
+ * Alta o edición. En un alta con foto el id se genera aquí para subir primero a
+ * `company-tools/<id>/<archivo>` y luego llamar al RPC con ese `p_id`.
+ */
+export async function saveCompanyTool(
+  input: CompanyToolInput,
+  opts: { id?: string | null; photo?: File | null; keepPhoto?: string | null } = {},
+): Promise<CompanyTool | null> {
+  const row = {
+    name: input.name.trim().replace(/\s+/g, ' '),
+    serial_or_code: normalizeSerial(input.serial_or_code),
+  };
+  if (!row.name || !row.serial_or_code) {
+    notifyError('Nombre y número de serie o código son obligatorios.');
+    return null;
+  }
+  if (input.acquisition_cost_cents != null && !(input.acquisition_cost_cents >= 0)) {
+    notifyError('El costo no es válido.');
+    return null;
+  }
+  if (opts.photo && (opts.photo.size > MAX_PHOTO || !PHOTO_TYPES.includes(opts.photo.type))) {
+    notifyError('La foto debe ser JPG, PNG, WEBP o HEIC de máximo 5 MB.');
+    return null;
+  }
+  const id = opts.id ?? crypto.randomUUID();
+  const prev = opts.id ? getCompanyTool(opts.id) : null;
+  if (prev?.status === 'retired') {
+    notifyError('Una herramienta dada de baja no se puede editar.');
+    return null;
+  }
+  const clean = (t: string) => t.trim() || null;
+  const fileName = opts.photo ? opts.photo.name.replace(/[^\w.-]+/g, '_').slice(-60) : null;
+  const photoPath = opts.photo ? `${id}/${Date.now()}-${fileName}` : (opts.keepPhoto ?? null);
+  const list = getCompanyTools();
+  if (MOCK) {
+    if (list.some(t => t.id !== id && normalizeSerial(t.serial_or_code) === row.serial_or_code)) {
+      notifyError('Ese número de serie/código ya existe.');
+      return null;
+    }
+    if (opts.photo && photoPath) mockPhotos.set(photoPath, URL.createObjectURL(opts.photo));
+    const now = new Date().toISOString();
+    const fields = {
+      ...row,
+      category_id: input.category_id,
+      catalog_id: input.catalog_id,
+      brand: clean(input.brand),
+      model: clean(input.model),
+      acquired_on: input.acquired_on,
+      acquisition_cost_cents: input.acquisition_cost_cents,
+      photo_path: photoPath,
+    };
+    const next: CompanyTool = prev
+      ? { ...prev, ...fields, updated_at: now }
+      : {
+          id,
+          ...fields,
+          status: 'available',
+          retired_reason: null,
+          retired_note: null,
+          retired_at: null,
+          retired_by: null,
+          created_at: now,
+          updated_at: now,
+        };
+    useExtras.setState({ companyTools: prev ? list.map(t => (t.id === id ? next : t)) : [next, ...list] });
+    mockInvEvent(
+      'company_tool',
+      id,
+      prev ? 'tool_edited' : 'tool_created',
+      prev ? { before: prev, after: next } : { name: next.name, serial_or_code: next.serial_or_code, category_id: next.category_id },
+    );
+    bump();
+    return next;
+  }
+  const r = await mutateExtras(async () => {
+    if (opts.photo && photoPath) {
+      const up = await supabase.storage.from('company-tools').upload(photoPath, opts.photo, {
+        contentType: opts.photo.type,
+        upsert: false,
+      });
+      if (up.error) throw up.error;
+    }
+    const { data, error } = await supabase.rpc('admin_upsert_company_tool', {
+      p_id: id,
+      p_name: row.name,
+      p_serial_or_code: row.serial_or_code,
+      p_category_id: input.category_id ?? undefined,
+      p_catalog_id: input.catalog_id ?? undefined,
+      p_brand: clean(input.brand) ?? undefined,
+      p_model: clean(input.model) ?? undefined,
+      p_acquired_on: input.acquired_on ?? undefined,
+      p_acquisition_cost_cents: input.acquisition_cost_cents ?? undefined,
+      p_photo_path: photoPath ?? undefined,
+    });
+    if (error) throw error;
+    return data;
+  }, invErr('No se pudo guardar la herramienta.'));
+  return r;
+}
+
+/** Asigna una herramienta disponible a un técnico (fecha, condición, nota). */
+export async function assignCompanyTool(
+  toolId: string,
+  input: { technicianId: string; assignedAt: string; condition: InventoryCondition; note: string },
+): Promise<true | null> {
+  const tool = getCompanyTool(toolId);
+  if (!tool || tool.status !== 'available') {
+    notifyError('Solo se puede asignar una herramienta disponible.');
+    return null;
+  }
+  const note = input.note.trim() || null;
+  if (MOCK) {
+    if (!getAssignableTechnicians().some(t => t.id === input.technicianId)) {
+      notifyError('El técnico no existe o está suspendido.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const a: ToolAssignment = {
+      id: mockToolId('cta'),
+      tool_id: toolId,
+      technician_id: input.technicianId,
+      assigned_at: input.assignedAt,
+      assigned_condition: input.condition,
+      assigned_by: MOCK_ADMIN_ID,
+      assign_note: note,
+      returned_at: null,
+      returned_condition: null,
+      returned_by: null,
+      return_note: null,
+      created_at: now,
+      updated_at: now,
+    };
+    useExtras.setState(s => ({ toolAssignments: [a, ...s.toolAssignments] }));
+    patchTool(toolId, { status: 'assigned' });
+    const tn = personName(input.technicianId);
+    mockInvEvent('company_tool', toolId, 'tool_assigned', {
+      assignment_id: a.id, technician_id: input.technicianId, technician_name: tn, condition: input.condition, assigned_at: input.assignedAt, note,
+    });
+    mockInvEvent('technician', input.technicianId, 'company_tool_assigned', {
+      assignment_id: a.id, tool_id: toolId, tool_name: tool.name, serial_or_code: tool.serial_or_code, condition: input.condition,
+    });
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_assign_company_tool', {
+      p_tool_id: toolId,
+      p_technician_id: input.technicianId,
+      p_assigned_at: input.assignedAt,
+      p_condition: input.condition,
+      p_note: note ?? undefined,
+    });
+    if (error) throw error;
+    return true as const;
+  }, invErr('No se pudo asignar la herramienta.'));
+}
+
+/** Registra la devolución; `toRepair` (o condición dañada) la deja en reparación. */
+export async function returnCompanyTool(
+  toolId: string,
+  input: { returnedAt: string; condition: InventoryCondition; note: string; toRepair: boolean },
+): Promise<true | null> {
+  const open = getOpenToolAssignment(toolId);
+  const tool = getCompanyTool(toolId);
+  if (!open || !tool) {
+    notifyError('La herramienta no está asignada.');
+    return null;
+  }
+  const note = input.note.trim() || null;
+  const toRepair = input.toRepair || input.condition === 'damaged';
+  if (MOCK) {
+    const now = new Date().toISOString();
+    useExtras.setState(s => ({
+      toolAssignments: s.toolAssignments.map(a =>
+        a.id === open.id
+          ? { ...a, returned_at: input.returnedAt, returned_condition: input.condition, returned_by: MOCK_ADMIN_ID, return_note: note, updated_at: now }
+          : a,
+      ),
+    }));
+    patchTool(toolId, { status: toRepair ? 'in_repair' : 'available' });
+    const status = toRepair ? 'in_repair' : 'available';
+    mockInvEvent('company_tool', toolId, 'tool_returned', {
+      assignment_id: open.id, technician_id: open.technician_id, condition: input.condition, returned_at: input.returnedAt, new_status: status, note,
+    });
+    mockInvEvent('technician', open.technician_id, 'company_tool_returned', {
+      assignment_id: open.id, tool_id: toolId, tool_name: tool.name, condition: input.condition, new_status: status,
+    });
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_return_company_tool', {
+      p_tool_id: toolId,
+      p_returned_at: input.returnedAt,
+      p_condition: input.condition,
+      p_note: note ?? undefined,
+      p_to_repair: input.toRepair,
+    });
+    if (error) throw error;
+    return true as const;
+  }, invErr('No se pudo registrar la devolución.'));
+}
+
+/** Disponible ⇄ en reparación (no aplica si está asignada o dada de baja). */
+export async function setCompanyToolRepair(toolId: string, inRepair: boolean, note = ''): Promise<true | null> {
+  const tool = getCompanyTool(toolId);
+  if (!tool || tool.status !== (inRepair ? 'available' : 'in_repair')) {
+    notifyError('Transición de estado no válida.');
+    return null;
+  }
+  const n = note.trim() || null;
+  if (MOCK) {
+    patchTool(toolId, { status: inRepair ? 'in_repair' : 'available' });
+    mockInvEvent('company_tool', toolId, inRepair ? 'tool_repair_started' : 'tool_repair_finished', { note: n });
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_set_company_tool_repair', {
+      p_tool_id: toolId,
+      p_in_repair: inRepair,
+      p_note: n ?? undefined,
+    });
+    if (error) throw error;
+    return true as const;
+  }, invErr('No se pudo cambiar el estado de reparación.'));
+}
+
+/** Baja lógica con motivo (cierra la asignación abierta si la hay). Nunca borra. */
+export async function retireCompanyTool(toolId: string, reason: RetireReason, note: string): Promise<true | null> {
+  const tool = getCompanyTool(toolId);
+  if (!tool || tool.status === 'retired') {
+    notifyError('La herramienta ya está dada de baja.');
+    return null;
+  }
+  const n = note.trim() || null;
+  if (MOCK) {
+    const open = getOpenToolAssignment(toolId);
+    const now = new Date().toISOString();
+    if (open) {
+      const why = { damage: 'Baja por daño', loss: 'No devuelta: pérdida', theft: 'No devuelta: robo', end_of_life: 'Baja por fin de vida útil' }[reason];
+      useExtras.setState(s => ({
+        toolAssignments: s.toolAssignments.map(a =>
+          a.id === open.id
+            ? {
+                ...a,
+                returned_at: now,
+                returned_condition: reason === 'damage' ? 'damaged' : a.assigned_condition,
+                returned_by: MOCK_ADMIN_ID,
+                return_note: [why, n].filter(Boolean).join(' — '),
+                updated_at: now,
+              }
+            : a,
+        ),
+      }));
+      mockInvEvent('technician', open.technician_id, 'company_tool_returned', {
+        assignment_id: open.id, tool_id: toolId, tool_name: tool.name, new_status: 'retired', reason,
+      });
+    }
+    patchTool(toolId, { status: 'retired', retired_reason: reason, retired_note: n, retired_at: now, retired_by: MOCK_ADMIN_ID });
+    mockInvEvent('company_tool', toolId, 'tool_retired', { reason, note: n, assignment_id: open?.id ?? null, technician_id: open?.technician_id ?? null });
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.rpc('admin_retire_company_tool', {
+      p_tool_id: toolId,
+      p_reason: reason,
+      p_note: n ?? undefined,
+    });
+    if (error) throw error;
+    return true as const;
+  }, invErr('No se pudo dar de baja la herramienta.'));
+}
+
+/** Reporte «Asignada por técnico» (RPC; en maqueta o si falla, calculado local). */
+export async function fetchToolsByTechnician(): Promise<ByTechnicianRow[]> {
+  const local = () => byTechnician(getCompanyTools(), getAllToolAssignments(), personName);
+  if (MOCK) return local();
+  const { data, error } = await supabase.rpc('admin_company_tools_by_technician');
+  if (error) {
+    console.warn('[data] admin_company_tools_by_technician', error);
+    return local();
+  }
+  return (data ?? []).map(r => ({
+    technician_id: r.technician_id,
+    technician_name: r.technician_name,
+    tools_count: Number(r.tools_count),
+    total_value_cents: Number(r.total_value_cents),
+    tools: ((r.tools ?? []) as ByTechnicianRow['tools']) ?? [],
+  }));
+}
+
+/** Reporte «Pendiente de devolución» con filtro de antigüedad (días). */
+export async function fetchToolsOutstanding(olderThanDays: number): Promise<OutstandingRow[]> {
+  const local = () => outstanding(getCompanyTools(), getAllToolAssignments(), personName, olderThanDays);
+  if (MOCK) return local();
+  const { data, error } = await supabase.rpc('admin_company_tools_outstanding', { p_older_than_days: olderThanDays });
+  if (error) {
+    console.warn('[data] admin_company_tools_outstanding', error);
+    return local();
+  }
+  return (data ?? []).map(r => ({ ...r, days_held: Number(r.days_held) }));
+}

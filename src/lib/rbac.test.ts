@@ -24,3 +24,10 @@ test('rol desde app_metadata con fallback super_admin', () => {
   expect(roleFromMetadata({ admin_role: 'otra-cosa' })).toBe('super_admin');
   expect(roleFromMetadata(undefined)).toBe('super_admin');
 });
+
+test('inventario: solo super_admin y onboarding', () => {
+  expect(can('super_admin', 'inventario')).toBe(true);
+  expect(can('onboarding', 'inventario')).toBe(true);
+  expect(can('soporte', 'inventario')).toBe(false);
+  expect(can('legal', 'inventario')).toBe(false);
+});

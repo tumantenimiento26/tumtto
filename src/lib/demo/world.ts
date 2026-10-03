@@ -1,4 +1,5 @@
 import type { Database } from '@/types/supabase';
+import { defaultAvatarFor } from '@/lib/avatarArt';
 
 /**
  * In-memory demo world — one coherent dataset shared across the Cliente,
@@ -54,6 +55,21 @@ export const nextId = (p: string) => `${p}-${++seq}`;
 export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 
+const MOCK_ICONS: Record<string, string> = {
+  [CLIENT_ID]: 'casa',
+  [TECH_USER_ID]: 'llave',
+  'u-ag': 'foco',
+  'u-sc': 'casco',
+  'u-do': 'gota',
+  'u-carla': 'martillo',
+  'u-carlos': 'casco',
+  'u-miguel': 'martillo',
+  'u-jose': 'llave',
+  'u-lupita': 'gota',
+  'u-fer': 'foco',
+  // u-luis, u-ivan, u-roberto: sin entrada -> default por hash
+};
+
 function profile(
   id: string,
   full_name: string,
@@ -66,6 +82,7 @@ function profile(
     phone,
     role,
     avatar_path: null,
+    avatar_icon: MOCK_ICONS[id] ?? defaultAvatarFor(id),
     status: 'active',
     stripe_customer_id: null,
     ...ts(),

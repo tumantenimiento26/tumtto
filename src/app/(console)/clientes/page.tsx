@@ -168,7 +168,7 @@ export default function ClientesPage() {
       sortValue: r => r.name,
       render: r => (
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={r.name} size={36} />
+          <Avatar name={r.name} userId={r.id} size={36} />
           <div className="min-w-0">
             <div className="truncate font-display text-[14px] font-bold text-navy">
               {r.name}

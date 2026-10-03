@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useCallback, useEffect, useRef } from 'react';
 import {
   Droplet,
@@ -93,10 +94,14 @@ export const clock = (iso: string) =>
 export function Avatar({
   name,
   size = 36,
+  userId,
 }: {
   name: string | null | undefined;
   size?: number;
+  /** Con `userId` muestra el ícono de perfil en lugar de las iniciales. */
+  userId?: string | null;
 }) {
+  if (userId) return <UserIcon userId={userId} size={size} />;
   return (
     <span
       className="grid shrink-0 place-items-center rounded-full bg-info-soft font-display font-bold text-primary"

@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -611,9 +612,10 @@ export default function ServicioDetailPage() {
                             })}
                           </span>
                         </div>
-                        <div className="text-[12.5px] text-muted">
-                          {ACTOR_LABEL(e.actor_id)}
-                          {e.note && !assignmentHeadline(e) ? ` · ${e.note}` : ''}
+                        <div className="flex items-center gap-1.5 text-[12.5px] text-muted">
+                          {e.actor_id && getProfile(e.actor_id) && <UserIcon userId={e.actor_id} size={16} />}
+                          <span>{ACTOR_LABEL(e.actor_id)}
+                          {e.note && !assignmentHeadline(e) ? ` · ${e.note}` : ''}</span>
                         </div>
                       </div>
                     </li>
@@ -661,7 +663,7 @@ export default function ServicioDetailPage() {
           <Card padded>
             <Kicker className="mb-3">Cliente</Kicker>
             <div className="flex items-center gap-3">
-              <Avatar name={client?.full_name} size={42} />
+              <Avatar name={client?.full_name} userId={client?.id} size={42} />
               <div className="min-w-0">
                 <div className="truncate font-display text-[15px] font-bold text-navy">
                   {client?.full_name ?? 'Cliente'}
@@ -705,7 +707,7 @@ export default function ServicioDetailPage() {
             </div>
             {techProfile ? (
               <div className="flex items-center gap-3">
-                <Avatar name={techProfile.full_name} size={42} />
+                <Avatar name={techProfile.full_name} userId={techProfile.id} size={42} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate font-display text-[15px] font-bold text-navy">
@@ -1104,7 +1106,8 @@ function ChatModal({
                 >
                   {m.body}
                 </div>
-                <span className="mt-1 font-mono text-[10.5px] text-faint">
+                <span className="mt-1 inline-flex items-center gap-1.5 font-mono text-[10.5px] text-faint">
+                  {sender && <UserIcon userId={sender.id} size={16} />}
                   {isAdmin ? 'Admin' : (sender?.full_name ?? 'Usuario')} · {clock(m.created_at)}
                 </span>
               </div>

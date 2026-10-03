@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -62,7 +63,6 @@ import {
   ago,
   backgroundCheckOk,
   diditChecks,
-  initials,
   kycGroup,
   slaLabel,
   slaRemainingHours,
@@ -207,9 +207,7 @@ export default function TecnicoDetailPage() {
       {/* Encabezado */}
       <Card padded className="animate-up">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-full bg-action font-display text-[18px] font-bold text-white">
-            {initials(name)}
-          </span>
+          <UserIcon userId={tech.id} size={56} />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-[24px] font-extrabold tracking-[-0.5px] text-navy">
               {name}

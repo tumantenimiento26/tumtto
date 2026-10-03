@@ -157,7 +157,7 @@ export default function ClientDetailPage() {
 
       <Card padded className="animate-up">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={name} size={58} />
+          <Avatar name={name} userId={id} size={58} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-[24px] font-extrabold tracking-[-0.5px] text-navy">

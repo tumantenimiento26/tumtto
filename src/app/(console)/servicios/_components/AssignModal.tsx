@@ -133,7 +133,7 @@ export function AssignModal({
                 onClick={() => onSelect(t.technician_id, t.display_name)}
                 className="flex w-full items-start gap-3 rounded-box border border-line bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Avatar name={t.display_name} size={38} />
+                <Avatar name={t.display_name} userId={t.technician_id} size={38} />
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-display text-[14px] font-bold text-navy">{t.display_name}</span>

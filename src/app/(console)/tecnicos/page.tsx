@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -65,7 +66,6 @@ import {
   KYC_GROUP_META,
   activeFilterCount,
   filterTechs,
-  initials,
   kycGroup,
   type KycGroup,
   type TechListFilters,
@@ -233,9 +233,7 @@ export default function TecnicosPage() {
       sortValue: r => r.name,
       render: r => (
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-action font-display text-[12.5px] font-bold text-white">
-            {initials(r.name)}
-          </span>
+          <UserIcon userId={r.id} size={36} />
           <div className="min-w-0">
             <div className="truncate font-sans text-[13.5px] font-semibold text-navy">
               {r.name}

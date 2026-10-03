@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useState } from 'react';
 import Link from 'next/link';
 import { EyeOff, Eye, Star } from 'lucide-react';
@@ -93,7 +94,8 @@ export function RatingsCard({ techId }: { techId: string }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                         <Stars score={r.score} />
-                        <span className="font-sans text-[13px] font-semibold text-navy">
+                        <span className="inline-flex items-center gap-1.5 font-sans text-[13px] font-semibold text-navy">
+                          <UserIcon userId={r.reviewer_id} size={20} />
                           {getProfile(r.reviewer_id)?.full_name ?? 'Cliente'}
                         </span>
                       </div>

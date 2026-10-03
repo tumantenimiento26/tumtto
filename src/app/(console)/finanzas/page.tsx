@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Send, Check, Wallet, ExternalLink, X } from 'lucide-react';
@@ -47,7 +48,6 @@ import {
 import { orderCode } from '@/lib/orderCode';
 import { fmtDate } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
-import { initials } from '@/lib/techConsole';
 import { rangePreset, type DateRange } from '@/lib/calendar';
 import {
   aggregate,
@@ -437,9 +437,7 @@ export default function FinanzasPage() {
                   const tech = getTechnician(p.technician_id);
                   return (
                     <div key={p.id} className="flex flex-wrap items-center gap-3 border-t border-divider py-3 first:border-t-0">
-                      <span className="grid h-9 w-9 place-items-center rounded-full bg-action font-display text-[12px] font-bold text-white">
-                        {initials(techName(p.technician_id))}
-                      </span>
+                      <UserIcon userId={p.technician_id} size={36} />
                       <div className="min-w-0 flex-1">
                         <div className="font-sans text-[13.5px] font-semibold text-navy">{techName(p.technician_id)}</div>
                         <div className="font-mono text-[11.5px] text-muted">
@@ -510,7 +508,7 @@ export default function FinanzasPage() {
                     <tr key={w.id} className="border-t border-divider">
                       <td className="py-2.5">
                         <button type="button" onClick={() => router.push(`/tecnicos/${w.id}`)} className="inline-flex items-center gap-2.5 font-sans text-[13.5px] font-semibold text-navy hover:text-primary">
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-action font-display text-[11.5px] font-bold text-white">{initials(w.name)}</span>
+                          <UserIcon userId={w.id} size={32} />
                           {w.name}
                           <ExternalLink size={12} className="text-faint" />
                         </button>

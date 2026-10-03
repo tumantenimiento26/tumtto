@@ -22,6 +22,8 @@ import {
 } from '@/lib/landing';
 import { Container, H2, Initials, Kicker, Lead, Stars, StoreButtons } from './bits';
 import { scrollToId } from './hooks';
+import { CONTACT, displayPhone, mailLink, telLink, waLink } from '@/lib/contact';
+import { SocialLinks } from './socials';
 
 /* ── Reseñas: dos marquesinas en sentidos opuestos ── */
 const REVIEWS: [string, string, string][] = [
@@ -483,13 +485,26 @@ export function Faq() {
           <Kicker>Preguntas frecuentes</Kicker>
           <H2>Resolvemos tus dudas</H2>
           <Lead className="!text-lp-muted">
-            ¿No encuentras tu respuesta? Escríbenos a{' '}
-            <a
-              href="mailto:soporte@tumantenimiento.mx"
+            ¿No encuentras tu respuesta?{' '}
+            <button
+              type="button"
+              onClick={() => scrollToId('contacto')}
               className="font-semibold text-[var(--lp-link)] hover:text-white"
             >
-              soporte@tumantenimiento.mx
-            </a>
+              Escríbenos desde el formulario
+            </button>
+            {CONTACT.email && (
+              <>
+                {' '}
+                o a{' '}
+                <a
+                  href={mailLink() ?? undefined}
+                  className="font-semibold text-[var(--lp-link)] hover:text-white"
+                >
+                  {CONTACT.email}
+                </a>
+              </>
+            )}
             .
           </Lead>
         </div>
@@ -588,7 +603,7 @@ export function Footer() {
   );
   const lnk = 'text-[14px] text-[var(--lp-soft)] hover:text-white';
   return (
-    <footer className="relative border-t border-[rgba(90,176,255,0.12)] bg-lp-footer text-white">
+    <footer id="site-footer" className="relative border-t border-[rgba(90,176,255,0.12)] bg-lp-footer text-white">
       <div className="mx-auto max-w-[1200px] px-6 pt-16">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-x-10 gap-y-8 pb-12">
           <div>
@@ -628,12 +643,30 @@ export function Footer() {
           {col(
             'Contacto',
             <>
-              <a href="mailto:soporte@tumantenimiento.mx" className={lnk}>
-                soporte@tumantenimiento.mx
-              </a>
+              {CONTACT.email && (
+                <a href={mailLink() ?? undefined} className={lnk}>
+                  {CONTACT.email}
+                </a>
+              )}
+              {CONTACT.phone && (
+                <a href={telLink() ?? undefined} className={lnk}>
+                  {displayPhone(CONTACT.phone)}
+                </a>
+              )}
+              {CONTACT.whatsapp && (
+                <a
+                  href={waLink() ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={lnk}
+                >
+                  WhatsApp {displayPhone(CONTACT.whatsapp)}
+                </a>
+              )}
               <span className="text-[14px] text-[var(--lp-soft)]">
                 Guadalajara, Jalisco, México
               </span>
+              <SocialLinks className="mt-1" size={17} />
             </>,
           )}
         </div>
@@ -643,11 +676,16 @@ export function Footer() {
             reservados.
           </span>
           <div className="ml-auto flex flex-wrap gap-[18px]">
-            {/* ponytail: texto plano hasta que existan /terminos y /privacidad. */}
+            {/* ponytail: /terminos aún no existe; el aviso de privacidad sí. */}
             <span className="text-[12.5px] text-lp-muted">
               Términos y condiciones
             </span>
-            <span className="text-[12.5px] text-lp-muted">Aviso de privacidad</span>
+            <Link
+              href="/aviso-de-privacidad"
+              className="text-[12.5px] text-lp-muted hover:text-white"
+            >
+              Aviso de privacidad
+            </Link>
             <span className="font-mono text-[10.5px] tracking-[0.1em] text-[var(--lp-dim)]">
               HECHO EN LA ZMG
             </span>

@@ -216,6 +216,74 @@ export type Database = {
           },
         ]
       }
+      contact_messages: {
+        Row: {
+          admin_note: string | null
+          consent_at: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at: string
+          email: string
+          email_status: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          ip_hash: string | null
+          message: string
+          name: string
+          phone: string
+          source: string | null
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          consent_at: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email: string
+          email_status?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          ip_hash?: string | null
+          message: string
+          name: string
+          phone: string
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          consent_at?: string
+          contact_type?: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email?: string
+          email_status?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          ip_hash?: string | null
+          message?: string
+          name?: string
+          phone?: string
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_messages_handled_by_fkey"
+            columns: ["handled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coverage_zones: {
         Row: {
           created_at: string
@@ -2529,6 +2597,14 @@ export type Database = {
         Args: { p_order_id: string; p_reason: string }
         Returns: Database["public"]["Tables"]["service_orders"]["Row"]
       }
+      admin_update_contact_message: {
+        Args: {
+          p_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["contact_status"]
+        }
+        Returns: Database["public"]["Tables"]["contact_messages"]["Row"]
+      }
       admin_suggest_technicians: {
         Args: { p_order_id: string }
         Returns: {
@@ -3887,6 +3963,8 @@ export type Database = {
     }
     Enums: {
       client_document_kind: "proof_of_address"
+      contact_status: "new" | "handled" | "archived"
+      contact_type: "client" | "company" | "technician" | "other"
       deletion_request_status:
         | "pending"
         | "cancelled"
@@ -4096,6 +4174,8 @@ export const Constants = {
   public: {
     Enums: {
       client_document_kind: ["proof_of_address"],
+      contact_status: ["new", "handled", "archived"],
+      contact_type: ["client", "company", "technician", "other"],
       deletion_request_status: [
         "pending",
         "cancelled",

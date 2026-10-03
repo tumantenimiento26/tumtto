@@ -70,6 +70,9 @@ import {
   type TicketStatus,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import { loadContactMessages, useContact } from '@/lib/data/contactStore';
+import { newContactCount } from '@/lib/contactAdmin';
+import { ContactView } from './_components/ContactView';
 import { ClientDocActions, issuedOn } from '../clientes/_components/ClientDocCard';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
@@ -82,7 +85,7 @@ import {
   type Resolution,
 } from '@/lib/supportFormat';
 
-type TabKey = 'disputas' | 'tickets' | 'kyc';
+type TabKey = 'disputas' | 'tickets' | 'kyc' | 'contacto';
 
 const TICKET_STATUS: Record<TicketStatus, { label: string; tone: Tone }> = {
   open: { label: 'Abierto', tone: 'danger' },
@@ -134,6 +137,14 @@ export default function SoportePage() {
   const failed = useWorldFailed();
   const [tab, setTab] = useState<TabKey>('disputas');
   const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const contactNew = useContact(s => newContactCount(s.messages));
+  useEffect(() => {
+    void loadContactMessages();
+    // ?tab=contacto (enlace del correo y de las notificaciones). Sin
+    // useSearchParams para no exigir Suspense en esta página.
+    if (new URLSearchParams(window.location.search).get('tab') === 'contacto')
+      setTab('contacto');
+  }, []);
 
   const activeDisputes = getAllDisputes().filter(
     d => d.status === 'open' || d.status === 'in_review',
@@ -178,6 +189,7 @@ export default function SoportePage() {
           },
           { value: 'tickets', label: 'Tickets', count: openTickets.length },
           { value: 'kyc', label: 'Cola KYC', count: kycCount },
+          { value: 'contacto', label: 'Contacto', count: contactNew },
         ]}
       />
 
@@ -186,8 +198,10 @@ export default function SoportePage() {
           <DisputesView />
         ) : tab === 'tickets' ? (
           <TicketsView />
-        ) : (
+        ) : tab === 'kyc' ? (
           <KycView />
+        ) : (
+          <ContactView />
         )}
       </div>
 

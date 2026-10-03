@@ -16,6 +16,9 @@ import {
   ticketRequester,
   useTick,
 } from './store';
+import { getContactMessages, loadContactMessages, useContact } from './contactStore';
+import { CONTACT_TYPE_LABEL } from '@/lib/contactAdmin';
+import { useEffect } from 'react';
 
 /**
  * Notificaciones de la consola admin. ponytail: el backend tiene
@@ -29,6 +32,7 @@ export type NotifType =
   | 'kyc'
   | 'disputas'
   | 'tickets'
+  | 'contacto'
   | 'retiros'
   | 'emergencias'
   | 'servicios'
@@ -39,6 +43,7 @@ export const NOTIF_TYPES: { type: NotifType; label: string }[] = [
   { type: 'kyc', label: 'KYC' },
   { type: 'disputas', label: 'Disputas' },
   { type: 'tickets', label: 'Tickets' },
+  { type: 'contacto', label: 'Contacto' },
   { type: 'retiros', label: 'Retiros' },
   { type: 'emergencias', label: 'Emergencias' },
   { type: 'servicios', label: 'Servicios' },
@@ -94,6 +99,17 @@ export function derive(now = Date.now()): AdminNotification[] {
         body: `${name(ticketRequester(t))} · ${t.status === 'open' ? 'sin responder' : 'en seguimiento'}`,
         ts: t.created_at,
         href: '/soporte',
+      });
+  // Mensajes nuevos del formulario del landing (kind `contact_message`).
+  for (const c of getContactMessages())
+    if (c.status === 'new')
+      out.push({
+        id: `contact-${c.id}`,
+        type: 'contacto',
+        title: `Nuevo contacto (${CONTACT_TYPE_LABEL[c.contact_type]}): ${c.name}`,
+        body: c.message.length > 90 ? `${c.message.slice(0, 89)}…` : c.message,
+        ts: c.created_at,
+        href: '/soporte?tab=contacto',
       });
   for (const p of getAllPayments())
     if (p.status === 'failed')
@@ -190,6 +206,10 @@ export function useNotifications(): {
   unread: number;
 } {
   useTick();
+  useContact(s => s.messages);
+  useEffect(() => {
+    void loadContactMessages();
+  }, []);
   const { read, deleted, muted } = useNotifState();
   const items = derive()
     .filter(n => !deleted.includes(n.id) && !muted.includes(n.type))

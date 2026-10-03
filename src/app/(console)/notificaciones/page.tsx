@@ -49,6 +49,7 @@ const TYPE_TONE: Record<NotifType, Tone> = {
   kyc: 'warning',
   disputas: 'danger',
   tickets: 'info',
+  contacto: 'info',
   retiros: 'success',
   emergencias: 'danger',
   servicios: 'warning',

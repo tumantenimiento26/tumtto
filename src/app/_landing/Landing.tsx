@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import './landing.css';
 import { useReducedMotion, useReveal } from './hooks';
 import { Background, Hero, Nav, Stats } from './top';
+import { ContactSection, WhatsAppFab } from './contact';
 import { Categories, HowItWorks, Verified } from './middle';
 import {
   Coverage,
@@ -46,8 +47,10 @@ export function Landing() {
         <ForTechs />
         <Faq />
         <FinalCta />
+        <ContactSection />
       </main>
       <Footer />
+      <WhatsAppFab />
     </div>
   );
 }

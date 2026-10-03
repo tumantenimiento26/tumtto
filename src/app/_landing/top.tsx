@@ -41,6 +41,7 @@ const LINKS: [string, string][] = [
   ['cobertura', 'Cobertura'],
   ['precios', 'Precios'],
   ['faq', 'FAQ'],
+  ['contacto', 'Contacto'],
 ];
 const SECTION_ORDER = [
   'servicios',
@@ -49,6 +50,7 @@ const SECTION_ORDER = [
   'cobertura',
   'precios',
   'faq',
+  'contacto',
 ];
 
 export function Nav() {

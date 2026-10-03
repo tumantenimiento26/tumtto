@@ -40,14 +40,12 @@ const LINKS: [string, string][] = [
   ['tecnicos', 'Técnicos'],
   ['cobertura', 'Cobertura'],
   ['precios', 'Precios'],
-  ['trabajos', 'Trabajos'],
   ['faq', 'FAQ'],
 ];
 const SECTION_ORDER = [
   'servicios',
   'como',
   'tecnicos',
-  'trabajos',
   'cobertura',
   'precios',
   'faq',

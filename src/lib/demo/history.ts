@@ -100,6 +100,8 @@ export function withHistory(w: World): {
   const now = Date.now();
 
   const profiles = [...w.profiles];
+  // Actor de las asignaciones/rechazos hechos desde la maqueta (store.assignOrder).
+  profiles.push({ ...w.profiles[0], id: 'mock-admin', full_name: 'Admin Tumtto', role: 'admin' });
   const clientIds = CLIENTS.map((name, i) => {
     const id = `mock-cli-${i + 1}`;
     profiles.push({
@@ -531,6 +533,7 @@ export function withHistory(w: World): {
     const acceptedAt = iso(created + resp * 1000);
     const fixed = k % 2 === 1;
     o.priority = 'emergency';
+    o.assignment_mode = 'emergency';
     o.is_urgent = true;
     o.emergency_surcharge_cents = fixed
       ? 15000
@@ -567,6 +570,7 @@ export function withHistory(w: World): {
       description: 'Emergencia: necesito técnico lo antes posible.',
       is_urgent: true,
       priority: 'emergency',
+      assignment_mode: 'emergency',
       emergency_surcharge_cents: 15000,
       location: ewkb(lng, lat),
       address_line: `Calle ${between(1, 99)} #${between(100, 3000)}`,
@@ -625,6 +629,83 @@ export function withHistory(w: World): {
     note: 'Sin técnico tras 10 min · asignación manual',
     created_at: iso(now - 28 * MIN),
     updated_at: iso(now - 28 * MIN),
+  });
+
+  // Solicitudes sin técnico (el cliente pidió «que Tumtto asigne»): distintas
+  // antigüedades, zonas, categorías y fechas deseadas para la bandeja «Sin asignar».
+  const DESC = [
+    'Se tapó el drenaje de la cocina y huele mal, necesito que alguien venga.',
+    'El minisplit de la recámara gotea y ya no enfría.',
+    'Se botan los pastilleros cuando prendo el horno y la lavadora a la vez.',
+    'Quiero cambiar la chapa de la puerta principal, me la quieren forzar.',
+    'La lavadora no centrifuga y deja la ropa empapada.',
+    'Revisión de la instalación de gas, huele a gas por las noches.',
+    'Se descompuso el boiler, no hay agua caliente desde ayer.',
+  ];
+  const unassigned: [number, number, number, number | null][] = [
+    // [categoría idx, minutos de antigüedad, lugar, horas hasta la cita deseada]
+    [0, 7, 0, 20],
+    [3, 19, 1, 52],
+    [1, 34, 3, null],
+    [5, 72, 6, 30],
+    [4, 26 * 60, 4, 8],
+    [2, 3 * 24 * 60 + 90, 9, null],
+    [0, 12, 7, 5],
+  ];
+  unassigned.forEach(([catIdx, minsAgo, place, inH], k) => {
+    const n = 9101 + k;
+    const [catId, , , , titles] = CATS[catIdx];
+    const [neighborhood, municipality, postal_code, lng, lat] = PLACES[place];
+    const at = now - minsAgo * MIN;
+    const when = inH == null ? null : now + inH * 60 * MIN;
+    orders.push({
+      ...w.orders[0],
+      id: `SVC-${n}`,
+      folio: n,
+      client_id: clientIds[(n + 3) % clientIds.length],
+      technician_id: null,
+      category_id: catId,
+      client_address_id: null,
+      status: 'requested',
+      title: titles[0],
+      description: DESC[k % DESC.length],
+      is_urgent: false,
+      priority: 'normal',
+      assignment_mode: 'admin',
+      needs_manual_assignment: true,
+      schedule_surcharge_bps: inH != null && (k === 0 || k === 4) ? 1500 : 0,
+      scheduled_for: when != null ? iso(when) : null,
+      scheduled_until: when != null ? iso(when + 2 * 60 * MIN) : null,
+      location: ewkb(lng, lat),
+      address_line: `Calle ${between(1, 99)} #${between(100, 3000)}`,
+      neighborhood,
+      municipality,
+      postal_code,
+      quoted_subtotal_cents: null,
+      quoted_total_cents: null,
+      commission_cents: null,
+      is_disputed: false,
+      accepted_at: null,
+      completed_at: null,
+      paid_at: null,
+      cancelled_at: null,
+      cancellation_reason: null,
+      expires_at: null,
+      dispatch_status: null,
+      created_at: iso(at),
+      updated_at: iso(at),
+    });
+    events.push({
+      ...w.events[0],
+      id: `mev-SVC-${n}-0`,
+      service_order_id: `SVC-${n}`,
+      from_status: null,
+      to_status: 'requested',
+      actor_id: clientIds[(n + 3) % clientIds.length],
+      note: 'Pendiente de asignación',
+      created_at: iso(at),
+      updated_at: iso(at),
+    });
   });
 
   // Retiros semanales por técnico activo: pagados salvo la última semana.

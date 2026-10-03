@@ -13,6 +13,7 @@ import {
   Navigation,
   Scale,
   Siren,
+  UserX,
   Wrench,
   XCircle,
   type LucideIcon,
@@ -57,7 +58,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
           compact
           kind="all-clear"
           title="Todo al día"
-          description="No hay emergencias sin técnico, KYC, disputas ni servicios atorados."
+          description="No hay solicitudes sin técnico, KYC, disputas ni servicios atorados."
         />
       ) : (
         items.slice(0, 5).map(a => (
@@ -344,6 +345,7 @@ export const ATTENTION_ICON = {
   kyc: { icon: IdCard, tile: 'bg-warning-soft text-warning-ink' },
   dispute: { icon: Scale, tile: 'bg-error-soft text-error' },
   stuck: { icon: AlertTriangle, tile: 'bg-warning-soft text-warning-ink' },
+  unassigned: { icon: UserX, tile: 'bg-error-soft text-error' },
   waiting: { icon: Clock, tile: 'bg-info-soft text-primary' },
   payment: { icon: CreditCard, tile: 'bg-error-soft text-error' },
 } as const;

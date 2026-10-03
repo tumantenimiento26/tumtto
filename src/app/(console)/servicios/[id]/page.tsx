@@ -16,10 +16,10 @@ import {
   RotateCcw,
   Send,
   ShieldAlert,
+  XCircle,
   Siren,
   Star,
   UserCog,
-  Wrench,
   Undo2,
 } from 'lucide-react';
 import {
@@ -37,13 +37,25 @@ import {
   toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
-import { TechTypeBadge } from '../../tecnicos/_components/TechTypeParts';
+import { RequestMap } from '@/components/request-map';
+import { wkbPoint } from '@/lib/geo';
+import {
+  REASSIGN_BLOCKED_TIP,
+  ageLabel,
+  ageTone,
+  assignmentHeadline,
+  canReassignStatus,
+  inUnassignedInbox,
+  isAdminRequest,
+  scheduleLabel,
+  scheduleSurchargeLabel,
+} from '@/lib/unassigned';
+import { AssignModal, RejectModal } from '../_components/AssignModal';
 import {
   addNote,
   createTicket,
   fetchOrderMessages,
   getCategories,
-  loadExtras,
   getNotes,
   getOrderEvents,
   getPayment,
@@ -54,12 +66,11 @@ import {
   getRequest,
   getTickets,
   getTechByUser,
-  getTechniciansWithProfile,
-  getTechToolViews,
-  useExtras,
+  getUnassignedAlertMinutes,
   listOrderEvidence,
   loadWorld,
-  reassignRequest,
+  assignOrder,
+  rejectRequest,
   refundPayment,
   refundableCents,
   sendMessage,
@@ -75,7 +86,6 @@ import { orderCode } from '@/lib/orderCode';
 import { fmtDateTime } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
-import { toolsForCategory } from '@/lib/tools';
 import {
   Avatar,
   CategoryTile,
@@ -87,12 +97,7 @@ import {
 } from '../_components/shared';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
-import {
-  includedSurchargeCents,
-  isEmergency,
-  needsManualAssignment,
-  surchargeLabel,
-} from '@/lib/emergency';
+import { includedSurchargeCents, isEmergency, surchargeLabel } from '@/lib/emergency';
 
 // Stepper de 8 estados del handoff (closing cuenta como "En servicio";
 // closed como "Pagado"). Cancelado/expirado = nodo terminal rojo.
@@ -152,6 +157,7 @@ export default function ServicioDetailPage() {
   const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [forceTo, setForceTo] = useState<RequestStatus | null>(null);
@@ -181,12 +187,16 @@ export default function ServicioDetailPage() {
     [req?.id, req?.updated_at],
   );
 
-  // Desde la lista / dashboard / notificaciones: /servicios/:id?reasignar=1 abre el modal.
-  const wantsReassign = req ? needsManualAssignment(req) : false;
+  // Desde la lista / dashboard / notificaciones: /servicios/:id?asignar=1 (o ?reasignar=1)
+  // abre el modal de asignar; ?rechazar=1 abre el de rechazo.
+  const wantsReassign = req ? inUnassignedInbox(req) : false;
+  const adminRequest = req ? isAdminRequest(req) : false;
   useEffect(() => {
-    if (wantsReassign && new URLSearchParams(window.location.search).get('reasignar') === '1')
-      setReassignOpen(true);
-  }, [wantsReassign]);
+    if (!wantsReassign) return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('asignar') === '1' || q.get('reasignar') === '1') setReassignOpen(true);
+    else if (q.get('rechazar') === '1' && adminRequest) setRejectOpen(true);
+  }, [wantsReassign, adminRequest]);
 
   if (failed)
     return (
@@ -259,6 +269,12 @@ export default function ServicioDetailPage() {
   const refundMax = payment ? refundableCents(payment) : 0;
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
 
+  const address = [req.address_line, req.neighborhood, req.municipality].filter(Boolean).join(', ');
+  const desired = scheduleLabel(req.scheduled_for, req.scheduled_until);
+  const scheduleSur = scheduleSurchargeLabel(req.schedule_surcharge_bps);
+  const requestPhotos = (evidence ?? []).filter(e => e.kind === 'request' && e.url);
+  const reassignable = canReassignStatus(req.status);
+
   function copyId() {
     void navigator.clipboard.writeText(req!.id).then(
       () => toast.success('ID copiado', orderCode(req!.id)),
@@ -305,15 +321,24 @@ export default function ServicioDetailPage() {
           <Siren size={20} className="text-error" />
           <div className="min-w-0 flex-1">
             <div className="font-display text-[14px] font-bold text-error">
-              Emergencia sin técnico — asignar
+              {adminRequest ? 'Solicitud sin técnico — asignar o rechazar' : 'Emergencia sin técnico — asignar'}
             </div>
             <div className="text-[13px] text-body">
-              Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.
+              {adminRequest
+                ? `El cliente pidió que Tumtto asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
+                : 'Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.'}
             </div>
           </div>
-          <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
-            Asignar técnico
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {adminRequest && (
+              <Button size="sm" variant="secondary" icon={XCircle} onClick={() => setRejectOpen(true)} disabled={!canSupport}>
+                Rechazar
+              </Button>
+            )}
+            <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
+              Asignar técnico
+            </Button>
+          </div>
         </div>
       )}
 
@@ -364,8 +389,15 @@ export default function ServicioDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={STATUS[req.status].tone} dot>
-              {STATUS[req.status].label}
+              {adminRequest && req.status === 'requested'
+                ? 'Pendiente de asignación'
+                : STATUS[req.status].label}
             </Badge>
+            {wantsReassign && (
+              <Badge tone={ageTone(req.created_at, getUnassignedAlertMinutes())}>
+                Sin técnico hace {ageLabel(req.created_at)}
+              </Badge>
+            )}
             {emergency && (
               <Badge tone="danger">
                 Emergencia
@@ -447,11 +479,51 @@ export default function ServicioDetailPage() {
           {emergency && canSupport && (
             <EmergencyDispatchCard orderId={req.id} dispatchStatus={req.dispatch_status} />
           )}
+          {(adminRequest || wantsReassign) && (
+            <Card padded>
+              <Kicker className="mb-3">Ubicación del servicio</Kicker>
+              <RequestMap center={wkbPoint(req.location)} label={address || undefined} />
+              <p className="mt-3 text-[13.5px] text-body">{address || 'Dirección no disponible'}</p>
+            </Card>
+          )}
           <Card padded>
             <Kicker className="mb-3">Descripción del problema</Kicker>
             <p className="text-[15px] leading-relaxed text-navy">
               {req.description ? `“${req.description}”` : 'Sin descripción.'}
             </p>
+            {desired && (
+              <dl className="mt-4 flex flex-col gap-2 rounded-box bg-panel p-3 text-[13.5px]">
+                <Row label="Fecha y horario deseado" value={desired} />
+                <Row label="Recargo por horario" value={scheduleSur ?? 'Sin recargo'} />
+              </dl>
+            )}
+            {adminRequest ? (
+              <div className="mt-4">
+                <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.08em] text-muted">
+                  Fotos del cliente
+                </div>
+                {requestPhotos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {requestPhotos.map((ev, i) => (
+                      <a
+                        key={ev.id}
+                        href={ev.url ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative block aspect-[4/3] overflow-hidden rounded-box border border-line bg-panel"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={ev.url ?? ''} alt={`Foto ${i + 1} del cliente`} className="h-full w-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-muted">
+                    {evidence === null && !evidenceError ? 'Cargando fotos…' : 'El cliente no adjuntó fotos.'}
+                  </p>
+                )}
+              </div>
+            ) : (
             <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
               {EVIDENCE_SLOTS.map(slot => {
                 const ev = evidence?.find(e =>
@@ -487,6 +559,7 @@ export default function ServicioDetailPage() {
                 );
               })}
             </div>
+            )}
             {evidenceError && (
               <p className="mt-2 text-[12.5px] text-error">
                 No pudimos cargar las fotos de evidencia.
@@ -527,7 +600,7 @@ export default function ServicioDetailPage() {
                           >
                             {e.is_revert
                               ? `Estado revertido: ${label(e.from_status)} → ${label(e.to_status)}`
-                              : label(e.to_status)}
+                              : (assignmentHeadline(e) ?? label(e.to_status))}
                           </span>
                           <span className="font-mono text-[11px] text-muted">
                             {fmtDateTime(e.created_at, {
@@ -540,7 +613,7 @@ export default function ServicioDetailPage() {
                         </div>
                         <div className="text-[12.5px] text-muted">
                           {ACTOR_LABEL(e.actor_id)}
-                          {e.note ? ` · ${e.note}` : ''}
+                          {e.note && !assignmentHeadline(e) ? ` · ${e.note}` : ''}
                         </div>
                       </div>
                     </li>
@@ -613,9 +686,22 @@ export default function ServicioDetailPage() {
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
               <Kicker>Técnico</Kicker>
-              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal || !canSupport}>
-                Reasignar
-              </Button>
+              <span title={!terminal && !reassignable ? REASSIGN_BLOCKED_TIP : undefined}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={UserCog}
+                  onClick={() => setReassignOpen(true)}
+                  disabled={terminal || !canSupport || !reassignable}
+                  aria-label={
+                    !terminal && !reassignable
+                      ? `${req.technician_id ? 'Reasignar' : 'Asignar'} no disponible: ${REASSIGN_BLOCKED_TIP}`
+                      : undefined
+                  }
+                >
+                  {req.technician_id ? 'Reasignar' : 'Asignar'}
+                </Button>
+              </span>
             </div>
             {techProfile ? (
               <div className="flex items-center gap-3">
@@ -637,7 +723,11 @@ export default function ServicioDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-[13.5px] text-muted">Sin técnico asignado todavía.</p>
+              <p className="text-[13.5px] text-muted">
+                {inUnassignedInbox(req)
+                  ? `Sin técnico · espera ${ageLabel(req.created_at)}`
+                  : 'Sin técnico asignado todavía.'}
+              </p>
             )}
             {techRec && (
               <Link
@@ -655,6 +745,7 @@ export default function ServicioDetailPage() {
               <Row label="Mano de obra" value={money(laborCents || null, true)} />
               <Row label="Materiales" value={money(materialsCents || null, true)} />
               {emergency && <Row label="Recargo de emergencia" value={money(surchargeCents || null, true)} />}
+              {scheduleSur && <Row label="Recargo por horario" value={scheduleSur} />}
               <div className="my-1 border-t border-divider" />
               <Row label="Total" value={money(totalCents, true)} strong />
               <Row
@@ -731,15 +822,30 @@ export default function ServicioDetailPage() {
       {/* ── Modales y sheets ── */}
       <ServiceFormSheet open={editOpen} order={req} onClose={() => setEditOpen(false)} />
 
-      <ReassignModal
+      <AssignModal
         open={reassignOpen}
         onClose={() => setReassignOpen(false)}
-        currentTechUserId={req.technician_id}
+        orderId={req.id}
         categoryId={req.category_id}
-        busy={busy === 'reassign'}
+        mode={req.technician_id ? 'reassign' : 'assign'}
+        busy={busy === 'assign'}
         onSelect={async (userId, name) => {
-          const ok = await run('reassign', () => reassignRequest(req.id, userId), `Servicio reasignado a ${name}`);
+          const ok = await run(
+            'assign',
+            () => assignOrder(req.id, userId),
+            req.technician_id ? `Servicio reasignado a ${name}` : `Servicio asignado a ${name}`,
+          );
           if (ok) setReassignOpen(false);
+        }}
+      />
+
+      <RejectModal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        busy={busy === 'reject'}
+        onConfirm={async reason => {
+          const ok = await run('reject', () => rejectRequest(req.id, reason), 'Solicitud rechazada');
+          if (ok) setRejectOpen(false);
         }}
       />
 
@@ -842,120 +948,6 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <dd className={`font-mono tabular ${strong ? 'text-[15px] font-semibold text-navy' : 'text-body'}`}>
         {value}
       </dd>
-    </div>
-  );
-}
-
-function ReassignModal({
-  open,
-  onClose,
-  onSelect,
-  currentTechUserId,
-  categoryId,
-  busy,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSelect: (userId: string, name: string) => void;
-  currentTechUserId: string | null;
-  /** Categoría del servicio: se muestran las herramientas del técnico para ella. */
-  categoryId?: string | null;
-  busy?: boolean;
-}) {
-  useExtras(s => s.techTools);
-  useExtras(s => s.toolCatalog);
-  const [q, setQ] = useState('');
-  useEffect(() => {
-    if (open) void loadExtras();
-  }, [open]);
-  const candidates = getTechniciansWithProfile()
-    .filter(
-      ({ tech, profile }) =>
-        tech.kyc_status === 'approved' &&
-        profile?.status !== 'suspended' &&
-        tech.id !== currentTechUserId,
-    )
-    .filter(({ profile }) =>
-      (profile?.full_name ?? '').toLowerCase().includes(q.trim().toLowerCase()),
-    )
-    .sort((a, b) => Number(b.tech.is_available) - Number(a.tech.is_available));
-
-  return (
-    <Modal
-      open={open}
-      onClose={() => !busy && onClose()}
-      dismissible={!busy}
-      title="Reasignar técnico"
-      description="Técnicos aprobados; los disponibles primero."
-      icon={UserCog}
-      width={520}
-    >
-      <Input
-        value={q}
-        onChange={e => setQ(e.target.value)}
-        placeholder="Buscar técnico"
-        aria-label="Buscar técnico"
-        wrapperClassName="mb-3"
-      />
-      {candidates.length === 0 ? (
-        <EmptyState compact kind="no-results" title="No hay técnicos para reasignar" />
-      ) : (
-        <ul className="flex max-h-[360px] flex-col gap-2 overflow-y-auto">
-          {candidates.map(({ tech, profile }) => {
-            const name = profile?.full_name ?? 'Técnico';
-            return (
-              <li key={tech.id}>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSelect(tech.id, name)}
-                  className="flex w-full items-center gap-3 rounded-box border border-line bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Avatar name={name} size={38} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="font-display text-[14px] font-bold text-navy">{name}</span>
-                      <span className="sm:hidden"><TechTypeBadge techId={tech.id} short /></span>
-                      <span className="hidden sm:inline"><TechTypeBadge techId={tech.id} /></span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[12px] text-muted">
-                      <Star size={11} className="text-warning" fill="currentColor" />
-                      {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.rating_count} trabajos
-                    </div>
-                    <ToolChips techId={tech.id} categoryId={categoryId} />
-                  </div>
-                  <Badge tone={tech.is_available ? 'success' : 'neutral'} dot>
-                    {tech.is_available ? 'Disponible' : 'Ocupado'}
-                  </Badge>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Modal>
-  );
-}
-
-/** Herramientas del técnico para la categoría del servicio (chips compactos, «+N»). */
-function ToolChips({ techId, categoryId }: { techId: string; categoryId?: string | null }) {
-  const tools = toolsForCategory(getTechToolViews(techId), categoryId);
-  if (tools.length === 0) return null;
-  const MAX = 3;
-  return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1" title={tools.map(t => t.name).join(' · ')}>
-      {tools.slice(0, MAX).map(t => (
-        <span
-          key={t.rowId}
-          className="inline-flex max-w-full items-center gap-1 rounded-full bg-tint px-2 py-0.5 font-sans text-[11px] text-body"
-        >
-          <Wrench size={10} className="flex-shrink-0 text-faint" aria-hidden />
-          <span className="truncate">{t.name}</span>
-        </span>
-      ))}
-      {tools.length > MAX && (
-        <span className="font-sans text-[11px] font-semibold text-muted">+{tools.length - MAX}</span>
-      )}
     </div>
   );
 }

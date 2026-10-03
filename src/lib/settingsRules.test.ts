@@ -88,3 +88,37 @@ it('pctToBps redondea y conserva NaN', () => {
   expect(pctToBps(15.5)).toBe(1550);
   expect(pctToBps(NaN)).toBeNaN();
 });
+
+describe('validateSettings · asignación y recargo por horario', () => {
+  const ok = {
+    unassigned_alert_minutes: 30,
+    schedule_surcharge_bps: 1500,
+    schedule_surcharge_start_hour: 20,
+    schedule_surcharge_end_hour: 8,
+    schedule_surcharge_weekends: true,
+  };
+  it('acepta los defaults', () => {
+    expect(validateSettings(ok)).toEqual({});
+  });
+  it('rechaza umbral, horas, porcentaje y fin de semana inválidos', () => {
+    const e = validateSettings({
+      unassigned_alert_minutes: 0,
+      schedule_surcharge_bps: 12000,
+      schedule_surcharge_start_hour: 24,
+      schedule_surcharge_end_hour: -1,
+      schedule_surcharge_weekends: 'sí' as unknown as boolean,
+    });
+    expect(Object.keys(e).sort()).toEqual([
+      'schedule_surcharge_bps',
+      'schedule_surcharge_end_hour',
+      'schedule_surcharge_start_hour',
+      'schedule_surcharge_weekends',
+      'unassigned_alert_minutes',
+    ]);
+  });
+  it('la hora de fin no puede igualar a la de inicio', () => {
+    expect(
+      validateSettings({ ...ok, schedule_surcharge_end_hour: 20 }).schedule_surcharge_end_hour,
+    ).toMatch(/distinta/);
+  });
+});

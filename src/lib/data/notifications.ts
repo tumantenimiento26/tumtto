@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 import { needsManualAssignment } from '@/lib/emergency';
+import { ageLabel, inUnassignedInbox, isAdminRequest } from '@/lib/unassigned';
 import {
   getAllPayments,
   getAllRequests,
@@ -10,6 +11,7 @@ import {
   getPendingKyc,
   getProfile,
   getTickets,
+  getUnassignedAlertMinutes,
   isTicketOpen,
   ticketRequester,
   useTick,
@@ -111,12 +113,29 @@ export function derive(now = Date.now()): AdminNotification[] {
         title: 'Emergencia sin técnico — asignar',
         body: `Nadie aceptó a tiempo; sigue activa para asignación manual (${name(o.client_id)}).`,
         ts: o.updated_at ?? o.created_at,
-        href: `/servicios/${o.id}?reasignar=1`,
+        href: `/servicios/${o.id}?asignar=1`,
+      });
+  // Solicitudes sin técnico (Tumtto asigna) que superan unassigned_alert_minutes.
+  const alertMin = getUnassignedAlertMinutes();
+  for (const o of getAllRequests())
+    if (
+      inUnassignedInbox(o) &&
+      isAdminRequest(o) &&
+      now - new Date(o.created_at).getTime() > alertMin * 60_000
+    )
+      out.push({
+        id: `unas-${o.id}`,
+        type: 'servicios',
+        title: 'Solicitud sin técnico — asignar o rechazar',
+        body: `${name(o.client_id)} espera desde hace ${ageLabel(o.created_at, now)} (umbral ${alertMin} min).`,
+        ts: o.created_at,
+        href: `/servicios/${o.id}?asignar=1`,
       });
   for (const o of getAllRequests())
     if (
       o.status === 'requested' &&
       o.priority !== 'emergency' &&
+      !inUnassignedInbox(o) &&
       now - new Date(o.created_at).getTime() > STALE_REQUEST_MIN * 60_000
     )
       out.push({

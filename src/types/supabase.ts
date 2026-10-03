@@ -1326,6 +1326,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         Insert: {
@@ -1373,6 +1376,9 @@ export type Database = {
           technician_id?: string | null
           title?: string | null
           updated_at?: string
+          assignment_mode?: string
+          schedule_surcharge_bps?: number
+          unassigned_alerted_at?: string | null
           urgent_surcharge_bps?: number
         }
         Update: {
@@ -1420,6 +1426,9 @@ export type Database = {
           technician_id?: string | null
           title?: string | null
           updated_at?: string
+          assignment_mode?: string
+          schedule_surcharge_bps?: number
+          unassigned_alerted_at?: string | null
           urgent_surcharge_bps?: number
         }
         Relationships: [
@@ -2512,6 +2521,27 @@ export type Database = {
       }
     }
     Functions: {
+      admin_assign_order: {
+        Args: { p_note?: string; p_order_id: string; p_technician_id: string }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      admin_reject_request: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      admin_suggest_technicians: {
+        Args: { p_order_id: string }
+        Returns: {
+          active_orders: number
+          display_name: string
+          distance_m: number | null
+          is_available: boolean
+          rating_avg: number
+          rating_count: number
+          technician_id: string
+          zone_match: boolean
+        }[]
+      }
       admin_emergency_history: {
         Args: { p_order_id: string }
         Returns: Json
@@ -2618,6 +2648,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {
@@ -2665,6 +2698,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {
@@ -2750,6 +2786,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {
@@ -3187,6 +3226,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {
@@ -3452,6 +3494,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {
@@ -3715,6 +3760,9 @@ export type Database = {
           technician_id: string | null
           title: string | null
           updated_at: string
+          assignment_mode: string
+          schedule_surcharge_bps: number
+          unassigned_alerted_at: string | null
           urgent_surcharge_bps: number
         }
         SetofOptions: {

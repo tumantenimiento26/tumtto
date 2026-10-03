@@ -3,6 +3,7 @@
 
 import { inRange, type DateRange } from '@/lib/calendar';
 import { orderCode } from '@/lib/orderCode';
+import { matchesAge, type AgeBucket } from '@/lib/unassigned';
 
 export type OrderStatus =
   | 'requested'
@@ -27,7 +28,8 @@ export type ServiceTab =
   | 'completados'
   | 'cancelados'
   | 'disputa'
-  | 'emergencias';
+  | 'emergencias'
+  | 'sin_asignar';
 
 export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -37,6 +39,7 @@ export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'cancelados', label: 'Cancelados' },
   { value: 'disputa', label: 'En disputa' },
   { value: 'emergencias', label: 'Emergencias' },
+  { value: 'sin_asignar', label: 'Sin asignar' },
 ];
 
 const IN_PROGRESS: OrderStatus[] = [
@@ -50,7 +53,12 @@ const IN_PROGRESS: OrderStatus[] = [
 const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
 
 export function serviceTabOf(
-  o: { status: OrderStatus; is_disputed: boolean; is_emergency?: boolean },
+  o: {
+    status: OrderStatus;
+    is_disputed: boolean;
+    is_emergency?: boolean;
+    needs_manual?: boolean;
+  },
   tab: ServiceTab,
 ): boolean {
   switch (tab) {
@@ -68,6 +76,8 @@ export function serviceTabOf(
       return o.is_disputed;
     case 'emergencias':
       return !!o.is_emergency;
+    case 'sin_asignar':
+      return !!o.needs_manual;
   }
 }
 
@@ -78,8 +88,16 @@ export interface ServiceRow {
   is_disputed: boolean;
   /** priority = 'emergency' (reemplaza al antiguo «urgente»). */
   is_emergency: boolean;
-  /** Emergencia viva sin técnico: espera asignación manual. */
+  /** Sin técnico y pide asignación manual (solicitud sin técnico o emergencia vencida). */
   needs_manual: boolean;
+  /** Solicitud que el cliente dejó para que Tumtto asigne (assignment_mode = 'admin'). */
+  is_admin_request?: boolean;
+  /** Fecha/horario deseado (scheduled_for / scheduled_until). */
+  desiredAt?: string | null;
+  desiredUntil?: string | null;
+  /** Recargo por horario congelado, en bps. */
+  scheduleBps?: number;
+  description?: string | null;
   /** Orden de fijado arriba (0 = primero); null = no se fija. Ver emergencyPinRank. */
   pin: number | null;
   categoryId: string;
@@ -104,6 +122,9 @@ export interface ServiceFilters {
   emergencyOnly: boolean;
   disputeOnly: boolean;
   range: DateRange;
+  /** Solo «Sin asignar»: antigüedad mínima y fecha deseada. */
+  age: AgeBucket;
+  desiredRange: DateRange;
 }
 
 export const EMPTY_SERVICE_FILTERS: ServiceFilters = {
@@ -117,6 +138,8 @@ export const EMPTY_SERVICE_FILTERS: ServiceFilters = {
   emergencyOnly: false,
   disputeOnly: false,
   range: null,
+  age: 'all',
+  desiredRange: null,
 };
 
 export const norm = (s: string) =>
@@ -135,15 +158,18 @@ export function activeSheetFilters(f: ServiceFilters): number {
     (f.method ? 1 : 0) +
     (f.minPesos != null || f.maxPesos != null ? 1 : 0) +
     (f.emergencyOnly ? 1 : 0) +
-    (f.disputeOnly ? 1 : 0)
+    (f.disputeOnly ? 1 : 0) +
+    (f.age !== 'all' ? 1 : 0) +
+    (f.desiredRange ? 1 : 0)
   );
 }
 
 export function filterServices(
   rows: ServiceRow[],
   f: ServiceFilters,
-  opts: { ignoreTab?: boolean } = {},
+  opts: { ignoreTab?: boolean; now?: number } = {},
 ): ServiceRow[] {
+  const now = opts.now ?? Date.now();
   const q = norm(f.query);
   return rows.filter(r => {
     if (!opts.ignoreTab && !serviceTabOf(r, f.tab)) return false;
@@ -158,6 +184,12 @@ export function filterServices(
     if (f.emergencyOnly && !r.is_emergency) return false;
     if (f.disputeOnly && !r.is_disputed) return false;
     if (f.range && !inRange(new Date(r.createdAt), f.range)) return false;
+    if (f.age !== 'all' && !matchesAge(r.createdAt, f.age, now)) return false;
+    if (
+      f.desiredRange &&
+      !(r.desiredAt && inRange(new Date(r.desiredAt), f.desiredRange))
+    )
+      return false;
     if (!q) return true;
     return [
       orderCode(r.id),

@@ -16,6 +16,7 @@ import {
   getAllDisputes,
   getProfile,
   getTechnicians,
+  getUnassignedAlertMinutes,
   loadExtras,
   loadWorld,
   useExtras,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/dashboard';
 import { orderCode } from '@/lib/orderCode';
 import { needsManualAssignment } from '@/lib/emergency';
+import { ageLabel, inUnassignedInbox, isUnassignedAlert } from '@/lib/unassigned';
 import { DashBand, type BandKpi } from './_components/DashBand';
 import { GmvChart } from './_components/GmvChart';
 import { PipelineDonut } from './_components/PipelineDonut';
@@ -209,8 +211,21 @@ export default function DashboardPage() {
           title: `Emergencia ${orderCode(o.id)} sin técnico`,
           sub: `${catOf(o.category_id)?.name ?? 'Servicio'} · ${o.municipality ?? 'ZMG'} · nadie aceptó, asígnala`,
           cta: 'Asignar',
-          onClick: () => router.push(`/servicios/${o.id}?reasignar=1`),
+          onClick: () => router.push(`/servicios/${o.id}?asignar=1`),
         });
+    // Solicitudes sin técnico (el cliente pidió que Tumtto asigne) que superan unassigned_alert_minutes.
+    const alertMin = getUnassignedAlertMinutes();
+    for (const o of [...orders]
+      .filter(x => !needsManualAssignment(x) && isUnassignedAlert(x, alertMin, now))
+      .sort((a, b) => a.created_at.localeCompare(b.created_at)))
+      attention.push({
+        id: `unas-${o.id}`,
+        ...ATTENTION_ICON.unassigned,
+        title: `${orderCode(o.id)} sin técnico · ${ageLabel(o.created_at, now)}`,
+        sub: `${catOf(o.category_id)?.name ?? 'Servicio'} · ${o.municipality ?? 'ZMG'} · supera ${alertMin} min, asígnala o recházala`,
+        cta: 'Asignar',
+        onClick: () => router.push(`/servicios/${o.id}?asignar=1`),
+      });
     for (const t of getPendingKyc())
       attention.push({
         id: `kyc-${t.id}`,
@@ -246,7 +261,7 @@ export default function DashboardPage() {
         });
       if (
         o.status === 'requested' &&
-        !needsManualAssignment(o) &&
+        !inUnassignedInbox(o) &&
         o.priority !== 'emergency' &&
         (now - new Date(o.created_at).getTime()) / 60_000 > WAITING_MIN
       )

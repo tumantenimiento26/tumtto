@@ -42,7 +42,7 @@ const rows = [
 describe('servicios', () => {
   it('pestañas y conteos', () => {
     const c = tabCounts(rows, EMPTY_SERVICE_FILTERS);
-    expect(c).toEqual({ todos: 4, esperando: 1, curso: 1, completados: 1, cancelados: 1, disputa: 1, emergencias: 1 });
+    expect(c).toEqual({ todos: 4, esperando: 1, curso: 1, completados: 1, cancelados: 1, disputa: 1, emergencias: 1, sin_asignar: 0 });
   });
 
   it('búsqueda sin acentos por cliente, técnico y código SVC', () => {
@@ -116,5 +116,44 @@ describe('celular MX', () => {
     expect(toE164Mx('33 1234 5678')).toBe('+523312345678');
     expect(toE164Mx('+52 33 1234 5678')).toBe('+523312345678');
     expect(toE164Mx('1234')).toBeNull();
+  });
+});
+
+describe('servicios · Sin asignar', () => {
+  const NOW = new Date('2026-10-03T12:00:00Z').getTime();
+  const ago = (min: number) => new Date(NOW - min * 60_000).toISOString();
+  const inbox = [
+    svc({ id: 'u1', needs_manual: true, is_admin_request: true, createdAt: ago(10), desiredAt: '2026-10-05T16:00:00Z' }),
+    svc({ id: 'u2', needs_manual: true, is_admin_request: true, createdAt: ago(40), categoryId: 'cat-gas', zone: 'Tonalá' }),
+    svc({ id: 'u3', needs_manual: true, is_emergency: true, createdAt: ago(100) }),
+    svc({ id: 'u4', needs_manual: true, is_admin_request: true, createdAt: ago(30 * 60) }),
+    svc({ id: 'x1', status: 'enroute' }),
+  ];
+  const f = { ...EMPTY_SERVICE_FILTERS, tab: 'sin_asignar' as const };
+
+  it('la pestaña junta solicitudes sin técnico y emergencias vencidas', () => {
+    expect(filterServices(inbox, f, { now: NOW }).map(r => r.id)).toEqual(['u1', 'u2', 'u3', 'u4']);
+    expect(tabCounts(inbox, f).sin_asignar).toBe(4);
+  });
+
+  it('filtra por antigüedad (> 15 min, > 1 h, > 24 h)', () => {
+    const ids = (age: typeof f.age) => filterServices(inbox, { ...f, age }, { now: NOW }).map(r => r.id);
+    expect(ids('15m')).toEqual(['u2', 'u3', 'u4']);
+    expect(ids('30m')).toEqual(['u2', 'u3', 'u4']);
+    expect(ids('1h')).toEqual(['u3', 'u4']);
+    expect(ids('24h')).toEqual(['u4']);
+  });
+
+  it('filtra por categoría, zona y fecha deseada', () => {
+    expect(filterServices(inbox, { ...f, categoryId: 'cat-gas' }, { now: NOW }).map(r => r.id)).toEqual(['u2']);
+    expect(filterServices(inbox, { ...f, zones: ['Tonalá'] }, { now: NOW }).map(r => r.id)).toEqual(['u2']);
+    const day = new Date('2026-10-05T12:00:00');
+    const desiredRange = { from: day, to: day };
+    expect(filterServices(inbox, { ...f, desiredRange }, { now: NOW }).map(r => r.id)).toEqual(['u1']);
+  });
+
+  it('cuenta antigüedad y fecha deseada como filtros del sheet', () => {
+    expect(activeSheetFilters({ ...EMPTY_SERVICE_FILTERS, age: '1h' })).toBe(1);
+    expect(activeSheetFilters({ ...EMPTY_SERVICE_FILTERS, age: '1h', desiredRange: { from: new Date(), to: new Date() } })).toBe(2);
   });
 });

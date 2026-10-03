@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase';
 import type { Database, Json } from '@/types/supabase';
 import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
-import { wkbPoint } from '@/lib/geo';
+import { distanceM, wkbPoint } from '@/lib/geo';
+import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
 import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
 import { rejectionNotes } from '@/lib/clientDocs';
@@ -114,6 +115,8 @@ const EVENT_LABEL: Record<string, string> = {
   kyc_in_review: 'KYC en revisión',
   dispute_resolved: 'Disputa resuelta',
   order_reassigned: 'Servicio reasignado',
+  order_assigned: 'Servicio asignado',
+  request_rejected: 'Solicitud rechazada',
   order_refunded: 'Reembolso emitido',
   setting_updated: 'Ajuste actualizado',
   zone_upserted: 'Zona guardada',
@@ -420,6 +423,9 @@ export function getSettingList(key: string, fallback: string[]): string[] {
   const v = settings.find(s => s.key === key)?.value;
   return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
 }
+/** Minutos tras los que una solicitud sin técnico dispara alerta. */
+export const getUnassignedAlertMinutes = () =>
+  getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT);
 /** Configuración de emergencias (platform_settings) con los defaults del backend. */
 export function getEmergencyConfig(): EmergencyConfig {
   const d = EMERGENCY_DEFAULTS;
@@ -833,54 +839,180 @@ export async function setStatus(
   }, e => pgMessage(e, 'No se pudo cambiar el estado.'));
 }
 
-export async function reassignRequest(orderId: string, techUserId: string) {
+/** Técnico sugerido para una solicitud (admin_suggest_technicians). */
+export type TechSuggestion = Fn['admin_suggest_technicians']['Returns'][number];
+
+/**
+ * Técnicos candidatos para asignar/reasignar: KYC aprobado, cubren la
+ * categoría, disponibles primero, por zona/cercanía y calificación. En
+ * maqueta se calcula del snapshot demo.
+ */
+export async function suggestTechnicians(orderId: string): Promise<TechSuggestion[]> {
   if (MOCK) {
-    // Maqueta: asigna en memoria; una emergencia en manual deja de pedir asignación.
+    const o = getRequest(orderId);
+    if (!o) return [];
+    const at = wkbPoint(o.location);
+    const locs = mockHistory?.locations ?? [];
+    const rows = w()
+      .technicians.filter(
+        t =>
+          t.kyc_status === 'approved' &&
+          getProfile(t.id)?.status !== 'suspended' &&
+          t.id !== o.technician_id &&
+          w().technicianCategories.some(
+            c => c.technician_id === t.id && c.category_id === o.category_id,
+          ),
+      )
+      .map(t => {
+        const loc = locs.find(l => l.technician_id === t.id);
+        const from = loc ? wkbPoint(loc.location) : null;
+        return {
+          technician_id: t.id,
+          display_name: getProfile(t.id)?.full_name ?? 'Técnico',
+          rating_avg: t.rating_avg,
+          rating_count: t.rating_count,
+          distance_m: at && from ? distanceM(from, at) : null,
+          zone_match: !!loc && loc.municipality === o.municipality,
+          is_available: t.is_available,
+          active_orders: w().orders.filter(
+            x =>
+              x.technician_id === t.id &&
+              ['accepted', 'enroute', 'onsite', 'quote', 'working', 'closing'].includes(x.status),
+          ).length,
+        } satisfies TechSuggestion;
+      });
+    return rows.sort(
+      (a, b) =>
+        Number(b.is_available) - Number(a.is_available) ||
+        Number(b.zone_match) - Number(a.zone_match) ||
+        (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity) ||
+        b.rating_avg - a.rating_avg,
+    );
+  }
+  const { data, error } = await supabase.rpc('admin_suggest_technicians', {
+    p_order_id: orderId,
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+const MOCK_ADMIN_ID = 'mock-admin';
+
+function mockEvent(orderId: string, from: OrderStatus, to: OrderStatus, note: string, at: string) {
+  w().events.push({
+    ...(w().events[0] ?? ({} as ServiceStatusEvent)),
+    id: `mock-ev-${Date.now()}-${Math.round(Math.random() * 1e4)}`,
+    service_order_id: orderId,
+    from_status: from,
+    to_status: to,
+    actor_id: MOCK_ADMIN_ID,
+    note,
+    is_revert: false,
+    created_at: at,
+    updated_at: at,
+  });
+}
+
+/**
+ * Asigna (requested → accepted) o reasigna (accepted) con admin_assign_order.
+ * El backend rechaza `enroute` o posterior y notifica a técnico y cliente;
+ * deja «Asignado a X por Y» en la bitácora. Sirve a la bandeja y a Reasignar.
+ */
+export async function assignOrder(
+  orderId: string,
+  techUserId: string,
+  note: string | null = null,
+) {
+  if (MOCK) {
+    // Maqueta: en memoria, con las mismas reglas.
     const arr = w().orders;
     const i = arr.findIndex(o => o.id === orderId);
     if (i < 0) return null;
-    const now = new Date().toISOString();
     const prev = arr[i];
+    if (!canReassignStatus(prev.status)) {
+      notifyError('Ya va en camino: no se puede reasignar.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const name = getProfile(techUserId)?.full_name ?? techUserId;
     const wasRequested = prev.status === 'requested';
     arr[i] = {
       ...prev,
       technician_id: techUserId,
-      status: wasRequested ? 'accepted' : prev.status,
-      accepted_at: prev.accepted_at ?? now,
+      status: 'accepted',
+      accepted_at: wasRequested ? now : (prev.accepted_at ?? now),
       needs_manual_assignment: false,
       dispatch_status: prev.priority === 'emergency' ? 'assigned' : prev.dispatch_status,
       updated_at: now,
     };
-    if (wasRequested)
-      w().events.push({
-        ...(w().events[0] ?? ({} as ServiceStatusEvent)),
-        id: `mock-ev-${Date.now()}`,
-        service_order_id: orderId,
-        from_status: 'requested',
-        to_status: 'accepted',
-        actor_id: 'mock-admin',
-        note: `Reasignado a ${getProfile(techUserId)?.full_name ?? techUserId} por admin`,
-        is_revert: false,
-        created_at: now,
-        updated_at: now,
-      });
+    const by = getProfile(MOCK_ADMIN_ID)?.full_name ?? 'admin';
+    mockEvent(
+      orderId,
+      prev.status,
+      'accepted',
+      `${wasRequested ? 'Asignado' : 'Reasignado'} a ${name} por ${by}${note ? ` · ${note}` : ''}`,
+      now,
+    );
     bump();
     return true as const;
   }
-  // Reasignación + evento de estado en una sola transacción (antes el evento
-  // podía fallar en silencio).
   return mutate(
     async () => {
-      const name = getProfile(techUserId)?.full_name ?? techUserId;
-      const { error } = await supabase.rpc('admin_reassign_order', {
+      const { error } = await supabase.rpc('admin_assign_order', {
         p_order_id: orderId,
         p_technician_id: techUserId,
-        p_note: `Reasignado a ${name} por admin`,
+        p_note: note ?? undefined,
       });
       if (error) throw error;
       return true;
     },
-    e => pgMessage(e, 'No se pudo reasignar el servicio.'),
+    e => pgMessage(e, 'No se pudo asignar el servicio.'),
+  );
+}
+
+/** Reasignar = el mismo RPC (válido solo en requested/accepted). */
+export const reassignRequest = (orderId: string, techUserId: string) =>
+  assignOrder(orderId, techUserId);
+
+/** Rechaza una solicitud sin técnico (admin_reject_request): cancelada con motivo. */
+export async function rejectRequest(orderId: string, reason: string) {
+  const text = reason.trim();
+  if (!text) {
+    notifyError('Escribe el motivo del rechazo.');
+    return null;
+  }
+  if (MOCK) {
+    const arr = w().orders;
+    const i = arr.findIndex(o => o.id === orderId);
+    if (i < 0) return null;
+    const prev = arr[i];
+    if (prev.status !== 'requested') {
+      notifyError('Solo se puede rechazar una solicitud sin aceptar.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    arr[i] = {
+      ...prev,
+      status: 'cancelled',
+      cancelled_at: now,
+      cancellation_reason: text,
+      needs_manual_assignment: false,
+      updated_at: now,
+    };
+    mockEvent(orderId, 'requested', 'cancelled', rejectNote(text), now);
+    bump();
+    return true as const;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_reject_request', {
+        p_order_id: orderId,
+        p_reason: text,
+      });
+      if (error) throw error;
+      return true;
+    },
+    e => pgMessage(e, 'No se pudo rechazar la solicitud.'),
   );
 }
 
@@ -1606,6 +1738,18 @@ export type OrderEvidence = {
   url: string | null;
 };
 
+/** Fotos de relleno (SVG) para las solicitudes de la maqueta. */
+function mockRequestPhotos(createdAt: string): OrderEvidence[] {
+  const svg = (label: string, c1: string, c2: string) =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="640" height="480" fill="url(#g)"/><text x="320" y="250" font-family="sans-serif" font-size="30" fill="#ffffff" text-anchor="middle">${label}</text></svg>`,
+    )}`;
+  return [
+    { id: 'mock-ph-1', kind: 'request', is_final: false, created_at: createdAt, url: svg('Foto 1 del cliente', '#3b82c4', '#0e2c56') },
+    { id: 'mock-ph-2', kind: 'request', is_final: false, created_at: createdAt, url: svg('Foto 2 del cliente', '#18a66a', '#0e2c56') },
+  ];
+}
+
 /**
  * Evidencia de un servicio con URLs firmadas (bucket privado job-evidence).
  * Fuera del snapshot: se pide al abrir el detalle.
@@ -1613,7 +1757,11 @@ export type OrderEvidence = {
 export async function listOrderEvidence(
   orderId: string,
 ): Promise<OrderEvidence[]> {
-  if (MOCK) return []; // ponytail: la maqueta no tiene fotos; se ven los recuadros «sin foto».
+  if (MOCK) {
+    // ponytail: la maqueta no tiene fotos salvo en solicitudes sin técnico (placeholders SVG).
+    const o = getRequest(orderId);
+    return o?.assignment_mode === 'admin' ? mockRequestPhotos(o.created_at) : [];
+  }
   const { data, error } = await supabase
     .from('service_evidence')
     .select('id, kind, is_final, created_at, storage_path')

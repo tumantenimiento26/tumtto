@@ -26,7 +26,8 @@ export type ServiceTab =
   | 'curso'
   | 'completados'
   | 'cancelados'
-  | 'disputa';
+  | 'disputa'
+  | 'emergencias';
 
 export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -35,6 +36,7 @@ export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'completados', label: 'Completados' },
   { value: 'cancelados', label: 'Cancelados' },
   { value: 'disputa', label: 'En disputa' },
+  { value: 'emergencias', label: 'Emergencias' },
 ];
 
 const IN_PROGRESS: OrderStatus[] = [
@@ -48,7 +50,7 @@ const IN_PROGRESS: OrderStatus[] = [
 const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
 
 export function serviceTabOf(
-  o: { status: OrderStatus; is_disputed: boolean },
+  o: { status: OrderStatus; is_disputed: boolean; is_emergency?: boolean },
   tab: ServiceTab,
 ): boolean {
   switch (tab) {
@@ -64,6 +66,8 @@ export function serviceTabOf(
       return o.status === 'cancelled' || o.status === 'expired';
     case 'disputa':
       return o.is_disputed;
+    case 'emergencias':
+      return !!o.is_emergency;
   }
 }
 
@@ -72,7 +76,12 @@ export interface ServiceRow {
   id: string;
   status: OrderStatus;
   is_disputed: boolean;
-  is_urgent: boolean;
+  /** priority = 'emergency' (reemplaza al antiguo «urgente»). */
+  is_emergency: boolean;
+  /** Emergencia viva sin técnico: espera asignación manual. */
+  needs_manual: boolean;
+  /** Orden de fijado arriba (0 = primero); null = no se fija. Ver emergencyPinRank. */
+  pin: number | null;
   categoryId: string;
   categoryName: string;
   clientName: string;
@@ -92,7 +101,7 @@ export interface ServiceFilters {
   method: string | null; // null = cualquiera
   minPesos: number | null;
   maxPesos: number | null;
-  urgentOnly: boolean;
+  emergencyOnly: boolean;
   disputeOnly: boolean;
   range: DateRange;
 }
@@ -105,7 +114,7 @@ export const EMPTY_SERVICE_FILTERS: ServiceFilters = {
   method: null,
   minPesos: null,
   maxPesos: null,
-  urgentOnly: false,
+  emergencyOnly: false,
   disputeOnly: false,
   range: null,
 };
@@ -120,10 +129,12 @@ export const norm = (s: string) =>
 /** Filtros del sheet (sin pestaña, búsqueda, categoría ni fechas). */
 export function activeSheetFilters(f: ServiceFilters): number {
   return (
+    (f.categoryId ? 1 : 0) +
+    (f.range ? 1 : 0) +
     f.zones.length +
     (f.method ? 1 : 0) +
     (f.minPesos != null || f.maxPesos != null ? 1 : 0) +
-    (f.urgentOnly ? 1 : 0) +
+    (f.emergencyOnly ? 1 : 0) +
     (f.disputeOnly ? 1 : 0)
   );
 }
@@ -144,7 +155,7 @@ export function filterServices(
       return false;
     if (f.maxPesos != null && (pesos == null || pesos > f.maxPesos))
       return false;
-    if (f.urgentOnly && !r.is_urgent) return false;
+    if (f.emergencyOnly && !r.is_emergency) return false;
     if (f.disputeOnly && !r.is_disputed) return false;
     if (f.range && !inRange(new Date(r.createdAt), f.range)) return false;
     if (!q) return true;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -39,6 +39,9 @@ import { useAction } from '@/components/use-action';
 import {
   getAllDisputes,
   getPendingKyc,
+  getPendingClientDocuments,
+  loadExtras,
+  useExtras,
   getKycSessions,
   getProfile,
   getRequest,
@@ -67,6 +70,7 @@ import {
   type TicketStatus,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import { ClientDocActions, issuedOn } from '../clientes/_components/ClientDocCard';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/data/notifications';
@@ -135,7 +139,12 @@ export default function SoportePage() {
     d => d.status === 'open' || d.status === 'in_review',
   );
   const openTickets = getTickets().filter(isTicketOpen);
+  useExtras(s => s.clientDocs);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
   const pendingKyc = getPendingKyc();
+  const kycCount = pendingKyc.length + getPendingClientDocuments().length;
 
   if (failed)
     return (
@@ -168,7 +177,7 @@ export default function SoportePage() {
             count: activeDisputes.length,
           },
           { value: 'tickets', label: 'Tickets', count: openTickets.length },
-          { value: 'kyc', label: 'Cola KYC', count: pendingKyc.length },
+          { value: 'kyc', label: 'Cola KYC', count: kycCount },
         ]}
       />
 
@@ -764,14 +773,16 @@ const REJECT_REASONS = [
 
 function KycView() {
   useTick();
+  useExtras(s => s.clientDocs);
   const pending = getPendingKyc();
-  if (pending.length === 0)
+  const clientDocs = getPendingClientDocuments();
+  if (pending.length === 0 && clientDocs.length === 0)
     return (
       <Card padded>
         <EmptyState
           kind="all-clear"
           title="Cola KYC al día"
-          description="No hay técnicos esperando verificación."
+          description="No hay técnicos ni clientes esperando verificación."
         />
       </Card>
     );
@@ -780,7 +791,50 @@ function KycView() {
       {pending.map(t => (
         <KycCard key={t.id} techId={t.id} />
       ))}
+      {clientDocs.map(d => (
+        <ClientDocKycCard key={d.id} doc={d} />
+      ))}
     </div>
+  );
+}
+
+function ClientDocKycCard({ doc }: { doc: ReturnType<typeof getPendingClientDocuments>[number] }) {
+  const profile = getProfile(doc.client_id);
+  const who = profile?.full_name ?? 'Cliente';
+  return (
+    <Card padded className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <Avatar name={profile?.full_name} size={42} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-sans text-[14px] font-semibold text-navy">{who}</div>
+          <div className="font-sans text-[12px] text-muted">
+            {formatPhone(profile?.phone) || '—'}
+          </div>
+        </div>
+        <Badge tone="warning">En revisión</Badge>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 rounded-btn border border-line px-3 py-2">
+          <FileText size={14} className="text-primary" />
+          <span className="flex-1 truncate font-sans text-[12.5px] text-navy">
+            Cliente · Comprobante de domicilio
+          </span>
+          <span className="font-sans text-[11px] text-faint">{timeAgo(doc.created_at)}</span>
+        </div>
+        <span className="font-sans text-[12.5px] text-muted">
+          Emitido el {issuedOn(doc.issued_on)}
+        </span>
+        <Link
+          href={`/clientes/${doc.client_id}`}
+          className="inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-primary"
+        >
+          Ver perfil del cliente <ArrowRight size={12} />
+        </Link>
+      </div>
+      <div className="mt-auto">
+        <ClientDocActions doc={doc} who={who} />
+      </div>
+    </Card>
   );
 }
 

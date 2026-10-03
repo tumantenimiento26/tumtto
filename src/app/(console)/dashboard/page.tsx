@@ -40,6 +40,7 @@ import {
   type DashRange,
 } from '@/lib/dashboard';
 import { orderCode } from '@/lib/orderCode';
+import { needsManualAssignment } from '@/lib/emergency';
 import { DashBand, type BandKpi } from './_components/DashBand';
 import { GmvChart } from './_components/GmvChart';
 import { PipelineDonut } from './_components/PipelineDonut';
@@ -199,6 +200,17 @@ export default function DashboardPage() {
 
     // Requiere atención
     const attention: AttentionItem[] = [];
+    // Emergencias sin técnico tras el tiempo límite: lo más urgente, siempre arriba.
+    for (const o of orders)
+      if (needsManualAssignment(o))
+        attention.push({
+          id: `emg-${o.id}`,
+          ...ATTENTION_ICON.emergency,
+          title: `Emergencia ${orderCode(o.id)} sin técnico`,
+          sub: `${catOf(o.category_id)?.name ?? 'Servicio'} · ${o.municipality ?? 'ZMG'} · nadie aceptó, asígnala`,
+          cta: 'Asignar',
+          onClick: () => router.push(`/servicios/${o.id}?reasignar=1`),
+        });
     for (const t of getPendingKyc())
       attention.push({
         id: `kyc-${t.id}`,
@@ -234,6 +246,8 @@ export default function DashboardPage() {
         });
       if (
         o.status === 'requested' &&
+        !needsManualAssignment(o) &&
+        o.priority !== 'emergency' &&
         (now - new Date(o.created_at).getTime()) / 60_000 > WAITING_MIN
       )
         attention.push({

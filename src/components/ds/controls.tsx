@@ -72,9 +72,9 @@ export function Card({
   return (
     <As
       onClick={onClick}
-      className={`rounded-box border border-line bg-card ${padded ? 'p-5' : ''} ${
+      className={`card-modern rounded-box border border-line bg-card shadow-card-soft transition-[box-shadow,transform,border-color] duration-200 hover:border-line-strong ${padded ? 'p-5' : ''} ${
         hover
-          ? 'transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-kpi'
+          ? 'hover:-translate-y-0.5 hover:shadow-card-lift'
           : ''
       } ${onClick ? 'cursor-pointer' : ''} ${className}`}
     >
@@ -320,3 +320,4 @@ export function Tabs<T extends string>({
     </div>
   );
 }
+

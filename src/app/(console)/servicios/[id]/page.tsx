@@ -16,8 +16,11 @@ import {
   RotateCcw,
   Send,
   ShieldAlert,
+  Siren,
   Star,
   UserCog,
+  Wrench,
+  Undo2,
 } from 'lucide-react';
 import {
   Badge,
@@ -34,21 +37,26 @@ import {
   toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
+import { TechTypeBadge } from '../../tecnicos/_components/TechTypeParts';
 import {
   addNote,
   createTicket,
   fetchOrderMessages,
   getCategories,
+  loadExtras,
   getNotes,
   getOrderEvents,
   getPayment,
   getProfile,
   getQuote,
   getQuoteItems,
+  getEmergencyConfig,
   getRequest,
   getTickets,
   getTechByUser,
   getTechniciansWithProfile,
+  getTechToolViews,
+  useExtras,
   listOrderEvidence,
   loadWorld,
   reassignRequest,
@@ -67,6 +75,7 @@ import { orderCode } from '@/lib/orderCode';
 import { fmtDateTime } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
+import { toolsForCategory } from '@/lib/tools';
 import {
   Avatar,
   CategoryTile,
@@ -77,6 +86,13 @@ import {
   timeAgo,
 } from '../_components/shared';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
+import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
+import {
+  includedSurchargeCents,
+  isEmergency,
+  needsManualAssignment,
+  surchargeLabel,
+} from '@/lib/emergency';
 
 // Stepper de 8 estados del handoff (closing cuenta como "En servicio";
 // closed como "Pagado"). Cancelado/expirado = nodo terminal rojo.
@@ -165,6 +181,13 @@ export default function ServicioDetailPage() {
     [req?.id, req?.updated_at],
   );
 
+  // Desde la lista / dashboard / notificaciones: /servicios/:id?reasignar=1 abre el modal.
+  const wantsReassign = req ? needsManualAssignment(req) : false;
+  useEffect(() => {
+    if (wantsReassign && new URLSearchParams(window.location.search).get('reasignar') === '1')
+      setReassignOpen(true);
+  }, [wantsReassign]);
+
   if (failed)
     return (
       <ErrorPage
@@ -213,13 +236,15 @@ export default function ServicioDetailPage() {
   const laborCents = quote?.labor_cents ?? 0;
   const materialsCents = items.reduce((s, i) => s + i.total_cents, 0);
   const totalCents = req.quoted_total_cents ?? quote?.total_cents ?? null;
-  const surchargeCents =
-    req.is_urgent && totalCents != null
-      ? Math.round(
-          totalCents -
-            totalCents / (1 + (req.urgent_surcharge_bps || 2000) / 10000),
-        )
-      : 0;
+  const emergency = isEmergency(req);
+  const emCfg = getEmergencyConfig();
+  const surchargeCents = emergency
+    ? includedSurchargeCents({
+        emergency_surcharge_cents: req.emergency_surcharge_cents,
+        total_cents: totalCents,
+        fallback_bps: req.urgent_surcharge_bps || emCfg.surchargeBps,
+      })
+    : 0;
   const commissionCents =
     payment?.commission_cents ??
     req.commission_cents ??
@@ -272,8 +297,28 @@ export default function ServicioDetailPage() {
         <ChevronLeft size={16} /> Servicios
       </Link>
 
+      {wantsReassign && (
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-box border border-error-line bg-error-soft p-4 sm:flex-row sm:items-center"
+        >
+          <Siren size={20} className="text-error" />
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-[14px] font-bold text-error">
+              Emergencia sin técnico — asignar
+            </div>
+            <div className="text-[13px] text-body">
+              Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.
+            </div>
+          </div>
+          <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
+            Asignar técnico
+          </Button>
+        </div>
+      )}
+
       {req.is_disputed && (
-        <div className="flex flex-wrap items-center gap-3 rounded-box border border-error-line bg-error-soft p-4">
+        <div className="flex flex-col items-start gap-3 rounded-box border border-error-line bg-error-soft p-4 sm:flex-row sm:items-center">
           <ShieldAlert size={20} className="text-error" />
           <div className="min-w-0 flex-1">
             <div className="font-display text-[14px] font-bold text-error">
@@ -321,9 +366,14 @@ export default function ServicioDetailPage() {
             <Badge tone={STATUS[req.status].tone} dot>
               {STATUS[req.status].label}
             </Badge>
-            {req.is_urgent && (
-              <Badge tone="warning">
-                Urgente · +{Math.round((req.urgent_surcharge_bps || 2000) / 100)}%
+            {emergency && (
+              <Badge tone="danger">
+                Emergencia
+                {req.emergency_surcharge_cents != null
+                  ? ` · ${surchargeLabel('fixed', 0, req.emergency_surcharge_cents)}`
+                  : req.urgent_surcharge_bps
+                    ? ` · ${surchargeLabel('percent', req.urgent_surcharge_bps, 0)}`
+                    : ''}
               </Badge>
             )}
             <Button variant="secondary" icon={Pencil} onClick={() => setEditOpen(true)}>
@@ -367,13 +417,13 @@ export default function ServicioDetailPage() {
                   ) : null}
                 </span>
                 <span
-                  className={`mt-2 font-display text-[13px] font-bold ${
+                  className={`mt-2 pr-1 font-display text-[11px] font-bold leading-tight sm:text-[13px] ${
                     now ? 'text-primary' : i <= current ? 'text-navy' : 'text-faint'
                   }`}
                 >
                   {st.label}
                 </span>
-                <span className="font-mono text-[11px] text-muted">{t ?? '—'}</span>
+                <span className="font-mono text-[10px] text-muted sm:text-[11px]">{t ?? '—'}</span>
               </li>
             );
           })}
@@ -394,6 +444,9 @@ export default function ServicioDetailPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         {/* Columna principal */}
         <div className="flex min-w-0 flex-col gap-4">
+          {emergency && canSupport && (
+            <EmergencyDispatchCard orderId={req.id} dispatchStatus={req.dispatch_status} />
+          )}
           <Card padded>
             <Kicker className="mb-3">Descripción del problema</Kicker>
             <p className="text-[15px] leading-relaxed text-navy">
@@ -452,33 +505,47 @@ export default function ServicioDetailPage() {
               <EmptyState compact kind="first-use" title="Sin movimientos todavía" />
             ) : (
               <ol className="flex flex-col">
-                {events.map((e, i) => (
-                  <li key={e.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
-                      {i < events.length - 1 && <span className="w-[2px] flex-1 bg-line" />}
-                    </div>
-                    <div className="min-w-0 flex-1 pb-4">
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <span className="font-display text-[13.5px] font-bold text-navy">
-                          {STATUS[e.to_status as RequestStatus]?.label ?? e.to_status}
-                        </span>
-                        <span className="font-mono text-[11px] text-muted">
-                          {fmtDateTime(e.created_at, {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                {events.map((e, i) => {
+                  const label = (st: string | null) =>
+                    STATUS[st as RequestStatus]?.label ?? st ?? '—';
+                  return (
+                    <li key={e.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        {e.is_revert ? (
+                          <span className="mt-0.5 grid h-4 w-4 place-items-center rounded-full bg-warning-soft text-warning">
+                            <Undo2 size={10} />
+                          </span>
+                        ) : (
+                          <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
+                        )}
+                        {i < events.length - 1 && <span className="w-[2px] flex-1 bg-line" />}
                       </div>
-                      <div className="text-[12.5px] text-muted">
-                        {ACTOR_LABEL(e.actor_id)}
-                        {e.note ? ` · ${e.note}` : ''}
+                      <div className="min-w-0 flex-1 pb-4">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span
+                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning' : 'text-navy'}`}
+                          >
+                            {e.is_revert
+                              ? `Estado revertido: ${label(e.from_status)} → ${label(e.to_status)}`
+                              : label(e.to_status)}
+                          </span>
+                          <span className="font-mono text-[11px] text-muted">
+                            {fmtDateTime(e.created_at, {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <div className="text-[12.5px] text-muted">
+                          {ACTOR_LABEL(e.actor_id)}
+                          {e.note ? ` · ${e.note}` : ''}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </Card>
@@ -587,7 +654,7 @@ export default function ServicioDetailPage() {
             <dl className="flex flex-col gap-2 text-[13.5px]">
               <Row label="Mano de obra" value={money(laborCents || null, true)} />
               <Row label="Materiales" value={money(materialsCents || null, true)} />
-              {req.is_urgent && <Row label="Recargo urgente" value={money(surchargeCents || null, true)} />}
+              {emergency && <Row label="Recargo de emergencia" value={money(surchargeCents || null, true)} />}
               <div className="my-1 border-t border-divider" />
               <Row label="Total" value={money(totalCents, true)} strong />
               <Row
@@ -668,6 +735,7 @@ export default function ServicioDetailPage() {
         open={reassignOpen}
         onClose={() => setReassignOpen(false)}
         currentTechUserId={req.technician_id}
+        categoryId={req.category_id}
         busy={busy === 'reassign'}
         onSelect={async (userId, name) => {
           const ok = await run('reassign', () => reassignRequest(req.id, userId), `Servicio reasignado a ${name}`);
@@ -783,15 +851,23 @@ function ReassignModal({
   onClose,
   onSelect,
   currentTechUserId,
+  categoryId,
   busy,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (userId: string, name: string) => void;
   currentTechUserId: string | null;
+  /** Categoría del servicio: se muestran las herramientas del técnico para ella. */
+  categoryId?: string | null;
   busy?: boolean;
 }) {
+  useExtras(s => s.techTools);
+  useExtras(s => s.toolCatalog);
   const [q, setQ] = useState('');
+  useEffect(() => {
+    if (open) void loadExtras();
+  }, [open]);
   const candidates = getTechniciansWithProfile()
     .filter(
       ({ tech, profile }) =>
@@ -837,11 +913,16 @@ function ReassignModal({
                 >
                   <Avatar name={name} size={38} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-display text-[14px] font-bold text-navy">{name}</div>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-display text-[14px] font-bold text-navy">{name}</span>
+                      <span className="sm:hidden"><TechTypeBadge techId={tech.id} short /></span>
+                      <span className="hidden sm:inline"><TechTypeBadge techId={tech.id} /></span>
+                    </div>
                     <div className="flex items-center gap-1 text-[12px] text-muted">
                       <Star size={11} className="text-warning" fill="currentColor" />
                       {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.rating_count} trabajos
                     </div>
+                    <ToolChips techId={tech.id} categoryId={categoryId} />
                   </div>
                   <Badge tone={tech.is_available ? 'success' : 'neutral'} dot>
                     {tech.is_available ? 'Disponible' : 'Ocupado'}
@@ -853,6 +934,29 @@ function ReassignModal({
         </ul>
       )}
     </Modal>
+  );
+}
+
+/** Herramientas del técnico para la categoría del servicio (chips compactos, «+N»). */
+function ToolChips({ techId, categoryId }: { techId: string; categoryId?: string | null }) {
+  const tools = toolsForCategory(getTechToolViews(techId), categoryId);
+  if (tools.length === 0) return null;
+  const MAX = 3;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1" title={tools.map(t => t.name).join(' · ')}>
+      {tools.slice(0, MAX).map(t => (
+        <span
+          key={t.rowId}
+          className="inline-flex max-w-full items-center gap-1 rounded-full bg-tint px-2 py-0.5 font-sans text-[11px] text-body"
+        >
+          <Wrench size={10} className="flex-shrink-0 text-faint" aria-hidden />
+          <span className="truncate">{t.name}</span>
+        </span>
+      ))}
+      {tools.length > MAX && (
+        <span className="font-sans text-[11px] font-semibold text-muted">+{tools.length - MAX}</span>
+      )}
+    </div>
   );
 }
 

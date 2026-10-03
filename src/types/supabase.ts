@@ -156,6 +156,66 @@ export type Database = {
           },
         ]
       }
+      client_documents: {
+        Row: {
+          bucket_id: string
+          client_id: string
+          created_at: string
+          id: string
+          issued_on: string
+          kind: Database["public"]["Enums"]["client_document_kind"]
+          review_notes: string | null
+          review_status: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_id?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          issued_on: string
+          kind?: Database["public"]["Enums"]["client_document_kind"]
+          review_notes?: string | null
+          review_status?: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          issued_on?: string
+          kind?: Database["public"]["Enums"]["client_document_kind"]
+          review_notes?: string | null
+          review_status?: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coverage_zones: {
         Row: {
           created_at: string
@@ -293,6 +353,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      emergency_dispatch_log: {
+        Row: {
+          distance_m: number
+          id: string
+          notified_at: string
+          order_id: string
+          radius_m: number
+          round: number
+          technician_id: string
+        }
+        Insert: {
+          distance_m: number
+          id?: string
+          notified_at?: string
+          order_id: string
+          radius_m: number
+          round: number
+          technician_id: string
+        }
+        Update: {
+          distance_m?: number
+          id?: string
+          notified_at?: string
+          order_id?: string
+          radius_m?: number
+          round?: number
+          technician_id?: string
+        }
+        Relationships: []
       }
       kyc_sessions: {
         Row: {
@@ -1113,6 +1203,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id: string
+          is_revert: boolean
           note: string | null
           service_order_id: string
           to_status: Database["public"]["Enums"]["service_order_status"]
@@ -1125,6 +1216,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id?: string
+          is_revert?: boolean
           note?: string | null
           service_order_id: string
           to_status: Database["public"]["Enums"]["service_order_status"]
@@ -1137,6 +1229,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id?: string
+          is_revert?: boolean
           note?: string | null
           service_order_id?: string
           to_status?: Database["public"]["Enums"]["service_order_status"]
@@ -1173,6 +1266,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -1181,10 +1281,12 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
@@ -1211,6 +1313,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          dispatch_deadline_at?: string | null
+          dispatch_last_round_at?: string | null
+          dispatch_radius_m?: number | null
+          dispatch_round?: number | null
+          dispatch_started_at?: string | null
+          dispatch_status?: string | null
+          emergency_surcharge_cents?: number | null
           expires_at?: string | null
           folio?: number
           id?: string
@@ -1219,10 +1328,12 @@ export type Database = {
           location: unknown
           mapbox_feature_id?: string | null
           municipality?: string | null
+          needs_manual_assignment?: boolean
           neighborhood?: string | null
           paid_at?: string | null
           place_name?: string | null
           postal_code?: string | null
+          priority?: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents?: number | null
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
@@ -1249,6 +1360,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          dispatch_deadline_at?: string | null
+          dispatch_last_round_at?: string | null
+          dispatch_radius_m?: number | null
+          dispatch_round?: number | null
+          dispatch_started_at?: string | null
+          dispatch_status?: string | null
+          emergency_surcharge_cents?: number | null
           expires_at?: string | null
           folio?: number
           id?: string
@@ -1257,10 +1375,12 @@ export type Database = {
           location?: unknown
           mapbox_feature_id?: string | null
           municipality?: string | null
+          needs_manual_assignment?: boolean
           neighborhood?: string | null
           paid_at?: string | null
           place_name?: string | null
           postal_code?: string | null
+          priority?: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents?: number | null
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
@@ -1664,6 +1784,42 @@ export type Database = {
           },
         ]
       }
+      technician_companies: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          rfc: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          rfc?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          rfc?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       technician_documents: {
         Row: {
           bucket_id: string
@@ -1865,6 +2021,136 @@ export type Database = {
           },
         ]
       }
+      technician_vehicles: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          make?: string
+          model?: string
+          plate?: string
+          technician_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_vehicles_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_catalog: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_tools: {
+        Row: {
+          catalog_id: string | null
+          created_at: string
+          custom_category_id: string | null
+          custom_name: string | null
+          id: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_category_id?: string | null
+          custom_name?: string | null
+          id?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_category_id?: string | null
+          custom_name?: string | null
+          id?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_tools_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "tool_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_tools_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technician_rates: {
         Row: {
           category_id: string
@@ -1994,6 +2280,7 @@ export type Database = {
           bank_name: string | null
           bio: string | null
           clabe: string | null
+          company_id: string | null
           created_at: string
           curp: string | null
           display_name: string | null
@@ -2005,6 +2292,7 @@ export type Database = {
           rating_count: number
           rfc: string | null
           service_radius_m: number | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
           updated_at: string
           zone_id: string | null
         }
@@ -2013,6 +2301,7 @@ export type Database = {
           bank_name?: string | null
           bio?: string | null
           clabe?: string | null
+          company_id?: string | null
           created_at?: string
           curp?: string | null
           display_name?: string | null
@@ -2024,6 +2313,7 @@ export type Database = {
           rating_count?: number
           rfc?: string | null
           service_radius_m?: number | null
+          technician_type?: Database["public"]["Enums"]["technician_type"]
           updated_at?: string
           zone_id?: string | null
         }
@@ -2032,6 +2322,7 @@ export type Database = {
           bank_name?: string | null
           bio?: string | null
           clabe?: string | null
+          company_id?: string | null
           created_at?: string
           curp?: string | null
           display_name?: string | null
@@ -2043,10 +2334,18 @@ export type Database = {
           rating_count?: number
           rfc?: string | null
           service_radius_m?: number | null
+          technician_type?: Database["public"]["Enums"]["technician_type"]
           updated_at?: string
           zone_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "technicians_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "technician_companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "technicians_id_fkey"
             columns: ["id"]
@@ -2185,6 +2484,74 @@ export type Database = {
       }
     }
     Functions: {
+      admin_emergency_history: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      create_emergency_request: {
+        Args: {
+          p_address_line?: string
+          p_category_id: string
+          p_client_address_id?: string
+          p_client_id?: string
+          p_description?: string
+          p_lat: number
+          p_lng: number
+          p_mapbox_feature_id?: string
+          p_municipality?: string
+          p_neighborhood?: string
+          p_place_name?: string
+          p_postal_code?: string
+          p_raw_mapbox_feature?: Json
+          p_state?: string
+        }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      get_emergency_terms: {
+        Args: { p_category_id: string }
+        Returns: Json
+      }
+      admin_find_technicians_by_plate: {
+        Args: { p_query: string }
+        Returns: {
+          full_name: string
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          year: number
+        }[]
+      }
+      admin_custom_tools: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          category_ids: string[]
+          first_seen: string
+          name: string
+          technicians_count: number
+        }[]
+      }
+      admin_promote_custom_tool: {
+        Args: { p_category_id?: string; p_custom_name: string; p_name: string }
+        Returns: Database["public"]["Tables"]["tool_catalog"]["Row"]
+      }
+      admin_set_technician_type: {
+        Args: {
+          p_company_id?: string
+          p_note?: string
+          p_technician_id: string
+          p_type: Database["public"]["Enums"]["technician_type"]
+        }
+        Returns: Database["public"]["Tables"]["technicians"]["Row"]
+      }
+      revert_service_order_status: {
+        Args: { p_order_id: string; p_reason?: string }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
+      }
+      client_address_verified: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       accept_quote: {
         Args: { p_quote_id: string }
         Returns: {
@@ -2813,44 +3180,7 @@ export type Database = {
           p_technician_id?: string
           p_title?: string
         }
-        Returns: {
-          accepted_at: string | null
-          address_line: string | null
-          cancellation_reason: string | null
-          cancelled_at: string | null
-          category_id: string
-          client_address_id: string | null
-          client_id: string
-          commission_bps: number | null
-          commission_cents: number | null
-          completed_at: string | null
-          created_at: string
-          description: string | null
-          expires_at: string | null
-          folio: number
-          id: string
-          is_disputed: boolean
-          is_urgent: boolean
-          location: unknown
-          mapbox_feature_id: string | null
-          municipality: string | null
-          neighborhood: string | null
-          paid_at: string | null
-          place_name: string | null
-          postal_code: string | null
-          quoted_subtotal_cents: number | null
-          quoted_total_cents: number | null
-          raw_mapbox_feature: Json | null
-          requested_technician_id: string | null
-          scheduled_for: string | null
-          scheduled_until: string | null
-          state: string | null
-          status: Database["public"]["Enums"]["service_order_status"]
-          technician_id: string | null
-          title: string | null
-          updated_at: string
-          urgent_surcharge_bps: number
-        }
+        Returns: Database["public"]["Tables"]["service_orders"]["Row"]
         SetofOptions: {
           from: "*"
           to: "service_orders"
@@ -3424,6 +3754,7 @@ export type Database = {
       }
     }
     Enums: {
+      client_document_kind: "proof_of_address"
       deletion_request_status:
         | "pending"
         | "cancelled"
@@ -3477,6 +3808,7 @@ export type Database = {
         | "cancelled"
         | "held"
       profile_status: "active" | "suspended" | "deleted"
+      service_priority: "normal" | "emergency"
       service_order_status:
         | "requested"
         | "accepted"
@@ -3490,6 +3822,7 @@ export type Database = {
         | "closed"
         | "expired"
         | "cancelled"
+      technician_type: "tumtto" | "third_party" | "independent"
       technician_document_kind:
         | "criminal_record"
         | "proof_of_address"
@@ -3623,6 +3956,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      client_document_kind: ["proof_of_address"],
       deletion_request_status: [
         "pending",
         "cancelled",
@@ -3682,6 +4016,7 @@ export const Constants = {
         "held",
       ],
       profile_status: ["active", "suspended", "deleted"],
+      service_priority: ["normal", "emergency"],
       service_order_status: [
         "requested",
         "accepted",
@@ -3696,6 +4031,7 @@ export const Constants = {
         "expired",
         "cancelled",
       ],
+      technician_type: ["tumtto", "third_party", "independent"],
       technician_document_kind: [
         "criminal_record",
         "proof_of_address",

@@ -236,13 +236,14 @@ export function Modal({
   return (
     <Portal>
       <Scrim onClick={close} />
-      <div className="pointer-events-none fixed inset-0 z-[81] grid place-items-center p-4">
+      {/* Celular (≤640 px): pantalla completa con scroll y botones al pie. */}
+      <div className="pointer-events-none fixed inset-0 z-[81] grid place-items-center p-4 max-[640px]:place-items-stretch max-[640px]:p-0">
         <div
           role="dialog"
           aria-modal="true"
           aria-label={title}
-          className="anim-modal pointer-events-auto w-full rounded-modal border border-line bg-card p-6 shadow-modal"
-          style={{ maxWidth: width }}
+          className="anim-modal pointer-events-auto w-full max-w-[var(--modal-w)] rounded-modal border border-line bg-card p-6 shadow-modal max-[640px]:flex max-[640px]:max-w-none max-[640px]:flex-col max-[640px]:overflow-y-auto max-[640px]:rounded-none max-[640px]:border-0"
+          style={{ '--modal-w': `${width}px` } as React.CSSProperties}
         >
           {Icon && (
             <div
@@ -261,7 +262,9 @@ export function Modal({
           )}
           {children && <div className="mt-4">{children}</div>}
           {footer && (
-            <div className="mt-6 flex justify-end gap-2.5">{footer}</div>
+            <div className="mt-6 flex flex-wrap justify-end gap-2.5 max-[640px]:mt-auto max-[640px]:pt-6 max-[640px]:[&>*]:flex-1">
+              {footer}
+            </div>
           )}
         </div>
       </div>

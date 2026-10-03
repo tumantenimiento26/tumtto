@@ -4,7 +4,8 @@
 
 import { orderCode } from './orderCode';
 
-export type DashRange = 'hoy' | '7d' | '30d';
+/** Rápidos del hero o un rango libre del date picker (inclusive, por día). */
+export type DashRange = 'hoy' | '7d' | '30d' | { from: Date; to: Date };
 export type DashMetric = 'gmv' | 'servicios' | 'ticket';
 
 export interface Bucket {
@@ -25,6 +26,8 @@ const startOfDay = (t: number) => {
 
 /** Duración total del periodo (para el periodo anterior). */
 export function rangeMs(range: DashRange): number {
+  if (typeof range === 'object')
+    return startOfDay(range.to.getTime()) + DAY - startOfDay(range.from.getTime());
   return range === 'hoy' ? DAY : range === '7d' ? 7 * DAY : 30 * DAY;
 }
 
@@ -33,6 +36,28 @@ export function rangeMs(range: DashRange): number {
  * 30d = 30 días, terminando en el día actual.
  */
 export function buckets(range: DashRange, now = Date.now()): Bucket[] {
+  if (typeof range === 'object') {
+    // Rango libre: 1 día = franjas de 2 h · ≤ 31 días = por día · más = por semana.
+    const from = startOfDay(range.from.getTime());
+    const end = from + rangeMs(range);
+    const days = Math.round((end - from) / DAY);
+    if (days <= 1) return buckets('hoy', from);
+    const step = days > 31 ? 7 * DAY : DAY;
+    return Array.from({ length: Math.ceil((end - from) / step) }, (_, i) => {
+      const start = from + i * step;
+      const d = new Date(start);
+      return {
+        start,
+        end: Math.min(start + step, end),
+        label:
+          step > DAY
+            ? `${d.getDate()}/${d.getMonth() + 1}`
+            : days <= 7
+              ? DOW[d.getDay()]
+              : String(d.getDate()),
+      };
+    });
+  }
   const today = startOfDay(now);
   if (range === 'hoy')
     return Array.from({ length: 12 }, (_, i) => {

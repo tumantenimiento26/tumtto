@@ -12,13 +12,20 @@ import {
   Kicker,
   PageHeader,
   ScreenSkeleton,
-  Segmented,
   toast,
+  Chip,
+  Select,
+  PeriodFilters,
+  periodLabel,
+  toPeriod,
 } from '@/components/ds';
 import { LineChart, HBars } from '@/components/charts';
 import {
   getCategoriesWithCounts,
   getReportData,
+  getCompanies,
+  loadExtras,
+  useExtras,
   getTechniciansWithProfile,
   fetchReportKpis,
   fetchTicketByCategory,
@@ -33,20 +40,14 @@ import {
   completedSeries,
   demandHeatmap,
   funnel,
-  lastDays,
   prdKpis,
   toCsv,
   type Kpi,
 } from '@/lib/reportMetrics';
+import { TECH_TYPES, TECH_TYPE_LABEL, type TechType } from '@/lib/techType';
 import { Heatmap } from './_components/Heatmap';
+import { rangePreset, type DateRange } from '@/lib/calendar';
 
-const RANGES = ['7 días', '30 días', '90 días'] as const;
-type Range = (typeof RANGES)[number];
-const DAYS: Record<Range, number> = {
-  '7 días': 7,
-  '30 días': 30,
-  '90 días': 90,
-};
 
 const mxn = (cents: number) =>
   `$${Math.round(cents / 100).toLocaleString('es-MX')}`;
@@ -62,9 +63,19 @@ export default function ReportesPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const [range, setRange] = useState<Range>('30 días');
-  const days = DAYS[range];
-  const period = useMemo(() => lastDays(days), [days]);
+  const [range, setRange] = useState<NonNullable<DateRange>>(() => rangePreset('30d')!);
+  const period = useMemo(() => toPeriod(range), [range]);
+  const days = Math.max(1, Math.round((period.to.getTime() - period.from.getTime()) / 864e5));
+  const label = periodLabel(range);
+
+  // Filtros por tipo/empresa de técnico (solo afectan lo calculado en local).
+  const [typeF, setTypeF] = useState<TechType | null>(null);
+  const [companyF, setCompanyF] = useState<string | null>(null);
+  useExtras(s => s.companies);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
+  const filtered = !!typeF;
 
   const [rpc, setRpc] = useState<{
     kpis: ReportKpis | null;
@@ -88,9 +99,18 @@ export default function ReportesPage() {
     };
   }, [period]);
 
-  const { orders, events, technicians } = getReportData();
+  const all = getReportData();
+  const technicians = all.technicians.filter(
+    t => !typeF || (t.technician_type === typeF && (!companyF || t.company_id === companyF)),
+  );
+  const techIds = new Set(technicians.map(t => t.id));
+  const orders = filtered
+    ? all.orders.filter(o => !!o.technician_id && techIds.has(o.technician_id))
+    : all.orders;
+  const orderIds = new Set(orders.map(o => o.id));
+  const events = filtered ? all.events.filter(e => orderIds.has(e.service_order_id)) : all.events;
   const kpis = prdKpis(orders, events, technicians, period);
-  const series = completedSeries(orders, Math.min(days, 30));
+  const series = completedSeries(orders, Math.min(days, 30), range.to);
   const steps = funnel(orders, events, period);
   const grid = demandHeatmap(orders, period);
   const cats = getCategoriesWithCounts();
@@ -115,6 +135,7 @@ export default function ReportesPage() {
         (doneByTech.get(o.technician_id) ?? 0) + 1,
       );
   const techRows = getTechniciansWithProfile()
+    .filter(({ tech }) => !typeF || techIds.has(tech.id))
     .map(({ tech, profile }) => ({
       id: tech.id,
       name: profile?.full_name ?? 'Técnico',
@@ -161,7 +182,7 @@ export default function ReportesPage() {
       a.download = `reporte-${days}d-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('CSV exportado', `${rows.length} filas · ${range}`);
+      toast.success('CSV exportado', `${rows.length} filas · ${label}`);
     } catch {
       toast.error('No se pudo exportar el CSV');
     }
@@ -194,7 +215,45 @@ export default function ReportesPage() {
         description="Metas del PRD a 6 meses frente a la operación actual."
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
-            <Segmented options={RANGES} value={range} onChange={setRange} />
+            <PeriodFilters value={range} onChange={setRange} kicker="Reportes">
+              <section>
+                <Kicker className="mb-2.5">Tipo de técnico</Kicker>
+                <div className="flex flex-wrap gap-2">
+                  <Chip
+                    active={!typeF}
+                    onClick={() => {
+                      setTypeF(null);
+                      setCompanyF(null);
+                    }}
+                  >
+                    Todos
+                  </Chip>
+                  {TECH_TYPES.map(t => (
+                    <Chip
+                      key={t}
+                      active={typeF === t}
+                      onClick={() => {
+                        setTypeF(typeF === t ? null : t);
+                        setCompanyF(null);
+                      }}
+                    >
+                      {TECH_TYPE_LABEL[t]}
+                    </Chip>
+                  ))}
+                </div>
+                {typeF === 'third_party' && (
+                  <div className="mt-3">
+                    <Select
+                      options={getCompanies().map(c => ({ value: c.id, label: c.name }))}
+                      value={companyF}
+                      onChange={setCompanyF}
+                      placeholder="Todas las empresas"
+                      aria-label="Empresa"
+                    />
+                  </div>
+                )}
+              </section>
+            </PeriodFilters>
             <Button variant="secondary" icon={Download} onClick={exportCsv}>
               Exportar CSV
             </Button>
@@ -237,6 +296,17 @@ export default function ReportesPage() {
           loading={rpc.loading}
         />
       </div>
+      {filtered && (
+        <p className="-mt-3 font-sans text-[12px] text-muted">
+          Filtrado por{' '}
+          {typeF === 'third_party' && companyF
+            ? `Tercero · ${getCompanies().find(c => c.id === companyF)?.name ?? 'empresa'}`
+            : TECH_TYPE_LABEL[typeF as TechType]}
+          : las metas, el embudo, la demanda, las series y el ranking se filtran. El resumen del
+          periodo (GMV, servicios pagados, llegada), el ticket por categoría y las zonas frías
+          vienen del servidor y no se filtran por tipo.
+        </p>
+      )}
       {!rpc.loading && !rpc.kpis && (
         <p className="-mt-3 font-sans text-[12px] text-muted">
           El resumen del periodo viene del reporte del servidor y no respondió;
@@ -256,7 +326,7 @@ export default function ReportesPage() {
             />
           ) : (
             <LineChart
-              key={range}
+              key={label}
               data={series.map(p => ({ label: p.label, value: p.value }))}
               height={220}
               format={v => `${v} servicios`}
@@ -280,7 +350,7 @@ export default function ReportesPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <Kicker>Demanda por día y franja</Kicker>
           <span className="font-sans text-[12px] text-muted">
-            Solicitudes creadas · {range} · 8–20 h
+            Solicitudes creadas · {label} · 8–20 h
           </span>
         </div>
         <Heatmap grid={grid} />
@@ -480,35 +550,49 @@ function Funnel({
         description="No hubo solicitudes en el periodo."
       />
     );
+  // Embudo real: cada etapa es un trapecio centrado cuyo borde superior mide lo
+  // que la etapa y el inferior lo que la siguiente (mínimo 22 % para el texto).
+  // Ancho útil 50 % del centro para dejar las etiquetas a los lados.
+  const w = steps.map(s => Math.max(12, s.ofTotal * 50));
   return (
-    <div className="flex flex-col gap-2.5" onMouseLeave={() => setHover(null)}>
-      {steps.map((s, i) => (
-        <div
-          key={s.label}
-          onMouseEnter={() => setHover(i)}
-          className={`transition-opacity ${
-            hover != null && hover !== i ? 'opacity-40' : ''
-          }`}
-        >
-          <div className="mb-1 flex items-center justify-between font-sans text-[12.5px]">
-            <span className="font-semibold text-navy">{s.label}</span>
-            <span className="font-mono text-muted tabular">
-              {s.value}
-              {hover === i && i > 0 && (
-                <span className="ml-2 text-primary">
-                  {Math.round(s.ofPrev * 100)}% del paso anterior
-                </span>
-              )}
+    <div className="flex flex-col gap-[3px]" onMouseLeave={() => setHover(null)}>
+      {steps.map((s, i) => {
+        const top = w[i];
+        const bottom = i < steps.length - 1 ? w[i + 1] : top * 0.82;
+        const pts = `${50 - top / 2},0 ${50 + top / 2},0 ${50 + bottom / 2},100 ${50 - bottom / 2},100`;
+        return (
+          <button
+            key={s.label}
+            type="button"
+            onMouseEnter={() => setHover(i)}
+            onFocus={() => setHover(i)}
+            aria-label={`${s.label}: ${s.value}${i > 0 ? `, ${Math.round(s.ofPrev * 100)}% del paso anterior` : ''}`}
+            className={`relative block h-[52px] w-full text-left outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
+              hover != null && hover !== i ? 'opacity-45' : ''
+            }`}
+          >
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+              <polygon
+                points={pts}
+                className="fill-primary transition-all duration-700"
+                style={{ fillOpacity: 1 - i * 0.14 }}
+              />
+            </svg>
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 font-sans text-[12.5px] font-semibold text-navy">
+              {s.label}
             </span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-full bg-segment">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-700"
-              style={{ width: `${Math.max(2, Math.round(s.ofTotal * 100))}%` }}
-            />
-          </div>
-        </div>
-      ))}
+            <span className="relative flex h-full items-center justify-center font-mono text-[13px] font-bold text-white tabular">
+              {s.value}
+            </span>
+            {i > 0 && (
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 font-mono text-[11px] text-muted tabular">
+                {Math.round(s.ofPrev * 100)}%
+              </span>
+            )}
+          </button>
+        );
+      })}
+      <p className="mt-1.5 text-right font-mono text-[10.5px] text-faint">% = conversión desde el paso anterior</p>
     </div>
   );
 }

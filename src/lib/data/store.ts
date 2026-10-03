@@ -6,14 +6,38 @@ import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import { wkbPoint } from '@/lib/geo';
 import type { AdminRole } from '@/lib/rbac';
+import { MOCK } from '@/lib/mock';
+import { rejectionNotes } from '@/lib/clientDocs';
+import { typeChangeText, typeCompanyValid, type TechType } from '@/lib/techType';
+import { isValidPlate, normalizePlate, vehicleEventText } from '@/lib/vehicles';
+import {
+  countCatalogTechs,
+  normalizeToolName,
+  resolveTechTools,
+  summarizeCustomTools,
+  toolEventText,
+  type CustomToolSummary,
+} from '@/lib/tools';
+import { withHistory } from '@/lib/demo/history';
+import {
+  EMERGENCY_DEFAULTS,
+  EMERGENCY_KEYS,
+  buildHistory,
+  parseHistory,
+  type EmergencyConfig,
+  type EmergencyHistory,
+  type SurchargeMode,
+} from '@/lib/emergency';
 import {
   emptyWorld,
+  demoWorld,
   CLIENT_ID,
   TECH_USER_ID,
   type World,
   type OrderStatus,
   type ServiceOrder,
   type ServiceCategory,
+  type ServiceStatusEvent,
   type DemoPayout,
 } from '@/lib/demo/world';
 
@@ -92,6 +116,13 @@ const EVENT_LABEL: Record<string, string> = {
   order_refunded: 'Reembolso emitido',
   setting_updated: 'Ajuste actualizado',
   zone_upserted: 'Zona guardada',
+  technician_type_changed: 'Tipo de técnico cambiado',
+  vehicle_added: 'Vehículo agregado',
+  vehicle_updated: 'Vehículo actualizado',
+  vehicle_removed: 'Vehículo eliminado',
+  tool_added: 'Herramienta agregada',
+  tool_updated: 'Herramienta actualizada',
+  tool_removed: 'Herramienta eliminada',
 };
 /** Tablas secundarias del snapshot: si fallan (RLS, migración pendiente) no tiran la consola. */
 const optional = <T,>(p: Promise<T[]>, what: string) =>
@@ -151,10 +182,31 @@ export function fetchAll<K extends keyof Tables & string>(table: K) {
 }
 
 let inflight: Promise<void> | null = null;
+let mockHistory: ReturnType<typeof withHistory> | null = null;
 let rerun: Promise<void> | null = null;
 
 /** Load (or reload) the world snapshot. Call once from the console shell. */
 export function loadWorld(force = false): Promise<void> {
+  if (MOCK) {
+    // Una sola vez: bump() mueve `tick` y hay pantallas que recargan con él.
+    if (mockHistory && world === mockHistory.world) return Promise.resolve();
+    mockHistory ??= withHistory(demoWorld());
+    world = mockHistory.world;
+    adminEvents = mockHistory.vehicles.map(v => ({
+      id: `mock-ae-${v.id}`,
+      actor_id: v.technician_id,
+      entity_type: 'technician',
+      entity_id: v.technician_id,
+      event_type: 'vehicle_added',
+      payload: { before: null, after: { make: v.make, model: v.model, year: v.year, color: v.color, plate: v.plate } },
+      created_at: v.created_at,
+      updated_at: v.created_at,
+    }));
+    registerFolios(world.orders);
+    useData.setState({ status: 'ready' });
+    bump();
+    return Promise.resolve();
+  }
   if (inflight) {
     if (!force) return inflight;
     // Una escritura terminó mientras otra carga iba en vuelo: esa carga salió
@@ -365,6 +417,23 @@ export function getSettingList(key: string, fallback: string[]): string[] {
   const v = settings.find(s => s.key === key)?.value;
   return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
 }
+/** Configuración de emergencias (platform_settings) con los defaults del backend. */
+export function getEmergencyConfig(): EmergencyConfig {
+  const d = EMERGENCY_DEFAULTS;
+  const k = EMERGENCY_KEYS;
+  const mode = getSettingStr(k.surchargeMode, d.surchargeMode);
+  return {
+    initialRadiusM: getSettingInt(k.initialRadiusM, d.initialRadiusM),
+    stepM: getSettingInt(k.stepM, d.stepM),
+    maxRadiusM: getSettingInt(k.maxRadiusM, d.maxRadiusM),
+    roundSeconds: getSettingInt(k.roundSeconds, d.roundSeconds),
+    timeoutMinutes: getSettingInt(k.timeoutMinutes, d.timeoutMinutes),
+    surchargeMode: (mode === 'fixed' ? 'fixed' : 'percent') as SurchargeMode,
+    surchargeBps: getSettingInt(k.surchargeBps, d.surchargeBps),
+    surchargeFixedCents: getSettingInt(k.surchargeFixedCents, d.surchargeFixedCents),
+  };
+}
+
 /**
  * Guarda settings vía upsert_platform_setting (RPC: valida, registra
  * admin_events y crea la key si no existe). Una llamada por key; si una falla
@@ -373,6 +442,21 @@ export function getSettingList(key: string, fallback: string[]): string[] {
 export async function saveSettings(
   entries: Record<string, number | string | boolean | string[]>,
 ) {
+  if (MOCK) {
+    // Maqueta: se guarda solo en memoria (sin Supabase ni sesión).
+    const now = new Date().toISOString();
+    for (const [key, value] of Object.entries(entries)) {
+      const i = settings.findIndex(x => x.key === key);
+      if (i >= 0) settings[i] = { ...settings[i], value, updated_at: now };
+      else
+        settings = [
+          ...settings,
+          { id: `mock-set-${key}`, key, value, description: null, created_at: now, updated_at: now },
+        ];
+    }
+    bump();
+    return Promise.resolve(true as const);
+  }
   return mutate(
     async () => {
       for (const [key, value] of Object.entries(entries)) {
@@ -469,6 +553,36 @@ export const getNotes = (entityId: string): Note[] =>
       const raw = (e.payload as { note?: unknown } | null)?.note;
       const note = typeof raw === 'string' ? raw : null;
       const label = EVENT_LABEL[e.event_type] ?? e.event_type;
+      if (e.event_type.startsWith('vehicle_'))
+        return {
+          id: e.id,
+          entity_id: entityId,
+          author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+          event_type: e.event_type,
+          note,
+          text: vehicleEventText(e.event_type, e.payload),
+          created_at: e.created_at,
+        };
+      if (e.event_type.startsWith('tool_'))
+        return {
+          id: e.id,
+          entity_id: entityId,
+          author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+          event_type: e.event_type,
+          note,
+          text: toolEventText(e.event_type, e.payload, id => getCatalogTool(id)?.name ?? null),
+          created_at: e.created_at,
+        };
+      if (e.event_type === 'technician_type_changed')
+        return {
+          id: e.id,
+          entity_id: entityId,
+          author: (e.actor_id && getProfile(e.actor_id)?.full_name) || 'Sistema',
+          event_type: e.event_type,
+          note,
+          text: typeChangeText(e.payload, id => getCompany(id)?.name ?? null),
+          created_at: e.created_at,
+        };
       return {
         id: e.id,
         entity_id: entityId,
@@ -622,6 +736,66 @@ export async function createRequest(
   );
 }
 
+/**
+ * Alta de una emergencia desde la consola (soporte telefónico) con
+ * create_emergency_request: nace sin técnico y arranca el despacho por rondas;
+ * el recargo y los tiempos los fija el backend con la config de emergencias.
+ */
+export async function createEmergencyRequest(input: {
+  client_id: string;
+  category_id: string;
+  client_address_id?: string | null;
+  description?: string | null;
+}): Promise<ServiceOrder | null> {
+  return mutate(
+    async () => {
+      const addr = w().addresses.find(a => a.id === input.client_address_id);
+      const [lng, lat] = wkbPoint(addr?.location) ?? [-103.3773, 20.7062];
+      const { data, error } = await supabase.rpc('create_emergency_request', {
+        p_category_id: input.category_id,
+        p_lng: lng,
+        p_lat: lat,
+        p_place_name: addr?.place_name ?? undefined,
+        p_neighborhood: addr?.neighborhood ?? undefined,
+        p_municipality: addr?.municipality ?? 'Guadalajara',
+        p_postal_code: addr?.postal_code ?? undefined,
+        p_state: addr?.state ?? 'Jalisco',
+        p_address_line: addr?.address_line ?? undefined,
+        p_client_address_id: input.client_address_id ?? undefined,
+        p_description: input.description ?? undefined,
+        p_client_id: input.client_id,
+      });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo crear la emergencia.'),
+  );
+}
+
+/**
+ * Historial del despacho de una emergencia (admin_emergency_history): rondas
+ * con radio, técnicos notificados, quién aceptó y tiempo de respuesta.
+ */
+export async function fetchEmergencyHistory(
+  orderId: string,
+): Promise<EmergencyHistory | null> {
+  if (MOCK) {
+    const o = getRequest(orderId);
+    if (!o) return null;
+    const rows = (mockHistory?.dispatchLog ?? []).filter(r => r.order_id === orderId);
+    return buildHistory(
+      o,
+      rows,
+      id => getProfile(id)?.full_name ?? 'Técnico',
+    );
+  }
+  const { data, error } = await supabase.rpc('admin_emergency_history', {
+    p_order_id: orderId,
+  });
+  if (error) throw error;
+  return parseHistory(data);
+}
+
 export async function setStatus(
   orderId: string,
   status: OrderStatus,
@@ -639,6 +813,39 @@ export async function setStatus(
 }
 
 export async function reassignRequest(orderId: string, techUserId: string) {
+  if (MOCK) {
+    // Maqueta: asigna en memoria; una emergencia en manual deja de pedir asignación.
+    const arr = w().orders;
+    const i = arr.findIndex(o => o.id === orderId);
+    if (i < 0) return null;
+    const now = new Date().toISOString();
+    const prev = arr[i];
+    const wasRequested = prev.status === 'requested';
+    arr[i] = {
+      ...prev,
+      technician_id: techUserId,
+      status: wasRequested ? 'accepted' : prev.status,
+      accepted_at: prev.accepted_at ?? now,
+      needs_manual_assignment: false,
+      dispatch_status: prev.priority === 'emergency' ? 'assigned' : prev.dispatch_status,
+      updated_at: now,
+    };
+    if (wasRequested)
+      w().events.push({
+        ...(w().events[0] ?? ({} as ServiceStatusEvent)),
+        id: `mock-ev-${Date.now()}`,
+        service_order_id: orderId,
+        from_status: 'requested',
+        to_status: 'accepted',
+        actor_id: 'mock-admin',
+        note: `Reasignado a ${getProfile(techUserId)?.full_name ?? techUserId} por admin`,
+        is_revert: false,
+        created_at: now,
+        updated_at: now,
+      });
+    bump();
+    return true as const;
+  }
   // Reasignación + evento de estado en una sola transacción (antes el evento
   // podía fallar en silencio).
   return mutate(
@@ -1211,6 +1418,10 @@ async function reportRpc<F extends ReportFn>(
   from: Date,
   to: Date,
 ): Promise<Fn[F]['Returns'] | null> {
+  if (MOCK) {
+    await loadWorld(); // el reporte puede pedirse antes de que cargue el snapshot
+    return mockReport(fn, from, to) as Fn[F]['Returns'] | null;
+  }
   try {
     const { data, error } = await supabase.rpc(fn, {
       p_from: from.toISOString(),
@@ -1225,6 +1436,47 @@ async function reportRpc<F extends ReportFn>(
     console.warn('[data]', fn, e);
     return null;
   }
+}
+/** Modo maqueta: los RPC de reportes calculados sobre el snapshot local. */
+function mockReport(fn: ReportFn, from: Date, to: Date) {
+  const span = to.getTime() - from.getTime();
+  const kpis = (a: number, b: number) => {
+    const paid = w().orders.filter(o => {
+      const t = o.paid_at ? Date.parse(o.paid_at) : NaN;
+      return t >= a && t < b;
+    });
+    const arrivals = paid.flatMap(o => {
+      const ev = (st: string) => w().events.find(e => e.service_order_id === o.id && e.to_status === st);
+      const acc = ev('accepted');
+      const ons = ev('onsite');
+      return acc && ons ? [(Date.parse(ons.created_at) - Date.parse(acc.created_at)) / 1000] : [];
+    });
+    return {
+      orders: w().orders.filter(o => Date.parse(o.created_at) >= a && Date.parse(o.created_at) < b).length,
+      paid_orders: paid.length,
+      gmv_cents: paid.reduce((s, o) => s + (o.quoted_total_cents ?? 0), 0),
+      avg_arrival_seconds: arrivals.length ? arrivals.reduce((s, x) => s + x, 0) / arrivals.length : 0,
+    };
+  };
+  if (fn === 'admin_report_kpis')
+    return {
+      current: kpis(from.getTime(), to.getTime()),
+      previous: kpis(from.getTime() - span, from.getTime()),
+    };
+  if (fn === 'admin_report_ticket_by_category')
+    return w().categories.map(c => {
+      const paid = w().orders.filter(
+        o => o.category_id === c.id && o.paid_at && Date.parse(o.paid_at) >= from.getTime() && Date.parse(o.paid_at) < to.getTime(),
+      );
+      return {
+        category_id: c.id,
+        category_name: c.name,
+        paid_orders: paid.length,
+        avg_ticket_cents: paid.length ? Math.round(paid.reduce((s, o) => s + (o.quoted_total_cents ?? 0), 0) / paid.length) : 0,
+      };
+    });
+  if (fn === 'admin_report_cold_zones') return [];
+  return null; // heatmap: la pantalla cae al cálculo desde el snapshot.
 }
 export type ReportKpis = {
   current: {
@@ -1285,7 +1537,6 @@ export async function updateOrder(
   fields: {
     title?: string | null;
     description?: string | null;
-    is_urgent?: boolean;
     category_id?: string;
   },
 ) {
@@ -1294,10 +1545,6 @@ export async function updateOrder(
       const patch: Database['public']['Tables']['service_orders']['Update'] = {
         ...fields,
       };
-      if (fields.is_urgent !== undefined)
-        patch.urgent_surcharge_bps = fields.is_urgent
-          ? getSettingInt('urgent_surcharge_bps', 2000)
-          : 0;
       const { error } = await supabase
         .from('service_orders')
         .update(patch)
@@ -1345,6 +1592,7 @@ export type OrderEvidence = {
 export async function listOrderEvidence(
   orderId: string,
 ): Promise<OrderEvidence[]> {
+  if (MOCK) return []; // ponytail: la maqueta no tiene fotos; se ven los recuadros «sin foto».
   const { data, error } = await supabase
     .from('service_evidence')
     .select('id, kind, is_final, created_at, storage_path')
@@ -1374,10 +1622,15 @@ export async function listOrderEvidence(
 // y el resto de la consola sigue funcionando.
 
 export type TechDocument = Row<'technician_documents'>;
+export type ClientDocument = Row<'client_documents'>;
+export type TechnicianCompany = Row<'technician_companies'>;
 export type PayoutRequest = Row<'payout_requests'>;
 export type OrderRating = Row<'order_ratings'>;
 export type WalletSummary = Database['public']['Views']['technician_wallet_summaries']['Row'];
 export type TechLocation = Row<'technician_locations'>;
+export type TechVehicle = Row<'technician_vehicles'>;
+export type ToolCatalogItem = Row<'tool_catalog'>;
+export type TechToolRow = Row<'technician_tools'>;
 export type ZoneGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
 /** Fila de admin_list_coverage_zones con el geojson (jsonb) ya acotado a su forma. */
 export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][number], 'geojson'> & {
@@ -1385,14 +1638,19 @@ export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][numbe
   geojson: ZoneGeometry | null;
 };
 
-type ExtraKey = 'docs' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations';
+type ExtraKey = 'docs' | 'clientDocs' | 'companies' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations' | 'vehicles' | 'toolCatalog' | 'techTools';
 interface ExtrasState {
   docs: TechDocument[];
+  clientDocs: ClientDocument[];
+  companies: TechnicianCompany[];
   payouts: PayoutRequest[];
   zones: CoverageZone[];
   ratings: OrderRating[];
   wallets: WalletSummary[];
   locations: TechLocation[];
+  vehicles: TechVehicle[];
+  toolCatalog: ToolCatalogItem[];
+  techTools: TechToolRow[];
   /** Dominios que no se pudieron leer (tabla ausente o sin permiso). */
   unavailable: Partial<Record<ExtraKey, boolean>>;
   loaded: boolean;
@@ -1400,11 +1658,16 @@ interface ExtrasState {
 
 export const useExtras = create<ExtrasState>(() => ({
   docs: [],
+  clientDocs: [],
+  companies: [],
   payouts: [],
   zones: [],
   ratings: [],
   wallets: [],
   locations: [],
+  vehicles: [],
+  toolCatalog: [],
+  techTools: [],
   unavailable: {},
   loaded: false,
 }));
@@ -1419,6 +1682,18 @@ const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
         .select('*')
         .order('created_at', { ascending: false })
         .range(a, b),
+    ),
+  clientDocs: () =>
+    fetchAllRows((a, b) =>
+      supabase
+        .from('client_documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(a, b),
+    ),
+  companies: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('technician_companies').select('*').order('name').range(a, b),
     ),
   payouts: () =>
     fetchAllRows((a, b) =>
@@ -1446,12 +1721,41 @@ const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
     fetchAllRows((a, b) => supabase.from('technician_wallet_summaries').select('*').range(a, b)),
   locations: () =>
     fetchAllRows((a, b) => supabase.from('technician_locations').select('*').range(a, b)),
+  vehicles: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('technician_vehicles').select('*').order('created_at').range(a, b),
+    ),
+  toolCatalog: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('tool_catalog').select('*').order('sort_order').order('name').range(a, b),
+    ),
+  techTools: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('technician_tools').select('*').order('created_at').range(a, b),
+    ),
 };
 
 let extrasInflight: Promise<void> | null = null;
 
 /** Carga (o recarga) las tablas extra; cada una falla por separado. */
 export function loadExtras(force = false): Promise<void> {
+  if (MOCK) {
+    if (useExtras.getState().loaded) return Promise.resolve();
+    mockHistory ??= withHistory(demoWorld());
+    useExtras.setState({
+      loaded: true,
+      ratings: mockHistory.ratings,
+      clientDocs: mockHistory.clientDocuments,
+      companies: mockHistory.companies,
+      payouts: mockHistory.payouts,
+      zones: mockHistory.zones,
+      locations: mockHistory.locations,
+      vehicles: mockHistory.vehicles,
+      toolCatalog: mockHistory.toolCatalog,
+      techTools: mockHistory.techTools,
+    });
+    return Promise.resolve();
+  }
   if (extrasInflight) return extrasInflight;
   if (!force && useExtras.getState().loaded) return Promise.resolve();
   extrasInflight = (async () => {
@@ -1481,6 +1785,45 @@ export function loadExtras(force = false): Promise<void> {
 
 export const getTechDocuments = (techId: string) =>
   useExtras.getState().docs.filter(d => d.technician_id === techId);
+export const getClientDocument = (clientId: string) =>
+  useExtras.getState().clientDocs.find(d => d.client_id === clientId) ?? null;
+/** Comprobantes de domicilio por revisar (los más antiguos primero). */
+export const getPendingClientDocuments = () =>
+  useExtras
+    .getState()
+    .clientDocs.filter(d => d.review_status === 'pending')
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+export const isAddressVerified = (clientId: string) =>
+  getClientDocument(clientId)?.review_status === 'approved';
+/** Vehículos del técnico: el principal primero. */
+export const getTechVehicles = (techId: string) =>
+  useExtras
+    .getState()
+    .vehicles.filter(v => v.technician_id === techId)
+    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.created_at.localeCompare(b.created_at));
+export const getAllVehicles = () => useExtras.getState().vehicles;
+export const getToolCatalog = () => useExtras.getState().toolCatalog;
+export const getCatalogTool = (id: string | null | undefined) =>
+  id ? (useExtras.getState().toolCatalog.find(t => t.id === id) ?? null) : null;
+export const getAllTechTools = () => useExtras.getState().techTools;
+/** Herramientas de un técnico ya resueltas contra el catálogo. */
+export const getTechToolViews = (techId: string) => {
+  const x = useExtras.getState();
+  return resolveTechTools(x.techTools, x.toolCatalog, techId);
+};
+/** Técnicos distintos que tienen un ítem del catálogo. */
+export const countToolTechs = (catalogId: string) => countCatalogTechs(useExtras.getState().techTools, catalogId);
+export const getCompanies = () => useExtras.getState().companies;
+export const getCompany = (id: string | null | undefined) =>
+  id ? (useExtras.getState().companies.find(c => c.id === id) ?? null) : null;
+/** Tipo del técnico y su empresa (solo admin; nunca llega a la app del cliente). */
+export function getTechType(techId: string): { type: TechType; company: TechnicianCompany | null } {
+  const t = getTechnician(techId);
+  return { type: t?.technician_type ?? 'independent', company: getCompany(t?.company_id) };
+}
+/** Técnicos asignados a cada empresa. */
+export const countCompanyTechs = (companyId: string) =>
+  w().technicians.filter(t => t.company_id === companyId).length;
 export const getTechLocation = (techId: string) =>
   useExtras.getState().locations.find(l => l.technician_id === techId) ?? null;
 export const getTechRatings = (techId: string) =>
@@ -1514,6 +1857,524 @@ export async function getDocumentUrl(doc: TechDocument): Promise<string | null> 
     return null;
   }
   return data.signedUrl;
+}
+
+/** URL firmada (10 min) del comprobante de domicilio de un cliente. */
+export async function getClientDocumentUrl(doc: ClientDocument): Promise<string | null> {
+  if (MOCK) {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="100%" height="100%" fill="#f4f6fa"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#334">Comprobante de ejemplo (maqueta)</text></svg>';
+    return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  }
+  const { data, error } = await supabase.storage
+    .from(doc.bucket_id)
+    .createSignedUrl(doc.storage_path, 600);
+  if (error || !data?.signedUrl) {
+    notifyError('No se pudo abrir el comprobante.');
+    return null;
+  }
+  return data.signedUrl;
+}
+
+/**
+ * Aprueba o rechaza el comprobante de domicilio (UPDATE sobre client_documents;
+ * la RLS exige permiso kyc). Rechazar requiere un motivo no vacío.
+ */
+export async function reviewClientDocument(
+  id: string,
+  approve: boolean,
+  notes?: string,
+): Promise<true | null> {
+  const reason = rejectionNotes(notes);
+  if (!approve && !reason) {
+    notifyError('Indica el motivo del rechazo.');
+    return null;
+  }
+  const patch = {
+    review_status: approve ? ('approved' as const) : ('rejected' as const),
+    review_notes: approve ? null : reason,
+    reviewed_at: new Date().toISOString(),
+  };
+  if (MOCK) {
+    useExtras.setState(s => ({
+      clientDocs: s.clientDocs.map(d =>
+        d.id === id ? { ...d, ...patch, reviewed_by: 'mock-admin', updated_at: patch.reviewed_at } : d,
+      ),
+    }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { data: auth } = await supabase.auth.getSession();
+      const { error } = await supabase
+        .from('client_documents')
+        .update({ ...patch, reviewed_by: auth.session?.user.id ?? null })
+        .eq('id', id);
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo guardar la revisión del comprobante.'),
+  );
+}
+
+/** Cambia el tipo del técnico (RPC admin_set_technician_type; queda en la bitácora). */
+export async function setTechnicianType(
+  techId: string,
+  type: TechType,
+  companyId: string | null,
+  note?: string,
+): Promise<true | null> {
+  if (!typeCompanyValid(type, companyId)) {
+    notifyError('Un técnico Tercero requiere empresa; los demás no.');
+    return null;
+  }
+  const cleanNote = note?.trim() || undefined;
+  if (MOCK) {
+    const arr = w().technicians;
+    const i = arr.findIndex(t => t.id === techId);
+    if (i < 0) return null;
+    const prev = arr[i];
+    arr[i] = { ...prev, technician_type: type, company_id: companyId };
+    adminEvents = [
+      ...adminEvents,
+      {
+        id: `mock-ae-${Date.now()}`,
+        actor_id: 'mock-admin',
+        entity_type: 'technician',
+        entity_id: techId,
+        event_type: 'technician_type_changed',
+        payload: {
+          from_type: prev.technician_type,
+          to_type: type,
+          from_company_id: prev.company_id,
+          to_company_id: companyId,
+          note: cleanNote ?? null,
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ];
+    bump();
+    return true;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_technician_type', {
+        p_technician_id: techId,
+        p_type: type,
+        p_company_id: companyId ?? undefined,
+        p_note: cleanNote,
+      });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo cambiar el tipo de técnico.'),
+  );
+}
+
+export interface CompanyInput {
+  name: string;
+  rfc?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+}
+
+/** Alta o edición de una empresa de técnicos (RLS: permiso usuarios). */
+export async function saveCompany(
+  input: CompanyInput,
+  id?: string | null,
+): Promise<TechnicianCompany | null> {
+  const row = {
+    name: input.name.trim(),
+    rfc: input.rfc?.trim() || null,
+    contact_name: input.contact_name?.trim() || null,
+    contact_phone: input.contact_phone?.trim() || null,
+    contact_email: input.contact_email?.trim() || null,
+  };
+  if (!row.name) {
+    notifyError('El nombre de la empresa es obligatorio.');
+    return null;
+  }
+  const dup = (e: unknown) =>
+    pgCode(e) === '23505' ? 'Ya existe una empresa con ese nombre.' : 'No se pudo guardar la empresa.';
+  if (MOCK) {
+    const list = useExtras.getState().companies;
+    const key = row.name.toLowerCase();
+    if (list.some(c => c.id !== id && c.name.trim().toLowerCase() === key)) {
+      notifyError('Ya existe una empresa con ese nombre.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const prev = id ? list.find(c => c.id === id) : null;
+    const next: TechnicianCompany = prev
+      ? { ...prev, ...row, updated_at: now }
+      : { id: `mock-co-${Date.now()}`, ...row, is_active: true, created_at: now, updated_at: now };
+    useExtras.setState({
+      companies: prev ? list.map(c => (c.id === id ? next : c)) : [...list, next],
+    });
+    return next;
+  }
+  try {
+    const q = id
+      ? supabase.from('technician_companies').update(row).eq('id', id)
+      : supabase.from('technician_companies').insert(row);
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    await loadExtras(true);
+    return data;
+  } catch (e) {
+    console.error('[data] saveCompany', e);
+    notifyError(dup(e));
+    return null;
+  }
+}
+
+/** Activa/desactiva una empresa (no se borran). */
+export async function setCompanyActive(id: string, active: boolean): Promise<true | null> {
+  if (MOCK) {
+    useExtras.setState(s => ({
+      companies: s.companies.map(c => (c.id === id ? { ...c, is_active: active } : c)),
+    }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase
+        .from('technician_companies')
+        .update({ is_active: active })
+        .eq('id', id);
+      if (error) throw error;
+      return true as const;
+    },
+    'No se pudo actualizar la empresa.',
+  );
+}
+
+export interface VehicleInput {
+  make: string;
+  model: string;
+  year: number;
+  color: string;
+  plate: string;
+}
+
+const vehicleSnap = (v: TechVehicle) => ({
+  make: v.make,
+  model: v.model,
+  year: v.year,
+  color: v.color,
+  plate: v.plate,
+  is_primary: v.is_primary,
+});
+
+function mockVehicleEvent(techId: string, type: string, before: TechVehicle | null, after: TechVehicle | null) {
+  const now = new Date().toISOString();
+  adminEvents = [
+    ...adminEvents,
+    {
+      id: `mock-ae-${Date.now()}-${adminEvents.length}`,
+      actor_id: 'mock-admin',
+      entity_type: 'technician',
+      entity_id: techId,
+      event_type: type,
+      payload: {
+        before: before ? vehicleSnap(before) : null,
+        after: after ? vehicleSnap(after) : null,
+      },
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+}
+
+/** Alta o edición de un vehículo del técnico (RLS: permiso usuarios). La placa se guarda normalizada. */
+export async function saveVehicle(
+  techId: string,
+  input: VehicleInput,
+  id?: string | null,
+): Promise<true | null> {
+  const row = {
+    make: input.make.trim(),
+    model: input.model.trim(),
+    year: Math.trunc(input.year),
+    color: input.color.trim(),
+    plate: normalizePlate(input.plate),
+  };
+  if (!row.make || !row.model || !row.color || !isValidPlate(row.plate)) {
+    notifyError('Revisa marca, modelo, color y placas (5 a 8 letras o números).');
+    return null;
+  }
+  const dup = (e: unknown) =>
+    pgCode(e) === '23505' ? 'Esas placas ya están registradas.' : pgMessage(e, 'No se pudo guardar el vehículo.');
+  if (MOCK) {
+    const list = useExtras.getState().vehicles;
+    if (list.some(v => v.id !== id && normalizePlate(v.plate) === row.plate)) {
+      notifyError('Esas placas ya están registradas.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const prev = id ? list.find(v => v.id === id) : null;
+    const next: TechVehicle = prev
+      ? { ...prev, ...row, updated_at: now }
+      : {
+          id: `mock-veh-${Date.now()}`,
+          technician_id: techId,
+          ...row,
+          is_primary: !list.some(v => v.technician_id === techId),
+          created_at: now,
+          updated_at: now,
+        };
+    useExtras.setState({ vehicles: prev ? list.map(v => (v.id === id ? next : v)) : [...list, next] });
+    mockVehicleEvent(techId, prev ? 'vehicle_updated' : 'vehicle_added', prev ?? null, next);
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const q = id
+      ? supabase.from('technician_vehicles').update(row).eq('id', id)
+      : supabase.from('technician_vehicles').insert({ ...row, technician_id: techId });
+    const { error } = await q;
+    if (error) throw error;
+    return true as const;
+  }, dup);
+}
+
+/** Elimina un vehículo; si era el principal, el backend promueve el más reciente. */
+export async function deleteVehicle(id: string): Promise<true | null> {
+  if (MOCK) {
+    const list = useExtras.getState().vehicles;
+    const v = list.find(x => x.id === id);
+    if (!v) return null;
+    let rest = list.filter(x => x.id !== id);
+    if (v.is_primary) {
+      const heir = rest
+        .filter(x => x.technician_id === v.technician_id)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      if (heir) rest = rest.map(x => (x.id === heir.id ? { ...x, is_primary: true } : x));
+    }
+    useExtras.setState({ vehicles: rest });
+    mockVehicleEvent(v.technician_id, 'vehicle_removed', v, null);
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.from('technician_vehicles').delete().eq('id', id);
+    if (error) throw error;
+    return true as const;
+  }, e => pgMessage(e, 'No se pudo eliminar el vehículo.'));
+}
+
+/** Marca un vehículo como principal (el backend desmarca los demás del técnico). */
+export async function setPrimaryVehicle(id: string): Promise<true | null> {
+  if (MOCK) {
+    const list = useExtras.getState().vehicles;
+    const v = list.find(x => x.id === id);
+    if (!v) return null;
+    const next = { ...v, is_primary: true, updated_at: new Date().toISOString() };
+    useExtras.setState({
+      vehicles: list.map(x =>
+        x.id === id ? next : x.technician_id === v.technician_id ? { ...x, is_primary: false } : x,
+      ),
+    });
+    mockVehicleEvent(v.technician_id, 'vehicle_updated', v, next);
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.from('technician_vehicles').update({ is_primary: true }).eq('id', id);
+    if (error) throw error;
+    return true as const;
+  }, e => pgMessage(e, 'No se pudo marcar el vehículo como principal.'));
+}
+
+// ── Herramienta del técnico (catálogo + lo que tiene cada técnico) ───────────
+let mockToolSeq = 0;
+const mockToolId = (p: string) => `mock-${p}-${Date.now()}-${++mockToolSeq}`;
+
+function mockToolEvent(techId: string, type: string, before: TechToolRow | null, after: TechToolRow | null) {
+  const now = new Date().toISOString();
+  const snap = (r: TechToolRow) => ({ catalog_id: r.catalog_id, custom_name: r.custom_name });
+  adminEvents = [
+    ...adminEvents,
+    {
+      id: mockToolId('ae'),
+      actor_id: 'mock-admin',
+      entity_type: 'technician',
+      entity_id: techId,
+      event_type: type,
+      payload: { tool_id: (after ?? before)?.id ?? null, before: before ? snap(before) : null, after: after ? snap(after) : null },
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+}
+
+export interface ToolInput {
+  name: string;
+  category_id: string | null;
+}
+
+/** Alta o edición (nombre/categoría) de un ítem del catálogo (RLS: permiso usuarios). */
+export async function saveCatalogTool(input: ToolInput, id?: string | null): Promise<ToolCatalogItem | null> {
+  const row = { name: input.name.trim().replace(/\s+/g, ' '), category_id: input.category_id || null };
+  if (!row.name) {
+    notifyError('El nombre de la herramienta es obligatorio.');
+    return null;
+  }
+  const dup = (e: unknown) =>
+    pgCode(e) === '23505' ? 'Ya existe una herramienta con ese nombre.' : 'No se pudo guardar la herramienta.';
+  const list = useExtras.getState().toolCatalog;
+  if (MOCK) {
+    if (list.some(t => t.id !== id && normalizeToolName(t.name) === normalizeToolName(row.name))) {
+      notifyError('Ya existe una herramienta con ese nombre.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const prev = id ? list.find(t => t.id === id) : null;
+    const next: ToolCatalogItem = prev
+      ? { ...prev, ...row, updated_at: now }
+      : {
+          id: mockToolId('tool'),
+          ...row,
+          is_active: true,
+          sort_order: Math.max(0, ...list.map(t => t.sort_order)) + 10,
+          created_at: now,
+          updated_at: now,
+        };
+    useExtras.setState({ toolCatalog: prev ? list.map(t => (t.id === id ? next : t)) : [...list, next] });
+    return next;
+  }
+  try {
+    const q = id
+      ? supabase.from('tool_catalog').update(row).eq('id', id)
+      : supabase.from('tool_catalog').insert({ ...row, sort_order: Math.max(0, ...list.map(t => t.sort_order)) + 10 });
+    const { data, error } = await q.select().single();
+    if (error) throw error;
+    await loadExtras(true);
+    return data;
+  } catch (e) {
+    console.error('[data] saveCatalogTool', e);
+    notifyError(dup(e));
+    return null;
+  }
+}
+
+/** Activa/desactiva un ítem del catálogo (no se borran). */
+export async function setCatalogToolActive(id: string, active: boolean): Promise<true | null> {
+  if (MOCK) {
+    useExtras.setState(s => ({
+      toolCatalog: s.toolCatalog.map(t => (t.id === id ? { ...t, is_active: active } : t)),
+    }));
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.from('tool_catalog').update({ is_active: active }).eq('id', id);
+    if (error) throw error;
+    return true as const;
+  }, 'No se pudo actualizar la herramienta.');
+}
+
+/** Quita una herramienta del técnico (queda en su bitácora como tool_removed). */
+export async function removeTechTool(id: string): Promise<true | null> {
+  if (MOCK) {
+    const list = useExtras.getState().techTools;
+    const r = list.find(x => x.id === id);
+    if (!r) return null;
+    useExtras.setState({ techTools: list.filter(x => x.id !== id) });
+    mockToolEvent(r.technician_id, 'tool_removed', r, null);
+    bump();
+    return true;
+  }
+  return mutateExtras(async () => {
+    const { error } = await supabase.from('technician_tools').delete().eq('id', id);
+    if (error) throw error;
+    return true as const;
+  }, e => pgMessage(e, 'No se pudo quitar la herramienta.'));
+}
+
+/** Herramientas en texto libre por revisar (RPC admin_custom_tools); null = no disponible. */
+export async function fetchCustomTools(): Promise<CustomToolSummary[] | null> {
+  if (MOCK) return summarizeCustomTools(useExtras.getState().techTools);
+  try {
+    const { data, error } = await supabase.rpc('admin_custom_tools');
+    if (error) throw error;
+    return (data ?? []).map(d => ({
+      name: d.name,
+      technicians_count: Number(d.technicians_count),
+      category_ids: d.category_ids ?? [],
+      first_seen: d.first_seen,
+    }));
+  } catch (e) {
+    console.warn('[data] admin_custom_tools no disponible', e);
+    return null;
+  }
+}
+
+/**
+ * Convierte un texto libre en ítem del catálogo (RPC admin_promote_custom_tool):
+ * crea o reutiliza el ítem y re-vincula a todos los técnicos que lo escribieron.
+ */
+export async function promoteCustomTool(
+  customName: string,
+  name: string,
+  categoryId: string | null,
+): Promise<ToolCatalogItem | null> {
+  const finalName = name.trim().replace(/\s+/g, ' ');
+  if (!finalName) {
+    notifyError('El nombre final es obligatorio.');
+    return null;
+  }
+  if (MOCK) {
+    const x = useExtras.getState();
+    const now = new Date().toISOString();
+    let item = x.toolCatalog.find(t => normalizeToolName(t.name) === normalizeToolName(finalName));
+    let catalog = x.toolCatalog;
+    if (!item) {
+      item = {
+        id: mockToolId('tool'),
+        name: finalName,
+        category_id: categoryId,
+        is_active: true,
+        sort_order: Math.max(0, ...catalog.map(t => t.sort_order)) + 10,
+        created_at: now,
+        updated_at: now,
+      };
+      catalog = [...catalog, item];
+    }
+    const key = normalizeToolName(customName);
+    const have = new Set(x.techTools.filter(r => r.catalog_id === item!.id).map(r => r.technician_id));
+    const next: TechToolRow[] = [];
+    for (const r of x.techTools) {
+      if (r.catalog_id || !r.custom_name || normalizeToolName(r.custom_name) !== key) {
+        next.push(r);
+        continue;
+      }
+      if (have.has(r.technician_id)) {
+        mockToolEvent(r.technician_id, 'tool_removed', r, null);
+        continue; // el técnico ya tenía el ítem: se descarta el duplicado
+      }
+      have.add(r.technician_id);
+      const linked = { ...r, catalog_id: item.id, custom_name: null, custom_category_id: null, updated_at: now };
+      next.push(linked);
+      mockToolEvent(r.technician_id, 'tool_updated', r, linked);
+    }
+    useExtras.setState({ toolCatalog: catalog, techTools: next });
+    bump();
+    return item;
+  }
+  return mutateExtras(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_promote_custom_tool', {
+        p_custom_name: customName,
+        p_name: finalName,
+        p_category_id: categoryId ?? undefined,
+      });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo convertir en catálogo.'),
+  );
 }
 
 /** Tras escribir: recarga snapshot + extras. */

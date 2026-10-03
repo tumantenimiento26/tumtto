@@ -78,3 +78,31 @@ describe('diditChecks', () => {
     expect(diditChecks('x')).toEqual([]);
   });
 });
+
+describe('filterTechs · placas', () => {
+  const rows = [
+    { name: 'Ramón Hernández', phone: '33 1452 8870', cats: [], zone: 'Zapopan', rating: 4.9, available: true, kyc: 'approved' as const, plates: ['JKL123A'] },
+    { name: 'Luis Ramírez', phone: '33 1111 2222', cats: [], zone: 'Tlaquepaque', rating: 0, available: false, kyc: 'in_review' as const, plates: ['XYZ987'] },
+  ];
+  const base: TechListFilters = { tab: 'all', q: '', category: null, zones: [], minRating: 0, availability: 'all' };
+  it('encuentra por placa con la consulta normalizada', () => {
+    expect(filterTechs(rows, { ...base, q: 'jkl-123' }).map(r => r.name)).toEqual(['Ramón Hernández']);
+    expect(filterTechs(rows, { ...base, q: ' xyz 98 ' }).map(r => r.name)).toEqual(['Luis Ramírez']);
+    expect(filterTechs(rows, { ...base, q: 'zzz' })).toHaveLength(0);
+  });
+});
+
+describe('filterTechs · herramientas', () => {
+  const rows = [
+    { name: 'A', phone: '1', cats: [], zone: 'Z', rating: 0, available: true, kyc: 'approved' as const, toolIds: ['t1', 't2'] },
+    { name: 'B', phone: '2', cats: [], zone: 'Z', rating: 0, available: true, kyc: 'approved' as const, toolIds: ['t1'] },
+    { name: 'C', phone: '3', cats: [], zone: 'Z', rating: 0, available: true, kyc: 'approved' as const },
+  ];
+  const base: TechListFilters = { tab: 'all', q: '', category: null, zones: [], minRating: 0, availability: 'all' };
+  it('exige todas las herramientas seleccionadas y cuenta como un filtro', () => {
+    expect(filterTechs(rows, { ...base, tools: ['t1'] }).map(r => r.name)).toEqual(['A', 'B']);
+    expect(filterTechs(rows, { ...base, tools: ['t1', 't2'] }).map(r => r.name)).toEqual(['A']);
+    expect(filterTechs(rows, { ...base, tools: [] })).toHaveLength(3);
+    expect(activeFilterCount({ ...base, tools: ['t1', 't2'] })).toBe(1);
+  });
+});

@@ -13,6 +13,12 @@ const INT_RULES: Record<string, Rule> = {
   default_match_radius_m: { min: 500, max: 100_000, label: 'El radio de búsqueda' },
   stripe_fee_estimate_fixed_cents: { min: 0, max: 100_000, label: 'La comisión fija de Stripe' },
   account_deletion_grace_days: { min: 1, max: 365, label: 'El periodo de gracia de baja' },
+  emergency_initial_radius_m: { min: 500, max: 100_000, label: 'El radio inicial de emergencia' },
+  emergency_radius_step_m: { min: 100, max: 100_000, label: 'El incremento de radio' },
+  emergency_max_radius_m: { min: 500, max: 100_000, label: 'El radio máximo de emergencia' },
+  emergency_round_seconds: { min: 1, max: 3600, label: 'Los segundos por ronda' },
+  emergency_timeout_minutes: { min: 1, max: 1440, label: 'El tiempo límite de emergencia' },
+  emergency_surcharge_fixed_cents: { min: 0, max: 10_000_000, label: 'El recargo fijo de emergencia' },
 };
 
 /** Mensaje por key inválida; objeto vacío = todo bien. */
@@ -32,11 +38,24 @@ export function validateSettings(s: Settings): Record<string, string> {
       )
         errs[key] =
           `${r.label} debe ser un número entero entre ${r.min} y ${r.max}.`;
+    } else if (key === 'emergency_surcharge_mode') {
+      if (v !== 'percent' && v !== 'fixed')
+        errs[key] = 'El modo de recargo debe ser porcentaje o monto fijo.';
     } else if (key === 'enabled_payment_methods') {
       if (!Array.isArray(v) || v.length === 0)
         errs[key] = 'Deja al menos un método de pago activo.';
     }
   }
+  const ini = s.emergency_initial_radius_m;
+  const max = s.emergency_max_radius_m;
+  if (
+    !errs.emergency_max_radius_m &&
+    typeof ini === 'number' &&
+    typeof max === 'number' &&
+    max < ini
+  )
+    errs.emergency_max_radius_m =
+      'El radio máximo no puede ser menor que el radio inicial.';
   return errs;
 }
 

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Banknote,
+  Building2,
+  Wrench,
   Clock,
   Users,
   Mail,
@@ -10,6 +12,7 @@ import {
   ShieldAlert,
   Check,
   Minus,
+  Siren,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -22,6 +25,7 @@ import {
   Modal,
   PageHeader,
   ScreenSkeleton,
+  Segmented,
   Select,
   Toggle,
   toast,
@@ -36,6 +40,7 @@ import {
   getSettingInt,
   getSettingBool,
   getSettingList,
+  getEmergencyConfig,
   saveSettings,
   fetchAdminRoles,
   getAdmins,
@@ -45,6 +50,9 @@ import {
   getSessionUserId,
 } from '@/lib/data/store';
 import { useAction } from '@/components/use-action';
+import { EMERGENCY_KEYS, type SurchargeMode } from '@/lib/emergency';
+import { CompaniesSection } from './_components/CompaniesSection';
+import { ToolCatalogSection } from './_components/ToolCatalogSection';
 import {
   changedSettings,
   pctToBps,
@@ -52,13 +60,16 @@ import {
   type Settings as SettingsMap,
 } from '@/lib/settingsRules';
 
-type SectionId = 'commission' | 'ops' | 'security' | 'team';
+type SectionId = 'commission' | 'ops' | 'emergency' | 'security' | 'team' | 'companies' | 'tools';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
   { id: 'ops', label: 'Operación', icon: Clock },
+  { id: 'emergency', label: 'Emergencias', icon: Siren },
   { id: 'security', label: 'Seguridad', icon: ShieldCheck },
   { id: 'team', label: 'Equipo y permisos', icon: Users },
+  { id: 'companies', label: 'Empresas de técnicos', icon: Building2 },
+  { id: 'tools', label: 'Catálogo de herramientas', icon: Wrench },
 ];
 
 // Métodos que las apps muestran (platform_settings.enabled_payment_methods).
@@ -74,9 +85,9 @@ const METHODS = [
  * las demás pantallas de ajustes de antes guardaban valores sin efecto.
  */
 function readForm(): SettingsMap {
+  const em = getEmergencyConfig();
   return {
     commission_bps: getSettingInt('commission_bps', 1500),
-    urgent_surcharge_bps: getSettingInt('urgent_surcharge_bps', 2000),
     stripe_fee_estimate_bps: getSettingInt('stripe_fee_estimate_bps', 360),
     stripe_fee_estimate_fixed_cents: getSettingInt('stripe_fee_estimate_fixed_cents', 300),
     request_ttl_minutes: getSettingInt('request_ttl_minutes', 30),
@@ -84,12 +95,27 @@ function readForm(): SettingsMap {
     account_deletion_grace_days: getSettingInt('account_deletion_grace_days', 30),
     enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
     admin_require_aal2: getSettingBool('admin_require_aal2', false),
+    [EMERGENCY_KEYS.initialRadiusM]: em.initialRadiusM,
+    [EMERGENCY_KEYS.stepM]: em.stepM,
+    [EMERGENCY_KEYS.maxRadiusM]: em.maxRadiusM,
+    [EMERGENCY_KEYS.roundSeconds]: em.roundSeconds,
+    [EMERGENCY_KEYS.timeoutMinutes]: em.timeoutMinutes,
+    [EMERGENCY_KEYS.surchargeMode]: em.surchargeMode,
+    [EMERGENCY_KEYS.surchargeBps]: em.surchargeBps,
+    [EMERGENCY_KEYS.surchargeFixedCents]: em.surchargeFixedCents,
   };
 }
 
 const LABELS: Record<string, string> = {
   commission_bps: 'Comisión global',
-  urgent_surcharge_bps: 'Recargo urgente',
+  emergency_initial_radius_m: 'Radio inicial de emergencia',
+  emergency_radius_step_m: 'Incremento de radio',
+  emergency_max_radius_m: 'Radio máximo de emergencia',
+  emergency_round_seconds: 'Segundos por ronda',
+  emergency_timeout_minutes: 'Tiempo límite de emergencia',
+  emergency_surcharge_mode: 'Modo de recargo de emergencia',
+  emergency_surcharge_bps: 'Recargo de emergencia (%)',
+  emergency_surcharge_fixed_cents: 'Recargo de emergencia (fijo)',
   stripe_fee_estimate_bps: 'Comisión Stripe (%)',
   stripe_fee_estimate_fixed_cents: 'Comisión Stripe (fija)',
   request_ttl_minutes: 'Ventana de aceptación',
@@ -112,6 +138,9 @@ export default function ConfigPage() {
       equipo: 'team',
       comisiones: 'commission',
       seguridad: 'security',
+      emergencias: 'emergency',
+      empresas: 'companies',
+      herramientas: 'tools',
     };
     const t = alias[raw] ?? raw;
     if (SECTIONS.some(x => x.id === t)) setActive(t as SectionId);
@@ -279,11 +308,6 @@ export default function ConfigPage() {
                   'Comisión global',
                   'Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
                 )}
-                {pctField(
-                  'urgent_surcharge_bps',
-                  'Recargo urgente',
-                  'Porcentaje extra sobre el total cuando el cliente marca la solicitud como urgente.',
-                )}
               </Section>
               <Section title="Costo estimado de Stripe">
                 {pctField(
@@ -351,6 +375,93 @@ export default function ConfigPage() {
             </>
           )}
 
+          {active === 'emergency' && (
+            <>
+              <Section title="Búsqueda de técnico">
+                {intField(
+                  'emergency_initial_radius_m',
+                  'Radio inicial',
+                  'm',
+                  'Primera ronda: se avisa a los técnicos elegibles dentro de este radio.',
+                )}
+                {intField(
+                  'emergency_radius_step_m',
+                  'Incremento por ronda',
+                  'm',
+                  'Cuánto se amplía el radio en cada ronda sin respuesta.',
+                )}
+                {intField(
+                  'emergency_max_radius_m',
+                  'Radio máximo',
+                  'm',
+                  'La búsqueda no se amplía más allá de este radio.',
+                )}
+                {intField(
+                  'emergency_round_seconds',
+                  'Segundos por ronda',
+                  's',
+                  'Espera antes de ampliar el radio y avisar a más técnicos.',
+                )}
+                {intField(
+                  'emergency_timeout_minutes',
+                  'Tiempo límite',
+                  'min',
+                  'Si nadie acepta, la solicitud pasa a asignación manual y sigue activa.',
+                )}
+              </Section>
+              <Section title="Recargo de emergencia">
+                <Row
+                  label="Tipo de recargo"
+                  desc="Reemplaza al antiguo recargo urgente. Se congela en cada solicitud."
+                >
+                  <Segmented<SurchargeMode>
+                    aria-label="Tipo de recargo"
+                    options={[
+                      { value: 'percent', label: 'Porcentaje' },
+                      { value: 'fixed', label: 'Monto fijo' },
+                    ]}
+                    value={form.emergency_surcharge_mode === 'fixed' ? 'fixed' : 'percent'}
+                    onChange={m => set('emergency_surcharge_mode', m)}
+                  />
+                </Row>
+                {form.emergency_surcharge_mode === 'fixed' ? (
+                  <Row
+                    label="Monto fijo"
+                    desc="Cargo extra por emergencia, en pesos."
+                    error={errs.emergency_surcharge_fixed_cents}
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1"
+                      prefix="$"
+                      value={
+                        Number.isNaN(num('emergency_surcharge_fixed_cents'))
+                          ? ''
+                          : num('emergency_surcharge_fixed_cents') / 100
+                      }
+                      onChange={e =>
+                        set(
+                          'emergency_surcharge_fixed_cents',
+                          e.target.value.trim() === '' ? NaN : Math.round(Number(e.target.value) * 100),
+                        )
+                      }
+                      suffix="MXN"
+                      error={!!errs.emergency_surcharge_fixed_cents}
+                      aria-label="Monto fijo del recargo"
+                    />
+                  </Row>
+                ) : (
+                  pctField(
+                    'emergency_surcharge_bps',
+                    'Porcentaje',
+                    'Porcentaje extra sobre el total cuando la solicitud es una emergencia.',
+                  )
+                )}
+              </Section>
+            </>
+          )}
+
           {active === 'security' && (
             <Section title="Verificación en dos pasos">
               {toggleField(
@@ -371,6 +482,8 @@ export default function ConfigPage() {
           )}
 
           {active === 'team' && <TeamSection />}
+          {active === 'companies' && <CompaniesSection />}
+          {active === 'tools' && <ToolCatalogSection />}
         </div>
       </div>
 

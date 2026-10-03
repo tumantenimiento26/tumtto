@@ -17,7 +17,9 @@ import { toE164Mx } from '@/app/(console)/clientes/_components/phoneMx';
 const svc = (p: Partial<ServiceRow> & { id: string }): ServiceRow => ({
   status: 'requested',
   is_disputed: false,
-  is_urgent: false,
+  is_emergency: false,
+  needs_manual: false,
+  pin: null,
   categoryId: 'cat-plumbing',
   categoryName: 'Plomería',
   clientName: 'María Castillo',
@@ -31,7 +33,7 @@ const svc = (p: Partial<ServiceRow> & { id: string }): ServiceRow => ({
 });
 
 const rows = [
-  svc({ id: 'a1b2c3d4-0000', status: 'enroute', techName: 'Ramón Hernández', totalCents: 150000, method: 'card', is_urgent: true }),
+  svc({ id: 'a1b2c3d4-0000', status: 'enroute', techName: 'Ramón Hernández', totalCents: 150000, method: 'card', is_emergency: true }),
   svc({ id: 'b0000000-0001', zone: 'Guadalajara', categoryId: 'cat-electrical', categoryName: 'Electricidad', clientName: 'Jorge Salas' }),
   svc({ id: 'c0000000-0002', status: 'paid', totalCents: 80000, method: 'cash' }),
   svc({ id: 'd0000000-0003', status: 'cancelled', is_disputed: true, totalCents: 300000 }),
@@ -40,7 +42,7 @@ const rows = [
 describe('servicios', () => {
   it('pestañas y conteos', () => {
     const c = tabCounts(rows, EMPTY_SERVICE_FILTERS);
-    expect(c).toEqual({ todos: 4, esperando: 1, curso: 1, completados: 1, cancelados: 1, disputa: 1 });
+    expect(c).toEqual({ todos: 4, esperando: 1, curso: 1, completados: 1, cancelados: 1, disputa: 1, emergencias: 1 });
   });
 
   it('búsqueda sin acentos por cliente, técnico y código SVC', () => {
@@ -50,14 +52,14 @@ describe('servicios', () => {
     expect(filterServices(rows, { ...f, query: orderCode('c0000000-0002') }).map(r => r.id)).toContain('c0000000-0002');
   });
 
-  it('filtros del sheet: zona, método, monto, urgentes, disputa', () => {
+  it('filtros del sheet: zona, método, monto, emergencias, disputa', () => {
     const f = { ...EMPTY_SERVICE_FILTERS };
     expect(filterServices(rows, { ...f, zones: ['Guadalajara'] })).toHaveLength(1);
     expect(filterServices(rows, { ...f, method: 'cash' }).map(r => r.id)).toEqual(['c0000000-0002']);
     expect(filterServices(rows, { ...f, minPesos: 1000, maxPesos: 2000 }).map(r => r.id)).toEqual(['a1b2c3d4-0000']);
-    expect(filterServices(rows, { ...f, urgentOnly: true })).toHaveLength(1);
+    expect(filterServices(rows, { ...f, emergencyOnly: true })).toHaveLength(1);
     expect(filterServices(rows, { ...f, disputeOnly: true })).toHaveLength(1);
-    expect(activeSheetFilters({ ...f, zones: ['A', 'B'], urgentOnly: true, minPesos: 1 })).toBe(4);
+    expect(activeSheetFilters({ ...f, zones: ['A', 'B'], emergencyOnly: true, minPesos: 1 })).toBe(4);
   });
 
   it('rango de fechas', () => {

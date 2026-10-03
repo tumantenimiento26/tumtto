@@ -11,6 +11,8 @@ export interface DataColumn<T> {
   /** Ancho CSS (p. ej. '120px', '20%'). */
   width?: string;
   className?: string;
+  /** Oculta la columna en la vista de tarjetas (celular); la primera columna siempre es el título. */
+  hideOnMobile?: boolean;
 }
 
 export type SortState = { key: string; dir: 'asc' | 'desc' } | null;
@@ -28,14 +30,24 @@ export function sortRows<T>(
   rows: T[],
   columns: DataColumn<T>[],
   sort: SortState,
+  /** Filas fijadas arriba (menor = primero; null/undefined = no se fija), sin importar el orden. */
+  pinRank?: (row: T) => number | null | undefined,
 ): T[] {
-  if (!sort) return rows;
-  const col = columns.find(c => c.key === sort.key);
-  if (!col?.sortValue) return rows;
-  const dir = sort.dir === 'asc' ? 1 : -1;
-  return [...rows].sort(
-    (a, b) => dir * compare(col.sortValue!(a), col.sortValue!(b)),
-  );
+  const col = sort ? columns.find(c => c.key === sort.key) : undefined;
+  let out = rows;
+  if (sort && col?.sortValue) {
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    out = [...rows].sort(
+      (a, b) => dir * compare(col.sortValue!(a), col.sortValue!(b)),
+    );
+  }
+  if (!pinRank) return out;
+  // Partición estable: fijadas (por rango) y después el resto en el orden elegido.
+  const rank = (r: T) => pinRank(r) ?? 1e9;
+  return out
+    .map((r, i) => [r, i] as const)
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
+    .map(x => x[0]);
 }
 
 /** Rango de páginas visible (máx. 5) alrededor de la actual. */

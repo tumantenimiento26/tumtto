@@ -69,14 +69,16 @@ function Tip({ tip }: { tip: TipState }) {
   if (!t) return null;
   return (
     <div
-      className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-[10px] bg-navy px-3 py-2 text-xs text-white shadow-overlay transition-opacity duration-[120ms] ${tip ? 'opacity-100' : 'opacity-0'}`}
+      className={`pointer-events-none absolute z-20 min-w-[168px] whitespace-nowrap rounded-[12px] border border-white/10 bg-[rgba(6,27,58,0.92)] px-3.5 py-2.5 text-xs text-white shadow-[0_18px_40px_-12px_rgba(6,27,58,0.6)] backdrop-blur-md transition-[opacity,transform] duration-150 ${tip ? 'opacity-100' : 'opacity-0'}`}
       style={{
         left: t.x,
         top: t.y,
-        transform: 'translate(-50%, calc(-100% - 10px))',
+        transform: `translate(-50%, calc(-100% - ${tip ? 12 : 6}px))`,
       }}
     >
       {t.body}
+      {/* flecha */}
+      <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r border-white/10 bg-[rgba(6,27,58,0.92)]" />
     </div>
   );
 }
@@ -100,8 +102,8 @@ function TipBody({
 }) {
   return (
     <>
-      <div className="text-white/70">{title}</div>
-      <div className="font-mono text-[13px] font-semibold tabular-nums">
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/55">{title}</div>
+      <div className="mt-0.5 font-display text-[17px] font-extrabold tabular-nums tracking-[-0.3px]">
         {value}
       </div>
       {delta && (
@@ -111,10 +113,11 @@ function TipBody({
           {delta}
         </div>
       )}
+      {rows && rows.length > 0 && <div className="my-1.5 h-px bg-white/10" />}
       {rows?.map(r => (
         <div
           key={r.label}
-          className="mt-0.5 flex items-baseline justify-between gap-3 text-[11px] text-white/60"
+          className="mt-0.5 flex items-baseline justify-between gap-4 text-[11px] text-white/60"
         >
           <span>{r.label}</span>
           <span className="font-mono tabular-nums text-white/85">
@@ -126,6 +129,12 @@ function TipBody({
     </>
   );
 }
+
+/** «+12%» / «−8%» de a contra b (null si no hay base). */
+const vs = (a: number, b: number | null | undefined) =>
+  b ? `${a >= b ? '+' : '−'}${Math.abs(((a - b) / b) * 100).toFixed(0)}%` : null;
+/** Posición de `v` en la serie (1 = más alto). */
+const rankOf = (v: number, all: number[]) => 1 + all.filter(x => x > v).length;
 
 /** Mide el ancho del contenedor para que el SVG sea fluido sin distorsión. */
 function useWidth(fallback = 600) {
@@ -268,12 +277,22 @@ export function LineChart({
         }
         deltaTone={deltaPct != null && deltaPct < 0 ? 'down' : 'up'}
         rows={[
-          ...(showCmp && cmpView?.[i] != null
-            ? [{ label: controls!.compare!.label, value: format(cmpView[i]) }]
+          ...(cmpView?.[i] != null
+            ? [
+                {
+                  label: controls?.compare?.label ?? 'Periodo anterior',
+                  value: `${format(cmpView[i]!)}${vs(d.value, cmpView[i]) ? ` · ${vs(d.value, cmpView[i])}` : ''}`,
+                },
+              ]
             : []),
-          ...(showAvg
-            ? [{ label: 'Promedio del rango', value: format(Math.round(avg)) }]
-            : []),
+          {
+            label: 'vs promedio',
+            value: `${vs(d.value, avg) ?? '—'} (${format(Math.round(avg))})`,
+          },
+          {
+            label: 'Ranking',
+            value: `#${rankOf(d.value, view.map(v => v.value))} de ${view.length}`,
+          },
         ]}
         meta={d.meta}
       />
@@ -627,7 +646,13 @@ export function Donut({
     <TipBody
       title={p.label}
       value={num(p.value)}
-      meta={`${pct(p.value)}% de lo visible`}
+      rows={[
+        { label: 'Participación', value: `${pct(p.value)}%` },
+        { label: 'Ranking', value: `#${rankOf(p.value, shown.map(x => x.value))} de ${shown.length}` },
+        ...(shown.length > 1
+          ? [{ label: 'vs mayor', value: vs(p.value, Math.max(...shown.map(x => x.value))) ?? '—' }]
+          : []),
+      ]}
     />
   );
   const toggle = (key: string) =>
@@ -790,7 +815,11 @@ export function HBars({
             <TipBody
               title={r.label}
               value={format(r.value)}
-              rows={[{ label: 'Participación', value: `${share}%` }]}
+              rows={[
+                { label: 'Participación', value: `${share}%` },
+                { label: 'Ranking', value: `#${rankOf(r.value, view.map(v => v.value))} de ${view.length}` },
+                { label: 'vs promedio', value: vs(r.value, total / Math.max(1, view.length)) ?? '—' },
+              ]}
               meta={r.meta}
             />
           );
@@ -924,16 +953,20 @@ export function VBars({
         }
         deltaTone={deltaPct != null && deltaPct < 0 ? 'down' : 'up'}
         rows={[
-          ...(showCmp && cmp?.[i] != null
-            ? [{ label: controls!.compare!.label, value: format(cmp[i]) }]
+          ...(cmp?.[i] != null
+            ? [
+                {
+                  label: controls?.compare?.label ?? 'Periodo anterior',
+                  value: `${format(cmp[i]!)}${vs(d.value, cmp[i]) ? ` · ${vs(d.value, cmp[i])}` : ''}`,
+                },
+              ]
             : []),
           {
             label: 'Participación',
             value: `${total ? Math.round((d.value / total) * 100) : 0}%`,
           },
-          ...(showAvg
-            ? [{ label: 'Promedio', value: format(Math.round(avg)) }]
-            : []),
+          { label: 'vs promedio', value: `${vs(d.value, avg) ?? '—'} (${format(Math.round(avg))})` },
+          { label: 'Ranking', value: `#${rankOf(d.value, data.map(v => v.value))} de ${data.length}` },
         ]}
         meta={d.meta}
       />

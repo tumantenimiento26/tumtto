@@ -81,6 +81,9 @@ import {
   RejectModal,
   fecha,
 } from '../_components/detail-parts';
+import { TechTypeBadge, TechTypeCard } from '../_components/TechTypeParts';
+import { VehiclesCard } from '../_components/VehiclesCard';
+import { ToolsCard } from '../_components/ToolsCard';
 
 const DONE = new Set(['completed', 'paid', 'closed']);
 const money = (c: number) =>
@@ -207,6 +210,7 @@ export default function TecnicoDetailPage() {
             </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Badge tone={meta.tone}>{meta.label}</Badge>
+              <TechTypeBadge techId={tech.id} />
               {data.catNames.length > 0 && <Badge>{data.catNames.join(' · ')}</Badge>}
               {data.zone && <Badge>{data.zone}</Badge>}
               {group === 'approved' && (
@@ -368,6 +372,9 @@ export default function TecnicoDetailPage() {
             </Card>
             {canSensitive && <BankCard tech={tech} />}
           </div>
+          <TechTypeCard techId={tech.id} />
+          <VehiclesCard techId={tech.id} />
+          <ToolsCard techId={tech.id} />
           <NotesCard techId={tech.id} />
         </>
       ) : (
@@ -461,6 +468,9 @@ export default function TecnicoDetailPage() {
                 )}
               </Card>
               {canSensitive && <BankCard tech={tech} />}
+              <TechTypeCard techId={tech.id} />
+              <VehiclesCard techId={tech.id} />
+              <ToolsCard techId={tech.id} />
               <NotesCard techId={tech.id} />
             </div>
           </div>

@@ -18,6 +18,9 @@ import {
   Tabs,
   toast,
   type DataColumn,
+  PeriodFilters,
+  periodLabel,
+  Chip,
 } from '@/components/ds';
 import { exportCsv } from '@/components/admin';
 import { useAction } from '@/components/use-action';
@@ -45,6 +48,7 @@ import { orderCode } from '@/lib/orderCode';
 import { fmtDate } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { initials } from '@/lib/techConsole';
+import { rangePreset, type DateRange } from '@/lib/calendar';
 import {
   aggregate,
   bucketGoal,
@@ -54,7 +58,7 @@ import {
   pctDelta,
   periodTotals,
   rangeBuckets,
-  type FinRange,
+  isWeekly,
 } from '@/lib/finance';
 import {
   KpiCard,
@@ -67,6 +71,13 @@ import {
 
 type Tab = 'tx' | 'po' | 'wal' | 'mes';
 type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
+const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'wallet', label: 'Mercado Pago' },
+  { value: 'oxxo', label: 'OXXO' },
+  { value: 'cash', label: 'Efectivo' },
+];
 
 const PAY_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   paid: { label: 'Pagado', tone: 'success' },
@@ -108,7 +119,7 @@ export default function FinanzasPage() {
   const failed = useWorldFailed();
   const { busy, run } = useAction();
   const canFinance = useAuth().can('finanzas');
-  const [range, setRange] = useState<FinRange>('30d');
+  const [range, setRange] = useState<NonNullable<DateRange>>(() => rangePreset('30d')!);
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
   const [batchOpen, setBatchOpen] = useState(false);
@@ -262,7 +273,7 @@ export default function FinanzasPage() {
 
   const onExport = () => {
     exportCsv(
-      `transacciones-${range}.csv`,
+      `transacciones-${periodLabel(range).replace(/\W+/g, '-')}.csv`,
       txRows.map(t => ({
         Pago: t.id,
         Servicio: orderCode(t.orderId),
@@ -311,15 +322,12 @@ export default function FinanzasPage() {
         description="Cobros con tarjeta (Stripe) y efectivo, comisión de plataforma y retiros a técnicos."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Segmented
-              options={[
-                { value: '7d', label: '7 días' },
-                { value: '30d', label: '30 días' },
-                { value: '90d', label: '90 días' },
-              ]}
-              value={range}
-              onChange={setRange}
-            />
+            <PeriodFilters value={range} onChange={setRange} kicker="Finanzas">
+              <section>
+                <Kicker className="mb-2.5">Método de pago · transacciones</Kicker>
+                <Segmented size="sm" options={METHOD_OPTIONS} value={method} onChange={setMethod} />
+              </section>
+            </PeriodFilters>
             <Button variant="secondary" icon={Download} onClick={onExport}>
               Exportar
             </Button>
@@ -338,7 +346,7 @@ export default function FinanzasPage() {
         <Card padded>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <Kicker>Ingresos por {range === '90d' ? 'semana' : 'día'}</Kicker>
+              <Kicker>Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
               <div className="mt-1 font-display text-[20px] font-extrabold text-navy tabular">
                 {money(m.bars.reduce((s, b) => s + b.gross, 0))}
               </div>
@@ -356,7 +364,7 @@ export default function FinanzasPage() {
             data={m.bars}
             labels={labels}
             goal={m.goal}
-            goalLabel={`Meta ${range === '90d' ? 'semanal' : 'diaria'} ${shortMoney(m.goal)}`}
+            goalLabel={`Meta ${isWeekly(range) ? 'semanal' : 'diaria'} ${shortMoney(m.goal)}`}
           />
         </Card>
         <Card padded>
@@ -381,20 +389,13 @@ export default function FinanzasPage() {
 
         {tab === 'tx' && (
           <>
-            <div className="p-5 pb-3">
-              <Segmented
-                size="sm"
-                options={[
-                  { value: 'all', label: 'Todos' },
-                  { value: 'card', label: 'Tarjeta' },
-                  { value: 'wallet', label: 'Mercado Pago' },
-                  { value: 'oxxo', label: 'OXXO' },
-                  { value: 'cash', label: 'Efectivo' },
-                ]}
-                value={method}
-                onChange={setMethod}
-              />
-            </div>
+            {method !== 'all' && (
+              <div className="p-5 pb-3">
+                <Chip active onRemove={() => setMethod('all')}>
+                  {METHOD_OPTIONS.find(o => o.value === method)?.label}
+                </Chip>
+              </div>
+            )}
             <DataTable
               rows={txRows}
               rowKey={r => r.id}

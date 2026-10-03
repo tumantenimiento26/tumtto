@@ -1,5 +1,7 @@
 // Lógica pura de la consola de técnicos (lista + detalle/KYC), probada en
 // techConsole.test.ts.
+import { hasAllTools } from './tools';
+import { normalizePlate } from './vehicles';
 
 export type KycGroup = 'approved' | 'in_review' | 'declined' | 'suspended';
 
@@ -124,6 +126,11 @@ export interface TechListFilters {
   zones: string[];
   minRating: number;
   availability: 'all' | 'available' | 'unavailable';
+  /** Tipo de técnico (technician_type) y empresa; null/undefined = todos. */
+  type?: string | null;
+  companyId?: string | null;
+  /** Ids de catálogo de herramienta: el técnico debe tener todas. */
+  tools?: string[];
 }
 
 export interface TechListRow {
@@ -134,6 +141,12 @@ export interface TechListRow {
   rating: number;
   available: boolean;
   kyc: KycGroup;
+  type?: string;
+  companyId?: string | null;
+  /** Placas del técnico (normalizadas); la búsqueda también las encuentra. */
+  plates?: string[];
+  /** Ids de catálogo de herramienta que tiene el técnico. */
+  toolIds?: string[];
 }
 
 const fold = (s: string) =>
@@ -147,6 +160,7 @@ export function filterTechs<T extends TechListRow>(
   f: TechListFilters,
 ): T[] {
   const q = fold(f.q.trim());
+  const plateQ = normalizePlate(f.q);
   return rows.filter(r => {
     if (f.tab !== 'all' && r.kyc !== f.tab) return false;
     if (f.category && !r.cats.includes(f.category)) return false;
@@ -154,16 +168,28 @@ export function filterTechs<T extends TechListRow>(
     if (f.minRating > 0 && r.rating < f.minRating) return false;
     if (f.availability === 'available' && !r.available) return false;
     if (f.availability === 'unavailable' && r.available) return false;
-    if (q && !fold(`${r.name} ${r.phone} ${r.zone}`).includes(q)) return false;
+    if (f.type && r.type !== f.type) return false;
+    if (f.companyId && r.companyId !== f.companyId) return false;
+    if (f.tools?.length && !hasAllTools(r.toolIds ?? [], f.tools)) return false;
+    if (
+      q &&
+      !fold(`${r.name} ${r.phone} ${r.zone}`).includes(q) &&
+      !(plateQ && r.plates?.some(p => normalizePlate(p).includes(plateQ)))
+    )
+      return false;
     return true;
   });
 }
 
 /** Número de filtros activos del sheet (para el contador del botón). */
 export const activeFilterCount = (f: TechListFilters) =>
+  (f.category ? 1 : 0) +
   (f.zones.length ? 1 : 0) +
   (f.minRating > 0 ? 1 : 0) +
-  (f.availability !== 'all' ? 1 : 0);
+  (f.availability !== 'all' ? 1 : 0) +
+  (f.type ? 1 : 0) +
+  (f.companyId ? 1 : 0) +
+  (f.tools?.length ? 1 : 0);
 
 /** Estado de una orden → etiqueta y tono de Badge. */
 export const ORDER_STATUS: Record<

@@ -24,6 +24,7 @@ import {
   PageHeader,
   ScreenSkeleton,
   Segmented,
+  Select,
   Sheet,
   Tabs,
   Card,
@@ -38,6 +39,11 @@ import {
   getTechCategories,
   getCategories,
   getAllRequests,
+  getCompanies,
+  getCompany,
+  getAllVehicles,
+  getAllTechTools,
+  getCatalogTool,
   getTechMunicipality,
   loadExtras,
   resolveKyc,
@@ -49,6 +55,10 @@ import {
   loadWorld,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import { TECH_TYPES, TECH_TYPE_LABEL, techTypeLabel, type TechType } from '@/lib/techType';
+import { formatPlate, matchingPlates } from '@/lib/vehicles';
+import { TechTypeBadge } from './_components/TechTypeParts';
+import { ToolFilter } from './_components/ToolFilter';
 import {
   KYC_GROUP_META,
   activeFilterCount,
@@ -70,6 +80,10 @@ interface Row {
   jobs: number;
   available: boolean;
   kyc: KycGroup;
+  type: TechType;
+  companyId: string | null;
+  plates: string[];
+  toolIds: string[];
 }
 
 const DONE = new Set(['completed', 'paid', 'closed']);
@@ -87,6 +101,9 @@ const EMPTY_FILTERS: TechListFilters = {
   zones: [],
   minRating: 0,
   availability: 'all',
+  type: null,
+  companyId: null,
+  tools: [],
 };
 
 export default function TecnicosPage() {
@@ -109,6 +126,8 @@ export default function TecnicosPage() {
   const rows = useMemo<Row[]>(() => {
     const cats = getCategories();
     const orders = getAllRequests();
+    const vehicles = getAllVehicles();
+    const techTools = getAllTechTools();
     return getTechniciansWithProfile().map(({ tech, profile }) => {
       const names = [
         ...new Set(
@@ -130,6 +149,12 @@ export default function TecnicosPage() {
         ).length,
         available: tech.is_available,
         kyc: kycGroup(tech.kyc_status, profile?.status),
+        type: tech.technician_type,
+        companyId: tech.company_id,
+        plates: vehicles.filter(v => v.technician_id === tech.id).map(v => v.plate),
+        toolIds: techTools
+          .filter(t => t.technician_id === tech.id && t.catalog_id)
+          .map(t => t.catalog_id as string),
       };
     });
     // `tick`/extras: el snapshot vive en el módulo del store.
@@ -182,10 +207,14 @@ export default function TecnicosPage() {
         Trabajos: r.jobs,
         Disponible: r.available ? 'Sí' : 'No',
         KYC: KYC_GROUP_META[r.kyc].label,
+        Tipo: techTypeLabel(r.type, getCompany(r.companyId)?.name),
       })),
     );
     toast.success('CSV exportado', `${list.length} técnicos`);
   }
+
+  const allVehicles = getAllVehicles();
+  const plateHits = (techId: string) => matchingPlates(allVehicles, techId, f.q);
 
   const columns: DataColumn<Row>[] = [
     {
@@ -202,9 +231,20 @@ export default function TecnicosPage() {
               {r.name}
             </div>
             <div className="font-mono text-[11.5px] text-muted">{r.phone}</div>
+            {plateHits(r.id).map(pl => (
+              <div key={pl} className="font-mono text-[11.5px] font-semibold text-primary">
+                Placas {formatPlate(pl)}
+              </div>
+            ))}
           </div>
         </div>
       ),
+    },
+    {
+      key: 'type',
+      header: 'Tipo',
+      sortValue: r => r.type,
+      render: r => <TechTypeBadge techId={r.id} />,
     },
     {
       key: 'cats',
@@ -308,7 +348,7 @@ export default function TecnicosPage() {
               icon={Search}
               value={f.q}
               onChange={e => setF(p => ({ ...p, q: e.target.value }))}
-              placeholder="Nombre, teléfono o zona"
+              placeholder="Nombre, teléfono, zona o placas"
               wrapperClassName="w-full max-w-sm"
               aria-label="Buscar técnicos"
             />
@@ -327,7 +367,7 @@ export default function TecnicosPage() {
                 </span>
               )}
             </Button>
-            {(nFilters > 0 || f.q || f.category) && (
+            {(nFilters > 0 || f.q) && (
               <Button variant="ghost" size="sm" onClick={() => setF(p => ({ ...EMPTY_FILTERS, tab: p.tab }))}>
                 Limpiar
               </Button>
@@ -337,6 +377,9 @@ export default function TecnicosPage() {
           {/* Chips de filtros activos */}
           {nFilters > 0 && (
             <div className="flex flex-wrap gap-2">
+              {f.category && (
+                <Chip onRemove={() => setF(p => ({ ...p, category: null }))}>{f.category}</Chip>
+              )}
               {f.zones.map(z => (
                 <Chip key={z} onRemove={() => setF(p => ({ ...p, zones: p.zones.filter(x => x !== z) }))}>
                   {z}
@@ -347,6 +390,21 @@ export default function TecnicosPage() {
                   Rating ≥ {f.minRating.toFixed(1)}
                 </Chip>
               )}
+              {f.type && (
+                <Chip onRemove={() => setF(p => ({ ...p, type: null, companyId: null }))}>
+                  {TECH_TYPE_LABEL[f.type as TechType]}
+                </Chip>
+              )}
+              {f.companyId && (
+                <Chip onRemove={() => setF(p => ({ ...p, companyId: null }))}>
+                  {getCompany(f.companyId)?.name ?? 'Empresa'}
+                </Chip>
+              )}
+              {(f.tools ?? []).map(id => (
+                <Chip key={id} onRemove={() => setF(p => ({ ...p, tools: (p.tools ?? []).filter(x => x !== id) }))}>
+                  {getCatalogTool(id)?.name ?? 'Herramienta'}
+                </Chip>
+              ))}
               {f.availability !== 'all' && (
                 <Chip onRemove={() => setF(p => ({ ...p, availability: 'all' }))}>
                   {f.availability === 'available' ? 'Disponibles' : 'No disponibles'}
@@ -355,21 +413,6 @@ export default function TecnicosPage() {
             </div>
           )}
 
-          {/* Categorías */}
-          <div className="flex flex-wrap gap-2">
-            <Chip active={!f.category} onClick={() => setF(p => ({ ...p, category: null }))}>
-              Todas
-            </Chip>
-            {categoryNames.map(c => (
-              <Chip
-                key={c}
-                active={f.category === c}
-                onClick={() => setF(p => ({ ...p, category: p.category === c ? null : c }))}
-              >
-                {c}
-              </Chip>
-            ))}
-          </div>
         </div>
 
         <DataTable
@@ -440,7 +483,7 @@ export default function TecnicosPage() {
             <Button
               variant="secondary"
               full
-              onClick={() => setDraft(d => ({ ...d, zones: [], minRating: 0, availability: 'all' }))}
+              onClick={() => setDraft(d => ({ ...d, category: null, zones: [], minRating: 0, availability: 'all', type: null, companyId: null, tools: [] }))}
             >
               Limpiar
             </Button>
@@ -457,6 +500,23 @@ export default function TecnicosPage() {
         }
       >
         <div className="flex flex-col gap-6">
+          <section>
+            <Kicker className="mb-2.5">Categoría</Kicker>
+            <div className="flex flex-wrap gap-2">
+              <Chip active={!draft.category} onClick={() => setDraft(d => ({ ...d, category: null }))}>
+                Todas
+              </Chip>
+              {categoryNames.map(c => (
+                <Chip
+                  key={c}
+                  active={draft.category === c}
+                  onClick={() => setDraft(d => ({ ...d, category: d.category === c ? null : c }))}
+                >
+                  {c}
+                </Chip>
+              ))}
+            </div>
+          </section>
           <section>
             <Kicker className="mb-2.5">Zona</Kicker>
             {zoneNames.length ? (
@@ -505,6 +565,52 @@ export default function TecnicosPage() {
               ]}
               value={draft.availability}
               onChange={v => setDraft(d => ({ ...d, availability: v }))}
+            />
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Tipo de técnico</Kicker>
+            <div className="flex flex-wrap gap-2">
+              <Chip active={!draft.type} onClick={() => setDraft(d => ({ ...d, type: null, companyId: null }))}>
+                Todos
+              </Chip>
+              {TECH_TYPES.map(t => (
+                <Chip
+                  key={t}
+                  active={draft.type === t}
+                  onClick={() =>
+                    setDraft(d => ({ ...d, type: d.type === t ? null : t, companyId: t === 'third_party' && d.type !== t ? d.companyId : null }))
+                  }
+                >
+                  {TECH_TYPE_LABEL[t]}
+                </Chip>
+              ))}
+            </div>
+            {draft.type === 'third_party' && (
+              <div className="mt-3">
+                <Select
+                  options={getCompanies().map(c => ({ value: c.id, label: c.name }))}
+                  value={draft.companyId ?? null}
+                  onChange={v => setDraft(d => ({ ...d, companyId: v }))}
+                  placeholder="Todas las empresas"
+                  aria-label="Empresa"
+                />
+                {draft.companyId && (
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, companyId: null }))}
+                    className="mt-1.5 font-sans text-[12.5px] font-semibold text-primary"
+                  >
+                    Quitar empresa
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Herramienta</Kicker>
+            <ToolFilter
+              selected={draft.tools ?? []}
+              onChange={tools => setDraft(d => ({ ...d, tools }))}
             />
           </section>
           <section>

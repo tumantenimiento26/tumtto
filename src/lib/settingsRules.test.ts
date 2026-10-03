@@ -38,6 +38,43 @@ describe('validateSettings', () => {
   });
 });
 
+describe('validateSettings · emergencias', () => {
+  const ok = {
+    emergency_initial_radius_m: 3000,
+    emergency_radius_step_m: 2000,
+    emergency_max_radius_m: 15000,
+    emergency_round_seconds: 60,
+    emergency_timeout_minutes: 10,
+    emergency_surcharge_mode: 'percent',
+    emergency_surcharge_bps: 3000,
+    emergency_surcharge_fixed_cents: 15000,
+  };
+  it('acepta los defaults', () => {
+    expect(validateSettings(ok)).toEqual({});
+  });
+  it('rechaza rangos, modo inválido y máximo < inicial', () => {
+    const e = validateSettings({
+      ...ok,
+      emergency_radius_step_m: 0,
+      emergency_round_seconds: 0,
+      emergency_surcharge_mode: 'otro',
+      emergency_surcharge_bps: 20000,
+      emergency_surcharge_fixed_cents: -1,
+      emergency_max_radius_m: 2000,
+    });
+    expect(Object.keys(e).sort()).toEqual(
+      [
+        'emergency_max_radius_m',
+        'emergency_radius_step_m',
+        'emergency_round_seconds',
+        'emergency_surcharge_bps',
+        'emergency_surcharge_fixed_cents',
+        'emergency_surcharge_mode',
+      ].sort(),
+    );
+  });
+});
+
 it('changedSettings solo devuelve lo modificado (arreglos por valor)', () => {
   expect(
     changedSettings(

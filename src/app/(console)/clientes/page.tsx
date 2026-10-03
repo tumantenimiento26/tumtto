@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Ban, Download, Eye, Pencil, RotateCcw, Search, UserPlus } from 'lucide-react';
+import { BadgeCheck, Ban, Download, Eye, Pencil, RotateCcw, Search, SlidersHorizontal, UserPlus } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -20,20 +20,26 @@ import {
   snackbar,
   toast,
   type DataColumn,
+  Sheet,
+  Kicker,
 } from '@/components/ds';
 import {
   getAddresses,
   getAllDisputes,
   getAllRequests,
   getClients,
+  isAddressVerified,
+  loadExtras,
   loadWorld,
   reactivateUser,
   suspendUser,
+  useExtras,
   useTick,
   useWorldFailed,
   useWorldReady,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import { ADDRESS_VERIFIED_LABEL } from '@/lib/clientDocs';
 import {
   EMPTY_CLIENT_FILTERS,
   SPEND_BUCKETS,
@@ -71,9 +77,16 @@ const SORTS: { value: ClientSort; label: string }[] = [
 export default function ClientesPage() {
   const tick = useTick();
   const router = useRouter();
+  useExtras(s => s.clientDocs); // re-render al cargar/revisar comprobantes
+  useEffect(() => {
+    void loadExtras();
+  }, []);
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const [f, setF] = useState<ClientFilters>(EMPTY_CLIENT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterCount =
+    f.zones.length + (f.spend !== 'todos' ? 1 : 0) + (f.sort !== EMPTY_CLIENT_FILTERS.sort ? 1 : 0);
   const [form, setForm] = useState<{ open: boolean; id: string | null }>({
     open: false,
     id: null,
@@ -160,8 +173,13 @@ export default function ClientesPage() {
             <div className="truncate font-display text-[14px] font-bold text-navy">
               {r.name}
             </div>
+            {isAddressVerified(r.id) && (
+              <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-success">
+                <BadgeCheck size={12} /> {ADDRESS_VERIFIED_LABEL}
+              </span>
+            )}
             {r.disputes > 0 && (
-              <span className="text-[11.5px] font-semibold text-error">
+              <span className="block text-[11.5px] font-semibold text-error">
                 {r.disputes} disputa{r.disputes === 1 ? '' : 's'}
               </span>
             )}
@@ -271,63 +289,29 @@ export default function ClientesPage() {
             value={f.tab}
             onChange={tab => setF(s => ({ ...s, tab }))}
           />
-          <Input
-            icon={Search}
-            value={f.query}
-            onChange={e => setF(s => ({ ...s, query: e.target.value }))}
-            placeholder="Nombre o teléfono"
-            aria-label="Buscar clientes"
-            wrapperClassName="mb-2.5 w-full sm:w-[300px]"
-          />
+          <div className="mb-2.5 flex w-full items-center gap-2.5 sm:w-auto">
+            <Input
+              icon={Search}
+              value={f.query}
+              onChange={e => setF(s => ({ ...s, query: e.target.value }))}
+              placeholder="Nombre o teléfono"
+              aria-label="Buscar clientes"
+              wrapperClassName="min-w-0 flex-1 sm:w-[300px] sm:flex-none"
+            />
+            <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setFiltersOpen(true)}>
+              Filtros
+              {filterCount > 0 && (
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                  {filterCount}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b border-line px-5 py-4">
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Zona">
-            {ZONES.map(z => (
-              <Chip
-                key={z}
-                active={f.zones.includes(z)}
-                onClick={() =>
-                  setF(s => ({
-                    ...s,
-                    zones: s.zones.includes(z)
-                      ? s.zones.filter(x => x !== z)
-                      : [...s.zones, z],
-                  }))
-                }
-              >
-                {z}
-              </Chip>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-              Gasto
-            </span>
-            <Segmented
-              size="sm"
-              options={SPEND_BUCKETS}
-              value={f.spend}
-              onChange={spend => setF(s => ({ ...s, spend }))}
-            />
-            <div className="ml-auto flex items-center gap-2">
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-                Orden
-              </span>
-              <div className="w-[190px]">
-                <Select
-                  aria-label="Ordenar clientes"
-                  options={SORTS}
-                  value={f.sort}
-                  onChange={sort => setF(s => ({ ...s, sort }))}
-                  searchable={false}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
 
         <DataTable
+          mobileSort={false}
           rows={visible}
           columns={columns}
           rowKey={r => r.id}
@@ -392,6 +376,69 @@ export default function ClientesPage() {
           }
         />
       </Card>
+
+      {/* Todos los filtros en el drawer: zona, gasto y orden (se aplican en vivo). */}
+      <Sheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        width={400}
+        kicker="Clientes"
+        title="Filtros"
+        footer={
+          <div className="flex w-full gap-2.5">
+            <Button
+              variant="secondary"
+              onClick={() => setF(s => ({ ...s, zones: [], spend: 'todos', sort: EMPTY_CLIENT_FILTERS.sort }))}
+            >
+              Limpiar
+            </Button>
+            <Button full onClick={() => setFiltersOpen(false)}>
+              Mostrar {visible.length} clientes
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <section>
+            <Kicker className="mb-2.5">Zona</Kicker>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Zona">
+              {ZONES.map(z => (
+                <Chip
+                  key={z}
+                  active={f.zones.includes(z)}
+                  onClick={() =>
+                    setF(s => ({
+                      ...s,
+                      zones: s.zones.includes(z) ? s.zones.filter(x => x !== z) : [...s.zones, z],
+                    }))
+                  }
+                >
+                  {z}
+                </Chip>
+              ))}
+            </div>
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Gasto</Kicker>
+            <Segmented
+              size="sm"
+              options={SPEND_BUCKETS}
+              value={f.spend}
+              onChange={spend => setF(s => ({ ...s, spend }))}
+            />
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Orden</Kicker>
+            <Select
+              aria-label="Ordenar clientes"
+              options={SORTS}
+              value={f.sort}
+              onChange={sort => setF(s => ({ ...s, sort }))}
+              searchable={false}
+            />
+          </section>
+        </div>
+      </Sheet>
 
       <ClientFormSheet
         open={form.open}

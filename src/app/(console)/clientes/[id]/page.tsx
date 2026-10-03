@@ -63,6 +63,7 @@ import {
   timeAgo,
 } from '../../servicios/_components/shared';
 import { ClientFormSheet } from '../_components/ClientFormSheet';
+import { ClientDocCard } from '../_components/ClientDocCard';
 
 type TabId = 'historial' | 'direcciones' | 'pagos' | 'disputas' | 'notas';
 type AddressRow = ReturnType<typeof getAddresses>[number];
@@ -202,6 +203,8 @@ export default function ClientDetailPage() {
           )}
         </div>
       </Card>
+
+      <ClientDocCard clientId={id} name={name} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Servicios" value={String(requests.length)} />

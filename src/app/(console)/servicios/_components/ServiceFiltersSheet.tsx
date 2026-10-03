@@ -1,21 +1,38 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input, Segmented, Sheet, Toggle } from '@/components/ds';
+import {
+  Button,
+  Chip,
+  DateRangePicker,
+  Input,
+  QuickRange,
+  Segmented,
+  Sheet,
+  Toggle,
+} from '@/components/ds';
 import type { ServiceFilters } from '@/lib/serviciosFilter';
 import { FormSection } from './ServiceFormSheet';
 import { METHOD_LABEL, ZONES } from './shared';
 
 type SheetValues = Pick<
   ServiceFilters,
-  'zones' | 'method' | 'minPesos' | 'maxPesos' | 'urgentOnly' | 'disputeOnly'
+  | 'categoryId'
+  | 'range'
+  | 'zones'
+  | 'method'
+  | 'minPesos'
+  | 'maxPesos'
+  | 'emergencyOnly'
+  | 'disputeOnly'
 >;
 
 const METHODS = ['todos', 'card', 'cash'] as const;
 
 /**
- * Sheet de filtros (400px): zona múltiple, método, monto, urgentes y
- * disputa. Trabaja sobre un borrador y aplica al confirmar.
+ * Sheet con TODOS los filtros (400px): fechas (rápidos + date picker),
+ * categoría, zona múltiple, método, monto, emergencias y disputa. Trabaja sobre
+ * un borrador y aplica al confirmar.
  */
 export function ServiceFiltersSheet({
   open,
@@ -24,6 +41,7 @@ export function ServiceFiltersSheet({
   onApply,
   onClear,
   resultCount,
+  categories,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,6 +50,7 @@ export function ServiceFiltersSheet({
   onClear: () => void;
   /** Resultados con el borrador aplicado (para el botón "Mostrar N"). */
   resultCount: (draft: SheetValues) => number;
+  categories: { id: string; name: string }[];
 }) {
   const [d, setD] = useState<SheetValues>(value);
   useEffect(() => {
@@ -77,6 +96,30 @@ export function ServiceFiltersSheet({
         </div>
       }
     >
+      <FormSection>Fechas</FormSection>
+      <div className="flex flex-col items-start gap-3">
+        <QuickRange value={d.range} onChange={range => setD(s => ({ ...s, range }))} />
+        <DateRangePicker value={d.range} onChange={range => setD(s => ({ ...s, range }))} />
+      </div>
+
+      <FormSection>Categoría</FormSection>
+      <div className="flex flex-wrap gap-2">
+        <Chip active={!d.categoryId} onClick={() => setD(s => ({ ...s, categoryId: null }))}>
+          Todas
+        </Chip>
+        {categories.map(c => (
+          <Chip
+            key={c.id}
+            active={d.categoryId === c.id}
+            onClick={() =>
+              setD(s => ({ ...s, categoryId: s.categoryId === c.id ? null : c.id }))
+            }
+          >
+            {c.name}
+          </Chip>
+        ))}
+      </div>
+
       <FormSection>Zona</FormSection>
       <div className="flex flex-wrap gap-2">
         {ZONES.map(z => (
@@ -97,7 +140,7 @@ export function ServiceFiltersSheet({
       />
 
       <FormSection>Monto (MXN)</FormSection>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 min-[641px]:grid-cols-2">
         <Input
           label="Mínimo"
           prefix="$"
@@ -120,11 +163,11 @@ export function ServiceFiltersSheet({
       <FormSection>Más</FormSection>
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[14px] text-navy">Solo urgentes</span>
+          <span className="text-[14px] text-navy">Solo emergencias</span>
           <Toggle
-            checked={d.urgentOnly}
-            onChange={x => setD(s => ({ ...s, urgentOnly: x }))}
-            aria-label="Solo urgentes"
+            checked={d.emergencyOnly}
+            onChange={x => setD(s => ({ ...s, emergencyOnly: x }))}
+            aria-label="Solo emergencias"
           />
         </div>
         <div className="flex items-center justify-between">

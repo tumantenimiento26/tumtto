@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+import { needsManualAssignment } from '@/lib/emergency';
 import {
   getAllPayments,
   getAllRequests,
@@ -27,6 +28,7 @@ export type NotifType =
   | 'disputas'
   | 'tickets'
   | 'retiros'
+  | 'emergencias'
   | 'servicios'
   | 'pagos'
   | 'sistema';
@@ -36,6 +38,7 @@ export const NOTIF_TYPES: { type: NotifType; label: string }[] = [
   { type: 'disputas', label: 'Disputas' },
   { type: 'tickets', label: 'Tickets' },
   { type: 'retiros', label: 'Retiros' },
+  { type: 'emergencias', label: 'Emergencias' },
   { type: 'servicios', label: 'Servicios' },
   { type: 'pagos', label: 'Pagos' },
   { type: 'sistema', label: 'Sistema' },
@@ -101,8 +104,19 @@ export function derive(now = Date.now()): AdminNotification[] {
         href: `/servicios/${p.service_order_id}`,
       });
   for (const o of getAllRequests())
+    if (needsManualAssignment(o))
+      out.push({
+        id: `emg-${o.id}`,
+        type: 'emergencias',
+        title: 'Emergencia sin técnico — asignar',
+        body: `Nadie aceptó a tiempo; sigue activa para asignación manual (${name(o.client_id)}).`,
+        ts: o.updated_at ?? o.created_at,
+        href: `/servicios/${o.id}?reasignar=1`,
+      });
+  for (const o of getAllRequests())
     if (
       o.status === 'requested' &&
+      o.priority !== 'emergency' &&
       now - new Date(o.created_at).getTime() > STALE_REQUEST_MIN * 60_000
     )
       out.push({

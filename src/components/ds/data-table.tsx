@@ -39,7 +39,7 @@ function RowMenu<T>({
           e.stopPropagation();
           setOpen(o => !o);
         }}
-        className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-segment hover:text-navy"
+        className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-segment hover:text-navy sm:h-8 sm:w-8"
       >
         <MoreHorizontal size={17} />
       </button>
@@ -75,6 +75,8 @@ export function DataTable<T>({
   sort: controlledSort,
   onSortChange,
   minWidth = 760,
+  mobileSort = true,
+  pinRank,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -91,6 +93,10 @@ export function DataTable<T>({
   sort?: SortState;
   onSortChange?: (s: SortState) => void;
   minWidth?: number;
+  /** false si la página ya tiene su propio control de orden. */
+  mobileSort?: boolean;
+  /** Fija filas arriba sin importar el orden (menor = primero; null = no se fija). */
+  pinRank?: (row: T) => number | null | undefined;
 }) {
   const [innerSort, setInnerSort] = useState<SortState>(initialSort);
   const sort = controlledSort !== undefined ? controlledSort : innerSort;
@@ -102,8 +108,8 @@ export function DataTable<T>({
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const sorted = useMemo(
-    () => sortRows(rows, columns, sort),
-    [rows, columns, sort],
+    () => sortRows(rows, columns, sort, pinRank),
+    [rows, columns, sort, pinRank],
   );
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   // Si cambian los filtros y la página actual ya no existe, vuelve al inicio.
@@ -158,7 +164,22 @@ export function DataTable<T>({
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
+      {/* Celular (≤640 px): tarjetas — título = primera columna, acciones siempre visibles. */}
+      <MobileCards
+        rows={loading ? [] : visible}
+        columns={columns}
+        rowKey={rowKey}
+        onRowClick={onRowClick}
+        rowMenu={rowMenu}
+        selectable={selectable}
+        selected={selected}
+        setSelected={setSelected}
+        sort={sort}
+        setSort={setSort}
+        loading={loading}
+        mobileSort={mobileSort}
+      />
+      <div className="overflow-x-auto max-[640px]:hidden">
         <table className="w-full border-collapse" style={{ minWidth }}>
           <thead>
             <tr className="bg-panel">
@@ -293,7 +314,7 @@ export function DataTable<T>({
               aria-label="Página anterior"
               disabled={page === 0}
               onClick={() => setPage(p => p - 1)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-panel disabled:opacity-30"
+              className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-panel disabled:opacity-30 sm:h-8 sm:w-8"
             >
               <ChevronLeft size={16} />
             </button>
@@ -303,7 +324,7 @@ export function DataTable<T>({
                 type="button"
                 aria-current={p === page ? 'page' : undefined}
                 onClick={() => setPage(p)}
-                className={`h-8 min-w-8 rounded-lg px-2 text-[13px] font-semibold tabular ${
+                className={`h-11 min-w-11 rounded-lg px-2 text-[13px] font-semibold tabular sm:h-8 sm:min-w-8 ${
                   p === page
                     ? 'bg-action text-white'
                     : 'text-body hover:bg-panel'
@@ -317,13 +338,122 @@ export function DataTable<T>({
               aria-label="Página siguiente"
               disabled={page >= pages - 1}
               onClick={() => setPage(p => p + 1)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-panel disabled:opacity-30"
+              className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-panel disabled:opacity-30 sm:h-8 sm:w-8"
             >
               <ChevronRight size={16} />
             </button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MobileCards<T>({
+  rows,
+  columns,
+  rowKey,
+  onRowClick,
+  rowMenu,
+  selectable,
+  selected,
+  setSelected,
+  sort,
+  setSort,
+  loading,
+  mobileSort,
+}: {
+  rows: T[];
+  columns: DataColumn<T>[];
+  rowKey: (row: T) => string;
+  onRowClick?: (row: T) => void;
+  rowMenu?: (row: T) => (MenuItem | 'divider')[];
+  selectable?: boolean;
+  selected: Set<string>;
+  setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
+  sort: SortState;
+  setSort: (s: SortState) => void;
+  loading?: boolean;
+  mobileSort?: boolean;
+}) {
+  const [title, ...rest] = columns;
+  const detail = rest.filter(c => !c.hideOnMobile);
+  const sortable = mobileSort ? columns.filter(c => c.sortValue) : [];
+  return (
+    <div className="min-[641px]:hidden">
+      {sortable.length > 0 && (
+        <label className="flex items-center gap-2 border-b border-divider px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">
+          Ordenar
+          <select
+            value={sort ? `${sort.key}:${sort.dir}` : ''}
+            onChange={e => {
+              const [key, dir] = e.target.value.split(':');
+              setSort(key ? { key, dir: dir as 'asc' | 'desc' } : null);
+            }}
+            className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 font-sans text-[14px] normal-case tracking-normal text-body"
+          >
+            <option value="">Sin orden</option>
+            {sortable.flatMap(c => [
+              <option key={`${c.key}:asc`} value={`${c.key}:asc`}>{c.header} ↑</option>,
+              <option key={`${c.key}:desc`} value={`${c.key}:desc`}>{c.header} ↓</option>,
+            ])}
+          </select>
+        </label>
+      )}
+      {loading &&
+        Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="border-t border-divider px-4 py-4">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="mt-3 h-3 w-full" />
+          </div>
+        ))}
+      <ul>
+        {rows.map(r => {
+          const k = rowKey(r);
+          const on = selected.has(k);
+          return (
+            <li
+              key={k}
+              onClick={onRowClick ? () => onRowClick(r) : undefined}
+              className={`border-t border-divider px-4 py-3.5 first:border-t-0 ${onRowClick ? 'cursor-pointer active:bg-panel' : ''} ${on ? 'bg-tint' : ''}`}
+            >
+              <div className="flex items-start gap-3">
+                {selectable && (
+                  <span className="pt-0.5" onClick={e => e.stopPropagation()}>
+                    <Checkbox
+                      checked={on}
+                      onChange={v =>
+                        setSelected(prev => {
+                          const next = new Set(prev);
+                          if (v) next.add(k);
+                          else next.delete(k);
+                          return next;
+                        })
+                      }
+                    />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1 text-[14px] text-body">{title?.render(r)}</div>
+                {rowMenu && (
+                  <span className="-mr-2 -mt-2" onClick={e => e.stopPropagation()}>
+                    <RowMenu row={r} items={rowMenu} />
+                  </span>
+                )}
+              </div>
+              {detail.length > 0 && (
+                <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+                  {detail.map(c => (
+                    <div key={c.key} className="min-w-0">
+                      <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{c.header}</dt>
+                      <dd className="mt-0.5 min-w-0 break-words text-[13.5px] text-body">{c.render(r)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

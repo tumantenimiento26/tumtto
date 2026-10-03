@@ -7,6 +7,7 @@ import {
   Check,
   CheckCheck,
   Inbox,
+  SlidersHorizontal,
   MailOpen,
   Trash2,
   X,
@@ -21,6 +22,9 @@ import {
   Segmented,
   snackbar,
   type Tone,
+  Chip,
+  Kicker,
+  Sheet,
 } from '@/components/ds';
 import { NOTIF_ICON } from '@/components/admin-shell';
 import {
@@ -46,6 +50,7 @@ const TYPE_TONE: Record<NotifType, Tone> = {
   disputas: 'danger',
   tickets: 'info',
   retiros: 'success',
+  emergencias: 'danger',
   servicios: 'warning',
   pagos: 'danger',
   sistema: 'neutral',
@@ -149,6 +154,7 @@ export default function NotificacionesPage() {
   const { muted, markRead, markUnread, remove, restore } = useNotifState();
   const [tab, setTab] = useState<NotifTab>('todas');
   const [type, setType] = useState<NotifType | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Cuántos avisos quedan ocultos por tipos silenciados (se ven como etiqueta).
@@ -227,54 +233,7 @@ export default function NotificacionesPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* Tipos */}
-        <nav
-          aria-label="Tipo de notificación"
-          className="flex gap-1 overflow-x-auto lg:w-[240px] lg:shrink-0 lg:flex-col lg:overflow-visible"
-        >
-          {typeRows.map(t => {
-            const on = type === t.key;
-            const Icon = t.key ? NOTIF_ICON[t.key].icon : Inbox;
-            return (
-              <button
-                key={t.label}
-                type="button"
-                onClick={() => {
-                  setType(t.key);
-                  clear();
-                }}
-                aria-current={on ? 'true' : undefined}
-                className={`flex h-10 shrink-0 items-center gap-3 rounded-btn px-3.5 text-left text-[14px] font-semibold transition-colors ${
-                  on ? 'bg-action text-white' : 'text-navy hover:bg-panel'
-                }`}
-              >
-                <Icon size={16} className={on ? '' : 'text-muted'} />
-                <span className="flex-1">{t.label}</span>
-                {t.muted ? (
-                  <span
-                    className={`flex items-center gap-1 text-[11px] font-medium ${
-                      on ? 'text-white/70' : 'text-faint'
-                    }`}
-                    title="Silenciado en Configuración"
-                  >
-                    <BellOff size={12} /> silenciado
-                  </span>
-                ) : (
-                  t.count > 0 && (
-                    <span
-                      className={`min-w-6 rounded-full px-1.5 py-0.5 text-center font-mono text-[11px] ${
-                        on ? 'bg-white/20 text-white' : 'bg-chip text-muted'
-                      }`}
-                    >
-                      {t.count}
-                    </span>
-                  )
-                )}
-              </button>
-            );
-          })}
-        </nav>
+      <div className="flex flex-col gap-4">
 
         {/* Lista */}
         <Card className="min-w-0 flex-1 overflow-hidden">
@@ -330,39 +289,26 @@ export default function NotificacionesPage() {
                 </Button>
               </div>
             )}
-            <Segmented
-              size="sm"
-              value={tab}
-              onChange={v => {
-                setTab(v);
-                clear();
-              }}
-              aria-label="Filtrar por lectura"
-              options={[
-                {
-                  value: 'todas',
-                  label: (
-                    <>
-                      Todas{' '}
-                      <span className="font-mono text-[11px] text-faint">
-                        {filterNotifs(items, 'todas', type).length}
-                      </span>
-                    </>
-                  ),
-                },
-                {
-                  value: 'no-leidas',
-                  label: (
-                    <>
-                      No leídas{' '}
-                      <span className="font-mono text-[11px] text-faint">
-                        {filterNotifs(items, 'no-leidas', type).length}
-                      </span>
-                    </>
-                  ),
-                },
-              ]}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {type && (
+                <Chip active onRemove={() => { setType(null); clear(); }}>
+                  {typeRows.find(t => t.key === type)?.label}
+                </Chip>
+              )}
+              {tab !== 'todas' && (
+                <Chip active onRemove={() => { setTab('todas'); clear(); }}>
+                  No leídas
+                </Chip>
+              )}
+              <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFiltersOpen(true)}>
+                Filtros
+                {(type ? 1 : 0) + (tab !== 'todas' ? 1 : 0) > 0 && (
+                  <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                    {(type ? 1 : 0) + (tab !== 'todas' ? 1 : 0)}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1 p-2">
@@ -410,6 +356,110 @@ export default function NotificacionesPage() {
           </div>
         </Card>
       </div>
+
+      {/* Todos los filtros en el drawer: lectura y tipo. */}
+      <Sheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        width={400}
+        kicker="Notificaciones"
+        title="Filtros"
+        footer={
+          <div className="flex w-full gap-2.5">
+            <Button variant="secondary" onClick={() => { setType(null); setTab('todas'); clear(); }}>
+              Limpiar
+            </Button>
+            <Button full onClick={() => setFiltersOpen(false)}>
+              Mostrar {visible.length}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <section>
+            <Kicker className="mb-2.5">Lectura</Kicker>
+            <Segmented
+              size="sm"
+              value={tab}
+              onChange={v => {
+                setTab(v);
+                clear();
+              }}
+              aria-label="Filtrar por lectura"
+              options={[
+                {
+                  value: 'todas',
+                  label: (
+                    <>
+                      Todas{' '}
+                      <span className="font-mono text-[11px] text-faint">
+                        {filterNotifs(items, 'todas', type).length}
+                      </span>
+                    </>
+                  ),
+                },
+                {
+                  value: 'no-leidas',
+                  label: (
+                    <>
+                      No leídas{' '}
+                      <span className="font-mono text-[11px] text-faint">
+                        {filterNotifs(items, 'no-leidas', type).length}
+                      </span>
+                    </>
+                  ),
+                },
+              ]}
+            />
+          </section>
+          <section>
+            <Kicker className="mb-2.5">Tipo</Kicker>
+            <nav aria-label="Tipo de notificación" className="flex flex-col gap-1">
+          {typeRows.map(t => {
+            const on = type === t.key;
+            const Icon = t.key ? NOTIF_ICON[t.key].icon : Inbox;
+            return (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => {
+                  setType(t.key);
+                  clear();
+                }}
+                aria-current={on ? 'true' : undefined}
+                className={`flex h-10 shrink-0 items-center gap-3 rounded-btn px-3.5 text-left text-[14px] font-semibold transition-colors ${
+                  on ? 'bg-action text-white' : 'text-navy hover:bg-panel'
+                }`}
+              >
+                <Icon size={16} className={on ? '' : 'text-muted'} />
+                <span className="flex-1">{t.label}</span>
+                {t.muted ? (
+                  <span
+                    className={`flex items-center gap-1 text-[11px] font-medium ${
+                      on ? 'text-white/70' : 'text-faint'
+                    }`}
+                    title="Silenciado en Configuración"
+                  >
+                    <BellOff size={12} /> silenciado
+                  </span>
+                ) : (
+                  t.count > 0 && (
+                    <span
+                      className={`min-w-6 rounded-full px-1.5 py-0.5 text-center font-mono text-[11px] ${
+                        on ? 'bg-white/20 text-white' : 'bg-chip text-muted'
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )
+                )}
+              </button>
+            );
+          })}
+            </nav>
+          </section>
+        </div>
+      </Sheet>
     </div>
   );
 }

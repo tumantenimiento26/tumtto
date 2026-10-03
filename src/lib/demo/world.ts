@@ -481,6 +481,33 @@ function build(): World {
 
   const quotes: ServiceQuote[] = [
     {
+      id: 'q-2851-v1',
+      service_order_id: 'SVC-2851',
+      technician_id: TECH_USER_ID,
+      labor_cents: 60000,
+      materials_cents: 52000,
+      surcharge_cents: 0,
+      total_cents: 112000,
+      notes: 'Primera cotización (reemplazada).',
+      accepted_at: null,
+      rejected_at: mins(60),
+      created_at: mins(95),
+      updated_at: mins(60),
+    },
+    {
+      id: 'q-2835',
+      service_order_id: 'SVC-2835',
+      technician_id: TECH_USER_ID,
+      labor_cents: 90000,
+      materials_cents: 74000,
+      surcharge_cents: 0,
+      total_cents: 164000,
+      notes: 'Cambio de termopar y limpieza del piloto.',
+      accepted_at: old,
+      rejected_at: null,
+      ...ts(),
+    },
+    {
       id: 'q-2851',
       service_order_id: 'SVC-2851',
       technician_id: TECH_USER_ID,

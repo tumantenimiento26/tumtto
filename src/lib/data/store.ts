@@ -9,6 +9,7 @@ import { distanceM, wkbPoint } from '@/lib/geo';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
 import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
+import { isImageMime, type QuoteAttachment } from '@/lib/quoteAttachments';
 import {
   applyCashResolution,
   buildPaymentSummary,
@@ -538,8 +539,12 @@ export const getTechRequests = (techUserId = TECH_USER_ID) =>
     .sort(byNewest);
 export const getRequest = (id: string) =>
   w().orders.find(r => r.id === id) ?? null;
-export const getQuote = (orderId: string) =>
-  w().quotes.find(q => q.service_order_id === orderId) ?? null;
+/** Cotizaciones de una orden, de la más reciente a la más antigua (cada reenvío crea una nueva). */
+export const getOrderQuotes = (orderId: string) =>
+  w()
+    .quotes.filter(q => q.service_order_id === orderId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+export const getQuote = (orderId: string) => getOrderQuotes(orderId)[0] ?? null;
 export const getQuoteItems = (quoteId: string) =>
   w().quoteItems.filter(i => i.quote_id === quoteId);
 /** Todos los pagos de una orden (tarifa base, presupuesto en efectivo o legado). */
@@ -2059,6 +2064,87 @@ export async function listOrderEvidence(
       };
     }),
   );
+}
+/** PDF mínimo (1 página en blanco) para los anexos de la maqueta. */
+const MOCK_PDF_URL =
+  'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjk1IDQyMF0+PmVuZG9iagp0cmFpbGVyPDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==';
+
+function mockQuoteAttachments(orderId: string): QuoteAttachment[] {
+  const q = getQuote(orderId);
+  if (!q) return [];
+  const prev = getOrderQuotes(orderId)[1];
+  const mk = (
+    n: number,
+    file_name: string,
+    mime_type: string,
+    size_bytes: number,
+    url: string,
+    mins: number,
+    quoteId = q.id,
+  ): QuoteAttachment => ({
+    id: `mock-qa-${orderId}-${n}`,
+    quote_id: quoteId,
+    file_name,
+    mime_type,
+    size_bytes,
+    created_at: new Date(Date.now() - mins * 60_000).toISOString(),
+    uploaded_by: q.technician_id,
+    storage_path: url,
+    url: mime_type === 'application/pdf' ? null : url,
+  });
+  if (orderId === 'SVC-2851')
+    return [
+      ...(prev ? [mk(9, 'cotizacion-v1.pdf', 'application/pdf', 120_832, MOCK_PDF_URL, 95, prev.id)] : []),
+      mk(1, 'presupuesto-materiales.pdf', 'application/pdf', 184_320, MOCK_PDF_URL, 40),
+      mk(2, 'llave-angular-danada.jpg', 'image/jpeg', 912_384, '/landing/categorias/plomeria.jpg', 38),
+      mk(3, 'cespol-fuga.jpg', 'image/jpeg', 1_258_291, '/landing/categorias/gas.jpg', 37),
+    ];
+  if (orderId === 'SVC-2835')
+    return [mk(1, 'cotizacion-calentador.pdf', 'application/pdf', 96_256, MOCK_PDF_URL, 60 * 24 * 9)];
+  return [];
+}
+
+/**
+ * Anexos de la cotización de una orden (bucket privado quote-attachments).
+ * Fuera del snapshot; las imágenes llevan URL firmada (10 min), los PDF la
+ * piden al abrir (getQuoteAttachmentUrl). Solo lectura.
+ */
+export async function listQuoteAttachments(orderId: string): Promise<QuoteAttachment[]> {
+  if (MOCK) return mockQuoteAttachments(orderId);
+  const { data, error } = await supabase
+    .from('service_quote_attachments')
+    .select('id, quote_id, file_name, mime_type, size_bytes, created_at, uploaded_by, storage_path')
+    .eq('service_order_id', orderId)
+    .order('created_at');
+  if (error) throw error;
+  return Promise.all(
+    (data ?? []).map(async a => ({
+      ...a,
+      url: isImageMime(a.mime_type)
+        ? ((await supabase.storage.from('quote-attachments').createSignedUrl(a.storage_path, 600))
+            .data?.signedUrl ?? null)
+        : null,
+    })),
+  );
+}
+
+/** URL firmada (10 min) de un anexo para abrir/descargar en otra pestaña. */
+export async function getQuoteAttachmentUrl(a: QuoteAttachment): Promise<string | null> {
+  if (MOCK) {
+    if (!a.storage_path.startsWith('data:')) return a.storage_path;
+    // fetch(data:) lo bloquea la CSP (connect-src); se decodifica a mano.
+    const bin = atob(a.storage_path.split(',')[1] ?? '');
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    return URL.createObjectURL(new Blob([bytes], { type: a.mime_type }));
+  }
+  const { data, error } = await supabase.storage
+    .from('quote-attachments')
+    .createSignedUrl(a.storage_path, 600);
+  if (error || !data?.signedUrl) {
+    notifyError('No se pudo abrir el anexo.');
+    return null;
+  }
+  return data.signedUrl;
 }
 // ── fin consola-b ────────────────────────────────────────────────────────────
 

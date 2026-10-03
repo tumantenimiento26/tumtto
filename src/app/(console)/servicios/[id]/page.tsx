@@ -70,6 +70,7 @@ import {
   getTechByUser,
   getUnassignedAlertMinutes,
   listOrderEvidence,
+  listQuoteAttachments,
   loadWorld,
   assignOrder,
   rejectRequest,
@@ -96,6 +97,8 @@ import {
   money,
   timeAgo,
 } from '../_components/shared';
+import { QuoteAttachments } from '../_components/QuoteAttachments';
+import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { PaymentBreakdown } from '../_components/PaymentBreakdown';
 import { paymentLabel, refundablePayments, type PayRow } from '@/lib/payments';
@@ -169,6 +172,8 @@ export default function ServicioDetailPage() {
   const [caseTicketId, setCaseTicketId] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<OrderEvidence[] | null>(null);
   const [evidenceError, setEvidenceError] = useState(false);
+  const [attachments, setAttachments] = useState<QuoteAttachment[] | null>(null);
+  const [attachmentsError, setAttachmentsError] = useState(false);
 
   useEffect(() => {
     if (!ready || !id) return;
@@ -176,6 +181,10 @@ export default function ServicioDetailPage() {
     listOrderEvidence(id).then(
       e => alive && setEvidence(e),
       () => alive && setEvidenceError(true),
+    );
+    listQuoteAttachments(id).then(
+      a => alive && setAttachments(a),
+      () => alive && setAttachmentsError(true),
     );
     return () => {
       alive = false;
@@ -570,6 +579,8 @@ export default function ServicioDetailPage() {
               </p>
             )}
           </Card>
+
+          {quote && <QuoteAttachments orderId={req.id} items={attachments} error={attachmentsError} />}
 
           <Card padded>
             <div className="mb-3 flex items-center justify-between">

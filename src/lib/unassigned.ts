@@ -6,14 +6,6 @@ import { fmtDate, fmtDateTime } from '@/lib/dates';
 export const ALERT_MINUTES_KEY = 'unassigned_alert_minutes';
 export const ALERT_MINUTES_DEFAULT = 30;
 
-/** Claves del recargo por horario (platform_settings). */
-export const SCHEDULE_SURCHARGE_KEYS = {
-  bps: 'schedule_surcharge_bps',
-  startHour: 'schedule_surcharge_start_hour',
-  endHour: 'schedule_surcharge_end_hour',
-  weekends: 'schedule_surcharge_weekends',
-} as const;
-
 export interface UnassignedOrderLike {
   status: string;
   needs_manual_assignment?: boolean | null;

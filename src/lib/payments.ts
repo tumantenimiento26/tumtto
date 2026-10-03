@@ -10,6 +10,7 @@ type T = Database['public']['Tables'];
 type Fn = Database['public']['Functions'];
 export type PayOrder = T['service_orders']['Row'];
 export type PayRow = T['payments']['Row'];
+export type PayQuote = T['service_quotes']['Row'];
 
 // ── Etiquetas ────────────────────────────────────────────────────────────────
 
@@ -151,13 +152,97 @@ export interface QuoteSummary {
   reviewReason: string | null;
   paymentId: string | null;
 }
+/** Estado de la cotización (borrador → enviada → aceptada | rechazada). */
+export type QuoteStatus = 'none' | 'draft' | 'sent' | 'accepted' | 'rejected';
+export const QUOTE_STATUS: Record<QuoteStatus, { label: string; tone: Tone }> = {
+  none: { label: 'Sin cotización', tone: 'neutral' },
+  draft: { label: 'Borrador', tone: 'neutral' },
+  sent: { label: 'Enviada', tone: 'info' },
+  accepted: { label: 'Aceptada', tone: 'success' },
+  rejected: { label: 'Rechazada', tone: 'danger' },
+};
+export const quoteStatusLabel = (s: string | null | undefined) =>
+  QUOTE_STATUS[(s as QuoteStatus) ?? 'none']?.label ?? s ?? '—';
+
+export interface QuoteState {
+  status: QuoteStatus;
+  quoteId: string | null;
+  totalCents: number;
+  sentAt: string | null;
+  rejectedAt: string | null;
+  rejectReason: string | null;
+  attachmentsCount: number | null;
+}
+/** Estado de la última cotización de la orden (la más reciente por created_at). */
+export function quoteStateOf(quotes: PayQuote[], attachmentsCount: number | null = null): QuoteState {
+  const q = [...quotes].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (!q)
+    return { status: 'none', quoteId: null, totalCents: 0, sentAt: null, rejectedAt: null, rejectReason: null, attachmentsCount };
+  const status: QuoteStatus = q.rejected_at
+    ? 'rejected'
+    : q.accepted_at
+      ? 'accepted'
+      : q.submitted_at
+        ? 'sent'
+        : 'draft';
+  return {
+    status,
+    quoteId: q.id,
+    totalCents: q.total_cents,
+    sentAt: q.submitted_at,
+    rejectedAt: q.rejected_at,
+    rejectReason: q.reject_reason,
+    attachmentsCount,
+  };
+}
+
+/** Órdenes cerradas porque el cliente rechazó la cotización (solo se cobró la base). */
+export function rejectedCloseIds(orders: Pick<PayOrder, 'id' | 'status'>[], quotes: PayQuote[]): Set<string> {
+  const latest = new Map<string, PayQuote>();
+  for (const q of quotes) {
+    const cur = latest.get(q.service_order_id);
+    if (!cur || q.created_at > cur.created_at) latest.set(q.service_order_id, q);
+  }
+  return new Set(orders.filter(o => o.status === 'closed' && latest.get(o.id)?.rejected_at).map(o => o.id));
+}
+
+/** Conceptos separados del cobro (visita, recargo de horario, emergencia, cotización). */
+export interface Concepts {
+  visitCents: number;
+  scheduleCents: number;
+  scheduleRuleName: string | null;
+  emergencyCents: number;
+  quoteCents: number;
+  totalCents: number;
+}
+
 export interface PaymentSummary {
   orderId: string;
   paymentModel: 'legacy' | 'base_cash';
   base: BaseSummary | null;
   quote: QuoteSummary;
+  /** null en órdenes del modelo anterior (no hay conceptos separados). */
+  concepts: Concepts | null;
+  quoteState: QuoteState;
+  closedByQuoteRejection: boolean;
   cashReviewOpen: boolean;
   totalCents: number;
+}
+
+/** Conceptos de una orden base+efectivo (misma suma que get_order_payment_summary). */
+export function conceptsOf(order: PayOrder, rejected = false): Concepts {
+  const visit = order.base_fee_cents ?? 0;
+  const schedule = order.schedule_surcharge_cents ?? 0;
+  const emergency = order.emergency_surcharge_cents ?? 0;
+  const quote = rejected ? 0 : (order.quoted_total_cents ?? 0);
+  return {
+    visitCents: visit,
+    scheduleCents: schedule,
+    scheduleRuleName: order.schedule_surcharge_name,
+    emergencyCents: emergency,
+    quoteCents: quote,
+    totalCents: visit + schedule + emergency + quote,
+  };
 }
 
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
@@ -180,14 +265,23 @@ export const basePayment = (payments: PayRow[]) => pick(payments, ['base_fee']);
 export const quotePayment = (payments: PayRow[]) => pick(payments, ['quote', 'legacy']);
 
 /** Calcula el resumen desde la orden y sus pagos (mismas reglas que el RPC). */
-export function buildPaymentSummary(order: PayOrder, payments: PayRow[]): PaymentSummary {
+export function buildPaymentSummary(
+  order: PayOrder,
+  payments: PayRow[],
+  quotes: PayQuote[] = [],
+  attachmentsCount: number | null = null,
+): PaymentSummary {
   const base = basePayment(payments);
   const quote = quotePayment(payments);
   const isBaseCash = order.payment_model === 'base_cash';
   const quoted = order.quoted_total_cents ?? 0;
+  const closedByRejection = rejectedCloseIds([order], quotes).has(order.id);
   return {
     orderId: order.id,
     paymentModel: isBaseCash ? 'base_cash' : 'legacy',
+    concepts: isBaseCash ? conceptsOf(order, closedByRejection) : null,
+    quoteState: quoteStateOf(quotes, attachmentsCount),
+    closedByQuoteRejection: closedByRejection,
     base: isBaseCash
       ? {
           feeCents: order.base_fee_cents,
@@ -226,9 +320,31 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
   const j = json as Record<string, Json | undefined>;
   const b = j.base && typeof j.base === 'object' && !Array.isArray(j.base) ? (j.base as Record<string, Json>) : null;
   const q = (j.quote && typeof j.quote === 'object' && !Array.isArray(j.quote) ? j.quote : {}) as Record<string, Json>;
+  const c = j.concepts && typeof j.concepts === 'object' && !Array.isArray(j.concepts) ? (j.concepts as Record<string, Json>) : null;
+  const qs = str(q.status);
   return {
     orderId: str(j.order_id) ?? '',
     paymentModel: j.payment_model === 'base_cash' ? 'base_cash' : 'legacy',
+    concepts: c
+      ? {
+          visitCents: num0(c.visit_cents),
+          scheduleCents: num0(c.schedule_surcharge_cents),
+          scheduleRuleName: str(c.schedule_rule_name),
+          emergencyCents: num0(c.emergency_surcharge_cents),
+          quoteCents: num0(c.quote_cents),
+          totalCents: num0(c.total_cents),
+        }
+      : null,
+    closedByQuoteRejection: j.closed_by_quote_rejection === true,
+    quoteState: {
+      status: (['none', 'draft', 'sent', 'accepted', 'rejected'] as const).find(x => x === qs) ?? 'none',
+      quoteId: str(q.quote_id),
+      totalCents: num0(q.quote_total_cents),
+      sentAt: str(q.sent_at),
+      rejectedAt: str(q.rejected_at),
+      rejectReason: str(q.reject_reason),
+      attachmentsCount: num(q.attachments_count),
+    },
     base: b
       ? {
           feeCents: num0(b.fee_cents),
@@ -409,6 +525,12 @@ export interface KpiWindow {
   orders: number;
   paid_orders: number;
   gmv_cents: number;
+  /** Conceptos separados de las órdenes pagadas/cerradas de la ventana. */
+  base_fee_cents: number;
+  schedule_surcharge_cents: number;
+  emergency_surcharge_cents: number;
+  quote_cents: number;
+  quotes_rejected: number;
 }
 
 export function kpiWindow(
@@ -417,6 +539,7 @@ export function kpiWindow(
   from: number,
   to: number,
   method: MethodFilter,
+  rejected: Set<string> = new Set(),
 ): KpiWindow {
   const inWin = (iso: string | null) => {
     const t = iso ? Date.parse(iso) : NaN;
@@ -424,10 +547,23 @@ export function kpiWindow(
   };
   const os = orders.filter(o => orderHasMethod(byOrder.get(o.id), method));
   const paid = os.filter(o => PAID_STATUS.includes(o.status) && inWin(o.paid_at));
+  // Conceptos: con «tarjeta» solo cuenta lo cobrado en la app (base y recargos);
+  // con «efectivo», solo la cotización.
+  const baseOrders = paid.filter(o => o.payment_model === 'base_cash' && method !== 'cash');
+  const sum = (f: (c: ReturnType<typeof conceptsOf>) => number) =>
+    baseOrders.reduce((acc, o) => acc + f(conceptsOf(o, rejected.has(o.id))), 0);
   return {
     orders: os.filter(o => inWin(o.created_at)).length,
     paid_orders: paid.length,
     gmv_cents: paid.reduce((s, o) => s + orderGmv(o, byOrder.get(o.id), method), 0),
+    base_fee_cents: sum(c => c.visitCents),
+    schedule_surcharge_cents: sum(c => c.scheduleCents),
+    emergency_surcharge_cents: sum(c => c.emergencyCents),
+    quote_cents:
+      method === 'card'
+        ? 0
+        : paid.reduce((acc, o) => acc + (rejected.has(o.id) ? 0 : (o.quoted_total_cents ?? 0)), 0),
+    quotes_rejected: paid.filter(o => rejected.has(o.id)).length,
   };
 }
 
@@ -468,35 +604,50 @@ export type CashTechRow = NullableCols<
   'technician_name'
 >;
 
+const emptyCashRow = (id: string, name: string | null): CashTechRow => ({
+  technician_id: id,
+  technician_name: name,
+  services_count: 0,
+  cash_expected_cents: 0,
+  cash_reported_cents: 0,
+  cash_client_confirmed_cents: 0,
+  cash_awaiting_client_cents: 0,
+  cash_disputed_cents: 0,
+  reviews_open: 0,
+  commission_generated_cents: 0,
+  commission_recovered_cents: 0,
+  commission_pending_cents: 0,
+  base_fee_credited_cents: 0,
+  schedule_surcharge_credited_cents: 0,
+  quotes_rejected: 0,
+});
+
 export function cashByTechnician(
   payments: PayRow[],
   from: number,
   to: number,
   nameOf: (id: string) => string | null,
   technicianId: string | null = null,
+  /** Órdenes para acreditar tarifa base y recargo de horario, y contar cotizaciones rechazadas. */
+  credits?: { orders: PayOrder[]; rejected: Set<string> },
 ): CashTechRow[] {
   const acc = new Map<string, CashTechRow>();
+  for (const o of credits?.orders ?? []) {
+    if (!o.technician_id || (technicianId && o.technician_id !== technicianId)) continue;
+    const t = o.base_fee_credited_at ? Date.parse(o.base_fee_credited_at) : NaN;
+    if (!(t >= from && t < to)) continue;
+    const r = acc.get(o.technician_id) ?? emptyCashRow(o.technician_id, nameOf(o.technician_id));
+    r.base_fee_credited_cents += o.base_fee_cents ?? 0;
+    r.schedule_surcharge_credited_cents += o.schedule_surcharge_cents ?? 0;
+    if (credits!.rejected.has(o.id)) r.quotes_rejected += 1;
+    acc.set(o.technician_id, r);
+  }
   for (const p of payments) {
     if (p.kind !== 'quote' || !p.technician_id || !p.cash_reported_at) continue;
     const t = Date.parse(p.cash_reported_at);
     if (t < from || t >= to) continue;
     if (technicianId && p.technician_id !== technicianId) continue;
-    const r =
-      acc.get(p.technician_id) ??
-      ({
-        technician_id: p.technician_id,
-        technician_name: nameOf(p.technician_id),
-        services_count: 0,
-        cash_expected_cents: 0,
-        cash_reported_cents: 0,
-        cash_client_confirmed_cents: 0,
-        cash_awaiting_client_cents: 0,
-        cash_disputed_cents: 0,
-        reviews_open: 0,
-        commission_generated_cents: 0,
-        commission_recovered_cents: 0,
-        commission_pending_cents: 0,
-      } satisfies CashTechRow);
+    const r = acc.get(p.technician_id) ?? emptyCashRow(p.technician_id, nameOf(p.technician_id));
     const got = p.cash_received_cents ?? 0;
     r.services_count += 1;
     r.cash_expected_cents += p.amount_cents;
@@ -536,6 +687,9 @@ export function cashTotals(rows: CashTechRow[]) {
     generated: 0,
     recovered: 0,
     pending: 0,
+    baseCredited: 0,
+    scheduleCredited: 0,
+    rejected: 0,
   };
   for (const r of rows) {
     z.services += Number(r.services_count);
@@ -548,6 +702,9 @@ export function cashTotals(rows: CashTechRow[]) {
     z.generated += Number(r.commission_generated_cents);
     z.recovered += Number(r.commission_recovered_cents);
     z.pending += Number(r.commission_pending_cents);
+    z.baseCredited += Number(r.base_fee_credited_cents);
+    z.scheduleCredited += Number(r.schedule_surcharge_credited_cents);
+    z.rejected += Number(r.quotes_rejected);
   }
   return z;
 }
@@ -567,6 +724,9 @@ export function cashByTechCsvRows(rows: CashTechRow[]): Record<string, string | 
     'Comisión generada': pesos(r.commission_generated_cents),
     'Comisión recuperada': pesos(r.commission_recovered_cents),
     'Comisión pendiente': pesos(r.commission_pending_cents),
+    'Tarifa base acreditada': pesos(r.base_fee_credited_cents),
+    'Recargo de horario acreditado': pesos(r.schedule_surcharge_credited_cents),
+    'Cotizaciones rechazadas': Number(r.quotes_rejected),
   }));
 }
 
@@ -586,6 +746,7 @@ export type PaymentsReportRow = NullableCols<
   | 'cash_received_cents'
   | 'cash_reported_at'
   | 'client_response'
+  | 'schedule_rule_name'
 >;
 export interface PaymentsReportFilters {
   method: MethodFilter;
@@ -599,6 +760,8 @@ export function paymentsReport(
   names: {
     category: (id: string) => string;
     person: (id: string | null) => string | null;
+    /** Cotizaciones del snapshot (para estado de cotización y cierre por rechazo). */
+    quotes?: PayQuote[];
   },
   from: number,
   to: number,
@@ -618,9 +781,15 @@ export function paymentsReport(
     })
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const total = rows.length;
+  const quotes = names.quotes ?? [];
+  const rej = rejectedCloseIds(rows, quotes);
   return rows.slice(offset, offset + limit).map(o => {
     const pays = byOrder.get(o.id) ?? [];
-    const s = buildPaymentSummary(o, pays);
+    const s = buildPaymentSummary(
+      o,
+      pays,
+      quotes.filter(q => q.service_order_id === o.id),
+    );
     const baseKept = ['paid', 'refund_pending', 'refunded'].includes(o.base_fee_status) ? (o.base_total_cents ?? 0) : 0;
     const isBC = o.payment_model === 'base_cash';
     return {
@@ -636,6 +805,11 @@ export function paymentsReport(
       payment_model: o.payment_model,
       base_fee_cents: o.base_fee_cents,
       base_surcharge_cents: o.base_surcharge_cents,
+      schedule_rule_name: o.schedule_surcharge_name,
+      schedule_surcharge_cents: o.schedule_surcharge_cents ?? 0,
+      emergency_surcharge_cents: o.emergency_surcharge_cents ?? 0,
+      quote_status: s.quoteState.status,
+      closed_by_quote_rejection: rej.has(o.id),
       base_total_cents: o.base_total_cents,
       base_fee_status: o.base_fee_status,
       base_method: isBC && (o.base_total_cents ?? 0) > 0 ? 'card' : null,
@@ -668,12 +842,16 @@ export function paymentsReportCsvRows(rows: PaymentsReportRow[]): Record<string,
     Técnico: r.technician_name ?? '',
     Modelo: r.payment_model === 'base_cash' ? 'Base + efectivo' : 'Anterior',
     'Tarifa base': pesos(r.base_fee_cents),
-    Recargos: pesos(r.base_surcharge_cents),
+    'Recargo de horario': pesos(r.schedule_surcharge_cents),
+    'Regla de horario': r.schedule_rule_name ?? '',
+    'Recargo de emergencia': pesos(r.emergency_surcharge_cents),
     'Total base': pesos(r.base_total_cents),
     'Método base': methodName(r.base_method),
     'Estado base': BASE_STATUS[r.base_fee_status]?.label ?? r.base_fee_status,
     'Base reembolsada': pesos(r.base_refunded_cents),
     Presupuesto: pesos(r.quote_total_cents),
+    'Estado cotización': quoteStatusLabel(r.quote_status),
+    'Cerrado por cotización rechazada': r.closed_by_quote_rejection ? 'Sí' : 'No',
     'Método presupuesto': methodName(r.quote_method),
     'Estado efectivo': r.cash_status ? (CASH_STATUS[r.cash_status]?.label ?? r.cash_status) : '',
     'Efectivo esperado': pesos(r.cash_expected_cents),

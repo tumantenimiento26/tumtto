@@ -320,6 +320,27 @@ export default function ReportesPage() {
           loading={rpc.loading}
         />
       </div>
+      {/* Conceptos separados del cobro (modelo v2); '—' si el servidor aún no los envía */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" aria-label="Desglose del cobro">
+        {(
+          [
+            ['Tarifa base de visita', 'base_fee_cents', true, false],
+            ['Recargos de horario', 'schedule_surcharge_cents', true, false],
+            ['Recargos de emergencia', 'emergency_surcharge_cents', true, false],
+            ['Cotizaciones (efectivo)', 'quote_cents', true, false],
+            ['Cotizaciones rechazadas', 'quotes_rejected', false, true],
+          ] as const
+        ).map(([label, key, isMoney, invert]) => (
+          <PeriodStat
+            key={key}
+            label={label}
+            value={cur?.[key] == null ? '—' : isMoney ? mxn(Number(cur[key])) : String(cur[key])}
+            delta={delta(Number(cur?.[key]), Number(prev?.[key]))}
+            invert={invert}
+            loading={rpc.loading}
+          />
+        ))}
+      </div>
       {payMethod !== 'all' && (
         <p className="-mt-3 font-sans text-[12px] text-muted">
           Forma de pago: {METHOD_FILTER_OPTIONS.find(o => o.value === payMethod)?.label}. El GMV, los servicios

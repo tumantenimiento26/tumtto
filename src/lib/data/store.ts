@@ -19,6 +19,7 @@ import {
   kpiWindow,
   parsePaymentSummary,
   paymentsReport,
+  rejectedCloseIds,
   quotePayment,
   ticketByCategory,
   validateResolution,
@@ -31,6 +32,16 @@ import {
   type ReviewOutcome,
 } from '@/lib/payments';
 import { rejectionNotes } from '@/lib/clientDocs';
+import {
+  evaluateSurcharge,
+  mxParts,
+  parsePreview,
+  ruleRpcArgs,
+  type Holiday,
+  type Preview,
+  type RuleForm,
+  type ScheduleRule,
+} from '@/lib/scheduleRules';
 import { typeChangeText, typeCompanyValid, type TechType } from '@/lib/techType';
 import { ratingNoteRequired, ratingReasonLabel, type RatingReason } from '@/lib/ratingModeration';
 import { isValidPlate, normalizePlate, vehicleEventText } from '@/lib/vehicles';
@@ -1690,8 +1701,9 @@ async function reportRpc<F extends ReportFn>(
 function mockReport(fn: ReportFn, from: Date, to: Date, method: MethodFilter) {
   const span = to.getTime() - from.getTime();
   const byOrder = groupByOrder(w().payments);
+  const rejected = rejectedCloseIds(w().orders, w().quotes);
   const kpis = (a: number, b: number) => {
-    const k = kpiWindow(w().orders, byOrder, a, b, method);
+    const k = kpiWindow(w().orders, byOrder, a, b, method, rejected);
     const arrivals = w()
       .orders.filter(
         o =>
@@ -1722,20 +1734,19 @@ function mockReport(fn: ReportFn, from: Date, to: Date, method: MethodFilter) {
   if (fn === 'admin_report_cold_zones') return [];
   return null; // heatmap: la pantalla cae al cálculo desde el snapshot.
 }
-export type ReportKpis = {
-  current: {
-    orders: number;
-    paid_orders: number;
-    gmv_cents: number;
-    avg_arrival_seconds: number;
-  };
-  previous: {
-    orders: number;
-    paid_orders: number;
-    gmv_cents: number;
-    avg_arrival_seconds: number;
-  };
+/** Ventana de admin_report_kpis; los conceptos separados llegan con el modelo de cobro v2. */
+export type ReportKpiWindow = {
+  orders: number;
+  paid_orders: number;
+  gmv_cents: number;
+  avg_arrival_seconds: number;
+  base_fee_cents?: number;
+  schedule_surcharge_cents?: number;
+  emergency_surcharge_cents?: number;
+  quote_cents?: number;
+  quotes_rejected?: number;
 };
+export type ReportKpis = { current: ReportKpiWindow; previous: ReportKpiWindow };
 /** admin_report_kpis devuelve jsonb: su forma es la de ReportKpis. */
 export const fetchReportKpis = async (from: Date, to: Date, method: MethodFilter = 'all') =>
   (await reportRpc('admin_report_kpis', from, to, method)) as ReportKpis | null;
@@ -1755,7 +1766,7 @@ const personOrNull = (id: string | null) =>
 export async function fetchOrderPaymentSummary(orderId: string): Promise<PaymentSummary | null> {
   const local = () => {
     const o = getRequest(orderId);
-    return o ? buildPaymentSummary(o, getOrderPayments(orderId)) : null;
+    return o ? buildPaymentSummary(o, getOrderPayments(orderId), w().quotes.filter(q => q.service_order_id === orderId)) : null;
   };
   if (MOCK) return local();
   try {
@@ -1788,7 +1799,10 @@ export async function fetchCashReviews(): Promise<CashReviewRow[] | null> {
 export async function fetchCashByTechnician(from: Date, to: Date): Promise<CashTechRow[] | null> {
   if (MOCK) {
     await loadWorld();
-    return cashByTechnician(w().payments, from.getTime(), to.getTime(), personOrNull);
+    return cashByTechnician(w().payments, from.getTime(), to.getTime(), personOrNull, null, {
+      orders: w().orders,
+      rejected: rejectedCloseIds(w().orders, w().quotes),
+    });
   }
   try {
     const { data, error } = await supabase.rpc('admin_report_cash_by_technician', {
@@ -1816,7 +1830,11 @@ export async function fetchPaymentsReport(
     const all = paymentsReport(
       w().orders,
       groupByOrder(w().payments),
-      { category: id => w().categories.find(c => c.id === id)?.name ?? 'Servicio', person: personOrNull },
+      {
+        category: id => w().categories.find(c => c.id === id)?.name ?? 'Servicio',
+        person: personOrNull,
+        quotes: w().quotes,
+      },
       from.getTime(),
       to.getTime(),
       f,
@@ -2101,6 +2119,12 @@ function mockQuoteAttachments(orderId: string): QuoteAttachment[] {
     ];
   if (orderId === 'SVC-2835')
     return [mk(1, 'cotizacion-calentador.pdf', 'application/pdf', 96_256, MOCK_PDF_URL, 60 * 24 * 9)];
+  // Modelo v2: enviar la cotización exige evidencia (≥ 1 imagen o PDF); el borrador puede llevar una.
+  if (/^SVC-40\d\d$/.test(orderId))
+    return [
+      mk(1, 'cotizacion.pdf', 'application/pdf', 142_336, MOCK_PDF_URL, 90),
+      ...(q.submitted_at ? [mk(2, 'evidencia-falla.jpg', 'image/jpeg', 804_864, '/landing/categorias/plomeria.jpg', 88)] : []),
+    ];
   return [];
 }
 
@@ -2162,6 +2186,7 @@ export type WalletSummary = Database['public']['Views']['technician_wallet_summa
 export type TechLocation = Row<'technician_locations'>;
 export type TechVehicle = Row<'technician_vehicles'>;
 export type ToolCatalogItem = Row<'tool_catalog'>;
+export type { Holiday, ScheduleRule };
 export type TechToolRow = Row<'technician_tools'>;
 export type ZoneGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
 /** Fila de admin_list_coverage_zones con el geojson (jsonb) ya acotado a su forma. */
@@ -2170,7 +2195,7 @@ export type CoverageZone = Omit<Fn['admin_list_coverage_zones']['Returns'][numbe
   geojson: ZoneGeometry | null;
 };
 
-type ExtraKey = 'docs' | 'clientDocs' | 'companies' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations' | 'vehicles' | 'toolCatalog' | 'techTools' | 'companyTools' | 'toolAssignments';
+type ExtraKey = 'docs' | 'clientDocs' | 'companies' | 'payouts' | 'zones' | 'ratings' | 'wallets' | 'locations' | 'vehicles' | 'toolCatalog' | 'techTools' | 'companyTools' | 'toolAssignments' | 'scheduleRules' | 'holidays';
 interface ExtrasState {
   docs: TechDocument[];
   clientDocs: ClientDocument[];
@@ -2185,6 +2210,8 @@ interface ExtrasState {
   techTools: TechToolRow[];
   companyTools: CompanyTool[];
   toolAssignments: ToolAssignment[];
+  scheduleRules: ScheduleRule[];
+  holidays: Holiday[];
   /** Dominios que no se pudieron leer (tabla ausente o sin permiso). */
   unavailable: Partial<Record<ExtraKey, boolean>>;
   loaded: boolean;
@@ -2204,6 +2231,8 @@ export const useExtras = create<ExtrasState>(() => ({
   techTools: [],
   companyTools: [],
   toolAssignments: [],
+  scheduleRules: [],
+  holidays: [],
   unavailable: {},
   loaded: false,
 }));
@@ -2277,6 +2306,12 @@ const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
     fetchAllRows((a, b) =>
       supabase.from('company_tool_assignments').select('*').order('assigned_at', { ascending: false }).range(a, b),
     ),
+  scheduleRules: () =>
+    fetchAllRows((a, b) =>
+      supabase.from('schedule_surcharge_rules').select('*').order('sort_order').order('name').range(a, b),
+    ),
+  holidays: () =>
+    fetchAllRows((a, b) => supabase.from('holidays').select('*').order('date').range(a, b)),
 };
 
 let extrasInflight: Promise<void> | null = null;
@@ -2299,6 +2334,8 @@ export function loadExtras(force = false): Promise<void> {
       techTools: mockHistory.techTools,
       companyTools: mockHistory.companyTools,
       toolAssignments: mockHistory.toolAssignments,
+      scheduleRules: mockHistory.scheduleRules,
+      holidays: mockHistory.holidays,
     });
     return Promise.resolve();
   }
@@ -3573,4 +3610,183 @@ export async function fetchToolsOutstanding(olderThanDays: number): Promise<Outs
     return local();
   }
   return (data ?? []).map(r => ({ ...r, days_held: Number(r.days_held) }));
+}
+
+// ══ Modelo de cobro v2 · tarifa base por categoría y recargos por horario ════
+// Reglas y festivos viven en `useExtras` (cargan aparte; si faltan la sección lo
+// dice en vez de pintarse vacía). Las escrituras pasan por RPC (finanzas /
+// super_admin) y solo afectan órdenes nuevas: las existentes tienen snapshot.
+
+export const getScheduleRules = () => useExtras.getState().scheduleRules;
+export const getHolidays = () => useExtras.getState().holidays;
+
+/** Tarifa base de visita de una categoría (admin_set_category_base_fee). */
+export async function setCategoryBaseFee(catId: string, cents: number): Promise<true | null> {
+  if (!Number.isInteger(cents) || cents < 0) {
+    notifyError('La tarifa base debe ser un monto en pesos, cero o mayor.');
+    return null;
+  }
+  if (MOCK) {
+    const arr = w().categories;
+    const i = arr.findIndex(c => c.id === catId);
+    if (i < 0) return null;
+    arr[i] = { ...arr[i], base_visit_fee_cents: cents, updated_at: new Date().toISOString() };
+    bump();
+    return true;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_category_base_fee', {
+        p_category_id: catId,
+        p_cents: cents,
+      });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo guardar la tarifa base de la categoría.'),
+  );
+}
+
+/** Alta (id = null) o edición de una regla de recargo por horario. */
+export async function saveScheduleRule(form: RuleForm): Promise<true | null> {
+  const args = ruleRpcArgs(form);
+  if (MOCK) {
+    const list = useExtras.getState().scheduleRules;
+    const now = new Date().toISOString();
+    const prev = form.id ? list.find(r => r.id === form.id) : null;
+    const next: ScheduleRule = {
+      id: prev?.id ?? `mock-rule-${Date.now()}`,
+      name: args.p_name,
+      kind: args.p_kind,
+      start_time: args.p_start_time ?? null,
+      end_time: args.p_end_time ?? null,
+      weekdays: args.p_weekdays ?? null,
+      surcharge_type: args.p_surcharge_type,
+      value: args.p_value,
+      is_active: args.p_is_active,
+      sort_order: prev?.sort_order ?? (Math.max(0, ...list.map(r => r.sort_order)) + 10),
+      created_at: prev?.created_at ?? now,
+      updated_at: now,
+    };
+    useExtras.setState({ scheduleRules: prev ? list.map(r => (r.id === prev.id ? next : r)) : [...list, next] });
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('admin_upsert_schedule_rule', args);
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo guardar la regla de recargo.'),
+  );
+}
+
+export async function setScheduleRuleActive(id: string, active: boolean): Promise<true | null> {
+  if (MOCK) {
+    useExtras.setState(s => ({
+      scheduleRules: s.scheduleRules.map(r => (r.id === id ? { ...r, is_active: active } : r)),
+    }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_schedule_rule_active', { p_id: id, p_active: active });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo actualizar la regla.'),
+  );
+}
+
+export async function deleteScheduleRule(id: string): Promise<true | null> {
+  if (MOCK) {
+    useExtras.setState(s => ({ scheduleRules: s.scheduleRules.filter(r => r.id !== id) }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('admin_delete_schedule_rule', { p_id: id });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo eliminar la regla.'),
+  );
+}
+
+/** Alta o renombrado de un festivo (la fecha es la llave). */
+export async function saveHoliday(date: string, name: string): Promise<true | null> {
+  const text = name.trim();
+  if (!date || !text) {
+    notifyError('Indica la fecha y el nombre del festivo.');
+    return null;
+  }
+  if (MOCK) {
+    const now = new Date().toISOString();
+    useExtras.setState(s => ({
+      holidays: [
+        ...s.holidays.filter(h => h.date !== date),
+        { date, name: text, created_at: s.holidays.find(h => h.date === date)?.created_at ?? now, updated_at: now },
+      ].sort((a, b) => a.date.localeCompare(b.date)),
+    }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('admin_upsert_holiday', { p_date: date, p_name: text });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo guardar el festivo.'),
+  );
+}
+
+export async function deleteHoliday(date: string): Promise<true | null> {
+  if (MOCK) {
+    useExtras.setState(s => ({ holidays: s.holidays.filter(h => h.date !== date) }));
+    return true;
+  }
+  return mutateExtras(
+    async () => {
+      const { error } = await supabase.rpc('admin_delete_holiday', { p_date: date });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo eliminar el festivo.'),
+  );
+}
+
+/** «Probar»: recargo que resultaría para una categoría en un instante (admin_preview_schedule_surcharge). */
+export async function previewScheduleSurcharge(categoryId: string, ts: string): Promise<Preview | null> {
+  if (MOCK) {
+    await loadWorld();
+    const cat = w().categories.find(c => c.id === categoryId);
+    const base = cat?.base_visit_fee_cents ?? 0;
+    const x = useExtras.getState();
+    const r = evaluateSurcharge(x.scheduleRules, x.holidays, base, ts);
+    return {
+      timestamp: ts,
+      local_time: mxParts(ts).label,
+      is_holiday: r.isHoliday,
+      base_fee_cents: base,
+      source: cat?.base_visit_fee_cents != null ? 'category' : 'none',
+      rule_id: r.rule?.id ?? null,
+      rule_name: r.rule?.name ?? null,
+      surcharge_type: r.rule?.surcharge_type ?? null,
+      surcharge_value: r.rule?.value ?? null,
+      surcharge_cents: r.cents,
+      total_cents: base + r.cents,
+    };
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_preview_schedule_surcharge', {
+      p_category_id: categoryId,
+      p_ts: ts,
+    });
+    if (error) throw error;
+    return parsePreview(data);
+  } catch (e) {
+    console.error('[data] admin_preview_schedule_surcharge', e);
+    notifyError(pgMessage(e, 'No se pudo calcular la prueba.'));
+    return null;
+  }
 }

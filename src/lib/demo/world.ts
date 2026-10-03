@@ -89,6 +89,14 @@ function profile(
   };
 }
 
+const BASE_FEE: Record<string, number> = {
+  plumbing: 35000,
+  electrical: 30000,
+  gas: 40000,
+  ac: 45000,
+  appliances: 30000,
+};
+
 // ── Catalog (mirrors supabase/seed.sql) ──────────────────────────────────────
 const CAT = (
   slug: string,
@@ -105,6 +113,8 @@ const CAT = (
   sort_order,
   is_active: true,
   commission_bps: null,
+  // Tarifa base de visita (modelo de cobro v2): «locks» queda sin configurar a propósito.
+  base_visit_fee_cents: BASE_FEE[slug] ?? null,
   ...ts(),
 });
 
@@ -392,6 +402,9 @@ function build(): World {
       priority: 'normal',
       assignment_mode: 'client',
       schedule_surcharge_bps: 0,
+      schedule_surcharge_cents: null,
+      schedule_surcharge_name: null,
+      schedule_surcharge_rule_id: null,
       unassigned_alerted_at: null,
       emergency_surcharge_cents: null,
       dispatch_status: null,
@@ -491,6 +504,8 @@ function build(): World {
       notes: 'Primera cotización (reemplazada).',
       accepted_at: null,
       rejected_at: mins(60),
+      reject_reason: 'Muy caro; pido otra opción.',
+      submitted_at: mins(90),
       created_at: mins(95),
       updated_at: mins(60),
     },
@@ -505,6 +520,8 @@ function build(): World {
       notes: 'Cambio de termopar y limpieza del piloto.',
       accepted_at: old,
       rejected_at: null,
+      reject_reason: null,
+      submitted_at: old,
       ...ts(),
     },
     {
@@ -518,6 +535,8 @@ function build(): World {
       notes: 'Incluye cambio de llave angular y cespol.',
       accepted_at: mins(20),
       rejected_at: null,
+      reject_reason: null,
+      submitted_at: mins(30),
       ...ts(),
     },
   ];

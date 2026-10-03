@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Gavel, HandCoins } from 'lucide-react';
+import { Banknote, CreditCard, Gavel, HandCoins, Receipt, XCircle } from 'lucide-react';
 import { Badge, Button, Card, Input, Kicker, Modal, Textarea } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
 import { useAction } from '@/components/use-action';
 import {
   fetchOrderPaymentSummary,
   getOrderPayments,
+  getOrderQuotes,
   quotePaymentOf,
   useTick,
   waiveBaseFee,
@@ -18,6 +19,7 @@ import {
   BASE_STATUS,
   CASH_STATUS,
   CLIENT_RESPONSE_LABEL,
+  QUOTE_STATUS,
   OUTCOME_LABEL,
   buildPaymentSummary,
   canWaiveBase,
@@ -26,6 +28,7 @@ import {
   type PayOrder,
   type PaymentSummary,
 } from '@/lib/payments';
+import { surchargeBadge } from '@/lib/scheduleRules';
 import { money } from './shared';
 
 const when = (iso: string | null) =>
@@ -37,7 +40,7 @@ function Line({
   strong,
   tone,
 }: {
-  label: string;
+  label: React.ReactNode;
   value: React.ReactNode;
   strong?: boolean;
   tone?: 'error' | 'success';
@@ -79,7 +82,10 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
       live = false;
     };
   }, [order.id, order.updated_at, tick]);
-  const s = rpc && rpc.orderId === order.id ? rpc : buildPaymentSummary(order, getOrderPayments(order.id));
+  const s =
+    rpc && rpc.orderId === order.id
+      ? rpc
+      : buildPaymentSummary(order, getOrderPayments(order.id), getOrderQuotes(order.id));
   const b = s.base;
   const q = s.quote;
   const quotePay = quotePaymentOf(order.id);
@@ -88,13 +94,68 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
   const cash = q.cashStatus ? (CASH_STATUS[q.cashStatus] ?? { label: q.cashStatus, tone: 'neutral' as const }) : null;
   const base = b ? (BASE_STATUS[b.status] ?? { label: b.status, tone: 'neutral' as const }) : null;
   const commission = quotePay?.commission_cents ?? order.commission_cents ?? 0;
+  const c = s.concepts;
+  const qs = s.quoteState;
+  const qStatus = QUOTE_STATUS[qs.status];
+  const ruleBadge =
+    order.schedule_surcharge_rule_id && order.schedule_surcharge_bps > 0
+      ? surchargeBadge('percent', order.schedule_surcharge_bps)
+      : null;
 
   return (
     <Card padded>
       <Kicker className="mb-3">Formas de pago</Kicker>
 
+      {c && (
+        <section aria-label="Desglose del cobro" className="mb-4">
+          <h3 className="mb-2 flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
+            <Receipt size={15} className="text-primary" aria-hidden /> Desglose del cobro
+          </h3>
+          <dl className="flex flex-col gap-1.5 text-[13.5px]">
+            <Line label="Visita (tarifa base)" value={money(c.visitCents, true)} />
+            {c.scheduleCents > 0 && (
+              <Line
+                label={
+                  <span>
+                    Recargo de horario
+                    {c.scheduleRuleName && (
+                      <span className="ml-1.5 inline-flex flex-wrap items-center gap-1.5 align-middle">
+                        <Badge tone="info">{c.scheduleRuleName}</Badge>
+                        {ruleBadge && <span className="font-mono text-[11.5px] text-muted">{ruleBadge}</span>}
+                      </span>
+                    )}
+                  </span>
+                }
+                value={money(c.scheduleCents, true)}
+              />
+            )}
+            {c.emergencyCents > 0 && <Line label="Recargo de emergencia" value={money(c.emergencyCents, true)} />}
+            <Line
+              label={
+                <span>
+                  Cotización <span className="text-[12px] text-faint">· efectivo</span>
+                </span>
+              }
+              value={s.closedByQuoteRejection ? '—' : c.quoteCents > 0 ? money(c.quoteCents, true) : '—'}
+            />
+            <div className="my-0.5 border-t border-divider" />
+            <Line label="Total del servicio" value={money(c.totalCents, true)} strong />
+          </dl>
+          {s.closedByQuoteRejection && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">
+              <XCircle size={15} className="mt-0.5 shrink-0 text-warning-ink" aria-hidden />
+              <p>
+                <b className="font-semibold text-navy">Cerrado por cotización rechazada.</b> El cliente rechazó la
+                cotización: el servicio se cerró y solo se cobró la visita
+                {c.scheduleCents > 0 ? ' con su recargo' : ''}. No hay efectivo pendiente.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
       {b && base && (
-        <section aria-label="Tarifa base" className="mb-4">
+        <section aria-label="Tarifa base" className="mb-4 border-t border-divider pt-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
               <CreditCard size={15} className="text-primary" aria-hidden /> Tarifa base · Tarjeta
@@ -102,9 +163,7 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
             <Badge tone={base.tone}>{base.label}</Badge>
           </div>
           <dl className="flex flex-col gap-1.5 text-[13.5px]">
-            <Line label="Tarifa de visita" value={money(b.feeCents, true)} />
-            {b.surchargeCents > 0 && <Line label="Recargos" value={money(b.surchargeCents, true)} />}
-            <Line label="Total base" value={money(b.totalCents, true)} strong />
+            <Line label="Total base (visita + recargos)" value={money(b.totalCents, true)} strong />
             {b.paidAt && <Line label="Pagada" value={when(b.paidAt)} />}
             {b.refundedCents > 0 && (
               <Line
@@ -143,24 +202,55 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         </section>
       )}
 
-      <section aria-label="Presupuesto" className={b ? 'border-t border-divider pt-4' : ''}>
+      <section aria-label="Cotización" className={b ? 'border-t border-divider pt-4' : ''}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
             <Banknote size={15} className="text-success" aria-hidden />
-            {s.paymentModel === 'base_cash' ? 'Presupuesto · Efectivo' : 'Servicio'}
+            {s.paymentModel === 'base_cash' ? 'Cotización · Efectivo' : 'Servicio'}
           </h3>
-          {cash && <Badge tone={cash.tone}>{cash.label}</Badge>}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {s.paymentModel === 'base_cash' && qs.status !== 'none' && (
+              <Badge tone={qStatus.tone}>{qStatus.label}</Badge>
+            )}
+            {cash && <Badge tone={cash.tone}>{cash.label}</Badge>}
+          </div>
         </div>
-        {q.totalCents > 0 || q.expectedCents != null ? (
+        {qs.status === 'rejected' && (
+          <div className="mb-2.5 rounded-btn bg-error-soft px-3 py-2 text-[12.5px]">
+            <div className="font-sans font-semibold text-navy">
+              Rechazada por el cliente{qs.rejectedAt ? ` · ${when(qs.rejectedAt)}` : ''}
+            </div>
+            <p className="mt-0.5 text-body">
+              {qs.rejectReason ? <>Motivo: “{qs.rejectReason}”</> : 'Sin motivo indicado.'}
+            </p>
+            {qs.totalCents > 0 && (
+              <p className="mt-0.5 text-muted">Cotización de {money(qs.totalCents, true)} · no se cobra.</p>
+            )}
+          </div>
+        )}
+        {qs.status === 'draft' && (
+          <p className="mb-2.5 rounded-btn bg-panel px-3 py-2 text-[12.5px] text-body">
+            Borrador del técnico{qs.totalCents > 0 ? ` por ${money(qs.totalCents, true)}` : ''}: el cliente aún no la ve.
+            Se envía al adjuntar al menos una imagen o PDF de evidencia.
+          </p>
+        )}
+        {qs.status === 'sent' && (
+          <p className="mb-2.5 rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+            Enviada{qs.sentAt ? ` · ${when(qs.sentAt)}` : ''}: el cliente decide si la acepta o la rechaza.
+          </p>
+        )}
+        {s.closedByQuoteRejection ? (
+          <p className="text-[13px] text-muted">Sin cobro en efectivo: el servicio se cerró al rechazarse la cotización.</p>
+        ) : q.totalCents > 0 || q.expectedCents != null ? (
           <dl className="flex flex-col gap-1.5 text-[13.5px]">
-            <Line label="Total presupuesto" value={money(q.totalCents, true)} strong />
+            <Line label="Total cotización" value={money(q.totalCents, true)} strong />
             {s.paymentModel !== 'base_cash' && (
               <Line label="Método" value={q.method === 'card' ? 'Tarjeta' : q.method === 'cash' ? 'Efectivo' : (q.method ?? '—')} />
             )}
             {s.paymentModel === 'base_cash' && (
               <>
-                <Line label="Esperado" value={money(q.expectedCents, true)} />
-                <Line label="Recibido (técnico)" value={money(q.receivedCents, true)} />
+                {q.expectedCents != null && <Line label="Esperado" value={money(q.expectedCents, true)} />}
+                {q.expectedCents != null && <Line label="Recibido (técnico)" value={money(q.receivedCents, true)} />}
                 {diff != null && diff !== 0 && (
                   <Line
                     label="Diferencia"
@@ -178,10 +268,10 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
               </>
             )}
           </dl>
-        ) : (
+        ) : qs.status === 'draft' || qs.status === 'sent' ? null : (
           <p className="text-[13px] text-muted">
             {s.paymentModel === 'base_cash'
-              ? 'Sin presupuesto todavía. Se paga en efectivo al técnico al terminar.'
+              ? 'Sin cotización todavía. Se paga en efectivo al técnico al terminar.'
               : 'Sin pago registrado.'}
           </p>
         )}
@@ -224,16 +314,13 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         )}
       </section>
 
-      {s.paymentModel === 'base_cash' && (
+      {s.paymentModel === 'base_cash' && commission > 0 && (
         <div className="mt-4 flex flex-col gap-1.5 border-t border-divider pt-3 text-[13.5px]">
           <dl className="flex flex-col gap-1.5">
-            <Line label="Total del servicio" value={money(s.totalCents, true)} strong />
-            {commission > 0 && (
-              <Line
-                label={`Comisión del efectivo ${((order.commission_bps ?? 1500) / 100).toFixed(0)}%`}
-                value={`−${money(commission, true)}`}
-              />
-            )}
+            <Line
+              label={`Comisión del efectivo ${((order.commission_bps ?? 1500) / 100).toFixed(0)}%`}
+              value={`−${money(commission, true)}`}
+            />
           </dl>
           {commission > 0 && (
             <p className="text-[12px] text-muted">

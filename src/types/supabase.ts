@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       account_deletion_requests: {
@@ -657,6 +682,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      holidays: {
+        Row: {
+          created_at: string
+          date: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       kyc_sessions: {
         Row: {
@@ -1480,8 +1526,54 @@ export type Database = {
           },
         ]
       }
+      schedule_surcharge_rules: {
+        Row: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        Insert: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          name: string
+          sort_order?: number
+          start_time?: string | null
+          surcharge_type: string
+          updated_at?: string
+          value: number
+          weekdays?: number[] | null
+        }
+        Update: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          name?: string
+          sort_order?: number
+          start_time?: string | null
+          surcharge_type?: string
+          updated_at?: string
+          value?: number
+          weekdays?: number[] | null
+        }
+        Relationships: []
+      }
       service_categories: {
         Row: {
+          base_visit_fee_cents: number | null
           commission_bps: number | null
           created_at: string
           description: string | null
@@ -1494,6 +1586,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_visit_fee_cents?: number | null
           commission_bps?: number | null
           created_at?: string
           description?: string | null
@@ -1506,6 +1599,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_visit_fee_cents?: number | null
           commission_bps?: number | null
           created_at?: string
           description?: string | null
@@ -1674,6 +1768,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -1733,6 +1830,9 @@ export type Database = {
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
           schedule_surcharge_bps?: number
+          schedule_surcharge_cents?: number | null
+          schedule_surcharge_name?: string | null
+          schedule_surcharge_rule_id?: string | null
           scheduled_for?: string | null
           scheduled_until?: string | null
           state?: string | null
@@ -1792,6 +1892,9 @@ export type Database = {
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
           schedule_surcharge_bps?: number
+          schedule_surcharge_cents?: number | null
+          schedule_surcharge_name?: string | null
+          schedule_surcharge_rule_id?: string | null
           scheduled_for?: string | null
           scheduled_until?: string | null
           state?: string | null
@@ -1843,6 +1946,13 @@ export type Database = {
             columns: ["requested_technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_schedule_surcharge_rule_id_fkey"
+            columns: ["schedule_surcharge_rule_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_surcharge_rules"
             referencedColumns: ["id"]
           },
           {
@@ -1978,8 +2088,10 @@ export type Database = {
           labor_cents: number
           materials_cents: number
           notes: string | null
+          reject_reason: string | null
           rejected_at: string | null
           service_order_id: string
+          submitted_at: string | null
           surcharge_cents: number
           technician_id: string
           total_cents: number
@@ -1992,8 +2104,10 @@ export type Database = {
           labor_cents?: number
           materials_cents?: number
           notes?: string | null
+          reject_reason?: string | null
           rejected_at?: string | null
           service_order_id: string
+          submitted_at?: string | null
           surcharge_cents?: number
           technician_id: string
           total_cents: number
@@ -2006,8 +2120,10 @@ export type Database = {
           labor_cents?: number
           materials_cents?: number
           notes?: string | null
+          reject_reason?: string | null
           rejected_at?: string | null
           service_order_id?: string
+          submitted_at?: string | null
           surcharge_cents?: number
           technician_id?: string
           total_cents?: number
@@ -3013,6 +3129,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -3081,6 +3200,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -3200,6 +3322,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -3251,6 +3376,8 @@ export type Database = {
           technicians_count: number
         }[]
       }
+      admin_delete_holiday: { Args: { p_date: string }; Returns: undefined }
+      admin_delete_schedule_rule: { Args: { p_id: string }; Returns: undefined }
       admin_emergency_history: { Args: { p_order_id: string }; Returns: Json }
       admin_find_technicians_by_plate: {
         Args: { p_query: string }
@@ -3333,6 +3460,10 @@ export type Database = {
           technician_count: number
         }[]
       }
+      admin_preview_schedule_surcharge: {
+        Args: { p_category_id: string; p_ts?: string }
+        Returns: Json
+      }
       admin_promote_custom_tool: {
         Args: { p_category_id?: string; p_custom_name: string; p_name: string }
         Returns: {
@@ -3402,6 +3533,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -3535,6 +3669,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -3555,6 +3692,7 @@ export type Database = {
       admin_report_cash_by_technician: {
         Args: { p_from: string; p_technician_id?: string; p_to: string }
         Returns: {
+          base_fee_credited_cents: number
           cash_awaiting_client_cents: number
           cash_client_confirmed_cents: number
           cash_disputed_cents: number
@@ -3563,7 +3701,9 @@ export type Database = {
           commission_generated_cents: number
           commission_pending_cents: number
           commission_recovered_cents: number
+          quotes_rejected: number
           reviews_open: number
+          schedule_surcharge_credited_cents: number
           services_count: number
           technician_id: string
           technician_name: string
@@ -3619,13 +3759,18 @@ export type Database = {
           client_id: string
           client_name: string
           client_response: string
+          closed_by_quote_rejection: boolean
           commission_cents: number
           created_at: string
+          emergency_surcharge_cents: number
           folio: number
           order_id: string
           payment_model: string
           quote_method: string
+          quote_status: string
           quote_total_cents: number
+          schedule_rule_name: string
+          schedule_surcharge_cents: number
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string
           technician_name: string
@@ -3858,6 +4003,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_set_category_base_fee: {
+        Args: { p_category_id: string; p_cents: number }
+        Returns: {
+          base_visit_fee_cents: number | null
+          commission_bps: number | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_categories"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_set_company_tool_repair: {
         Args: { p_in_repair: boolean; p_note?: string; p_tool_id: string }
         Returns: {
@@ -3884,6 +4051,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "company_tools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_schedule_rule_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_surcharge_rules"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4033,6 +4223,55 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_upsert_holiday: {
+        Args: { p_date: string; p_name: string }
+        Returns: {
+          created_at: string
+          date: string
+          name: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "holidays"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_schedule_rule: {
+        Args: {
+          p_end_time?: string
+          p_id: string
+          p_is_active?: boolean
+          p_kind: string
+          p_name: string
+          p_sort_order?: number
+          p_start_time?: string
+          p_surcharge_type?: string
+          p_value?: number
+          p_weekdays?: number[]
+        }
+        Returns: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_surcharge_rules"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_waive_base_fee: {
         Args: { p_order_id: string; p_reason: string }
         Returns: {
@@ -4084,6 +4323,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -4348,6 +4590,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -4494,6 +4739,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -4582,6 +4830,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -4667,6 +4918,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -4784,7 +5038,15 @@ export type Database = {
         Args: { p_category_id: string; p_scheduled_for?: string }
         Returns: {
           applies: boolean
+          base_fee_cents: number
+          schedule_rule_id: string
+          schedule_rule_name: string
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number
+          schedule_surcharge_type: string
+          schedule_surcharge_value: number
+          source: string
+          total_cents: number
           visit_base_cents: number
         }[]
       }
@@ -4931,6 +5193,77 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reject_quote: {
+        Args: { p_quote_id: string; p_reason?: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       release_service_order: {
         Args: { p_order_id: string; p_reason?: string }
         Returns: {
@@ -4982,6 +5315,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -5184,6 +5520,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -5197,6 +5536,31 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      send_quote: {
+        Args: { p_quote_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          labor_cents: number
+          materials_cents: number
+          notes: string | null
+          reject_reason: string | null
+          rejected_at: string | null
+          service_order_id: string
+          submitted_at: string | null
+          surcharge_cents: number
+          technician_id: string
+          total_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_quotes"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -5291,8 +5655,10 @@ export type Database = {
           labor_cents: number
           materials_cents: number
           notes: string | null
+          reject_reason: string | null
           rejected_at: string | null
           service_order_id: string
+          submitted_at: string | null
           surcharge_cents: number
           technician_id: string
           total_cents: number
@@ -5419,6 +5785,9 @@ export type Database = {
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
           schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
@@ -5762,6 +6131,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       client_document_kind: ["proof_of_address"],

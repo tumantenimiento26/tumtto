@@ -4,12 +4,15 @@
 // disputa, resuelto…). Determinista; se anexa al historial sintético.
 import type { Database } from '@/types/supabase';
 import { commissionOf } from '@/lib/payments';
+import { mxInstant, mxParts, ruleCents } from '@/lib/scheduleRules';
+import { DEMO_RULES, DEMO_RULE_HOLIDAY, DEMO_RULE_NIGHT, DEMO_RULE_SUNDAY } from './schedule';
 
 type T = Database['public']['Tables'];
 type Order = T['service_orders']['Row'];
 type Pay = T['payments']['Row'];
 type Ev = T['service_order_status_events']['Row'];
 type Led = T['ledger_entries']['Row'];
+type Quote = T['service_quotes']['Row'];
 type Status = Order['status'];
 
 const MIN = 60_000;
@@ -30,6 +33,13 @@ interface Spec {
   basePay?: Pay['status'] | null;
   refunded?: boolean;
   quote?: number;
+  /** Estado de la cotización (por defecto: aceptada si hay efectivo; enviada en `quote`). */
+  qs?: 'draft' | 'sent' | 'rejected';
+  rejectReason?: string;
+  /** Recargo de horario congelado (id de regla de demo/schedule.ts). */
+  sched?: string;
+  /** Fecha/hora (México) de la visita: la última ocurrencia antes de hoy; la orden se crea 2 h antes. */
+  when?: { weekday?: number; date?: string; time: string };
   /** estado del efectivo (kind=quote) */
   cash?: {
     status: NonNullable<Pay['cash_status']>;
@@ -85,12 +95,45 @@ const SPECS: Spec[] = [
     path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
   { folio: 4013, agoH: 1, cat: 0, tech: null, status: 'cancelled', title: 'Drenaje tapado', base: 35000, baseStatus: 'refund_pending', basePay: 'paid',
     path: ['requested', 'cancelled'] },
+  // Modelo de cobro v2: recargos por horario congelados, cotización con estados y cierre por rechazo.
+  { folio: 4014, agoH: 14, cat: 0, tech: 0, status: 'paid', title: 'Fuga en regadera (noche)', base: 35000, sched: DEMO_RULE_NIGHT, when: { time: '22:30' },
+    baseStatus: 'paid', basePay: 'paid', quote: 90000, cash: { status: 'client_confirmed', received: 90000, response: 'confirmed', recovered: 13500 },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  { folio: 4015, agoH: 60, cat: 1, tech: 1, status: 'paid', title: 'Cambio de apagadores (domingo)', base: 30000, sched: DEMO_RULE_SUNDAY, when: { weekday: 0, time: '11:00' },
+    baseStatus: 'paid', basePay: 'paid', quote: 60000, cash: { status: 'client_confirmed', received: 60000, response: 'confirmed', recovered: 9000 },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  { folio: 4016, agoH: 8, cat: 3, tech: 0, status: 'closed', title: 'Minisplit con ruido (nocturno)', base: 45000, sched: DEMO_RULE_NIGHT, when: { time: '21:45' },
+    baseStatus: 'paid', basePay: 'paid', quote: 380000, qs: 'rejected', rejectReason: 'Muy caro; prefiero cotizar con otro proveedor.',
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'closed'] },
+  { folio: 4017, agoH: 5, cat: 2, tech: 0, status: 'quote', title: 'Fuga de gas en boiler (emergencia nocturna)', emergency: true, base: 40000, surcharge: 20000, sched: DEMO_RULE_NIGHT,
+    when: { time: '23:15' }, baseStatus: 'paid', basePay: 'paid', quote: 150000, qs: 'sent',
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote'] },
+  { folio: 4018, agoH: 2, cat: 4, tech: 1, status: 'onsite', title: 'Refrigerador no enfría', base: 30000, baseStatus: 'paid', basePay: 'paid', quote: 80000, qs: 'draft',
+    path: ['requested', 'accepted', 'enroute', 'onsite'] },
+  { folio: 4019, agoH: 26, cat: 4, tech: 1, status: 'closed', title: 'Lavadora con fuga', base: 30000, baseStatus: 'paid', basePay: 'paid', quote: 210000, qs: 'rejected',
+    rejectReason: 'Prefiero comprar una lavadora nueva.',
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'closed'] },
+  { folio: 4020, agoH: 20, cat: 0, tech: 1, status: 'paid', title: 'Tubería rota (día festivo)', base: 35000, sched: DEMO_RULE_HOLIDAY, when: { date: '2026-09-16', time: '10:00' },
+    baseStatus: 'paid', basePay: 'paid', quote: 70000, cash: { status: 'client_confirmed', received: 70000, response: 'confirmed', recovered: 10500 },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
 ];
 
+/** Última ocurrencia (hora de México) de `time` —en `weekday` si se indica— antes de `before`. */
+function lastOccurrence(before: number, w: { weekday?: number; date?: string; time: string }): number {
+  if (w.date) return Date.parse(mxInstant(w.date, w.time));
+  for (let i = 0; i < 15; i++) {
+    const p = mxParts(before - i * 864e5);
+    if (w.weekday != null && p.weekday !== w.weekday) continue;
+    const t = Date.parse(mxInstant(p.date, w.time));
+    if (t <= before) return t;
+  }
+  return before;
+}
+
 export function paymentModelDemo(
-  base: { orders: Order[]; payments: Pay[]; events: Ev[]; ledger: Led[] },
+  base: { orders: Order[]; payments: Pay[]; events: Ev[]; ledger: Led[]; quotes: Quote[] },
   ctx: { clientIds: string[]; techIds: string[]; catIds: string[]; now: number },
-): { orders: Order[]; payments: Pay[]; events: Ev[]; ledger: Led[] } {
+): { orders: Order[]; payments: Pay[]; events: Ev[]; ledger: Led[]; quotes: Quote[] } {
   const orderT = base.orders[0];
   const payT = base.payments[0];
   const evT = base.events[0];
@@ -99,15 +142,22 @@ export function paymentModelDemo(
   const payments: Pay[] = [];
   const events: Ev[] = [];
   const ledger: Led[] = [];
+  const quotes: Quote[] = [];
 
   SPECS.forEach((s, i) => {
     const id = `SVC-${s.folio}`;
-    const created = ctx.now - s.agoH * HOUR;
+    const created = s.when
+      ? lastOccurrence(ctx.now - s.agoH * HOUR, s.when) - 2 * HOUR
+      : ctx.now - s.agoH * HOUR;
+    const rule = s.sched ? DEMO_RULES.find(r => r.id === s.sched)! : null;
+    const schedCents = rule ? ruleCents(rule, s.base) : 0;
     const techId = s.tech == null ? null : ctx.techIds[s.tech % ctx.techIds.length];
     const clientId = ctx.clientIds[(i * 3 + 1) % ctx.clientIds.length];
     const last = Math.min(ctx.now - MIN, created + s.path.length * 25 * MIN);
-    const baseTotal = s.base + (s.surcharge ?? 0);
-    const quoted = s.quote ?? null;
+    const baseTotal = s.base + (s.surcharge ?? 0) + schedCents;
+    const rejected = s.qs === 'rejected';
+    // Rechazada: el servidor reinicia el total cotizado de la orden a 0; borrador: aún no existe para el cliente.
+    const quoted = s.quote == null || s.qs === 'draft' ? null : rejected ? 0 : s.quote;
     const done = s.path.includes('completed');
     const at = (st: Status) => {
       const k = s.path.indexOf(st);
@@ -136,12 +186,17 @@ export function paymentModelDemo(
       commission_cents: s.cash?.received != null ? commissionOf(s.cash.received, 1500) : null,
       accepted_at: at('accepted'),
       completed_at: at('completed'),
-      paid_at: at('paid'),
+      paid_at: at('paid') ?? (rejected ? at('closed') : null),
       cancelled_at: at('cancelled'),
       cancellation_reason: s.status === 'cancelled' ? 'Cancelada por el cliente antes de la visita' : null,
       payment_model: 'base_cash',
       base_fee_cents: s.base,
-      base_surcharge_cents: s.surcharge ?? 0,
+      base_surcharge_cents: (s.surcharge ?? 0) + schedCents,
+      scheduled_for: s.when ? iso(created + 2 * HOUR) : null,
+      schedule_surcharge_rule_id: rule?.id ?? null,
+      schedule_surcharge_name: rule?.name ?? null,
+      schedule_surcharge_cents: rule ? schedCents : null,
+      schedule_surcharge_bps: rule?.surcharge_type === 'percent' ? rule.value : 0,
       base_total_cents: baseTotal,
       base_fee_status: s.baseStatus,
       base_fee_paid_at: ['paid', 'refund_pending', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
@@ -197,6 +252,29 @@ export function paymentModelDemo(
         cash_status: null,
         created_at: iso(created + MIN),
         updated_at: iso(created + 4 * MIN),
+      });
+    }
+
+    if (s.quote != null) {
+      const total = s.quote;
+      const sent = s.qs ? s.qs !== 'draft' : true;
+      const settled = !s.qs && !!s.cash;
+      const qAt = (min: number) => iso(Math.min(ctx.now - MIN, created + min * MIN));
+      quotes.push({
+        id: `q-${s.folio}`,
+        service_order_id: id,
+        technician_id: techId ?? ctx.techIds[0],
+        labor_cents: Math.round(total * 0.6),
+        materials_cents: total - Math.round(total * 0.6),
+        surcharge_cents: 0,
+        total_cents: total,
+        notes: rejected ? 'Reparación mayor: incluye refacciones y mano de obra.' : 'Mano de obra y materiales.',
+        submitted_at: sent ? qAt(100) : null,
+        accepted_at: settled ? qAt(110) : null,
+        rejected_at: rejected ? qAt(115) : null,
+        reject_reason: rejected ? (s.rejectReason ?? null) : null,
+        created_at: qAt(95),
+        updated_at: qAt(115),
       });
     }
 
@@ -272,5 +350,6 @@ export function paymentModelDemo(
     payments: [...base.payments, ...payments],
     events: [...base.events, ...events],
     ledger: [...base.ledger, ...ledger],
+    quotes: [...base.quotes, ...quotes],
   };
 }

@@ -4,6 +4,7 @@
 import type { Database } from '@/types/supabase';
 import { demoInventory } from './inventory';
 import { paymentModelDemo } from './payments';
+import { DEMO_HOLIDAYS, DEMO_RULES } from './schedule';
 import { TECH_USER_ID, type World, type OrderStatus } from './world';
 
 type Row<T extends keyof Database['public']['Tables']> =
@@ -93,6 +94,8 @@ export function withHistory(w: World): {
   techTools: Row<'technician_tools'>[];
   companyTools: Row<'company_tools'>[];
   toolAssignments: Row<'company_tool_assignments'>[];
+  scheduleRules: Row<'schedule_surcharge_rules'>[];
+  holidays: Row<'holidays'>[];
   inventoryEvents: Row<'admin_events'>[];
   dispatchLog: Row<'emergency_dispatch_log'>[];
 } {
@@ -807,7 +810,7 @@ export function withHistory(w: World): {
       technicians,
       technicianCategories,
       ...paymentModelDemo(
-        { orders, events, payments, ledger },
+        { orders, events, payments, ledger, quotes: w.quotes },
         {
           clientIds,
           techIds: [...new Set(CATS.flatMap(c => c[2]))],
@@ -828,6 +831,8 @@ export function withHistory(w: World): {
     techTools,
     companyTools: inv.tools,
     toolAssignments: inv.assignments,
+    scheduleRules: DEMO_RULES,
+    holidays: DEMO_HOLIDAYS,
     inventoryEvents: inv.events,
     dispatchLog,
   };

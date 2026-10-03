@@ -21,6 +21,9 @@ import {
   kpiWindow,
   orderGmv,
   parsePaymentSummary,
+  quoteStateOf,
+  rejectedCloseIds,
+  conceptsOf,
   paymentLabel,
   paymentsReport,
   paymentsReportCsvRows,
@@ -36,7 +39,7 @@ import {
 const w = demoWorld();
 const NOW = Date.parse('2026-10-03T18:00:00Z');
 const demo = paymentModelDemo(
-  { orders: w.orders, payments: w.payments, events: w.events, ledger: w.ledger },
+  { orders: w.orders, payments: w.payments, events: w.events, ledger: w.ledger, quotes: w.quotes },
   { clientIds: ['c1', 'c2', 'c3'], techIds: ['t1', 't2'], catIds: ['cat-plumbing', 'cat-electrical'], now: NOW },
 );
 const ord = (folio: number) => demo.orders.find(o => o.folio === folio)!;
@@ -312,5 +315,97 @@ describe('filtros de la cola de revisión de efectivo', () => {
     expect(filterCashReviews(rows, { ...f, minDays: 7 }, NOW)).toHaveLength(1);
     expect(filterCashReviews(rows, { ...f, minDays: 1, technicianId: 't1' }, NOW)).toHaveLength(2);
     expect(activeCashReviewFilters({ reason: 'amount_mismatch', minDays: 3, technicianId: 't1' })).toBe(3);
+  });
+});
+
+describe('modelo de cobro v2: conceptos separados', () => {
+  const quotesOf = (folio: number) => demo.quotes.filter(q => q.service_order_id === `SVC-${folio}`);
+  const rej = rejectedCloseIds(demo.orders, demo.quotes);
+
+  it('desglosa visita, recargo de horario con su regla, emergencia y cotización', () => {
+    const s = buildPaymentSummary(ord(4014), pays(4014), quotesOf(4014));
+    expect(s.concepts).toMatchObject({
+      visitCents: 35000,
+      scheduleCents: 5250,
+      scheduleRuleName: 'Nocturno',
+      emergencyCents: 0,
+      quoteCents: 90000,
+      totalCents: 130250,
+    });
+    expect(s.base?.surchargeCents).toBe(5250);
+    expect(s.quoteState.status).toBe('accepted');
+    // emergencia + horario viven los dos en el recargo de la base
+    const e = conceptsOf(ord(4017));
+    expect(e).toMatchObject({ emergencyCents: 20000, scheduleCents: 6000, scheduleRuleName: 'Nocturno' });
+    expect(ord(4017).base_surcharge_cents).toBe(26000);
+  });
+
+  it('cierre por cotización rechazada: solo se cobra la base y el total no suma la cotización', () => {
+    expect([...rej].sort()).toEqual(['SVC-4016', 'SVC-4019']);
+    const s = buildPaymentSummary(ord(4016), pays(4016), quotesOf(4016));
+    expect(s.closedByQuoteRejection).toBe(true);
+    expect(s.quoteState).toMatchObject({ status: 'rejected', rejectReason: expect.stringContaining('Muy caro') });
+    expect(s.concepts).toMatchObject({ visitCents: 45000, scheduleCents: 6750, quoteCents: 0, totalCents: 51750 });
+    expect(s.totalCents).toBe(51750);
+    expect(pays(4016).some(p => p.kind === 'quote')).toBe(false);
+  });
+
+  it('estados de cotización: borrador, enviada, aceptada, ninguna', () => {
+    expect(quoteStateOf(quotesOf(4018)).status).toBe('draft');
+    expect(quoteStateOf(quotesOf(4017)).status).toBe('sent');
+    expect(quoteStateOf(quotesOf(4001)).status).toBe('accepted');
+    expect(quoteStateOf([]).status).toBe('none');
+  });
+
+  it('parsea concepts y quote.status del RPC', () => {
+    const s = parsePaymentSummary({
+      payment_model: 'base_cash',
+      closed_by_quote_rejection: true,
+      concepts: { visit_cents: 100, schedule_surcharge_cents: 15, schedule_rule_name: 'Nocturno', emergency_surcharge_cents: 0, quote_cents: 0, total_cents: 115 },
+      quote: { status: 'rejected', reject_reason: 'caro', attachments_count: 2 },
+    })!;
+    expect(s.concepts).toMatchObject({ visitCents: 100, scheduleCents: 15, scheduleRuleName: 'Nocturno', totalCents: 115 });
+    expect(s.closedByQuoteRejection).toBe(true);
+    expect(s.quoteState).toMatchObject({ status: 'rejected', rejectReason: 'caro', attachmentsCount: 2 });
+    expect(parsePaymentSummary({ payment_model: 'legacy' })!.concepts).toBeNull();
+  });
+
+  it('el reporte de pagos trae los conceptos nuevos y el CSV los etiqueta', () => {
+    const rows = paymentsReport(demo.orders, byOrder, { ...names, quotes: demo.quotes }, ...WIDE, ALL, 100, 0);
+    const r = rows.find(x => x.folio === 4016)!;
+    expect(r).toMatchObject({
+      schedule_rule_name: 'Nocturno',
+      schedule_surcharge_cents: 6750,
+      emergency_surcharge_cents: 0,
+      quote_status: 'rejected',
+      closed_by_quote_rejection: true,
+    });
+    expect(rows.find(x => x.folio === 4017)).toMatchObject({ emergency_surcharge_cents: 20000, quote_status: 'sent' });
+    const csv = paymentsReportCsvRows([r])[0];
+    expect(csv['Estado cotización']).toBe('Rechazada');
+    expect(csv['Cerrado por cotización rechazada']).toBe('Sí');
+    expect(csv['Regla de horario']).toBe('Nocturno');
+  });
+
+  it('KPIs: conceptos y cotizaciones rechazadas del periodo', () => {
+    const k = kpiWindow(demo.orders, byOrder, ...WIDE, 'all', rej);
+    expect(k.quotes_rejected).toBe(2);
+    expect(k.schedule_surcharge_cents).toBeGreaterThanOrEqual(5250 + 3000 + 6750);
+    expect(k.base_fee_cents).toBeGreaterThan(0);
+    // rechazada: no suma cotización
+    const only = kpiWindow([ord(4016)], groupByOrder(pays(4016)), ...WIDE, 'all', rej);
+    expect(only).toMatchObject({ quote_cents: 0, quotes_rejected: 1, base_fee_cents: 45000, schedule_surcharge_cents: 6750, gmv_cents: 51750 });
+    // con «efectivo» solo cuenta la cotización
+    expect(kpiWindow(demo.orders, byOrder, ...WIDE, 'cash', rej).base_fee_cents).toBe(0);
+  });
+
+  it('efectivo por técnico: base y recargo acreditados + cotizaciones rechazadas', () => {
+    const rows = cashByTechnician(demo.payments, ...WIDE, id => id, null, { orders: demo.orders, rejected: rej });
+    const t = rows.find(r => r.technician_id === 't1')!;
+    expect(t.quotes_rejected).toBeGreaterThanOrEqual(1);
+    expect(t.base_fee_credited_cents).toBeGreaterThan(0);
+    expect(rows.some(r => r.schedule_surcharge_credited_cents > 0)).toBe(true);
+    expect(cashTotals(rows).rejected).toBe(2);
+    expect(cashByTechCsvRows(rows)[0]).toHaveProperty('Cotizaciones rechazadas');
   });
 });

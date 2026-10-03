@@ -89,36 +89,12 @@ it('pctToBps redondea y conserva NaN', () => {
   expect(pctToBps(NaN)).toBeNaN();
 });
 
-describe('validateSettings · asignación y recargo por horario', () => {
-  const ok = {
-    unassigned_alert_minutes: 30,
-    schedule_surcharge_bps: 1500,
-    schedule_surcharge_start_hour: 20,
-    schedule_surcharge_end_hour: 8,
-    schedule_surcharge_weekends: true,
-  };
-  it('acepta los defaults', () => {
-    expect(validateSettings(ok)).toEqual({});
+describe('validateSettings · alerta de solicitudes sin técnico', () => {
+  // Los recargos por horario ya no son settings: viven en schedule_surcharge_rules (scheduleRules.ts).
+  it('acepta el default', () => {
+    expect(validateSettings({ unassigned_alert_minutes: 30 })).toEqual({});
   });
-  it('rechaza umbral, horas, porcentaje y fin de semana inválidos', () => {
-    const e = validateSettings({
-      unassigned_alert_minutes: 0,
-      schedule_surcharge_bps: 12000,
-      schedule_surcharge_start_hour: 24,
-      schedule_surcharge_end_hour: -1,
-      schedule_surcharge_weekends: 'sí' as unknown as boolean,
-    });
-    expect(Object.keys(e).sort()).toEqual([
-      'schedule_surcharge_bps',
-      'schedule_surcharge_end_hour',
-      'schedule_surcharge_start_hour',
-      'schedule_surcharge_weekends',
-      'unassigned_alert_minutes',
-    ]);
-  });
-  it('la hora de fin no puede igualar a la de inicio', () => {
-    expect(
-      validateSettings({ ...ok, schedule_surcharge_end_hour: 20 }).schedule_surcharge_end_hour,
-    ).toMatch(/distinta/);
+  it('rechaza un umbral fuera de rango', () => {
+    expect(Object.keys(validateSettings({ unassigned_alert_minutes: 0 }))).toEqual(['unassigned_alert_minutes']);
   });
 });

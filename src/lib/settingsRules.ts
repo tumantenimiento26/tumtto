@@ -19,8 +19,6 @@ const INT_RULES: Record<string, Rule> = {
   emergency_round_seconds: { min: 1, max: 3600, label: 'Los segundos por ronda' },
   emergency_timeout_minutes: { min: 1, max: 1440, label: 'El tiempo límite de emergencia' },
   unassigned_alert_minutes: { min: 1, max: 1440, label: 'El umbral de alerta de solicitudes sin técnico' },
-  schedule_surcharge_start_hour: { min: 0, max: 23, label: 'La hora de inicio del recargo por horario' },
-  schedule_surcharge_end_hour: { min: 0, max: 23, label: 'La hora de fin del recargo por horario' },
   emergency_surcharge_fixed_cents: { min: 0, max: 10_000_000, label: 'El recargo fijo de emergencia' },
 };
 
@@ -44,8 +42,6 @@ export function validateSettings(s: Settings): Record<string, string> {
     } else if (key === 'emergency_surcharge_mode') {
       if (v !== 'percent' && v !== 'fixed')
         errs[key] = 'El modo de recargo debe ser porcentaje o monto fijo.';
-    } else if (key === 'schedule_surcharge_weekends') {
-      if (typeof v !== 'boolean') errs[key] = 'Indica si el recargo aplica en fin de semana.';
     } else if (key === 'enabled_payment_methods') {
       if (!Array.isArray(v) || v.length === 0)
         errs[key] = 'Deja al menos un método de pago activo.';
@@ -61,16 +57,6 @@ export function validateSettings(s: Settings): Record<string, string> {
   )
     errs.emergency_max_radius_m =
       'El radio máximo no puede ser menor que el radio inicial.';
-  const sh = s.schedule_surcharge_start_hour;
-  const eh = s.schedule_surcharge_end_hour;
-  if (
-    !errs.schedule_surcharge_end_hour &&
-    typeof sh === 'number' &&
-    typeof eh === 'number' &&
-    sh === eh
-  )
-    errs.schedule_surcharge_end_hour =
-      'La hora de fin debe ser distinta de la de inicio (la franja cruza la medianoche si es menor).';
   return errs;
 }
 

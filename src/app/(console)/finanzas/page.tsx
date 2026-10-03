@@ -374,6 +374,34 @@ export default function FinanzasPage() {
         <KpiCard index={3} label="Por cobrar · efectivo" value={money(m.owed[0])} delta={deltaLabel(pctDelta(m.owed[0], m.owed[1]))} negative />
       </div>
 
+      {/* Conceptos separados del cobro (modelo v2), del RPC admin_report_kpis */}
+      {kpis?.current.base_fee_cents != null && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" aria-label="Desglose del cobro">
+          {(
+            [
+              ['Tarifa base de visita', 'base_fee_cents', true],
+              ['Recargos de horario', 'schedule_surcharge_cents', true],
+              ['Recargos de emergencia', 'emergency_surcharge_cents', true],
+              ['Cotizaciones (efectivo)', 'quote_cents', true],
+              ['Cotizaciones rechazadas', 'quotes_rejected', false],
+            ] as const
+          ).map(([label, key, isMoney], i) => {
+            const a = Number(kpis.current[key] ?? 0);
+            const b = Number(kpis.previous[key] ?? 0);
+            return (
+              <KpiCard
+                key={key}
+                index={4 + i}
+                label={label}
+                value={isMoney ? money(a) : String(a)}
+                delta={deltaLabel(pctDelta(a, b))}
+                negative={key === 'quotes_rejected'}
+              />
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card padded>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

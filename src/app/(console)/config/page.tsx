@@ -13,6 +13,7 @@ import {
   Check,
   Minus,
   Siren,
+  Moon,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -51,7 +52,8 @@ import {
 } from '@/lib/data/store';
 import { useAction } from '@/components/use-action';
 import { EMERGENCY_KEYS, type SurchargeMode } from '@/lib/emergency';
-import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, SCHEDULE_SURCHARGE_KEYS } from '@/lib/unassigned';
+import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY } from '@/lib/unassigned';
+import { ScheduleSurchargeSection } from './_components/ScheduleSurchargeSection';
 import { CompaniesSection } from './_components/CompaniesSection';
 import { ToolCatalogSection } from './_components/ToolCatalogSection';
 import {
@@ -61,11 +63,12 @@ import {
   type Settings as SettingsMap,
 } from '@/lib/settingsRules';
 
-type SectionId = 'commission' | 'ops' | 'emergency' | 'security' | 'team' | 'companies' | 'tools';
+type SectionId = 'commission' | 'ops' | 'schedule' | 'emergency' | 'security' | 'team' | 'companies' | 'tools';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
   { id: 'ops', label: 'Operación', icon: Clock },
+  { id: 'schedule', label: 'Recargos por horario', icon: Moon },
   { id: 'emergency', label: 'Emergencias', icon: Siren },
   { id: 'security', label: 'Seguridad', icon: ShieldCheck },
   { id: 'team', label: 'Equipo y permisos', icon: Users },
@@ -97,10 +100,6 @@ function readForm(): SettingsMap {
     enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
     admin_require_aal2: getSettingBool('admin_require_aal2', false),
     [ALERT_MINUTES_KEY]: getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT),
-    [SCHEDULE_SURCHARGE_KEYS.bps]: getSettingInt(SCHEDULE_SURCHARGE_KEYS.bps, 0),
-    [SCHEDULE_SURCHARGE_KEYS.startHour]: getSettingInt(SCHEDULE_SURCHARGE_KEYS.startHour, 20),
-    [SCHEDULE_SURCHARGE_KEYS.endHour]: getSettingInt(SCHEDULE_SURCHARGE_KEYS.endHour, 8),
-    [SCHEDULE_SURCHARGE_KEYS.weekends]: getSettingBool(SCHEDULE_SURCHARGE_KEYS.weekends, true),
     [EMERGENCY_KEYS.initialRadiusM]: em.initialRadiusM,
     [EMERGENCY_KEYS.stepM]: em.stepM,
     [EMERGENCY_KEYS.maxRadiusM]: em.maxRadiusM,
@@ -130,10 +129,6 @@ const LABELS: Record<string, string> = {
   enabled_payment_methods: 'Métodos de pago',
   admin_require_aal2: 'Exigir 2 pasos en la API',
   unassigned_alert_minutes: 'Alerta de solicitud sin técnico',
-  schedule_surcharge_bps: 'Recargo por horario (%)',
-  schedule_surcharge_start_hour: 'Recargo por horario: desde',
-  schedule_surcharge_end_hour: 'Recargo por horario: hasta',
-  schedule_surcharge_weekends: 'Recargo por horario en fin de semana',
 };
 
 export default function ConfigPage() {
@@ -150,6 +145,8 @@ export default function ConfigPage() {
       comisiones: 'commission',
       seguridad: 'security',
       emergencias: 'emergency',
+      recargos: 'schedule',
+      horario: 'schedule',
       empresas: 'companies',
       herramientas: 'tools',
     };
@@ -358,30 +355,6 @@ export default function ConfigPage() {
                   'Las solicitudes que Tumtto debe asignar y llevan más de este tiempo sin técnico avisan en Panel y Notificaciones.',
                 )}
               </Section>
-              <Section title="Recargo por horario">
-                {pctField(
-                  'schedule_surcharge_bps',
-                  'Recargo',
-                  'Porcentaje extra cuando la fecha deseada cae en la franja. 0% = sin recargo. Se congela en cada solicitud.',
-                )}
-                {intField(
-                  'schedule_surcharge_start_hour',
-                  'Franja desde',
-                  'h (0–23)',
-                  'Hora de inicio (hora de Guadalajara). Ej. 20 = 8:00 pm.',
-                )}
-                {intField(
-                  'schedule_surcharge_end_hour',
-                  'Franja hasta',
-                  'h (0–23)',
-                  'Hora de fin. Si es menor que la de inicio la franja cruza la medianoche (20 → 8).',
-                )}
-                {toggleField(
-                  'schedule_surcharge_weekends',
-                  'Aplicar en fines de semana',
-                  'Sábado y domingo llevan el recargo todo el día.',
-                )}
-              </Section>
               <Section title="Métodos de pago en las apps">
                 {METHODS.map(m => (
                   <Row key={m.key} label={m.label} desc={m.note}>
@@ -415,6 +388,8 @@ export default function ConfigPage() {
               </Section>
             </>
           )}
+
+          {active === 'schedule' && <ScheduleSurchargeSection />}
 
           {active === 'emergency' && (
             <>

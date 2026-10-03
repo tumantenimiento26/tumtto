@@ -63,6 +63,7 @@ import {
   getPayment,
   getProfile,
   getQuote,
+  getOrderQuotes,
   getQuoteItems,
   getEmergencyConfig,
   getRequest,
@@ -101,7 +102,7 @@ import { QuoteAttachments } from '../_components/QuoteAttachments';
 import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { PaymentBreakdown } from '../_components/PaymentBreakdown';
-import { paymentLabel, refundablePayments, type PayRow } from '@/lib/payments';
+import { paymentLabel, refundablePayments, rejectedCloseIds, type PayRow } from '@/lib/payments';
 import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
 import { includedSurchargeCents, isEmergency, surchargeLabel } from '@/lib/emergency';
 
@@ -236,6 +237,8 @@ export default function ServicioDetailPage() {
   const notes = getNotes(req.id);
 
   const terminal = req.status === 'cancelled' || req.status === 'expired';
+  // Cierre por cotización rechazada: el servicio termina en el paso «Cotización».
+  const rejectedClose = rejectedCloseIds([req], getOrderQuotes(req.id)).has(req.id);
   const current = terminal
     ? // Último paso alcanzado antes de cancelar/expirar.
       Math.max(
@@ -244,7 +247,9 @@ export default function ServicioDetailPage() {
           .map(e => stepIndex(e.from_status as RequestStatus))
           .filter(i => i >= 0),
       )
-    : stepIndex(req.status);
+    : rejectedClose
+      ? stepIndex('quote')
+      : stepIndex(req.status);
   const reachedAt = (step: number) => {
     const ev = events.find(e =>
       STEPS[step].statuses.includes(e.to_status as RequestStatus),
@@ -284,7 +289,9 @@ export default function ServicioDetailPage() {
 
   const address = [req.address_line, req.neighborhood, req.municipality].filter(Boolean).join(', ');
   const desired = scheduleLabel(req.scheduled_for, req.scheduled_until);
-  const scheduleSur = scheduleSurchargeLabel(req.schedule_surcharge_bps);
+  const scheduleSur = req.schedule_surcharge_name
+    ? `${req.schedule_surcharge_name}${req.schedule_surcharge_cents ? ` · ${money(req.schedule_surcharge_cents, true)}` : ''}`
+    : scheduleSurchargeLabel(req.schedule_surcharge_bps);
   const requestPhotos = (evidence ?? []).filter(e => e.kind === 'request' && e.url);
   const reassignable = canReassignStatus(req.status);
 
@@ -406,6 +413,7 @@ export default function ServicioDetailPage() {
                 ? 'Pendiente de asignación'
                 : STATUS[req.status].label}
             </Badge>
+            {rejectedClose && <Badge tone="warning">Cerrado por cotización rechazada</Badge>}
             {wantsReassign && (
               <Badge tone={ageTone(req.created_at, getUnassignedAlertMinutes())}>
                 Sin técnico hace {ageLabel(req.created_at)}
@@ -430,7 +438,9 @@ export default function ServicioDetailPage() {
         {/* Stepper */}
         <ol className="mt-6 grid grid-cols-4 gap-y-5 sm:grid-cols-8" aria-label="Progreso del servicio">
           {STEPS.map((st, i) => {
-            const done = i < current || (!terminal && i === current && ['paid', 'closed'].includes(req.status));
+            const done =
+              i < current ||
+              (!terminal && i === current && (rejectedClose || ['paid', 'closed'].includes(req.status)));
             const now = !terminal && i === current && !done;
             const lastReached = terminal && i === current;
             const t = i <= current ? reachedAt(i) : null;

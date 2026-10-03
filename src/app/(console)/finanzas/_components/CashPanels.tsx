@@ -24,6 +24,8 @@ import {
   CASH_STATUS,
   CASH_STATUS_OPTIONS,
   METHOD_FILTER_OPTIONS,
+  QUOTE_STATUS,
+  quoteStatusLabel,
   cashByTechCsvRows,
   cashTotals,
   methodName,
@@ -32,6 +34,7 @@ import {
   type CashTechRow,
   type MethodFilter,
   type PaymentsReportRow,
+  type QuoteStatus,
 } from '@/lib/payments';
 import { money } from './fin-parts';
 
@@ -90,6 +93,9 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
     },
     { key: 'gen', header: 'Comisión generada', align: 'right', sortValue: r => Number(r.commission_generated_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.commission_generated_cents)}</span> },
     { key: 'rec', header: 'Recuperada', align: 'right', sortValue: r => Number(r.commission_recovered_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.commission_recovered_cents)}</span> },
+    { key: 'bcr', header: 'Tarifa base acreditada', align: 'right', sortValue: r => Number(r.base_fee_credited_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.base_fee_credited_cents)}</span> },
+    { key: 'scr', header: 'Recargo de horario acreditado', align: 'right', sortValue: r => Number(r.schedule_surcharge_credited_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.schedule_surcharge_credited_cents)}</span> },
+    { key: 'qrj', header: 'Cotizaciones rechazadas', align: 'right', sortValue: r => Number(r.quotes_rejected), render: r => (Number(r.quotes_rejected) ? <Badge tone="warning">{Number(r.quotes_rejected)}</Badge> : <span className="text-faint">—</span>) },
     { key: 'pen', header: 'Pendiente', align: 'right', sortValue: r => Number(r.commission_pending_cents), render: r => <span className={`font-mono text-[12.5px] font-semibold tabular ${Number(r.commission_pending_cents) ? 'text-warning-ink' : ''}`}>{num(r.commission_pending_cents)}</span> },
   ];
 
@@ -116,7 +122,7 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
         <EmptyState kind="no-results" compact title="Reporte no disponible" description="Requiere permiso de finanzas o el servidor no respondió." />
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-4 xl:grid-cols-6">
             <Stat label="Esperado" value={num(totals.expected)} />
             <Stat label="Reportado" value={num(totals.reported)} />
             <Stat label="Confirmado" value={num(totals.confirmed)} />
@@ -125,6 +131,9 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
             <Stat label="Comisión generada" value={num(totals.generated)} />
             <Stat label="Recuperada" value={num(totals.recovered)} />
             <Stat label="Pendiente" value={num(totals.pending)} tone={totals.pending ? 'warning' : undefined} />
+            <Stat label="Tarifa base acreditada" value={num(totals.baseCredited)} />
+            <Stat label="Recargo de horario acreditado" value={num(totals.scheduleCredited)} />
+            <Stat label="Cotizaciones rechazadas" value={String(totals.rejected)} tone={totals.rejected ? 'warning' : undefined} />
           </div>
           <DataTable
             rows={rows ?? []}
@@ -134,7 +143,7 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
             onRowClick={r => router.push(`/tecnicos/${r.technician_id}`)}
             initialSort={{ key: 'pen', dir: 'desc' }}
             pageSize={8}
-            minWidth={1040}
+            minWidth={1380}
             empty={<EmptyState kind="no-results" compact title="Sin efectivo en el periodo" description="Ningún técnico reportó efectivo en estas fechas." />}
           />
         </>
@@ -189,9 +198,26 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
         </div>
       ),
     },
+    { key: 'visit', header: 'Visita', align: 'right', sortValue: r => Number(r.base_fee_cents), render: r => <span className="font-mono text-[12.5px] tabular">{r.payment_model === 'base_cash' ? money(Number(r.base_fee_cents)) : '—'}</span> },
+    {
+      key: 'sched',
+      header: 'Recargo de horario',
+      align: 'right',
+      sortValue: r => Number(r.schedule_surcharge_cents),
+      render: r =>
+        Number(r.schedule_surcharge_cents) > 0 ? (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-mono text-[12.5px] tabular">{money(Number(r.schedule_surcharge_cents))}</span>
+            {r.schedule_rule_name && <Badge tone="info">{r.schedule_rule_name}</Badge>}
+          </div>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
+    },
+    { key: 'emer', header: 'Emergencia', align: 'right', sortValue: r => Number(r.emergency_surcharge_cents), render: r => (Number(r.emergency_surcharge_cents) > 0 ? <span className="font-mono text-[12.5px] tabular">{money(Number(r.emergency_surcharge_cents))}</span> : <span className="text-faint">—</span>) },
     {
       key: 'base',
-      header: 'Tarifa base · Tarjeta',
+      header: 'Total base · Tarjeta',
       align: 'right',
       sortValue: r => Number(r.base_total_cents),
       render: r =>
@@ -206,15 +232,20 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
     },
     {
       key: 'quote',
-      header: 'Presupuesto',
+      header: 'Cotización',
       align: 'right',
       sortValue: r => Number(r.quote_total_cents ?? 0),
       render: r => (
         <div className="flex flex-col items-end gap-0.5">
           <span className="font-mono text-[12.5px] font-semibold text-navy tabular">
-            {r.quote_total_cents == null ? '—' : money(Number(r.quote_total_cents))}
+            {r.quote_total_cents == null || Number(r.quote_total_cents) === 0 ? '—' : money(Number(r.quote_total_cents))}
           </span>
-          <span className="font-sans text-[11.5px] text-muted">{methodName(r.quote_method)}</span>
+          {r.quote_status !== 'none' ? (
+            <Badge tone={QUOTE_STATUS[r.quote_status as QuoteStatus]?.tone ?? 'neutral'}>{quoteStatusLabel(r.quote_status)}</Badge>
+          ) : (
+            <span className="font-sans text-[11.5px] text-muted">{methodName(r.quote_method)}</span>
+          )}
+          {r.closed_by_quote_rejection && <Badge tone="warning">Cerrado por rechazo</Badge>}
         </div>
       ),
     },
@@ -289,7 +320,7 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
             loading={data === undefined}
             onRowClick={r => router.push(`/servicios/${r.order_id}`)}
             pageSize={8}
-            minWidth={980}
+            minWidth={1320}
             empty={<EmptyState kind="no-results" compact title="Sin servicios" description="No hay servicios con esos filtros en el periodo." />}
           />
         </Card>

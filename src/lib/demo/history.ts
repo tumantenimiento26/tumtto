@@ -519,16 +519,21 @@ export function withHistory(w: World): {
       const radius = R0 + STEP * (round - 1);
       const batch = others.splice(0, perRound[round - 1] ?? 1);
       if (round === rounds && winner) batch.push(winner);
-      for (const tid of batch)
+      for (const tid of batch) {
+        const distance = between(round === 1 ? 400 : radius - STEP + 200, radius - 100);
+        const notifiedAt = iso(t0 + (round - 1) * 60_000 + between(1, 6) * 1000);
         dispatchLog.push({
           id: `mdl-${ord.id}-${++n}`,
           order_id: ord.id,
           round,
           radius_m: radius,
           technician_id: tid,
-          distance_m: between(round === 1 ? 400 : radius - STEP + 200, radius - 100),
-          notified_at: iso(t0 + (round - 1) * 60_000 + between(1, 6) * 1000),
+          distance_m: distance,
+          notified_at: notifiedAt,
+          created_at: notifiedAt,
+          updated_at: notifiedAt,
         });
+      }
     }
   }
   const converted = orders.filter(
@@ -734,6 +739,8 @@ export function withHistory(w: World): {
         batch_id: null,
         failure_reason: null,
         idempotency_key: `mpo-${t}-${wk}`,
+        platform_topup_cents: 0,
+        platform_transfer_id: null,
         stripe_account_id: null,
         stripe_payout_id: null,
         created_at: created,

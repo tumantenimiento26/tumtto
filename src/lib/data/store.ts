@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import type { Database, Json } from '@/types/supabase';
+import type { NullableCols } from '@/types/rpc';
 import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import { distanceM, wkbPoint } from '@/lib/geo';
@@ -894,7 +895,10 @@ export async function setStatus(
 }
 
 /** Técnico sugerido para una solicitud (admin_suggest_technicians). */
-export type TechSuggestion = Fn['admin_suggest_technicians']['Returns'][number];
+export type TechSuggestion = NullableCols<
+  Fn['admin_suggest_technicians']['Returns'][number],
+  'distance_m'
+>;
 
 /**
  * Técnicos candidatos para asignar/reasignar: KYC aprobado, cubren la

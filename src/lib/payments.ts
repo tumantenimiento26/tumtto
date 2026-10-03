@@ -4,6 +4,7 @@
 // recalcular localmente; en producción manda el servidor.
 
 import type { Database, Json } from '@/types/supabase';
+import type { NullableCols } from '@/types/rpc';
 
 type T = Database['public']['Tables'];
 type Fn = Database['public']['Functions'];
@@ -191,7 +192,7 @@ export function buildPaymentSummary(order: PayOrder, payments: PayRow[]): Paymen
       ? {
           feeCents: order.base_fee_cents,
           surchargeCents: order.base_surcharge_cents,
-          totalCents: order.base_total_cents,
+          totalCents: order.base_total_cents ?? 0,
           method: 'card',
           status: order.base_fee_status,
           paidAt: order.base_fee_paid_at,
@@ -215,7 +216,7 @@ export function buildPaymentSummary(order: PayOrder, payments: PayRow[]): Paymen
       paymentId: quote?.id ?? null,
     },
     cashReviewOpen: order.cash_review_open,
-    totalCents: (isBaseCash ? order.base_total_cents : 0) + quoted,
+    totalCents: (isBaseCash ? (order.base_total_cents ?? 0) : 0) + quoted,
   };
 }
 
@@ -393,7 +394,7 @@ export function orderGmv(order: PayOrder, pays: PayRow[] | undefined, method: Me
     const base =
       order.payment_model === 'base_cash' &&
       (order.base_fee_status === 'paid' || order.base_fee_status === 'refund_pending')
-        ? order.base_total_cents
+        ? (order.base_total_cents ?? 0)
         : 0;
     return base + (order.quoted_total_cents ?? 0);
   }
@@ -462,7 +463,10 @@ export function ticketByCategory(
 
 // ── Efectivo por técnico ─────────────────────────────────────────────────────
 
-export type CashTechRow = Fn['admin_report_cash_by_technician']['Returns'][number];
+export type CashTechRow = NullableCols<
+  Fn['admin_report_cash_by_technician']['Returns'][number],
+  'technician_name'
+>;
 
 export function cashByTechnician(
   payments: PayRow[],
@@ -568,7 +572,21 @@ export function cashByTechCsvRows(rows: CashTechRow[]): Record<string, string | 
 
 // ── Reporte de pagos por servicio ────────────────────────────────────────────
 
-export type PaymentsReportRow = Fn['admin_report_payments']['Returns'][number];
+export type PaymentsReportRow = NullableCols<
+  Fn['admin_report_payments']['Returns'][number],
+  | 'technician_id'
+  | 'technician_name'
+  | 'client_name'
+  | 'base_total_cents'
+  | 'base_method'
+  | 'quote_total_cents'
+  | 'quote_method'
+  | 'cash_status'
+  | 'cash_expected_cents'
+  | 'cash_received_cents'
+  | 'cash_reported_at'
+  | 'client_response'
+>;
 export interface PaymentsReportFilters {
   method: MethodFilter;
   cashStatus: CashStatus | null;
@@ -603,7 +621,7 @@ export function paymentsReport(
   return rows.slice(offset, offset + limit).map(o => {
     const pays = byOrder.get(o.id) ?? [];
     const s = buildPaymentSummary(o, pays);
-    const baseKept = ['paid', 'refund_pending', 'refunded'].includes(o.base_fee_status) ? o.base_total_cents : 0;
+    const baseKept = ['paid', 'refund_pending', 'refunded'].includes(o.base_fee_status) ? (o.base_total_cents ?? 0) : 0;
     const isBC = o.payment_model === 'base_cash';
     return {
       order_id: o.id,
@@ -620,7 +638,7 @@ export function paymentsReport(
       base_surcharge_cents: o.base_surcharge_cents,
       base_total_cents: o.base_total_cents,
       base_fee_status: o.base_fee_status,
-      base_method: isBC && o.base_total_cents > 0 ? 'card' : null,
+      base_method: isBC && (o.base_total_cents ?? 0) > 0 ? 'card' : null,
       base_refunded_cents: s.base?.refundedCents ?? 0,
       quote_total_cents: o.quoted_total_cents,
       quote_method: isBC ? ((o.quoted_total_cents ?? 0) > 0 ? 'cash' : null) : s.quote.method,
@@ -668,7 +686,17 @@ export function paymentsReportCsvRows(rows: PaymentsReportRow[]): Record<string,
 
 // ── Cola de revisiones ───────────────────────────────────────────────────────
 
-export type CashReviewRow = Fn['admin_list_cash_reviews']['Returns'][number];
+export type CashReviewRow = NullableCols<
+  Fn['admin_list_cash_reviews']['Returns'][number],
+  | 'technician_id'
+  | 'technician_name'
+  | 'client_name'
+  | 'review_reason'
+  | 'review_opened_at'
+  | 'received_cents'
+  | 'client_reported_cents'
+  | 'client_dispute_reason'
+>;
 
 export function cashReviews(
   orders: PayOrder[],

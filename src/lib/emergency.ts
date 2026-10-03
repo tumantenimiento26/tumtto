@@ -74,7 +74,8 @@ export function includedSurchargeCents(o: {
 }
 
 /** «850 m» / «2.4 km». */
-export function formatDistance(m: number): string {
+export function formatDistance(m: number | null): string {
+  if (m == null) return 'n/d';
   if (m < 1000) return `${Math.round(m)} m`;
   const km = m / 1000;
   return `${Number.isInteger(km) ? km : km.toFixed(1)} km`;
@@ -144,7 +145,7 @@ export const DISPATCH_LABEL: Record<string, string> = {
 export interface EmergencyNotified {
   technician_id: string;
   name: string;
-  distance_m: number;
+  distance_m: number | null;
   notified_at: string;
 }
 export interface EmergencyRound {
@@ -165,7 +166,7 @@ export interface DispatchLogRow {
   round: number;
   radius_m: number;
   technician_id: string;
-  distance_m: number;
+  distance_m: number | null;
   notified_at: string;
 }
 
@@ -226,7 +227,7 @@ export function parseHistory(json: unknown): EmergencyHistory | null {
   const toNotified = (n: Record<string, unknown>): EmergencyNotified => ({
     technician_id: str(n.technician_id) ?? '',
     name: str(n.name) ?? 'Técnico',
-    distance_m: num(n.distance_m) ?? 0,
+    distance_m: num(n.distance_m),
     notified_at: str(n.notified_at) ?? requested,
   });
   // Backend: rounds[{round,radius_m}] + notified[{round,...}] planos; también acepta notified anidado.

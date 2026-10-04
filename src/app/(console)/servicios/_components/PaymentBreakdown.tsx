@@ -188,8 +188,8 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
                 variant="secondary"
                 icon={RotateCcw}
                 loading={busy === 'retry-refund'}
-                disabled={!!busy || !canResolve}
-                title={canResolve ? undefined : 'Solo finanzas o soporte reintentan reembolsos'}
+                disabled={!!busy || !can('finanzas')}
+                title={can('finanzas') ? undefined : 'Solo finanzas reintenta reembolsos'}
                 onClick={() => void run('retry-refund', () => retryBaseFeeRefund(order.id), 'Reembolso en proceso de nuevo')}
               >
                 Reintentar reembolso

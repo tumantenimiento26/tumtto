@@ -482,7 +482,7 @@ export default function FinanzasPage() {
                   variant="secondary"
                   icon={RotateCcw}
                   loading={busy === `rf-${o.id}`}
-                  disabled={!!busy}
+                  disabled={!!busy || !canFinance}
                   onClick={() => void run(`rf-${o.id}`, () => retryBaseFeeRefund(o.id), 'Reembolso en proceso de nuevo')}
                 >
                   Reintentar

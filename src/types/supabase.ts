@@ -1096,6 +1096,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -1146,6 +1147,7 @@ export type Database = {
           mp_status?: string | null
           paid_at?: string | null
           platform_fee_cents?: number
+          refund_attempts?: number
           refund_reason?: string | null
           refund_requested_at?: string | null
           refunded_cents?: number
@@ -1196,6 +1198,7 @@ export type Database = {
           mp_status?: string | null
           paid_at?: string | null
           platform_fee_cents?: number
+          refund_attempts?: number
           refund_reason?: string | null
           refund_requested_at?: string | null
           refunded_cents?: number
@@ -3610,6 +3613,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -3847,6 +3851,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -3995,7 +4000,74 @@ export type Database = {
       }
       admin_retry_base_fee_refund: {
         Args: { p_order_id: string }
-        Returns: undefined
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       admin_return_company_tool: {
         Args: {
@@ -4669,6 +4741,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -4994,6 +5067,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -5201,6 +5275,66 @@ export type Database = {
       }
       prepare_payout_topup: { Args: { p_request_id: string }; Returns: Json }
       prepare_stripe_checkout: { Args: { p_order_id: string }; Returns: Json }
+      record_base_fee_refund_failure: {
+        Args: { p_error?: string; p_payment_id: string }
+        Returns: {
+          amount_cents: number
+          cash_confirmed_at: string | null
+          cash_confirmed_by: string | null
+          cash_debt_recovered_cents: number
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_id: string
+          client_reported_cents: number | null
+          commission_cents: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          metadata: Json
+          method: Database["public"]["Enums"]["payment_method"]
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          mp_status: string | null
+          paid_at: string | null
+          platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_dispute_id: string | null
+          stripe_fee_cents: number
+          stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
+          stripe_transfer_id: string | null
+          tech_credit_cents: number
+          technician_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_payout_topup: {
         Args: {
           p_request_id: string
@@ -5404,6 +5538,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number
@@ -5740,6 +5875,7 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
           refund_reason: string | null
           refund_requested_at: string | null
           refunded_cents: number

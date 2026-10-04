@@ -629,6 +629,7 @@ function build(): World {
       cash_confirmed_by: null,
       cash_debt_recovered_cents: 0,
       kind: 'legacy',
+      refund_attempts: 0,
       cash_status: null,
       cash_received_cents: null,
       client_cash_response: null,

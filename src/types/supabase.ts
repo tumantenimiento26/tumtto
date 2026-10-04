@@ -3379,6 +3379,28 @@ export type Database = {
       admin_delete_holiday: { Args: { p_date: string }; Returns: undefined }
       admin_delete_schedule_rule: { Args: { p_id: string }; Returns: undefined }
       admin_emergency_history: { Args: { p_order_id: string }; Returns: Json }
+      admin_escalate_dispute: {
+        Args: { p_dispute_id: string; p_note?: string }
+        Returns: {
+          created_at: string
+          id: string
+          opened_by: string
+          outcome: string | null
+          reason: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["dispute_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "disputes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_find_technicians_by_plate: {
         Args: { p_query: string }
         Returns: {
@@ -3970,6 +3992,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_retry_base_fee_refund: {
+        Args: { p_order_id: string }
+        Returns: undefined
       }
       admin_return_company_tool: {
         Args: {

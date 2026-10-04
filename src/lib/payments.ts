@@ -22,6 +22,7 @@ export type BaseFeeStatus =
   | 'paid'
   | 'failed'
   | 'refund_pending'
+  | 'refund_failed'
   | 'refunded'
   | 'waived'
   | 'void';
@@ -39,6 +40,7 @@ export const BASE_STATUS: Record<string, { label: string; tone: Tone }> = {
   paid: { label: 'Pagada', tone: 'success' },
   failed: { label: 'Cobro fallido', tone: 'danger' },
   refund_pending: { label: 'Reembolso en proceso', tone: 'warning' },
+  refund_failed: { label: 'Reembolso fallido', tone: 'danger' },
   refunded: { label: 'Reembolsada', tone: 'danger' },
   waived: { label: 'Exonerada', tone: 'info' },
   void: { label: 'Anulada', tone: 'neutral' },
@@ -388,6 +390,16 @@ export const canWaiveBase = (o: Pick<PayOrder, 'status' | 'base_fee_status' | 'p
   o.status === 'requested' &&
   (o.base_fee_status === 'pending' || o.base_fee_status === 'failed');
 
+/**
+ * Reembolsos de tarifa base que el reintento automático abandonó (10 intentos
+ * fallidos → `refund_failed`): necesitan que finanzas/soporte los reintente.
+ * Más antiguos primero.
+ */
+export const failedBaseRefunds = <T extends Pick<PayOrder, 'base_fee_status' | 'updated_at'>>(orders: T[]) =>
+  orders
+    .filter(o => o.base_fee_status === 'refund_failed')
+    .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+
 /** Solicitud que aún no se despacha porque la tarifa base no está cobrada. */
 export const awaitingBasePayment = (o: Pick<PayOrder, 'payment_model' | 'base_fee_status'>) =>
   o.payment_model === 'base_cash' && (o.base_fee_status === 'pending' || o.base_fee_status === 'failed');
@@ -509,7 +521,7 @@ export function orderGmv(order: PayOrder, pays: PayRow[] | undefined, method: Me
   if (method === 'all') {
     const base =
       order.payment_model === 'base_cash' &&
-      (order.base_fee_status === 'paid' || order.base_fee_status === 'refund_pending')
+      ['paid', 'refund_pending', 'refund_failed'].includes(order.base_fee_status)
         ? (order.base_total_cents ?? 0)
         : 0;
     return base + (order.quoted_total_cents ?? 0);
@@ -790,7 +802,7 @@ export function paymentsReport(
       pays,
       quotes.filter(q => q.service_order_id === o.id),
     );
-    const baseKept = ['paid', 'refund_pending', 'refunded'].includes(o.base_fee_status) ? (o.base_total_cents ?? 0) : 0;
+    const baseKept = ['paid', 'refund_pending', 'refund_failed', 'refunded'].includes(o.base_fee_status) ? (o.base_total_cents ?? 0) : 0;
     const isBC = o.payment_model === 'base_cash';
     return {
       order_id: o.id,

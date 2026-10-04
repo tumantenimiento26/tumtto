@@ -2,6 +2,13 @@
 
 import { fmtDate } from '@/lib/dates';
 
+/**
+ * ¿El admin aún puede rechazar el retiro? pending/held/approved sí (el saldo
+ * vuelve a la cartera); processing/paid ya salieron por Stripe.
+ */
+export const canRejectPayout = (status: string) =>
+  status === 'pending' || status === 'held' || status === 'approved';
+
 export type FinRange = '7d' | '30d' | '90d';
 /** Preset o rango libre del date picker (inclusive, por día). */
 export type FinPeriod = FinRange | { from: Date; to: Date };

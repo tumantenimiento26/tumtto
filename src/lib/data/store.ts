@@ -23,6 +23,7 @@ import {
   quotePayment,
   ticketByCategory,
   validateResolution,
+  failedBaseRefunds,
   type CashReviewRow,
   type CashTechRow,
   type MethodFilter,
@@ -31,6 +32,7 @@ import {
   type PaymentsReportRow,
   type ReviewOutcome,
 } from '@/lib/payments';
+import { canRejectPayout } from '@/lib/finance';
 import { rejectionNotes } from '@/lib/clientDocs';
 import {
   evaluateSurcharge,
@@ -570,6 +572,8 @@ export const getPayment = (orderId: string) => {
 export const quotePaymentOf = (orderId: string) => quotePayment(getOrderPayments(orderId));
 /** Órdenes con una revisión de efectivo abierta (cola de soporte/finanzas). */
 export const getCashReviewOrders = () => w().orders.filter(o => o.cash_review_open);
+/** Reembolsos de tarifa base abandonados tras 10 intentos (cola de finanzas). */
+export const getFailedBaseRefunds = () => failedBaseRefunds(w().orders);
 
 export const getPendingKyc = () =>
   w().technicians.filter(
@@ -1495,22 +1499,36 @@ export async function resolveDispute(
   );
 }
 
-/** Escala la disputa a nivel 2: sigue abierta (in_review) y queda en la bitácora. */
-export async function escalateDispute(disputeId: string) {
-  return mutate(async () => {
-    const { error } = await supabase
-      .from('disputes')
-      .update({ status: 'in_review' })
-      .eq('id', disputeId);
-    if (error) throw error;
-    const { error: ne } = await supabase.rpc('add_admin_note', {
-      p_entity_type: 'disputes',
-      p_entity_id: disputeId,
-      p_note: 'Escalada a nivel 2 — pendiente de revisión',
-    });
-    if (ne) throw ne;
-    return true;
-  }, 'No se pudo escalar la disputa.');
+/**
+ * Escala la disputa a nivel 2 (RPC admin_escalate_dispute, permiso soporte):
+ * solo open → in_review; la nota queda en la bitácora de la disputa.
+ */
+export async function escalateDispute(
+  disputeId: string,
+  note = 'Escalada a nivel 2 — pendiente de revisión',
+) {
+  if (MOCK) {
+    const i = w().disputes.findIndex(d => d.id === disputeId);
+    const d = w().disputes[i];
+    if (!d || d.status !== 'open') {
+      notifyError('Solo se escalan disputas abiertas.');
+      return null;
+    }
+    w().disputes[i] = { ...d, status: 'in_review', updated_at: new Date().toISOString() };
+    bump();
+    return true as const;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_escalate_dispute', {
+        p_dispute_id: disputeId,
+        p_note: note.trim() || undefined,
+      });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo escalar la disputa.'),
+  );
 }
 
 // ── Chat de una orden (tabla messages; se pide al abrir el chat) ────────────
@@ -1897,6 +1915,33 @@ export async function waiveBaseFee(orderId: string, reason: string) {
       return true;
     },
     e => pgMessage(e, 'No se pudo exonerar la tarifa base.'),
+  );
+}
+
+/**
+ * Reintenta un reembolso de tarifa base abandonado (`refund_failed`, RPC
+ * admin_retry_base_fee_refund): reinicia los intentos y vuelve a
+ * `refund_pending` para que el job de reembolsos lo tome otra vez.
+ */
+export async function retryBaseFeeRefund(orderId: string) {
+  if (MOCK) {
+    const i = w().orders.findIndex(o => o.id === orderId);
+    const o = w().orders[i];
+    if (!o || o.base_fee_status !== 'refund_failed') {
+      notifyError('La tarifa base de esta orden no tiene un reembolso fallido.');
+      return null;
+    }
+    w().orders[i] = { ...o, base_fee_status: 'refund_pending', updated_at: new Date().toISOString() };
+    bump();
+    return true as const;
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_retry_base_fee_refund', { p_order_id: orderId });
+      if (error) throw error;
+      return true as const;
+    },
+    e => pgMessage(e, 'No se pudo reintentar el reembolso.'),
   );
 }
 
@@ -2990,16 +3035,32 @@ export const approvePayouts = (ids: string[], note?: string) =>
     e => pgMessage(e, 'No se pudo aprobar el retiro.'),
   );
 
-/** Rechaza (cancela) una solicitud pendiente o retenida. */
-export const rejectPayout = (id: string) =>
-  mutateExtras(
+/**
+ * Rechaza (cancela) una solicitud pendiente, retenida o aprobada sin enviar
+ * (RPC cancel_payout_request); `processing`/`paid` ya no se pueden cancelar.
+ */
+export const rejectPayout = (id: string) => {
+  if (MOCK) {
+    const req = useExtras.getState().payouts.find(p => p.id === id);
+    if (!req || !canRejectPayout(req.status)) {
+      notifyError('Este retiro ya no se puede rechazar.');
+      return Promise.resolve(null);
+    }
+    const now = new Date().toISOString();
+    useExtras.setState(s => ({
+      payouts: s.payouts.map(p => (p.id === id ? { ...p, status: 'cancelled' as const, updated_at: now } : p)),
+    }));
+    return Promise.resolve(true as const);
+  }
+  return mutateExtras(
     async () => {
       const { error } = await supabase.rpc('cancel_payout_request', { p_request_id: id });
       if (error) throw error;
-      return true;
+      return true as const;
     },
     e => pgMessage(e, 'No se pudo rechazar el retiro.'),
   );
+};
 
 /** Envía por Stripe un retiro ya `approved` (edge function stripe-create-payout). */
 export const sendPayout = (id: string) => {

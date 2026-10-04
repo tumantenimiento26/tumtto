@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Gavel, HandCoins, Receipt, XCircle } from 'lucide-react';
+import { Banknote, CreditCard, Gavel, HandCoins, Receipt, RotateCcw, XCircle } from 'lucide-react';
 import { Badge, Button, Card, Input, Kicker, Modal, Textarea } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
 import { useAction } from '@/components/use-action';
@@ -10,6 +10,7 @@ import {
   getOrderPayments,
   getOrderQuotes,
   quotePaymentOf,
+  retryBaseFeeRefund,
   useTick,
   waiveBaseFee,
 } from '@/lib/data/store';
@@ -177,6 +178,23 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
             <p className="mt-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">
               No hubo visita: el reembolso a la tarjeta del cliente está en proceso.
             </p>
+          )}
+          {b.status === 'refund_failed' && (
+            <div className="mt-2 rounded-btn bg-error-soft px-3 py-2 text-[12.5px] text-body">
+              <p>El reembolso a la tarjeta falló 10 veces y ya no se reintenta solo. Revisa el pago en Stripe y reinténtalo.</p>
+              <Button
+                className="mt-2"
+                size="sm"
+                variant="secondary"
+                icon={RotateCcw}
+                loading={busy === 'retry-refund'}
+                disabled={!!busy || !canResolve}
+                title={canResolve ? undefined : 'Solo finanzas o soporte reintentan reembolsos'}
+                onClick={() => void run('retry-refund', () => retryBaseFeeRefund(order.id), 'Reembolso en proceso de nuevo')}
+              >
+                Reintentar reembolso
+              </Button>
+            </div>
           )}
           {order.dispatch_status === 'awaiting_payment' && (
             <p className="mt-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">

@@ -4,7 +4,7 @@ import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Download, Send, Check, Wallet, ExternalLink, X, Gavel, ChevronRight } from 'lucide-react';
+import { Download, Send, Check, Wallet, ExternalLink, X, Gavel, ChevronRight, RotateCcw } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -39,7 +39,9 @@ import {
   getTechnician,
   loadExtras,
   loadWorld,
+  getFailedBaseRefunds,
   rejectPayout,
+  retryBaseFeeRefund,
   sendPayout,
   useExtras,
   useTick,
@@ -63,6 +65,7 @@ import {
   periodTotals,
   rangeBuckets,
   isWeekly,
+  canRejectPayout,
 } from '@/lib/finance';
 import {
   KpiCard,
@@ -249,6 +252,7 @@ export default function FinanzasPage() {
   const payouts = extras.payouts;
   const pendingPO = payouts.filter(p => p.status === 'pending');
   const heldPO = payouts.filter(p => p.status === 'held');
+  const failedRefunds = getFailedBaseRefunds();
   const gmv = kpis ? Number(kpis.current.gmv_cents) : m.cur.gross;
   const gmvPrev = kpis ? Number(kpis.previous.gmv_cents) : m.prev.gross;
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
@@ -340,7 +344,9 @@ export default function FinanzasPage() {
       }
       toast.success(
         `${sent} de ${approved.length} retiros enviados`,
-        held ? `${held} retenidos por disputa abierta (lote ${batch.id.slice(0, 6).toUpperCase()})` : undefined,
+        held
+          ? `${held} retenidos por disputa abierta (lote ${batch.id.slice(0, 6).toUpperCase()}); se liberan al resolver la disputa del técnico.`
+          : undefined,
       );
       return sent === approved.length;
     });
@@ -450,6 +456,43 @@ export default function FinanzasPage() {
         </Link>
       )}
 
+      {failedRefunds.length > 0 && (
+        <Card padded>
+          <div className="mb-2 flex items-center gap-2">
+            <RotateCcw size={16} className="text-error" aria-hidden />
+            <h2 className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
+              Reembolsos fallidos ({failedRefunds.length})
+              <span className="ml-2 font-normal text-muted">
+                Stripe rechazó el reembolso de la visita 10 veces; ya no se reintenta solo.
+              </span>
+            </h2>
+          </div>
+          <div className="flex flex-col">
+            {failedRefunds.map(o => (
+              <div key={o.id} className="flex flex-wrap items-center gap-3 border-t border-divider py-2.5 first:border-t-0">
+                <Link href={`/servicios/${o.id}`} className="font-mono text-[12.5px] font-semibold text-primary hover:underline">
+                  {orderCode(o.id)}
+                </Link>
+                <span className="min-w-0 flex-1 truncate font-sans text-[13px] text-body">
+                  {getProfile(o.client_id)?.full_name ?? 'Cliente'} · {fechaCorta(o.updated_at)}
+                </span>
+                <span className="font-mono text-[13px] font-semibold text-navy tabular">{money(o.base_total_cents ?? 0)}</span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={RotateCcw}
+                  loading={busy === `rf-${o.id}`}
+                  disabled={!!busy}
+                  onClick={() => void run(`rf-${o.id}`, () => retryBaseFeeRefund(o.id), 'Reembolso en proceso de nuevo')}
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div ref={tabsRef} className="scroll-mt-4">
       <Card padded={false} className="overflow-hidden">
         <div className="border-b border-line px-5 pt-3">
@@ -493,7 +536,7 @@ export default function FinanzasPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="font-sans text-[13px] text-muted">
                 Los técnicos solicitan retiros desde su app · se aprueban aquí (en lote) y se envían por Stripe Connect.
-                Los técnicos con una disputa abierta quedan <b>retenidos</b> hasta resolverla.
+                Los técnicos con una disputa abierta quedan <b>retenidos</b>: al resolver su última disputa el retiro vuelve a pendientes.
               </p>
               {payoutsReal && pendingPO.length > 0 && (
                 <Button icon={Send} onClick={() => setBatchOpen(true)} disabled={!!busy}>
@@ -529,8 +572,16 @@ export default function FinanzasPage() {
                       </div>
                       <span className="font-display text-[15px] font-extrabold text-navy tabular">{money(p.amount_cents)}</span>
                       <Badge tone={st.tone}>{st.label}</Badge>
-                      {(p.status === 'pending' || p.status === 'held') && (
-                        <Button size="sm" variant="ghost" icon={X} loading={busy === `rj-${p.id}`} disabled={!!busy} onClick={() => void run(`rj-${p.id}`, () => rejectPayout(p.id), 'Retiro rechazado')}>
+                      {canRejectPayout(p.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={X}
+                          loading={busy === `rj-${p.id}`}
+                          disabled={!!busy}
+                          title={p.status === 'approved' ? 'Aún no se envía: el monto vuelve al saldo del técnico' : undefined}
+                          onClick={() => void run(`rj-${p.id}`, () => rejectPayout(p.id), 'Retiro rechazado · el monto volvió al saldo del técnico')}
+                        >
                           Rechazar
                         </Button>
                       )}
@@ -547,7 +598,10 @@ export default function FinanzasPage() {
                               if (!batch) return null;
                               const after = useExtras.getState().payouts.find(x => x.id === p.id);
                               if (after?.status === 'held')
-                                toast.warning('Retiro retenido', 'El técnico tiene una disputa abierta; se libera al resolverla.');
+                                toast.warning(
+                                  'Retiro retenido',
+                                  'Se libera al resolver la disputa del técnico: vuelve a pendientes para aprobarlo.',
+                                );
                               return true;
                             }, 'Retiro procesado')
                           }

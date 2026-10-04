@@ -116,6 +116,9 @@ const SPECS: Spec[] = [
   { folio: 4020, agoH: 20, cat: 0, tech: 1, status: 'paid', title: 'Tubería rota (día festivo)', base: 35000, sched: DEMO_RULE_HOLIDAY, when: { date: '2026-09-16', time: '10:00' },
     baseStatus: 'paid', basePay: 'paid', quote: 70000, cash: { status: 'client_confirmed', received: 70000, response: 'confirmed', recovered: 10500 },
     path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  // Reembolso de la visita que Stripe rechazó 10 veces: espera «Reintentar» en Finanzas.
+  { folio: 4021, agoH: 50, cat: 1, tech: null, status: 'cancelled', title: 'Corto en cocina', base: 30000, baseStatus: 'refund_failed', basePay: 'paid',
+    path: ['requested', 'cancelled'] },
 ];
 
 /** Última ocurrencia (hora de México) de `time` —en `weekday` si se indica— antes de `before`. */
@@ -199,7 +202,7 @@ export function paymentModelDemo(
       schedule_surcharge_bps: rule?.surcharge_type === 'percent' ? rule.value : 0,
       base_total_cents: baseTotal,
       base_fee_status: s.baseStatus,
-      base_fee_paid_at: ['paid', 'refund_pending', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
+      base_fee_paid_at: ['paid', 'refund_pending', 'refund_failed', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
       base_fee_credited_at: s.path.includes('enroute') && s.baseStatus === 'paid' ? iso(created + 50 * MIN) : null,
       base_fee_refunded_at: s.baseStatus === 'refunded' ? iso(created + 40 * MIN) : null,
       cash_review_open: s.cash?.status === 'disputed',
@@ -243,7 +246,7 @@ export function paymentModelDemo(
         stripe_fee_cents: paid ? fee : 0,
         stripe_payment_intent_id: paid ? `pi_mock_b${s.folio}` : null,
         refunded_cents: s.refunded ? baseTotal : 0,
-        refund_requested_at: s.baseStatus === 'refund_pending' ? iso(created + 10 * MIN) : null,
+        refund_requested_at: ['refund_pending', 'refund_failed'].includes(s.baseStatus) ? iso(created + 10 * MIN) : null,
         tech_credit_cents:
           s.path.includes('enroute') && s.baseStatus === 'paid'
             ? baseTotal - commissionOf(baseTotal, 1500) - fee

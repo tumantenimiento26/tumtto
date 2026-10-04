@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aggregate,
   bucketGoal,
+  canRejectPayout,
   deltaLabel,
   methodSplit,
   monthlySummary,
@@ -91,5 +92,14 @@ describe('rangeBuckets con rango libre', () => {
     expect(w.length).toBe(11);
     expect(w[w.length - 1].to).toBe(new Date(2026, 10, 16).getTime());
     expect(bucketGoal(30_000, { from, to: new Date(2026, 10, 15) })).toBe(7000);
+  });
+});
+
+describe('canRejectPayout', () => {
+  it('permite rechazar pendientes, retenidos y aprobados sin enviar', () => {
+    for (const st of ['pending', 'held', 'approved']) expect(canRejectPayout(st)).toBe(true);
+  });
+  it('no permite rechazar lo que ya salió o terminó', () => {
+    for (const st of ['processing', 'paid', 'failed', 'cancelled']) expect(canRejectPayout(st)).toBe(false);
   });
 });

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { demoWorld } from './demo/world';
 import { paymentModelDemo } from './demo/payments';
 import {
+  BASE_STATUS,
   CASH_STATUS,
+  failedBaseRefunds,
   OUTCOMES,
   applyCashResolution,
   awaitingBasePayment,
@@ -55,7 +57,7 @@ const WIDE: [number, number] = [NOW - 30 * 864e5, NOW + 864e5];
 describe('demo del modelo base + efectivo', () => {
   it('cubre cada estado de la tarifa base y del efectivo', () => {
     const base = new Set(demo.orders.filter(o => o.payment_model === 'base_cash').map(o => o.base_fee_status));
-    for (const st of ['paid', 'refunded', 'waived', 'pending', 'failed', 'refund_pending'])
+    for (const st of ['paid', 'refunded', 'waived', 'pending', 'failed', 'refund_pending', 'refund_failed'])
       expect(base.has(st)).toBe(true);
     const cash = new Set(demo.payments.filter(p => p.kind === 'quote').map(p => p.cash_status));
     for (const st of Object.keys(CASH_STATUS)) expect(cash.has(st as never)).toBe(true);
@@ -407,5 +409,28 @@ describe('modelo de cobro v2: conceptos separados', () => {
     expect(rows.some(r => r.schedule_surcharge_credited_cents > 0)).toBe(true);
     expect(cashTotals(rows).rejected).toBe(2);
     expect(cashByTechCsvRows(rows)[0]).toHaveProperty('Cotizaciones rechazadas');
+  });
+});
+
+describe('reembolsos de tarifa base fallidos', () => {
+  const o = (id: string, st: string, at: string) => ({ id, base_fee_status: st, updated_at: at });
+  it('solo lista refund_failed, del más antiguo al más reciente', () => {
+    const rows = [
+      o('a', 'refund_failed', '2026-10-03T10:00:00Z'),
+      o('b', 'refund_pending', '2026-10-01T10:00:00Z'),
+      o('c', 'refund_failed', '2026-10-01T09:00:00Z'),
+      o('d', 'refunded', '2026-09-30T10:00:00Z'),
+    ];
+    expect(failedBaseRefunds(rows).map(r => r.id)).toEqual(['c', 'a']);
+    expect(failedBaseRefunds([])).toEqual([]);
+  });
+  it('tiene etiqueta y tono de error', () => {
+    expect(BASE_STATUS.refund_failed).toEqual({ label: 'Reembolso fallido', tone: 'danger' });
+  });
+  it('el demo trae uno con la visita cobrada y sin reembolsar', () => {
+    const f = failedBaseRefunds(demo.orders);
+    expect(f).toHaveLength(1);
+    expect(f[0].base_fee_paid_at).not.toBeNull();
+    expect(orderGmv(f[0], [], 'all')).toBe(f[0].base_total_cents);
   });
 });

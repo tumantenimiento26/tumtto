@@ -5035,7 +5035,11 @@ export type Database = {
       }
       get_order_payment_summary: { Args: { p_order_id: string }; Returns: Json }
       get_request_terms: {
-        Args: { p_category_id: string; p_scheduled_for?: string }
+        Args: {
+          p_category_id: string
+          p_scheduled_for?: string
+          p_technician_id?: string
+        }
         Returns: {
           applies: boolean
           base_fee_cents: number
@@ -5148,6 +5152,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      order_technician_location: {
+        Args: { p_order_id: string }
+        Returns: {
+          accuracy_m: number
+          heading: number
+          lat: number
+          lng: number
+          recorded_at: string
+        }[]
       }
       order_technician_vehicle: {
         Args: { p_order_id: string }

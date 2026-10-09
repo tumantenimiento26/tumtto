@@ -322,17 +322,4 @@ export function clientTabCounts(
 
 // ── CSV ──────────────────────────────────────────────────────────────────────
 
-/** CSV con BOM (Excel en español) y comillas escapadas. */
-export function toCsv(rows: Record<string, string | number | null>[]): string {
-  if (!rows.length) return '﻿';
-  const headers = Object.keys(rows[0]);
-  const cell = (v: string | number | null) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return (
-    '﻿' +
-    [headers.join(','), ...rows.map(r => headers.map(h => cell(r[h])).join(','))]
-      .join('\n')
-  );
-}
+export { toCsv } from './csv';

@@ -13,6 +13,7 @@ import {
   Plug,
   KeyRound,
   Snowflake,
+  Download,
   Plus,
   Trash2,
   Search,
@@ -57,6 +58,7 @@ import { useAuth } from '@/lib/auth';
 import { parseRuleValue } from '@/lib/scheduleRules';
 import { money } from '../servicios/_components/shared';
 import { addIncluded, categoryStats, rangeLabel } from '@/lib/catalogStats';
+import { exportCsv } from '@/components/admin';
 
 const ICONS: Record<string, LucideIcon> = {
   wrench: Wrench,
@@ -144,9 +146,35 @@ export default function CatalogoPage() {
         title="Catálogo de servicios"
         description="Categorías que ve el cliente en la app, con rangos de precio y comisión."
         actions={
-          <Button icon={Plus} onClick={() => setCreating(true)}>
-            Nueva categoría
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={Download}
+              onClick={() =>
+                exportCsv(
+                  'catalogo-servicios.csv',
+                  filtered.map(c => {
+                    const st = categoryStats(c.id, data);
+                    return {
+                      Categoría: c.name,
+                      Slug: c.slug,
+                      Publicada: c.is_active ? 'Sí' : 'No',
+                      'Tarifa base (MXN)': c.base_visit_fee_cents != null ? c.base_visit_fee_cents / 100 : '',
+                      'Comisión (%)': c.commission_bps != null ? c.commission_bps / 100 : 'Global',
+                      'Rango de visita': rangeLabel(st),
+                      Técnicos: st.technicians,
+                      Servicios: c.services,
+                    };
+                  }),
+                )
+              }
+            >
+              Exportar
+            </Button>
+            <Button icon={Plus} onClick={() => setCreating(true)}>
+              Nueva categoría
+            </Button>
+          </>
         }
       />
 

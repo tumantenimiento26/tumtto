@@ -59,6 +59,7 @@ import {
   timeAgo,
 } from '../servicios/_components/shared';
 import { ClientFormSheet } from './_components/ClientFormSheet';
+import { ImportButton } from '@/components/import-dialog';
 
 const TABS: { value: ClientTab; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -274,6 +275,7 @@ export default function ClientesPage() {
             >
               Exportar
             </Button>
+            <ImportButton entity="clientes" />
             <Button icon={UserPlus} onClick={() => setForm({ open: true, id: null })}>
               Nuevo cliente
             </Button>

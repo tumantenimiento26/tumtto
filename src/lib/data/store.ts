@@ -9,6 +9,7 @@ import { distanceM, wkbPoint } from '@/lib/geo';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
 import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
+import type { CompanyToolRowValue, ImportContext, ImportEntity, ImportValue, TechRowValue, ToolRowValue } from '@/lib/bulkImport';
 import { isImageMime, type QuoteAttachment } from '@/lib/quoteAttachments';
 import {
   applyCashResolution,
@@ -3853,4 +3854,78 @@ export async function previewScheduleSurcharge(categoryId: string, ts: string): 
     notifyError(pgMessage(e, 'No se pudo calcular la prueba.'));
     return null;
   }
+}
+
+// ── Importación masiva (CSV) ────────────────────────────────────────────────
+
+/** Catálogos con los que se validan las filas del CSV. */
+export function getImportContext(): ImportContext {
+  const ex = useExtras.getState();
+  return {
+    categories: w().categories,
+    companies: ex.companies,
+    tools: ex.toolCatalog,
+    existing: new Set([
+      ...ex.toolCatalog.map(t => `tool:${normalizeToolName(t.name)}`),
+      ...ex.companyTools.map(t => `serial:${normalizeSerial(t.serial_or_code).toLowerCase()}`),
+    ]),
+  };
+}
+
+/** Mensaje legible de una Edge Function que respondió 4xx/5xx. */
+async function fnError(error: unknown): Promise<Error> {
+  const ctx = (error as { context?: Response }).context;
+  const body = await ctx?.json?.().catch(() => null);
+  return new Error(body?.error ?? (error instanceof Error ? error.message : 'Error'));
+}
+
+/**
+ * Escribe una fila ya validada; lanza Error con el motivo. Sin toasts ni
+ * recarga por fila: el diálogo recarga una vez al terminar (reloadAfterImport).
+ */
+export async function importRow(entity: ImportEntity, value: ImportValue): Promise<void> {
+  if (MOCK) return; // ponytail: modo demo sin backend, la fila se da por importada
+  if (entity === 'clientes' || entity === 'tecnicos') {
+    const v = value as TechRowValue;
+    const body =
+      entity === 'clientes'
+        ? { action: 'invite_client', email: v.email, full_name: v.full_name, phone: v.phone ?? undefined }
+        : {
+            action: 'invite_technician',
+            email: v.email,
+            full_name: v.full_name,
+            phone: v.phone ?? undefined,
+            category_slugs: v.category_slugs,
+            technician_type: v.technician_type,
+            company_id: v.company_id,
+          };
+    const { data, error } = await supabase.functions.invoke('admin-users', { body });
+    if (error) throw await fnError(error);
+    if (data?.warning) throw new Error(`Invitado, pero: ${data.warning}`);
+    return;
+  }
+  if (entity === 'herramientas') {
+    const v = value as ToolRowValue;
+    const sort = Math.max(0, ...useExtras.getState().toolCatalog.map(t => t.sort_order)) + 10;
+    const { error } = await supabase.from('tool_catalog').insert({ ...v, sort_order: sort });
+    if (error) throw new Error(pgCode(error) === '23505' ? 'Ya existe en el catálogo.' : error.message);
+    useExtras.setState(s => ({ toolCatalog: [...s.toolCatalog, { ...v, sort_order: sort } as ToolCatalogItem] }));
+    return;
+  }
+  const v = value as CompanyToolRowValue;
+  const { error } = await supabase.rpc('admin_upsert_company_tool', {
+    p_name: v.name,
+    p_serial_or_code: v.serial_or_code,
+    p_category_id: v.category_id ?? undefined,
+    p_catalog_id: v.catalog_id ?? undefined,
+    p_brand: v.brand ?? undefined,
+    p_model: v.model ?? undefined,
+    p_acquired_on: v.acquired_on ?? undefined,
+    p_acquisition_cost_cents: v.acquisition_cost_cents ?? undefined,
+  });
+  if (error) throw new Error(invErr(error.message)(error));
+}
+
+export async function reloadAfterImport() {
+  await Promise.all([loadWorld(true), loadExtras(true)]);
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Wrench } from 'lucide-react';
+import { Download, Pencil, Plus, Wrench } from 'lucide-react';
 import { Badge, Button, Card, EmptyState, Toggle } from '@/components/ds';
 import { useAuth } from '@/lib/auth';
 import {
@@ -16,6 +16,8 @@ import {
 } from '@/lib/data/store';
 import { groupByCategory, type CustomToolSummary } from '@/lib/tools';
 import { ToolModal } from './ToolModal';
+import { ImportButton } from '@/components/import-dialog';
+import { exportCsv } from '@/components/admin';
 
 type ModalState =
   | { kind: 'edit'; tool: ToolCatalogItem | null }
@@ -63,14 +65,35 @@ export function ToolCatalogSection() {
               Por categoría de servicio. Uso interno.
             </div>
           </div>
-          <Button
-            icon={Plus}
-            disabled={!canEdit || unavailable}
-            title={lock}
-            onClick={() => setModal({ kind: 'edit', tool: null })}
-          >
-            Nueva herramienta
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              icon={Download}
+              disabled={unavailable}
+              onClick={() =>
+                exportCsv(
+                  'catalogo-herramientas.csv',
+                  catalog.map(t => ({
+                    Herramienta: t.name,
+                    Categoría: (t.category_id && catName(t.category_id)) || '',
+                    Activa: t.is_active ? 'Sí' : 'No',
+                    Técnicos: countToolTechs(t.id),
+                  })),
+                )
+              }
+            >
+              Exportar
+            </Button>
+            {!unavailable && <ImportButton entity="herramientas" />}
+            <Button
+              icon={Plus}
+              disabled={!canEdit || unavailable}
+              title={lock}
+              onClick={() => setModal({ kind: 'edit', tool: null })}
+            >
+              Nueva herramienta
+            </Button>
+          </div>
         </div>
         {unavailable ? (
           <p className="px-5 py-6 text-[13px] text-muted">

@@ -116,16 +116,7 @@ export function Avatar({
   );
 }
 
-/** Descarga un CSV generado en el navegador. */
-export function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+export { downloadCsv } from '@/lib/csv';
 
 /**
  * Acción destructiva con "Deshacer": la escritura real se hace al vencer el

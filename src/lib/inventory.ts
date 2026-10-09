@@ -279,17 +279,8 @@ export function ageTone(days: number): Tone {
   return days >= 90 ? 'danger' : days >= 30 ? 'warning' : 'neutral';
 }
 
-type Cell = string | number | null;
 /** CSV con BOM (Excel) y escape de comillas/comas/saltos. */
-export function inventoryCsv(rows: Record<string, Cell>[]): string {
-  if (!rows.length) return '﻿';
-  const headers = Object.keys(rows[0]);
-  const cell = (v: Cell) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return '﻿' + [headers.join(','), ...rows.map(r => headers.map(h => cell(r[h])).join(','))].join('\n');
-}
+export { toCsv as inventoryCsv } from './csv';
 
 // ── Bitácora ─────────────────────────────────────────────────────────────────
 

@@ -50,6 +50,7 @@ import { ToolFormSheet } from './_components/ToolFormSheet';
 import { ToolFiltersSheet } from './_components/ToolFiltersSheet';
 import { AssignToolModal, RetireToolModal, ReturnToolModal } from './_components/ToolActionModals';
 import { ByTechnicianReport, OutstandingReport } from './_components/InventoryReports';
+import { ImportButton } from '@/components/import-dialog';
 
 type Tab = 'herramientas' | 'por_tecnico' | 'pendientes';
 
@@ -186,6 +187,7 @@ export default function InventarioPage() {
                 Exportar
               </Button>
             )}
+            <ImportButton entity="inventario" />
             <Button icon={Plus} disabled={!canEdit} title={lock} onClick={() => setForm({ open: true, id: null })}>
               Nueva herramienta
             </Button>

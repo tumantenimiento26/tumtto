@@ -223,13 +223,16 @@ const sinceIso = (days: number) =>
   new Date(Date.now() - days * DAY_MS).toISOString();
 
 /**
- * Tabla completa (paginada, orden estable por `id`). Las tablas que crecen sin
- * límite (eventos de estado, bitácora admin) se cargan aparte acotadas a 90 días.
+ * Tabla completa (paginada, orden estable por su llave primaria, `id` por
+ * defecto). Las tablas que crecen sin límite (eventos de estado, bitácora
+ * admin) se cargan aparte acotadas a 90 días.
  */
-export function fetchAll<K extends keyof Tables & string>(table: K) {
+export function fetchAll<K extends keyof Tables & string>(table: K, key: string[] = ['id']) {
   return fetchAllRows<Row<K>>(
     (from, to) =>
-      supabase.from(table).select('*').order('id').range(from, to) as unknown as PromiseLike<{
+      key
+        .reduce((q, col) => q.order(col), supabase.from(table).select('*'))
+        .range(from, to) as unknown as PromiseLike<{
         data: Row<K>[] | null;
         error: unknown;
       }>,
@@ -302,7 +305,7 @@ export function loadWorld(force = false): Promise<void> {
         fetchAll('profiles'),
         fetchAll('service_categories'),
         fetchAll('technicians'),
-        fetchAll('technician_categories'),
+        fetchAll('technician_categories', ['technician_id', 'category_id']),
         fetchAll('technician_rates'),
         fetchAll('client_addresses'),
         fetchAll('service_orders'),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AppWindow,
   Check,
@@ -25,24 +25,6 @@ import { Container, H2, Kicker, Lead } from './bits';
 import { Phone, STEP_SCREENS } from './phone';
 import { scrollToId, useInViewOnce } from './hooks';
 
-/* ── Tilt 3D + brillo que sigue al cursor (categorías y galería) ── */
-function useTilt(reduced: boolean) {
-  const onMove = (e: MouseEvent<HTMLElement>) => {
-    if (reduced) return;
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `perspective(900px) rotateX(${(-y * 7).toFixed(2)}deg) rotateY(${(x * 9).toFixed(2)}deg) translateY(-4px)`;
-    el.style.setProperty('--gx', `${(x + 0.5) * 100}%`);
-    el.style.setProperty('--gy', `${(y + 0.5) * 100}%`);
-  };
-  const onLeave = (e: MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.transform = '';
-  };
-  return { onMouseMove: onMove, onMouseLeave: onLeave };
-}
-
 /* ── Categorías: pestañas + panel que rota cada 5 s ── */
 type Cat = {
   name: string;
@@ -54,6 +36,10 @@ type Cat = {
   eta: string;
   rating: string;
   aura: string;
+  /** Foto de trabajo en /public/landing/categorias; sin ella queda el rayado. */
+  img?: string;
+  /** object-position para fotos verticales (por defecto centrado). */
+  imgPos?: string;
 };
 const CATS: Cat[] = [
   {
@@ -71,6 +57,7 @@ const CATS: Cat[] = [
     eta: '24 min',
     rating: '4.8',
     aura: 'rgba(10,107,207,0.35)',
+    img: '/landing/categorias/plomeria.jpg',
   },
   {
     name: 'Electricidad',
@@ -87,6 +74,7 @@ const CATS: Cat[] = [
     eta: '27 min',
     rating: '4.7',
     aura: 'rgba(245,185,74,0.25)',
+    img: '/landing/categorias/electricidad.jpg',
   },
   {
     name: 'Gas',
@@ -102,6 +90,7 @@ const CATS: Cat[] = [
     eta: '22 min',
     rating: '4.9',
     aura: 'rgba(248,113,113,0.25)',
+    img: '/landing/categorias/gas.jpg',
   },
   {
     name: 'Herrería',
@@ -117,6 +106,7 @@ const CATS: Cat[] = [
     eta: '35 min',
     rating: '4.7',
     aura: 'rgba(143,160,184,0.28)',
+    img: '/landing/categorias/herreria.jpg',
   },
   {
     name: 'Pintura',
@@ -132,6 +122,8 @@ const CATS: Cat[] = [
     eta: '1 día',
     rating: '4.6',
     aura: 'rgba(95,211,155,0.22)',
+    img: '/landing/categorias/pintura.jpg',
+    imgPos: '50% 70%',
   },
   {
     name: 'Cristales',
@@ -372,12 +364,21 @@ export function Categories({ reduced }: { reduced: boolean }) {
                 </div>
               </div>
               <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-3">
-                {/* ponytail: sin fotos públicas de trabajos todavía (la evidencia
-                    vive en el bucket privado job-evidence); placeholder rayado. */}
+                {/* ponytail: fotos estáticas por categoría; las que faltan quedan con el rayado. */}
                 <div className="lp-stripes relative min-h-[240px] flex-1 overflow-hidden rounded-[14px] border border-[rgba(90,176,255,0.16)]">
-                  <span className="absolute inset-0 flex items-center justify-center font-mono text-[11px] text-lp-muted">
-                    Foto de trabajo · {c.name.toLowerCase()}
-                  </span>
+                  {c.img ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.img}
+                      alt={`Técnico de ${c.name.toLowerCase()} trabajando`}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      style={{ objectPosition: c.imgPos }}
+                    />
+                  ) : (
+                    <span className="absolute inset-0 flex items-center justify-center font-mono text-[11px] text-lp-muted">
+                      Foto de trabajo · {c.name.toLowerCase()}
+                    </span>
+                  )}
                   <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-[rgba(5,15,34,0.75)] px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-[var(--lp-ok)]">
                     TRABAJO REAL · {c.name.toUpperCase()}
                   </span>
@@ -719,76 +720,6 @@ export function Verified({ reduced }: { reduced: boolean }) {
               Aprobada en 9 h
             </div>
           </div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-/* ── Trabajos realizados: galería con tilt ── */
-const WORKS = [
-  ['Cambio de calentador de paso', 'Plomería · Providencia, Zapopan', 'Ramón H.', 'SVC-2840'],
-  ['Tablero eléctrico nuevo', 'Electricidad · Americana, GDL', 'Adriana G.', 'SVC-2841'],
-  ['Regulador y línea de gas', 'Gas · Chapalita, Zapopan', 'José Carlos J.', 'SVC-2842'],
-  ['Portón restaurado', 'Herrería · Tlaquepaque centro', 'Lupita P.', 'SVC-2843'],
-  ['Minisplit instalado', 'Aire acondicionado · Tlajomulco', 'Óscar V.', 'SVC-2844'],
-] as const;
-
-export function Works({ reduced }: { reduced: boolean }) {
-  const tilt = useTilt(reduced);
-  return (
-    <section id="trabajos" className="relative scroll-mt-16">
-      <Container className="py-28 max-sm:py-20">
-        <div className="mb-9 flex flex-wrap items-end justify-between gap-6">
-          <div className="max-w-[640px]">
-            <Kicker>Trabajos realizados</Kicker>
-            <H2>Evidencia real de cada servicio</H2>
-            <Lead>
-              Cada técnico sube fotos al llegar y al cerrar el trabajo. Así se
-              ven algunos servicios recientes en la ZMG.
-            </Lead>
-          </div>
-          <span
-            data-reveal="0.15"
-            className="inline-flex items-center gap-2 rounded-full border border-[rgba(90,176,255,0.2)] px-3.5 py-2 font-mono text-[11px] tracking-[0.12em] text-lp-body"
-          >
-            <span className="h-1.5 w-1.5 animate-[lp-pulse_1.6s_ease-in-out_infinite] rounded-full bg-[var(--lp-cyan)]" />
-            FOTOS CON EVIDENCIA FINAL
-          </span>
-        </div>
-        {/* ponytail: las fotos de evidencia final (service_evidence kind='final',
-            bucket privado job-evidence con URLs firmadas) no son públicas para
-            anon; mientras no exista una galería curada/pública, placeholders. */}
-        <div className="grid auto-rows-[240px] grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-          {WORKS.map(([title, where, who, code], i) => (
-            <div
-              key={code}
-              data-reveal={String((i % 4) * 0.07)}
-              {...tilt}
-              className={`relative overflow-hidden rounded-[16px] border border-[rgba(90,176,255,0.16)] bg-[var(--lp-panel)] transition-[transform,box-shadow,border-color] duration-[250ms] ease-out hover:border-[rgba(24,193,255,0.5)] hover:shadow-[0_30px_60px_-30px_rgba(24,193,255,0.45)] ${
-                i === 0 ? 'min-[980px]:col-span-2 min-[980px]:row-span-2' : ''
-              } ${i === 4 ? 'min-[980px]:col-span-2' : ''}`}
-            >
-              <div className="lp-stripes absolute inset-0 flex items-center justify-center font-mono text-[11px] text-lp-muted">
-                Foto: {title.toLowerCase()}
-              </div>
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(400px_circle_at_var(--gx,50%)_var(--gy,50%),rgba(24,193,255,0.12),transparent_60%)]" />
-              <span className="pointer-events-none absolute left-3 top-3 h-4 w-4 border-l-2 border-t-2 border-[var(--lp-cyan)]" />
-              <span className="pointer-events-none absolute right-3 top-3 h-4 w-4 border-r-2 border-t-2 border-[var(--lp-cyan)]" />
-              <span className="pointer-events-none absolute left-3.5 top-[34px] rounded-md bg-[rgba(5,15,34,0.75)] px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-[var(--lp-ok)]">
-                EVIDENCIA FINAL · {code}
-              </span>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(5,15,34,0.92),rgba(5,15,34,0.5)_60%,transparent)] px-4 pb-3.5 pt-10">
-                <div className="font-display text-[16px] font-extrabold text-white">
-                  {title}
-                </div>
-                <div className="mt-0.5 flex flex-wrap justify-between gap-x-2 text-[12.5px] text-lp-body">
-                  <span>{where}</span>
-                  <span className="whitespace-nowrap">{who} · ★ 5.0</span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </Container>
     </section>

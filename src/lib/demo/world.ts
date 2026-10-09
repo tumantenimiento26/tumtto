@@ -1,4 +1,5 @@
 import type { Database } from '@/types/supabase';
+import { defaultAvatarFor } from '@/lib/avatarArt';
 
 /**
  * In-memory demo world — one coherent dataset shared across the Cliente,
@@ -54,6 +55,21 @@ export const nextId = (p: string) => `${p}-${++seq}`;
 export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 
+const MOCK_ICONS: Record<string, string> = {
+  [CLIENT_ID]: 'casa',
+  [TECH_USER_ID]: 'llave',
+  'u-ag': 'foco',
+  'u-sc': 'casco',
+  'u-do': 'gota',
+  'u-carla': 'martillo',
+  'u-carlos': 'casco',
+  'u-miguel': 'martillo',
+  'u-jose': 'llave',
+  'u-lupita': 'gota',
+  'u-fer': 'foco',
+  // u-luis, u-ivan, u-roberto: sin entrada -> default por hash
+};
+
 function profile(
   id: string,
   full_name: string,
@@ -66,11 +82,20 @@ function profile(
     phone,
     role,
     avatar_path: null,
+    avatar_icon: MOCK_ICONS[id] ?? defaultAvatarFor(id),
     status: 'active',
     stripe_customer_id: null,
     ...ts(),
   };
 }
+
+const BASE_FEE: Record<string, number> = {
+  plumbing: 35000,
+  electrical: 30000,
+  gas: 40000,
+  ac: 45000,
+  appliances: 30000,
+};
 
 // ── Catalog (mirrors supabase/seed.sql) ──────────────────────────────────────
 const CAT = (
@@ -88,6 +113,8 @@ const CAT = (
   sort_order,
   is_active: true,
   commission_bps: null,
+  // Tarifa base de visita (modelo de cobro v2): «locks» queda sin configurar a propósito.
+  base_visit_fee_cents: BASE_FEE[slug] ?? null,
   ...ts(),
 });
 
@@ -114,6 +141,8 @@ function tech(
     accepts_cash: true,
     service_radius_m: null,
     zone_id: null,
+    technician_type: 'independent',
+    company_id: null,
     ...ts(),
   };
 }
@@ -370,6 +399,21 @@ function build(): World {
       description: null,
       is_urgent: false,
       urgent_surcharge_bps: 0,
+      priority: 'normal',
+      assignment_mode: 'client',
+      schedule_surcharge_bps: 0,
+      schedule_surcharge_cents: null,
+      schedule_surcharge_name: null,
+      schedule_surcharge_rule_id: null,
+      unassigned_alerted_at: null,
+      emergency_surcharge_cents: null,
+      dispatch_status: null,
+      dispatch_round: null,
+      dispatch_last_round_at: null,
+      dispatch_radius_m: null,
+      dispatch_started_at: null,
+      dispatch_deadline_at: null,
+      needs_manual_assignment: false,
       location: geo(-103.3773, 20.7062),
       place_name: null,
       address_line: null,
@@ -395,6 +439,15 @@ function build(): World {
       requested_technician_id: null,
       scheduled_for: null,
       scheduled_until: null,
+      payment_model: 'legacy',
+      base_fee_cents: 0,
+      base_surcharge_cents: 0,
+      base_total_cents: 0,
+      base_fee_status: 'not_required',
+      base_fee_paid_at: null,
+      base_fee_credited_at: null,
+      base_fee_refunded_at: null,
+      cash_review_open: false,
       ...ts(),
       ...partial,
     };
@@ -441,6 +494,37 @@ function build(): World {
 
   const quotes: ServiceQuote[] = [
     {
+      id: 'q-2851-v1',
+      service_order_id: 'SVC-2851',
+      technician_id: TECH_USER_ID,
+      labor_cents: 60000,
+      materials_cents: 52000,
+      surcharge_cents: 0,
+      total_cents: 112000,
+      notes: 'Primera cotización (reemplazada).',
+      accepted_at: null,
+      rejected_at: mins(60),
+      reject_reason: 'Muy caro; pido otra opción.',
+      submitted_at: mins(90),
+      created_at: mins(95),
+      updated_at: mins(60),
+    },
+    {
+      id: 'q-2835',
+      service_order_id: 'SVC-2835',
+      technician_id: TECH_USER_ID,
+      labor_cents: 90000,
+      materials_cents: 74000,
+      surcharge_cents: 0,
+      total_cents: 164000,
+      notes: 'Cambio de termopar y limpieza del piloto.',
+      accepted_at: old,
+      rejected_at: null,
+      reject_reason: null,
+      submitted_at: old,
+      ...ts(),
+    },
+    {
       id: 'q-2851',
       service_order_id: 'SVC-2851',
       technician_id: TECH_USER_ID,
@@ -451,6 +535,8 @@ function build(): World {
       notes: 'Incluye cambio de llave angular y cespol.',
       accepted_at: mins(20),
       rejected_at: null,
+      reject_reason: null,
+      submitted_at: mins(30),
       ...ts(),
     },
   ];
@@ -483,6 +569,7 @@ function build(): World {
       to_status: 'requested',
       actor_id: CLIENT_ID,
       note: null,
+      is_revert: false,
       created_at: mins(40),
       updated_at: mins(40),
     },
@@ -493,6 +580,7 @@ function build(): World {
       to_status: 'accepted',
       actor_id: TECH_USER_ID,
       note: null,
+      is_revert: false,
       created_at: mins(25),
       updated_at: mins(25),
     },
@@ -503,6 +591,7 @@ function build(): World {
       to_status: 'enroute',
       actor_id: TECH_USER_ID,
       note: null,
+      is_revert: false,
       created_at: mins(12),
       updated_at: mins(12),
     },
@@ -539,6 +628,24 @@ function build(): World {
       cash_confirmed_at: null,
       cash_confirmed_by: null,
       cash_debt_recovered_cents: 0,
+      kind: 'legacy',
+      refund_attempts: 0,
+      cash_status: null,
+      cash_received_cents: null,
+      client_cash_response: null,
+      client_cash_responded_at: null,
+      client_reported_cents: null,
+      client_dispute_reason: null,
+      review_status: null,
+      review_reason: null,
+      review_opened_at: null,
+      review_resolved_at: null,
+      review_resolved_by: null,
+      review_outcome: null,
+      review_notes: null,
+      refund_requested_at: null,
+      refund_reason: null,
+      tech_credit_cents: 0,
       created_at: old,
       updated_at: old,
     },

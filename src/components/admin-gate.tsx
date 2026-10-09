@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui';
+import { MOCK } from '@/lib/mock';
 
 /**
  * Console gate: Supabase session + profiles.role === 'admin'.
@@ -36,7 +37,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   // admin_require_aal2 (Config › Seguridad). Middleware SSR: pendiente (README).
   const [mfaOk, setMfaOk] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!session || !isAdmin) return;
+    if (!session || !isAdmin || MOCK) return;
     let live = true;
     (async () => {
       try {
@@ -96,7 +97,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!mfaOk) return <Resolving />;
+  if (!mfaOk && !MOCK) return <Resolving />;
 
   return <>{children}</>;
 }

@@ -40,17 +40,17 @@ const LINKS: [string, string][] = [
   ['tecnicos', 'Técnicos'],
   ['cobertura', 'Cobertura'],
   ['precios', 'Precios'],
-  ['trabajos', 'Trabajos'],
   ['faq', 'FAQ'],
+  ['contacto', 'Contacto'],
 ];
 const SECTION_ORDER = [
   'servicios',
   'como',
   'tecnicos',
-  'trabajos',
   'cobertura',
   'precios',
   'faq',
+  'contacto',
 ];
 
 export function Nav() {

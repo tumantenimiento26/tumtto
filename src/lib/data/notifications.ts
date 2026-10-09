@@ -2,6 +2,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+import { needsManualAssignment } from '@/lib/emergency';
+import { awaitingBasePayment, isFailedCharge, reviewReason } from '@/lib/payments';
+import { ageLabel, inUnassignedInbox, isAdminRequest } from '@/lib/unassigned';
 import {
   getAllPayments,
   getAllRequests,
@@ -9,10 +12,14 @@ import {
   getPendingKyc,
   getProfile,
   getTickets,
+  getUnassignedAlertMinutes,
   isTicketOpen,
   ticketRequester,
   useTick,
 } from './store';
+import { getContactMessages, loadContactMessages, useContact } from './contactStore';
+import { CONTACT_TYPE_LABEL } from '@/lib/contactAdmin';
+import { useEffect } from 'react';
 
 /**
  * Notificaciones de la consola admin. ponytail: el backend tiene
@@ -26,7 +33,9 @@ export type NotifType =
   | 'kyc'
   | 'disputas'
   | 'tickets'
+  | 'contacto'
   | 'retiros'
+  | 'emergencias'
   | 'servicios'
   | 'pagos'
   | 'sistema';
@@ -35,7 +44,9 @@ export const NOTIF_TYPES: { type: NotifType; label: string }[] = [
   { type: 'kyc', label: 'KYC' },
   { type: 'disputas', label: 'Disputas' },
   { type: 'tickets', label: 'Tickets' },
+  { type: 'contacto', label: 'Contacto' },
   { type: 'retiros', label: 'Retiros' },
+  { type: 'emergencias', label: 'Emergencias' },
   { type: 'servicios', label: 'Servicios' },
   { type: 'pagos', label: 'Pagos' },
   { type: 'sistema', label: 'Sistema' },
@@ -90,19 +101,73 @@ export function derive(now = Date.now()): AdminNotification[] {
         ts: t.created_at,
         href: '/soporte',
       });
-  for (const p of getAllPayments())
-    if (p.status === 'failed')
+  // Mensajes nuevos del formulario del landing (kind `contact_message`).
+  for (const c of getContactMessages())
+    if (c.status === 'new')
+      out.push({
+        id: `contact-${c.id}`,
+        type: 'contacto',
+        title: `Nuevo contacto (${CONTACT_TYPE_LABEL[c.contact_type]}): ${c.name}`,
+        body: c.message.length > 90 ? `${c.message.slice(0, 89)}…` : c.message,
+        ts: c.created_at,
+        href: '/soporte?tab=contacto',
+      });
+  for (const p of getAllPayments()) {
+    if (isFailedCharge(p))
       out.push({
         id: `pay-${p.id}`,
         type: 'pagos',
-        title: 'Pago rechazado',
-        body: 'El cobro de una orden falló; revisa el método del cliente.',
+        title: p.kind === 'base_fee' ? 'Tarifa base rechazada' : 'Pago rechazado',
+        body:
+          p.kind === 'base_fee'
+            ? 'El cliente no pudo pagar la visita; puede reintentar o puedes exonerarla.'
+            : 'El cobro de una orden falló; revisa el método del cliente.',
         ts: p.updated_at ?? p.created_at,
         href: `/servicios/${p.service_order_id}`,
+      });
+    // Backend: notificación a admins `cash_review_opened`.
+    if (p.kind === 'quote' && p.review_status === 'open')
+      out.push({
+        id: `cash-${p.id}`,
+        type: 'pagos',
+        title: 'Revisión de efectivo abierta',
+        body: reviewReason(p.review_reason),
+        ts: p.review_opened_at ?? p.updated_at ?? p.created_at,
+        href: '/revision-efectivo',
+      });
+  }
+  for (const o of getAllRequests())
+    if (needsManualAssignment(o))
+      out.push({
+        id: `emg-${o.id}`,
+        type: 'emergencias',
+        title: 'Emergencia sin técnico — asignar',
+        body: `Nadie aceptó a tiempo; sigue activa para asignación manual (${name(o.client_id)}).`,
+        ts: o.updated_at ?? o.created_at,
+        href: `/servicios/${o.id}?asignar=1`,
+      });
+  // Solicitudes sin técnico (Tumtto asigna) que superan unassigned_alert_minutes.
+  const alertMin = getUnassignedAlertMinutes();
+  for (const o of getAllRequests())
+    if (
+      inUnassignedInbox(o) &&
+      isAdminRequest(o) &&
+      now - new Date(o.created_at).getTime() > alertMin * 60_000
+    )
+      out.push({
+        id: `unas-${o.id}`,
+        type: 'servicios',
+        title: 'Solicitud sin técnico — asignar o rechazar',
+        body: `${name(o.client_id)} espera desde hace ${ageLabel(o.created_at, now)} (umbral ${alertMin} min).`,
+        ts: o.created_at,
+        href: `/servicios/${o.id}?asignar=1`,
       });
   for (const o of getAllRequests())
     if (
       o.status === 'requested' &&
+      o.priority !== 'emergency' &&
+      !awaitingBasePayment(o) &&
+      !inUnassignedInbox(o) &&
       now - new Date(o.created_at).getTime() > STALE_REQUEST_MIN * 60_000
     )
       out.push({
@@ -157,6 +222,10 @@ export function useNotifications(): {
   unread: number;
 } {
   useTick();
+  useContact(s => s.messages);
+  useEffect(() => {
+    void loadContactMessages();
+  }, []);
   const { read, deleted, muted } = useNotifState();
   const items = derive()
     .filter(n => !deleted.includes(n.id) && !muted.includes(n.type))

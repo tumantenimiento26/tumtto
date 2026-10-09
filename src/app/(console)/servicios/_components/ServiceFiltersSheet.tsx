@@ -1,21 +1,48 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input, Segmented, Sheet, Toggle } from '@/components/ds';
+import {
+  Button,
+  Chip,
+  DateRangePicker,
+  Input,
+  QuickRange,
+  Segmented,
+  Sheet,
+  Toggle,
+} from '@/components/ds';
+import { addDays, sameDay, startOfDay } from '@/lib/calendar';
 import type { ServiceFilters } from '@/lib/serviciosFilter';
+import { AGE_BUCKETS } from '@/lib/unassigned';
 import { FormSection } from './ServiceFormSheet';
 import { METHOD_LABEL, ZONES } from './shared';
 
 type SheetValues = Pick<
   ServiceFilters,
-  'zones' | 'method' | 'minPesos' | 'maxPesos' | 'urgentOnly' | 'disputeOnly'
+  | 'categoryId'
+  | 'range'
+  | 'zones'
+  | 'method'
+  | 'minPesos'
+  | 'maxPesos'
+  | 'emergencyOnly'
+  | 'disputeOnly'
+  | 'age'
+  | 'desiredRange'
 >;
 
 const METHODS = ['todos', 'card', 'cash'] as const;
 
+const DESIRED_QUICK = [
+  { label: 'Hoy', range: () => ({ from: startOfDay(new Date()), to: startOfDay(new Date()) }) },
+  { label: 'Mañana', range: () => ({ from: addDays(startOfDay(new Date()), 1), to: addDays(startOfDay(new Date()), 1) }) },
+  { label: 'Próx. 7 días', range: () => ({ from: startOfDay(new Date()), to: addDays(startOfDay(new Date()), 6) }) },
+];
+
 /**
- * Sheet de filtros (400px): zona múltiple, método, monto, urgentes y
- * disputa. Trabaja sobre un borrador y aplica al confirmar.
+ * Sheet con TODOS los filtros (400px): fechas (rápidos + date picker),
+ * categoría, zona múltiple, método, monto, emergencias y disputa. Trabaja sobre
+ * un borrador y aplica al confirmar.
  */
 export function ServiceFiltersSheet({
   open,
@@ -24,6 +51,8 @@ export function ServiceFiltersSheet({
   onApply,
   onClear,
   resultCount,
+  categories,
+  inbox = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,6 +61,9 @@ export function ServiceFiltersSheet({
   onClear: () => void;
   /** Resultados con el borrador aplicado (para el botón "Mostrar N"). */
   resultCount: (draft: SheetValues) => number;
+  categories: { id: string; name: string }[];
+  /** Pestaña «Sin asignar»: suma antigüedad y fecha deseada. */
+  inbox?: boolean;
 }) {
   const [d, setD] = useState<SheetValues>(value);
   useEffect(() => {
@@ -77,6 +109,75 @@ export function ServiceFiltersSheet({
         </div>
       }
     >
+      {inbox && (
+        <>
+          <FormSection>Antigüedad</FormSection>
+          <div className="flex flex-wrap gap-2">
+            {AGE_BUCKETS.map(b => (
+              <Chip
+                key={b.value}
+                active={d.age === b.value}
+                onClick={() => setD(s => ({ ...s, age: b.value }))}
+              >
+                {b.label}
+              </Chip>
+            ))}
+          </div>
+
+          <FormSection>Fecha deseada</FormSection>
+          <div className="flex flex-col items-start gap-3">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Fecha deseada rápida">
+              {DESIRED_QUICK.map(q => {
+                const r = q.range();
+                const on =
+                  !!d.desiredRange &&
+                  sameDay(d.desiredRange.from, r.from) &&
+                  sameDay(d.desiredRange.to, r.to);
+                return (
+                  <Chip
+                    key={q.label}
+                    active={on}
+                    onClick={() => setD(s => ({ ...s, desiredRange: on ? null : r }))}
+                  >
+                    {q.label}
+                  </Chip>
+                );
+              })}
+            </div>
+            <DateRangePicker
+              label="Cita deseada"
+              disableFuture={false}
+              value={d.desiredRange}
+              onChange={desiredRange => setD(s => ({ ...s, desiredRange }))}
+            />
+          </div>
+        </>
+      )}
+
+      <FormSection>{inbox ? 'Fecha de la solicitud' : 'Fechas'}</FormSection>
+      <div className="flex flex-col items-start gap-3">
+        <QuickRange value={d.range} onChange={range => setD(s => ({ ...s, range }))} />
+        <DateRangePicker value={d.range} onChange={range => setD(s => ({ ...s, range }))} />
+      </div>
+
+      <FormSection>Categoría</FormSection>
+      <div className="flex flex-wrap gap-2">
+        <Chip active={!d.categoryId} onClick={() => setD(s => ({ ...s, categoryId: null }))}>
+          Todas
+        </Chip>
+        {categories.map(c => (
+          <Chip
+            key={c.id}
+            active={d.categoryId === c.id}
+            onClick={() =>
+              setD(s => ({ ...s, categoryId: s.categoryId === c.id ? null : c.id }))
+            }
+          >
+            {c.name}
+          </Chip>
+        ))}
+      </div>
+
       <FormSection>Zona</FormSection>
       <div className="flex flex-wrap gap-2">
         {ZONES.map(z => (
@@ -97,7 +198,7 @@ export function ServiceFiltersSheet({
       />
 
       <FormSection>Monto (MXN)</FormSection>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 min-[641px]:grid-cols-2">
         <Input
           label="Mínimo"
           prefix="$"
@@ -120,11 +221,11 @@ export function ServiceFiltersSheet({
       <FormSection>Más</FormSection>
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[14px] text-navy">Solo urgentes</span>
+          <span className="text-[14px] text-navy">Solo emergencias</span>
           <Toggle
-            checked={d.urgentOnly}
-            onChange={x => setD(s => ({ ...s, urgentOnly: x }))}
-            aria-label="Solo urgentes"
+            checked={d.emergencyOnly}
+            onChange={x => setD(s => ({ ...s, emergencyOnly: x }))}
+            aria-label="Solo emergencias"
           />
         </div>
         <div className="flex items-center justify-between">

@@ -2,7 +2,21 @@
 
 import { fmtDate } from '@/lib/dates';
 
+/**
+ * ¿El admin aún puede rechazar el retiro? pending/held/approved sí (el saldo
+ * vuelve a la cartera); processing/paid ya salieron por Stripe.
+ */
+export const canRejectPayout = (status: string) =>
+  status === 'pending' || status === 'held' || status === 'approved';
+
 export type FinRange = '7d' | '30d' | '90d';
+/** Preset o rango libre del date picker (inclusive, por día). */
+export type FinPeriod = FinRange | { from: Date; to: Date };
+
+/** ¿Barras semanales? 90d o rangos de más de 31 días. */
+export const isWeekly = (r: FinPeriod) =>
+  r === '90d' ||
+  (typeof r === 'object' && (startOfDay(r.to).getTime() - startOfDay(r.from).getTime()) / 864e5 + 1 > 31);
 
 export interface PayLike {
   status: string;
@@ -27,8 +41,28 @@ function startOfDay(d: Date) {
   return x;
 }
 
-/** 7d → 7 días · 30d → 30 días · 90d → 13 semanas. Último bucket = hoy. */
-export function rangeBuckets(range: FinRange, now = new Date()): Bucket[] {
+/** 7d → 7 días · 30d → 30 días · 90d → 13 semanas. Último bucket = hoy.
+ *  Rango libre: un bucket por día (≤ 31 días) o por semana desde `from`. */
+export function rangeBuckets(range: FinPeriod, now = new Date()): Bucket[] {
+  if (typeof range === 'object') {
+    const from = startOfDay(range.from).getTime();
+    const end = startOfDay(range.to).getTime() + DAY;
+    const days = Math.round((end - from) / DAY);
+    const step = isWeekly(range) ? 7 * DAY : DAY;
+    return Array.from({ length: Math.ceil((end - from) / step) }, (_, i) => {
+      const a = from + i * step;
+      return {
+        from: a,
+        to: Math.min(a + step, end),
+        label:
+          step > DAY
+            ? fmtDate(a, { day: '2-digit', month: 'short' })
+            : days <= 7
+              ? fmtDate(a, { weekday: 'short' }).replace('.', '')
+              : fmtDate(a, { day: 'numeric' }),
+      };
+    });
+  }
   const today = startOfDay(now).getTime();
   if (range === '90d') {
     return Array.from({ length: 13 }, (_, i) => {
@@ -83,7 +117,7 @@ export function aggregate(payments: PayLike[], buckets: Bucket[]): BucketTotals[
 /** Totales del periodo actual y del anterior (misma duración). */
 export function periodTotals(
   payments: PayLike[],
-  range: FinRange,
+  range: FinPeriod,
   now = new Date(),
 ): { cur: BucketTotals; prev: BucketTotals } {
   const b = rangeBuckets(range, now);
@@ -149,5 +183,5 @@ export function monthlySummary(
 }
 
 /** Meta por bucket a partir de la meta mensual (bucket semanal = 7 días). */
-export const bucketGoal = (monthlyGoalCents: number, range: FinRange) =>
-  Math.round((monthlyGoalCents / 30) * (range === '90d' ? 7 : 1));
+export const bucketGoal = (monthlyGoalCents: number, range: FinPeriod) =>
+  Math.round((monthlyGoalCents / 30) * (isWeekly(range) ? 7 : 1));

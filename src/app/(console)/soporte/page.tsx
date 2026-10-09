@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   FileText,
+  Download,
   Plus,
   Search,
   Send,
@@ -39,6 +40,9 @@ import { useAction } from '@/components/use-action';
 import {
   getAllDisputes,
   getPendingKyc,
+  getPendingClientDocuments,
+  loadExtras,
+  useExtras,
   getKycSessions,
   getProfile,
   getRequest,
@@ -67,6 +71,12 @@ import {
   type TicketStatus,
 } from '@/lib/data/store';
 import { formatPhone } from '@/lib/phone';
+import { loadContactMessages, useContact } from '@/lib/data/contactStore';
+import { newContactCount } from '@/lib/contactAdmin';
+import { ContactView } from './_components/ContactView';
+import { exportSupportTab } from './_components/exportSupport';
+import { ClientDocActions, issuedOn } from '../clientes/_components/ClientDocCard';
+import { OcrSummary } from '../tecnicos/_components/detail-parts';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/data/notifications';
@@ -78,7 +88,7 @@ import {
   type Resolution,
 } from '@/lib/supportFormat';
 
-type TabKey = 'disputas' | 'tickets' | 'kyc';
+type TabKey = 'disputas' | 'tickets' | 'kyc' | 'contacto';
 
 const TICKET_STATUS: Record<TicketStatus, { label: string; tone: Tone }> = {
   open: { label: 'Abierto', tone: 'danger' },
@@ -130,12 +140,25 @@ export default function SoportePage() {
   const failed = useWorldFailed();
   const [tab, setTab] = useState<TabKey>('disputas');
   const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const contactNew = useContact(s => newContactCount(s.messages));
+  useEffect(() => {
+    void loadContactMessages();
+    // ?tab=contacto (enlace del correo y de las notificaciones). Sin
+    // useSearchParams para no exigir Suspense en esta página.
+    if (new URLSearchParams(window.location.search).get('tab') === 'contacto')
+      setTab('contacto');
+  }, []);
 
   const activeDisputes = getAllDisputes().filter(
     d => d.status === 'open' || d.status === 'in_review',
   );
   const openTickets = getTickets().filter(isTicketOpen);
+  useExtras(s => s.clientDocs);
+  useEffect(() => {
+    void loadExtras();
+  }, []);
   const pendingKyc = getPendingKyc();
+  const kycCount = pendingKyc.length + getPendingClientDocuments().length;
 
   if (failed)
     return (
@@ -152,9 +175,14 @@ export default function SoportePage() {
         title="Soporte y disputas"
         description="Una disputa no detiene el servicio: la orden sigue su curso mientras se resuelve."
         actions={
-          <Button icon={Plus} onClick={() => setNewTicketOpen(true)}>
-            Nuevo ticket
-          </Button>
+          <>
+            <Button variant="secondary" icon={Download} onClick={() => exportSupportTab(tab)}>
+              Exportar
+            </Button>
+            <Button icon={Plus} onClick={() => setNewTicketOpen(true)}>
+              Nuevo ticket
+            </Button>
+          </>
         }
       />
 
@@ -168,7 +196,8 @@ export default function SoportePage() {
             count: activeDisputes.length,
           },
           { value: 'tickets', label: 'Tickets', count: openTickets.length },
-          { value: 'kyc', label: 'Cola KYC', count: pendingKyc.length },
+          { value: 'kyc', label: 'Cola KYC', count: kycCount },
+          { value: 'contacto', label: 'Contacto', count: contactNew },
         ]}
       />
 
@@ -177,8 +206,10 @@ export default function SoportePage() {
           <DisputesView />
         ) : tab === 'tickets' ? (
           <TicketsView />
-        ) : (
+        ) : tab === 'kyc' ? (
           <KycView />
+        ) : (
+          <ContactView />
         )}
       </div>
 
@@ -764,14 +795,16 @@ const REJECT_REASONS = [
 
 function KycView() {
   useTick();
+  useExtras(s => s.clientDocs);
   const pending = getPendingKyc();
-  if (pending.length === 0)
+  const clientDocs = getPendingClientDocuments();
+  if (pending.length === 0 && clientDocs.length === 0)
     return (
       <Card padded>
         <EmptyState
           kind="all-clear"
           title="Cola KYC al día"
-          description="No hay técnicos esperando verificación."
+          description="No hay técnicos ni clientes esperando verificación."
         />
       </Card>
     );
@@ -780,7 +813,51 @@ function KycView() {
       {pending.map(t => (
         <KycCard key={t.id} techId={t.id} />
       ))}
+      {clientDocs.map(d => (
+        <ClientDocKycCard key={d.id} doc={d} />
+      ))}
     </div>
+  );
+}
+
+function ClientDocKycCard({ doc }: { doc: ReturnType<typeof getPendingClientDocuments>[number] }) {
+  const profile = getProfile(doc.client_id);
+  const who = profile?.full_name ?? 'Cliente';
+  return (
+    <Card padded className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <Avatar name={profile?.full_name} size={42} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-sans text-[14px] font-semibold text-navy">{who}</div>
+          <div className="font-sans text-[12px] text-muted">
+            {formatPhone(profile?.phone) || '—'}
+          </div>
+        </div>
+        <Badge tone="warning">En revisión</Badge>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 rounded-btn border border-line px-3 py-2">
+          <FileText size={14} className="text-primary" />
+          <span className="flex-1 truncate font-sans text-[12.5px] text-navy">
+            Cliente · Comprobante de domicilio
+          </span>
+          <span className="font-sans text-[11px] text-faint">{timeAgo(doc.created_at)}</span>
+        </div>
+        <span className="font-sans text-[12.5px] text-muted">
+          Emitido el {issuedOn(doc.issued_on)}
+        </span>
+        <OcrSummary data={doc.ocr_data} />
+        <Link
+          href={`/clientes/${doc.client_id}`}
+          className="inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-primary"
+        >
+          Ver perfil del cliente <ArrowRight size={12} />
+        </Link>
+      </div>
+      <div className="mt-auto">
+        <ClientDocActions doc={doc} who={who} />
+      </div>
+    </Card>
   );
 }
 

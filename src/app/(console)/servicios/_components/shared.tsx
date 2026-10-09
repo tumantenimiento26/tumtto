@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useCallback, useEffect, useRef } from 'react';
 import {
   Droplet,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { snackbar, type Tone } from '@/components/ds';
 import type { OrderStatus } from '@/lib/serviciosFilter';
+import { MX_TZ } from '@/lib/dates';
 
 // Piezas compartidas por Servicios y Clientes (consola-b).
 
@@ -79,6 +81,7 @@ export function timeAgo(iso: string | null | undefined): string {
   const d = Math.round(h / 24);
   if (d < 30) return `hace ${d} d`;
   return new Date(iso).toLocaleDateString('es-MX', {
+    timeZone: MX_TZ,
     day: '2-digit',
     month: 'short',
   });
@@ -86,6 +89,7 @@ export function timeAgo(iso: string | null | undefined): string {
 
 export const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-MX', {
+    timeZone: MX_TZ,
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -93,10 +97,14 @@ export const clock = (iso: string) =>
 export function Avatar({
   name,
   size = 36,
+  userId,
 }: {
   name: string | null | undefined;
   size?: number;
+  /** Con `userId` muestra el ícono de perfil en lugar de las iniciales. */
+  userId?: string | null;
 }) {
+  if (userId) return <UserIcon userId={userId} size={size} />;
   return (
     <span
       className="grid shrink-0 place-items-center rounded-full bg-info-soft font-display font-bold text-primary"
@@ -108,16 +116,7 @@ export function Avatar({
   );
 }
 
-/** Descarga un CSV generado en el navegador. */
-export function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+export { downloadCsv } from '@/lib/csv';
 
 /**
  * Acción destructiva con "Deshacer": la escritura real se hace al vencer el

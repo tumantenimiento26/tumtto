@@ -3,6 +3,7 @@
 
 import { inRange, type DateRange } from '@/lib/calendar';
 import { orderCode } from '@/lib/orderCode';
+import { matchesAge, type AgeBucket } from '@/lib/unassigned';
 
 export type OrderStatus =
   | 'requested'
@@ -26,7 +27,9 @@ export type ServiceTab =
   | 'curso'
   | 'completados'
   | 'cancelados'
-  | 'disputa';
+  | 'disputa'
+  | 'emergencias'
+  | 'sin_asignar';
 
 export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -35,6 +38,8 @@ export const SERVICE_TABS: { value: ServiceTab; label: string }[] = [
   { value: 'completados', label: 'Completados' },
   { value: 'cancelados', label: 'Cancelados' },
   { value: 'disputa', label: 'En disputa' },
+  { value: 'emergencias', label: 'Emergencias' },
+  { value: 'sin_asignar', label: 'Sin asignar' },
 ];
 
 const IN_PROGRESS: OrderStatus[] = [
@@ -48,7 +53,12 @@ const IN_PROGRESS: OrderStatus[] = [
 const DONE: OrderStatus[] = ['completed', 'paid', 'closed'];
 
 export function serviceTabOf(
-  o: { status: OrderStatus; is_disputed: boolean },
+  o: {
+    status: OrderStatus;
+    is_disputed: boolean;
+    is_emergency?: boolean;
+    needs_manual?: boolean;
+  },
   tab: ServiceTab,
 ): boolean {
   switch (tab) {
@@ -64,6 +74,10 @@ export function serviceTabOf(
       return o.status === 'cancelled' || o.status === 'expired';
     case 'disputa':
       return o.is_disputed;
+    case 'emergencias':
+      return !!o.is_emergency;
+    case 'sin_asignar':
+      return !!o.needs_manual;
   }
 }
 
@@ -72,7 +86,20 @@ export interface ServiceRow {
   id: string;
   status: OrderStatus;
   is_disputed: boolean;
-  is_urgent: boolean;
+  /** priority = 'emergency' (reemplaza al antiguo «urgente»). */
+  is_emergency: boolean;
+  /** Sin técnico y pide asignación manual (solicitud sin técnico o emergencia vencida). */
+  needs_manual: boolean;
+  /** Solicitud que el cliente dejó para que Tumtto asigne (assignment_mode = 'admin'). */
+  is_admin_request?: boolean;
+  /** Fecha/horario deseado (scheduled_for / scheduled_until). */
+  desiredAt?: string | null;
+  desiredUntil?: string | null;
+  /** Recargo por horario congelado, en bps. */
+  scheduleBps?: number;
+  description?: string | null;
+  /** Orden de fijado arriba (0 = primero); null = no se fija. Ver emergencyPinRank. */
+  pin: number | null;
   categoryId: string;
   categoryName: string;
   clientName: string;
@@ -80,6 +107,8 @@ export interface ServiceRow {
   zone: string;
   totalCents: number | null;
   method: string | null; // card | cash | …
+  /** Todos los métodos de la orden (tarifa base en tarjeta + presupuesto en efectivo). */
+  methods?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -92,9 +121,12 @@ export interface ServiceFilters {
   method: string | null; // null = cualquiera
   minPesos: number | null;
   maxPesos: number | null;
-  urgentOnly: boolean;
+  emergencyOnly: boolean;
   disputeOnly: boolean;
   range: DateRange;
+  /** Solo «Sin asignar»: antigüedad mínima y fecha deseada. */
+  age: AgeBucket;
+  desiredRange: DateRange;
 }
 
 export const EMPTY_SERVICE_FILTERS: ServiceFilters = {
@@ -105,9 +137,11 @@ export const EMPTY_SERVICE_FILTERS: ServiceFilters = {
   method: null,
   minPesos: null,
   maxPesos: null,
-  urgentOnly: false,
+  emergencyOnly: false,
   disputeOnly: false,
   range: null,
+  age: 'all',
+  desiredRange: null,
 };
 
 export const norm = (s: string) =>
@@ -120,33 +154,44 @@ export const norm = (s: string) =>
 /** Filtros del sheet (sin pestaña, búsqueda, categoría ni fechas). */
 export function activeSheetFilters(f: ServiceFilters): number {
   return (
+    (f.categoryId ? 1 : 0) +
+    (f.range ? 1 : 0) +
     f.zones.length +
     (f.method ? 1 : 0) +
     (f.minPesos != null || f.maxPesos != null ? 1 : 0) +
-    (f.urgentOnly ? 1 : 0) +
-    (f.disputeOnly ? 1 : 0)
+    (f.emergencyOnly ? 1 : 0) +
+    (f.disputeOnly ? 1 : 0) +
+    (f.age !== 'all' ? 1 : 0) +
+    (f.desiredRange ? 1 : 0)
   );
 }
 
 export function filterServices(
   rows: ServiceRow[],
   f: ServiceFilters,
-  opts: { ignoreTab?: boolean } = {},
+  opts: { ignoreTab?: boolean; now?: number } = {},
 ): ServiceRow[] {
+  const now = opts.now ?? Date.now();
   const q = norm(f.query);
   return rows.filter(r => {
     if (!opts.ignoreTab && !serviceTabOf(r, f.tab)) return false;
     if (f.categoryId && r.categoryId !== f.categoryId) return false;
     if (f.zones.length && !f.zones.includes(r.zone)) return false;
-    if (f.method && r.method !== f.method) return false;
+    if (f.method && !(r.methods ?? (r.method ? [r.method] : [])).includes(f.method)) return false;
     const pesos = r.totalCents == null ? null : r.totalCents / 100;
     if (f.minPesos != null && (pesos == null || pesos < f.minPesos))
       return false;
     if (f.maxPesos != null && (pesos == null || pesos > f.maxPesos))
       return false;
-    if (f.urgentOnly && !r.is_urgent) return false;
+    if (f.emergencyOnly && !r.is_emergency) return false;
     if (f.disputeOnly && !r.is_disputed) return false;
     if (f.range && !inRange(new Date(r.createdAt), f.range)) return false;
+    if (f.age !== 'all' && !matchesAge(r.createdAt, f.age, now)) return false;
+    if (
+      f.desiredRange &&
+      !(r.desiredAt && inRange(new Date(r.desiredAt), f.desiredRange))
+    )
+      return false;
     if (!q) return true;
     return [
       orderCode(r.id),
@@ -277,17 +322,4 @@ export function clientTabCounts(
 
 // ── CSV ──────────────────────────────────────────────────────────────────────
 
-/** CSV con BOM (Excel en español) y comillas escapadas. */
-export function toCsv(rows: Record<string, string | number | null>[]): string {
-  if (!rows.length) return '﻿';
-  const headers = Object.keys(rows[0]);
-  const cell = (v: string | number | null) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return (
-    '﻿' +
-    [headers.join(','), ...rows.map(r => headers.map(h => cell(r[h])).join(','))]
-      .join('\n')
-  );
-}
+export { toCsv } from './csv';

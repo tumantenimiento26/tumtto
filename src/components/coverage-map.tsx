@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Layers, HardHat, Flame, Hexagon, Map as MapIcon } from 'lucide-react';
 import { coverageRing, geometryCenter, type LngLat } from '@/lib/geo';
+import { HEAT_GRADIENT, HEAT_STOPS, heatColor } from '@/lib/heatScale';
 
 /**
  * Mapa de cobertura ZMG (Mapbox GL) con datos reales: zonas de
@@ -32,7 +33,8 @@ export interface MapTechBase {
 
 const ZMG_CENTER: LngLat = [-103.38, 20.63];
 
-// Rampa de calor de marca — misma config de producción de la Lám. 08.
+// Rampa de calor estándar verde → amarillo → rojo (lib/heatScale, fuera del kit
+// de marca). Densidad baja transparente para no tapar el mapa base.
 const HEAT_PAINT = {
   'heatmap-weight': 1,
   'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 15, 2.4],
@@ -42,15 +44,10 @@ const HEAT_PAINT = {
     ['linear'],
     ['heatmap-density'],
     0,
-    'rgba(10,107,207,0)',
-    0.25,
-    '#0A6BCF',
-    0.5,
-    '#18C1FF',
-    0.75,
-    '#F59E0B',
-    1,
-    '#DC2626',
+    heatColor(0, 0),
+    0.15,
+    heatColor(0.15, 0.55),
+    ...HEAT_STOPS.slice(1).flat(),
   ],
   'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 16, 0.3],
 } as const;
@@ -437,7 +434,7 @@ export function CoverageMap({
               <div
                 className="h-2 rounded-full"
                 style={{
-                  background: 'linear-gradient(90deg, rgba(10,107,207,0), #0A6BCF, #18C1FF, #F59E0B, #DC2626)',
+                  background: HEAT_GRADIENT,
                 }}
               />
               <div className="mt-1 flex justify-between font-mono text-[8.5px] uppercase tracking-wider text-faint">

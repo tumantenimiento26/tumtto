@@ -1,16 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   Ban,
   Copy,
   Download,
+  Clock,
   Eye,
   Pencil,
   Plus,
   Search,
   SlidersHorizontal,
+  UserCog,
+  XCircle,
 } from 'lucide-react';
 import {
   Badge,
@@ -18,7 +23,6 @@ import {
   Card,
   Chip,
   DataTable,
-  DateRangePicker,
   EmptyState,
   ErrorPage,
   Input,
@@ -28,6 +32,9 @@ import {
   snackbar,
   toast,
   type DataColumn,
+  rangeLabel,
+  QuickRange,
+  isPreset,
 } from '@/components/ds';
 import {
   useTick,
@@ -39,9 +46,21 @@ import {
   getCategories,
   getProfile,
   getRequest,
+  getUnassignedAlertMinutes,
   setStatus,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
+import { emergencyPinRank, isEmergency } from '@/lib/emergency';
+import {
+  AGE_BUCKETS,
+  ageLabel,
+  ageTone,
+  inUnassignedInbox,
+  isAdminRequest,
+  scheduleLabel,
+  scheduleSurchargeLabel,
+} from '@/lib/unassigned';
+
 import {
   EMPTY_SERVICE_FILTERS,
   SERVICE_TABS,
@@ -94,15 +113,27 @@ export default function ServiciosPage() {
     [tick],
   );
   const rows: ServiceRow[] = useMemo(() => {
-    const payByOrder = new Map(
-      getAllPayments().map(p => [p.service_order_id, p]),
-    );
+    // Un pedido puede tener varios pagos (tarifa base en tarjeta + efectivo).
+    const methodsByOrder = new Map<string, string[]>();
+    for (const p of getAllPayments()) {
+      if (p.status === 'failed' || p.status === 'cancelled') continue;
+      const a = methodsByOrder.get(p.service_order_id) ?? [];
+      if (!a.includes(p.method)) a.push(p.method);
+      methodsByOrder.set(p.service_order_id, a);
+    }
     const catName = new Map(cats.map(c => [c.id, c.name]));
     return getAllRequests().map(r => ({
       id: r.id,
       status: r.status,
       is_disputed: r.is_disputed,
-      is_urgent: r.is_urgent,
+      is_emergency: isEmergency(r),
+      needs_manual: inUnassignedInbox(r),
+      is_admin_request: isAdminRequest(r),
+      desiredAt: r.scheduled_for,
+      desiredUntil: r.scheduled_until,
+      scheduleBps: r.schedule_surcharge_bps,
+      description: r.description,
+      pin: emergencyPinRank(r),
       categoryId: r.category_id,
       categoryName: catName.get(r.category_id) ?? 'Servicio',
       clientName: getProfile(r.client_id)?.full_name ?? 'Cliente',
@@ -111,7 +142,8 @@ export default function ServiciosPage() {
         : null,
       zone: r.municipality ?? '—',
       totalCents: r.quoted_total_cents,
-      method: payByOrder.get(r.id)?.method ?? null,
+      method: methodsByOrder.get(r.id)?.[0] ?? null,
+      methods: methodsByOrder.get(r.id) ?? [],
       createdAt: r.created_at,
       updatedAt: r.updated_at,
     }));
@@ -142,9 +174,9 @@ export default function ServiciosPage() {
           Categoría: r.categoryName,
           Zona: r.zone,
           Estado: STATUS[r.status].label,
-          Urgente: r.is_urgent ? 'Sí' : 'No',
+          Emergencia: r.is_emergency ? 'Sí' : 'No',
           Disputa: r.is_disputed ? 'Sí' : 'No',
-          Método: r.method ? (METHOD_LABEL[r.method] ?? r.method) : '',
+          Método: (r.methods ?? []).map(m => METHOD_LABEL[m] ?? m).join(' + '),
           Total: r.totalCents != null ? r.totalCents / 100 : '',
           Creado: r.createdAt,
           Actualizado: r.updatedAt,
@@ -200,17 +232,24 @@ export default function ServiciosPage() {
     const prev = f;
     setF(s => ({
       ...s,
+      categoryId: null,
+      range: null,
       zones: [],
       method: null,
       minPesos: null,
       maxPesos: null,
-      urgentOnly: false,
+      emergencyOnly: false,
       disputeOnly: false,
+      age: 'all',
+      desiredRange: null,
     }));
     setFiltersOpen(false);
     if (activeSheetFilters(prev))
       snackbar.show('Filtros limpiados', { undo: () => setF(prev) });
   }
+
+  const inbox = f.tab === 'sin_asignar';
+  const alertMin = getUnassignedAlertMinutes();
 
   const columns: DataColumn<ServiceRow>[] = [
     {
@@ -222,9 +261,14 @@ export default function ServiciosPage() {
           <span className="font-mono text-[12.5px] font-medium text-primary">
             {orderCode(r.id)}
           </span>
-          {r.is_urgent && (
-            <Badge tone="warning" mono>
-              Urgente
+          {r.is_emergency && (
+            <Badge tone="danger" mono>
+              Emergencia
+            </Badge>
+          )}
+          {r.is_admin_request && (
+            <Badge tone="info" mono>
+              Tumtto asigna
             </Badge>
           )}
         </div>
@@ -254,6 +298,15 @@ export default function ServiciosPage() {
       render: r =>
         r.techName ? (
           <span className="text-[13.5px] text-body">{r.techName}</span>
+        ) : r.needs_manual ? (
+          <Link
+            href={`/servicios/${r.id}?asignar=1`}
+            onClick={e => e.stopPropagation()}
+            className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-btn border border-error-line bg-error-soft px-2.5 py-1 text-[12.5px] font-semibold text-error hover:brightness-95 max-[640px]:whitespace-normal max-[640px]:text-left"
+          >
+            <AlertTriangle size={13} aria-hidden />
+            {inbox ? 'Asignar' : 'Sin técnico — asignar'}
+          </Link>
         ) : (
           <span className="text-[13.5px] text-faint">Sin asignar</span>
         ),
@@ -298,6 +351,51 @@ export default function ServiciosPage() {
     },
   ];
 
+  const inboxColumns: DataColumn<ServiceRow>[] = [
+    {
+      key: 'antiguedad',
+      header: 'Antigüedad',
+      sortValue: r => r.createdAt,
+      render: r => {
+        const tone = ageTone(r.createdAt, alertMin);
+        return (
+          <span
+            className={`inline-flex items-center gap-1 whitespace-nowrap font-mono text-[12.5px] font-semibold ${
+              tone === 'danger' ? 'text-error' : tone === 'warning' ? 'text-warning' : 'text-muted'
+            }`}
+          >
+            <Clock size={13} aria-hidden />
+            {ageLabel(r.createdAt)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'deseada',
+      header: 'Fecha deseada',
+      sortValue: r => r.desiredAt ?? '',
+      render: r => {
+        const label = scheduleLabel(r.desiredAt, r.desiredUntil);
+        const sur = scheduleSurchargeLabel(r.scheduleBps);
+        return label ? (
+          <span className="flex flex-col items-start gap-0.5 text-[12.5px] text-body">
+            <span>{label}</span>
+            {sur && <Badge tone="warning" mono>{`Horario ${sur}`}</Badge>}
+          </span>
+        ) : (
+          <span className="text-[12.5px] text-faint">Lo antes posible</span>
+        );
+      },
+    },
+  ];
+  const shownColumns = inbox
+    ? [
+        ...columns.filter(c => ['servicio', 'cliente', 'zona'].includes(c.key)),
+        ...inboxColumns,
+        columns.find(c => c.key === 'tecnico')!,
+      ]
+    : columns;
+
   if (failed)
     return (
       <ErrorPage
@@ -308,6 +406,25 @@ export default function ServiciosPage() {
   if (!ready) return <ScreenSkeleton kind="list" />;
 
   const activeChips: { key: string; label: string; remove: () => void }[] = [
+    ...(f.categoryId
+      ? [
+          {
+            key: 'cat',
+            label: cats.find(c => c.id === f.categoryId)?.name ?? 'Categoría',
+            remove: () => setF(s => ({ ...s, categoryId: null })),
+          },
+        ]
+      : []),
+    // Los rápidos (7/30/90) ya se ven activos en la barra; el chip es para rangos libres.
+    ...(f.range && !(['7d', '30d', '90d'] as const).some(k => isPreset(f.range, k))
+      ? [
+          {
+            key: 'range',
+            label: rangeLabel(f.range),
+            remove: () => setF(s => ({ ...s, range: null })),
+          },
+        ]
+      : []),
     ...f.zones.map(z => ({
       key: `z-${z}`,
       label: z,
@@ -331,12 +448,30 @@ export default function ServiciosPage() {
           },
         ]
       : []),
-    ...(f.urgentOnly
+    ...(f.age !== 'all'
+      ? [
+          {
+            key: 'age',
+            label: `Antigüedad ${AGE_BUCKETS.find(b => b.value === f.age)?.label ?? ''}`,
+            remove: () => setF(s => ({ ...s, age: 'all' as const })),
+          },
+        ]
+      : []),
+    ...(f.desiredRange
+      ? [
+          {
+            key: 'desired',
+            label: `Cita ${rangeLabel(f.desiredRange)}`,
+            remove: () => setF(s => ({ ...s, desiredRange: null })),
+          },
+        ]
+      : []),
+    ...(f.emergencyOnly
       ? [
           {
             key: 'u',
-            label: 'Urgentes',
-            remove: () => setF(s => ({ ...s, urgentOnly: false })),
+            label: 'Emergencias',
+            remove: () => setF(s => ({ ...s, emergencyOnly: false })),
           },
         ]
       : []),
@@ -391,6 +526,7 @@ export default function ServiciosPage() {
               aria-label="Buscar servicios"
               wrapperClassName="min-w-[220px] flex-1 sm:max-w-[360px]"
             />
+            <QuickRange value={f.range} onChange={range => setF(s => ({ ...s, range }))} />
             <Button
               variant="secondary"
               icon={SlidersHorizontal}
@@ -405,34 +541,7 @@ export default function ServiciosPage() {
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Categoría">
-            <Chip
-              active={!f.categoryId}
-              onClick={() => setF(s => ({ ...s, categoryId: null }))}
-            >
-              Todas
-            </Chip>
-            {cats.map(c => (
-              <Chip
-                key={c.id}
-                active={f.categoryId === c.id}
-                onClick={() =>
-                  setF(s => ({
-                    ...s,
-                    categoryId: s.categoryId === c.id ? null : c.id,
-                  }))
-                }
-              >
-                {c.name}
-              </Chip>
-            ))}
-          </div>
-
           <div className="flex flex-wrap items-center gap-2.5">
-            <DateRangePicker
-              value={f.range}
-              onChange={range => setF(s => ({ ...s, range }))}
-            />
             {activeChips.map(c => (
               <Chip key={c.key} active onRemove={c.remove}>
                 {c.label}
@@ -446,13 +555,15 @@ export default function ServiciosPage() {
 
         <DataTable
           rows={visible}
-          columns={columns}
+          key={inbox ? 'inbox' : 'all'}
+          columns={shownColumns}
           rowKey={r => r.id}
           onRowClick={r => router.push(`/servicios/${r.id}`)}
           selectable
-          initialSort={{ key: 'actualizado', dir: 'desc' }}
+          initialSort={inbox ? { key: 'antiguedad', dir: 'asc' } : { key: 'actualizado', dir: 'desc' }}
+          pinRank={r => r.pin}
           pageSize={8}
-          minWidth={980}
+          minWidth={inbox ? 800 : 980}
           bulkActions={(selected, clear) => (
             <>
               <Button
@@ -482,6 +593,25 @@ export default function ServiciosPage() {
               icon: Eye,
               onSelect: () => router.push(`/servicios/${r.id}`),
             },
+            ...(r.needs_manual
+              ? [
+                  {
+                    label: 'Asignar técnico',
+                    icon: UserCog,
+                    onSelect: () => router.push(`/servicios/${r.id}?asignar=1`),
+                  },
+                  ...(r.is_admin_request
+                    ? [
+                        {
+                          label: 'Rechazar solicitud',
+                          icon: XCircle,
+                          destructive: true,
+                          onSelect: () => router.push(`/servicios/${r.id}?rechazar=1`),
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
             {
               label: 'Editar',
               icon: Pencil,
@@ -518,6 +648,12 @@ export default function ServiciosPage() {
                   </Button>
                 }
               />
+            ) : inbox && counts.sin_asignar === 0 ? (
+              <EmptyState
+                kind="no-results"
+                title="Nada por asignar"
+                description="Todas las solicitudes tienen técnico o ya fueron atendidas."
+              />
             ) : (
               <EmptyState
                 kind="no-results"
@@ -544,6 +680,8 @@ export default function ServiciosPage() {
         onApply={v => setF(s => ({ ...s, ...v }))}
         onClear={clearSheetFilters}
         resultCount={d => filterServices(rows, { ...f, ...d }).length}
+        categories={cats}
+        inbox={inbox}
       />
 
       <ServiceFormSheet

@@ -55,7 +55,7 @@ export type DateRange = { from: Date; to: Date } | null;
 
 /** Presets de rango (hacia atrás desde hoy). null = todas las fechas. */
 export function rangePreset(
-  kind: 'today' | '7d' | '30d' | 'month' | 'lastMonth' | 'all',
+  kind: 'today' | '7d' | '30d' | '90d' | 'month' | 'lastMonth' | 'all',
   now = new Date(),
 ): DateRange {
   const today = startOfDay(now);
@@ -66,6 +66,8 @@ export function rangePreset(
       return { from: addDays(today, -6), to: today };
     case '30d':
       return { from: addDays(today, -29), to: today };
+    case '90d':
+      return { from: addDays(today, -89), to: today };
     case 'month':
       return {
         from: new Date(today.getFullYear(), today.getMonth(), 1),

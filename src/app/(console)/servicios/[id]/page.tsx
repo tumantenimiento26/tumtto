@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -16,8 +17,11 @@ import {
   RotateCcw,
   Send,
   ShieldAlert,
+  XCircle,
+  Siren,
   Star,
   UserCog,
+  Undo2,
 } from 'lucide-react';
 import {
   Badge,
@@ -34,6 +38,20 @@ import {
   toast,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
+import { RequestMap } from '@/components/request-map';
+import { wkbPoint } from '@/lib/geo';
+import {
+  REASSIGN_BLOCKED_TIP,
+  ageLabel,
+  ageTone,
+  assignmentHeadline,
+  canReassignStatus,
+  inUnassignedInbox,
+  isAdminRequest,
+  scheduleLabel,
+  scheduleSurchargeLabel,
+} from '@/lib/unassigned';
+import { AssignModal, RejectModal } from '../_components/AssignModal';
 import {
   addNote,
   createTicket,
@@ -41,19 +59,23 @@ import {
   getCategories,
   getNotes,
   getOrderEvents,
+  getOrderPayments,
   getPayment,
   getProfile,
   getQuote,
+  getOrderQuotes,
   getQuoteItems,
+  getEmergencyConfig,
   getRequest,
   getTickets,
   getTechByUser,
-  getTechniciansWithProfile,
+  getUnassignedAlertMinutes,
   listOrderEvidence,
+  listQuoteAttachments,
   loadWorld,
-  reassignRequest,
+  assignOrder,
+  rejectRequest,
   refundPayment,
-  refundableCents,
   sendMessage,
   setStatus,
   useTick,
@@ -76,7 +98,13 @@ import {
   money,
   timeAgo,
 } from '../_components/shared';
+import { QuoteAttachments } from '../_components/QuoteAttachments';
+import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
+import { PaymentBreakdown } from '../_components/PaymentBreakdown';
+import { paymentLabel, refundablePayments, rejectedCloseIds, type PayRow } from '@/lib/payments';
+import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
+import { includedSurchargeCents, isEmergency, surchargeLabel } from '@/lib/emergency';
 
 // Stepper de 8 estados del handoff (closing cuenta como "En servicio";
 // closed como "Pagado"). Cancelado/expirado = nodo terminal rojo.
@@ -136,6 +164,7 @@ export default function ServicioDetailPage() {
   const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [forceTo, setForceTo] = useState<RequestStatus | null>(null);
@@ -144,6 +173,8 @@ export default function ServicioDetailPage() {
   const [caseTicketId, setCaseTicketId] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<OrderEvidence[] | null>(null);
   const [evidenceError, setEvidenceError] = useState(false);
+  const [attachments, setAttachments] = useState<QuoteAttachment[] | null>(null);
+  const [attachmentsError, setAttachmentsError] = useState(false);
 
   useEffect(() => {
     if (!ready || !id) return;
@@ -151,6 +182,10 @@ export default function ServicioDetailPage() {
     listOrderEvidence(id).then(
       e => alive && setEvidence(e),
       () => alive && setEvidenceError(true),
+    );
+    listQuoteAttachments(id).then(
+      a => alive && setAttachments(a),
+      () => alive && setAttachmentsError(true),
     );
     return () => {
       alive = false;
@@ -164,6 +199,17 @@ export default function ServicioDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [req?.id, req?.updated_at],
   );
+
+  // Desde la lista / dashboard / notificaciones: /servicios/:id?asignar=1 (o ?reasignar=1)
+  // abre el modal de asignar; ?rechazar=1 abre el de rechazo.
+  const wantsReassign = req ? inUnassignedInbox(req) : false;
+  const adminRequest = req ? isAdminRequest(req) : false;
+  useEffect(() => {
+    if (!wantsReassign) return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('asignar') === '1' || q.get('reasignar') === '1') setReassignOpen(true);
+    else if (q.get('rechazar') === '1' && adminRequest) setRejectOpen(true);
+  }, [wantsReassign, adminRequest]);
 
   if (failed)
     return (
@@ -191,6 +237,8 @@ export default function ServicioDetailPage() {
   const notes = getNotes(req.id);
 
   const terminal = req.status === 'cancelled' || req.status === 'expired';
+  // Cierre por cotización rechazada: el servicio termina en el paso «Cotización».
+  const rejectedClose = rejectedCloseIds([req], getOrderQuotes(req.id)).has(req.id);
   const current = terminal
     ? // Último paso alcanzado antes de cancelar/expirar.
       Math.max(
@@ -199,7 +247,9 @@ export default function ServicioDetailPage() {
           .map(e => stepIndex(e.from_status as RequestStatus))
           .filter(i => i >= 0),
       )
-    : stepIndex(req.status);
+    : rejectedClose
+      ? stepIndex('quote')
+      : stepIndex(req.status);
   const reachedAt = (step: number) => {
     const ev = events.find(e =>
       STEPS[step].statuses.includes(e.to_status as RequestStatus),
@@ -213,13 +263,15 @@ export default function ServicioDetailPage() {
   const laborCents = quote?.labor_cents ?? 0;
   const materialsCents = items.reduce((s, i) => s + i.total_cents, 0);
   const totalCents = req.quoted_total_cents ?? quote?.total_cents ?? null;
-  const surchargeCents =
-    req.is_urgent && totalCents != null
-      ? Math.round(
-          totalCents -
-            totalCents / (1 + (req.urgent_surcharge_bps || 2000) / 10000),
-        )
-      : 0;
+  const emergency = isEmergency(req);
+  const emCfg = getEmergencyConfig();
+  const surchargeCents = emergency
+    ? includedSurchargeCents({
+        emergency_surcharge_cents: req.emergency_surcharge_cents,
+        total_cents: totalCents,
+        fallback_bps: req.urgent_surcharge_bps || emCfg.surchargeBps,
+      })
+    : 0;
   const commissionCents =
     payment?.commission_cents ??
     req.commission_cents ??
@@ -230,9 +282,18 @@ export default function ServicioDetailPage() {
     totalCents != null && commissionCents != null
       ? totalCents - commissionCents
       : null;
-  const refundable = payment?.status === 'paid' && refundableCents(payment) > 0;
-  const refundMax = payment ? refundableCents(payment) : 0;
+  const refundOptions = refundablePayments(getOrderPayments(req.id));
+  const refundable = refundOptions.length > 0;
+  const refundedAny = getOrderPayments(req.id).some(p => p.status === 'refunded');
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
+
+  const address = [req.address_line, req.neighborhood, req.municipality].filter(Boolean).join(', ');
+  const desired = scheduleLabel(req.scheduled_for, req.scheduled_until);
+  const scheduleSur = req.schedule_surcharge_name
+    ? `${req.schedule_surcharge_name}${req.schedule_surcharge_cents ? ` · ${money(req.schedule_surcharge_cents, true)}` : ''}`
+    : scheduleSurchargeLabel(req.schedule_surcharge_bps);
+  const requestPhotos = (evidence ?? []).filter(e => e.kind === 'request' && e.url);
+  const reassignable = canReassignStatus(req.status);
 
   function copyId() {
     void navigator.clipboard.writeText(req!.id).then(
@@ -272,8 +333,37 @@ export default function ServicioDetailPage() {
         <ChevronLeft size={16} /> Servicios
       </Link>
 
+      {wantsReassign && (
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-box border border-error-line bg-error-soft p-4 sm:flex-row sm:items-center"
+        >
+          <Siren size={20} className="text-error" />
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-[14px] font-bold text-error">
+              {adminRequest ? 'Solicitud sin técnico — asignar o rechazar' : 'Emergencia sin técnico — asignar'}
+            </div>
+            <div className="text-[13px] text-body">
+              {adminRequest
+                ? `El cliente pidió que Tumtto asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
+                : 'Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.'}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {adminRequest && (
+              <Button size="sm" variant="secondary" icon={XCircle} onClick={() => setRejectOpen(true)} disabled={!canSupport}>
+                Rechazar
+              </Button>
+            )}
+            <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
+              Asignar técnico
+            </Button>
+          </div>
+        </div>
+      )}
+
       {req.is_disputed && (
-        <div className="flex flex-wrap items-center gap-3 rounded-box border border-error-line bg-error-soft p-4">
+        <div className="flex flex-col items-start gap-3 rounded-box border border-error-line bg-error-soft p-4 sm:flex-row sm:items-center">
           <ShieldAlert size={20} className="text-error" />
           <div className="min-w-0 flex-1">
             <div className="font-display text-[14px] font-bold text-error">
@@ -319,11 +409,24 @@ export default function ServicioDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={STATUS[req.status].tone} dot>
-              {STATUS[req.status].label}
+              {adminRequest && req.status === 'requested'
+                ? 'Pendiente de asignación'
+                : STATUS[req.status].label}
             </Badge>
-            {req.is_urgent && (
-              <Badge tone="warning">
-                Urgente · +{Math.round((req.urgent_surcharge_bps || 2000) / 100)}%
+            {rejectedClose && <Badge tone="warning">Cerrado por cotización rechazada</Badge>}
+            {wantsReassign && (
+              <Badge tone={ageTone(req.created_at, getUnassignedAlertMinutes())}>
+                Sin técnico hace {ageLabel(req.created_at)}
+              </Badge>
+            )}
+            {emergency && (
+              <Badge tone="danger">
+                Emergencia
+                {req.emergency_surcharge_cents != null
+                  ? ` · ${surchargeLabel('fixed', 0, req.emergency_surcharge_cents)}`
+                  : req.urgent_surcharge_bps
+                    ? ` · ${surchargeLabel('percent', req.urgent_surcharge_bps, 0)}`
+                    : ''}
               </Badge>
             )}
             <Button variant="secondary" icon={Pencil} onClick={() => setEditOpen(true)}>
@@ -335,7 +438,9 @@ export default function ServicioDetailPage() {
         {/* Stepper */}
         <ol className="mt-6 grid grid-cols-4 gap-y-5 sm:grid-cols-8" aria-label="Progreso del servicio">
           {STEPS.map((st, i) => {
-            const done = i < current || (!terminal && i === current && ['paid', 'closed'].includes(req.status));
+            const done =
+              i < current ||
+              (!terminal && i === current && (rejectedClose || ['paid', 'closed'].includes(req.status)));
             const now = !terminal && i === current && !done;
             const lastReached = terminal && i === current;
             const t = i <= current ? reachedAt(i) : null;
@@ -367,13 +472,13 @@ export default function ServicioDetailPage() {
                   ) : null}
                 </span>
                 <span
-                  className={`mt-2 font-display text-[13px] font-bold ${
+                  className={`mt-2 pr-1 font-display text-[11px] font-bold leading-tight sm:text-[13px] ${
                     now ? 'text-primary' : i <= current ? 'text-navy' : 'text-faint'
                   }`}
                 >
                   {st.label}
                 </span>
-                <span className="font-mono text-[11px] text-muted">{t ?? '—'}</span>
+                <span className="font-mono text-[10px] text-muted sm:text-[11px]">{t ?? '—'}</span>
               </li>
             );
           })}
@@ -394,11 +499,54 @@ export default function ServicioDetailPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         {/* Columna principal */}
         <div className="flex min-w-0 flex-col gap-4">
+          {emergency && canSupport && (
+            <EmergencyDispatchCard orderId={req.id} dispatchStatus={req.dispatch_status} />
+          )}
+          {(adminRequest || wantsReassign) && (
+            <Card padded>
+              <Kicker className="mb-3">Ubicación del servicio</Kicker>
+              <RequestMap center={wkbPoint(req.location)} label={address || undefined} />
+              <p className="mt-3 text-[13.5px] text-body">{address || 'Dirección no disponible'}</p>
+            </Card>
+          )}
           <Card padded>
             <Kicker className="mb-3">Descripción del problema</Kicker>
             <p className="text-[15px] leading-relaxed text-navy">
               {req.description ? `“${req.description}”` : 'Sin descripción.'}
             </p>
+            {desired && (
+              <dl className="mt-4 flex flex-col gap-2 rounded-box bg-panel p-3 text-[13.5px]">
+                <Row label="Fecha y horario deseado" value={desired} />
+                <Row label="Recargo por horario" value={scheduleSur ?? 'Sin recargo'} />
+              </dl>
+            )}
+            {adminRequest ? (
+              <div className="mt-4">
+                <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.08em] text-muted">
+                  Fotos del cliente
+                </div>
+                {requestPhotos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {requestPhotos.map((ev, i) => (
+                      <a
+                        key={ev.id}
+                        href={ev.url ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative block aspect-[4/3] overflow-hidden rounded-box border border-line bg-panel"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={ev.url ?? ''} alt={`Foto ${i + 1} del cliente`} className="h-full w-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-muted">
+                    {evidence === null && !evidenceError ? 'Cargando fotos…' : 'El cliente no adjuntó fotos.'}
+                  </p>
+                )}
+              </div>
+            ) : (
             <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
               {EVIDENCE_SLOTS.map(slot => {
                 const ev = evidence?.find(e =>
@@ -434,12 +582,15 @@ export default function ServicioDetailPage() {
                 );
               })}
             </div>
+            )}
             {evidenceError && (
               <p className="mt-2 text-[12.5px] text-error">
                 No pudimos cargar las fotos de evidencia.
               </p>
             )}
           </Card>
+
+          {quote && <QuoteAttachments orderId={req.id} items={attachments} error={attachmentsError} />}
 
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
@@ -452,33 +603,48 @@ export default function ServicioDetailPage() {
               <EmptyState compact kind="first-use" title="Sin movimientos todavía" />
             ) : (
               <ol className="flex flex-col">
-                {events.map((e, i) => (
-                  <li key={e.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
-                      {i < events.length - 1 && <span className="w-[2px] flex-1 bg-line" />}
-                    </div>
-                    <div className="min-w-0 flex-1 pb-4">
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <span className="font-display text-[13.5px] font-bold text-navy">
-                          {STATUS[e.to_status as RequestStatus]?.label ?? e.to_status}
-                        </span>
-                        <span className="font-mono text-[11px] text-muted">
-                          {fmtDateTime(e.created_at, {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                {events.map((e, i) => {
+                  const label = (st: string | null) =>
+                    STATUS[st as RequestStatus]?.label ?? st ?? '—';
+                  return (
+                    <li key={e.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        {e.is_revert ? (
+                          <span className="mt-0.5 grid h-4 w-4 place-items-center rounded-full bg-warning-soft text-warning">
+                            <Undo2 size={10} />
+                          </span>
+                        ) : (
+                          <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
+                        )}
+                        {i < events.length - 1 && <span className="w-[2px] flex-1 bg-line" />}
                       </div>
-                      <div className="text-[12.5px] text-muted">
-                        {ACTOR_LABEL(e.actor_id)}
-                        {e.note ? ` · ${e.note}` : ''}
+                      <div className="min-w-0 flex-1 pb-4">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span
+                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning' : 'text-navy'}`}
+                          >
+                            {e.is_revert
+                              ? `Estado revertido: ${label(e.from_status)} → ${label(e.to_status)}`
+                              : (assignmentHeadline(e) ?? label(e.to_status))}
+                          </span>
+                          <span className="font-mono text-[11px] text-muted">
+                            {fmtDateTime(e.created_at, {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[12.5px] text-muted">
+                          {e.actor_id && getProfile(e.actor_id) && <UserIcon userId={e.actor_id} size={16} />}
+                          <span>{ACTOR_LABEL(e.actor_id)}
+                          {e.note && !assignmentHeadline(e) ? ` · ${e.note}` : ''}</span>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </Card>
@@ -521,7 +687,7 @@ export default function ServicioDetailPage() {
           <Card padded>
             <Kicker className="mb-3">Cliente</Kicker>
             <div className="flex items-center gap-3">
-              <Avatar name={client?.full_name} size={42} />
+              <Avatar name={client?.full_name} userId={client?.id} size={42} />
               <div className="min-w-0">
                 <div className="truncate font-display text-[15px] font-bold text-navy">
                   {client?.full_name ?? 'Cliente'}
@@ -546,13 +712,26 @@ export default function ServicioDetailPage() {
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
               <Kicker>Técnico</Kicker>
-              <Button size="sm" variant="ghost" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={terminal || !canSupport}>
-                Reasignar
-              </Button>
+              <span title={!terminal && !reassignable ? REASSIGN_BLOCKED_TIP : undefined}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={UserCog}
+                  onClick={() => setReassignOpen(true)}
+                  disabled={terminal || !canSupport || !reassignable}
+                  aria-label={
+                    !terminal && !reassignable
+                      ? `${req.technician_id ? 'Reasignar' : 'Asignar'} no disponible: ${REASSIGN_BLOCKED_TIP}`
+                      : undefined
+                  }
+                >
+                  {req.technician_id ? 'Reasignar' : 'Asignar'}
+                </Button>
+              </span>
             </div>
             {techProfile ? (
               <div className="flex items-center gap-3">
-                <Avatar name={techProfile.full_name} size={42} />
+                <Avatar name={techProfile.full_name} userId={techProfile.id} size={42} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate font-display text-[15px] font-bold text-navy">
@@ -570,7 +749,11 @@ export default function ServicioDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-[13.5px] text-muted">Sin técnico asignado todavía.</p>
+              <p className="text-[13.5px] text-muted">
+                {inUnassignedInbox(req)
+                  ? `Sin técnico · espera ${ageLabel(req.created_at)}`
+                  : 'Sin técnico asignado todavía.'}
+              </p>
             )}
             {techRec && (
               <Link
@@ -582,12 +765,16 @@ export default function ServicioDetailPage() {
             )}
           </Card>
 
+          {req.payment_model === 'base_cash' ? (
+            <PaymentBreakdown order={req} />
+          ) : (
           <Card padded>
             <Kicker className="mb-3">Cobro y comisión</Kicker>
             <dl className="flex flex-col gap-2 text-[13.5px]">
               <Row label="Mano de obra" value={money(laborCents || null, true)} />
               <Row label="Materiales" value={money(materialsCents || null, true)} />
-              {req.is_urgent && <Row label="Recargo urgente" value={money(surchargeCents || null, true)} />}
+              {emergency && <Row label="Recargo de emergencia" value={money(surchargeCents || null, true)} />}
+              {scheduleSur && <Row label="Recargo por horario" value={scheduleSur} />}
               <div className="my-1 border-t border-divider" />
               <Row label="Total" value={money(totalCents, true)} strong />
               <Row
@@ -611,6 +798,7 @@ export default function ServicioDetailPage() {
               )}
             </div>
           </Card>
+          )}
 
           <Card padded>
             <Kicker className="mb-3">Acciones del admin</Kicker>
@@ -635,13 +823,13 @@ export default function ServicioDetailPage() {
                     ? 'Solo finanzas emite reembolsos'
                     : refundable
                       ? 'Devuelve el cobro al cliente'
-                      : payment?.status === 'refunded'
+                      : refundedAny
                         ? 'Este pago ya fue reembolsado'
                         : 'No hay un pago cobrado que reembolsar'
                 }
                 onClick={() => setRefundOpen(true)}
               >
-                {payment?.status === 'refunded' ? 'Reembolso emitido' : 'Reembolsar'}
+                {!refundable && refundedAny ? 'Reembolso emitido' : 'Reembolsar'}
               </Button>
               <Button
                 variant="destructive"
@@ -664,14 +852,30 @@ export default function ServicioDetailPage() {
       {/* ── Modales y sheets ── */}
       <ServiceFormSheet open={editOpen} order={req} onClose={() => setEditOpen(false)} />
 
-      <ReassignModal
+      <AssignModal
         open={reassignOpen}
         onClose={() => setReassignOpen(false)}
-        currentTechUserId={req.technician_id}
-        busy={busy === 'reassign'}
+        orderId={req.id}
+        categoryId={req.category_id}
+        mode={req.technician_id ? 'reassign' : 'assign'}
+        busy={busy === 'assign'}
         onSelect={async (userId, name) => {
-          const ok = await run('reassign', () => reassignRequest(req.id, userId), `Servicio reasignado a ${name}`);
+          const ok = await run(
+            'assign',
+            () => assignOrder(req.id, userId),
+            req.technician_id ? `Servicio reasignado a ${name}` : `Servicio asignado a ${name}`,
+          );
           if (ok) setReassignOpen(false);
+        }}
+      />
+
+      <RejectModal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        busy={busy === 'reject'}
+        onConfirm={async reason => {
+          const ok = await run('reject', () => rejectRequest(req.id, reason), 'Solicitud rechazada');
+          if (ok) setRejectOpen(false);
         }}
       />
 
@@ -744,12 +948,12 @@ export default function ServicioDetailPage() {
       <RefundModal
         open={refundOpen}
         onClose={() => setRefundOpen(false)}
-        maxCents={refundMax}
+        payments={refundOptions}
         busy={busy === 'refund'}
-        onConfirm={async (reason, amountCents) => {
+        onConfirm={async (paymentId, reason, amountCents) => {
           const ok = await run(
             'refund',
-            () => refundPayment(req.id, reason || undefined, amountCents),
+            () => refundPayment(req.id, reason || undefined, amountCents, paymentId),
             `Reembolso emitido · ${money(amountCents, true)}`,
           );
           if (ok) setRefundOpen(false);
@@ -778,109 +982,39 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   );
 }
 
-function ReassignModal({
-  open,
-  onClose,
-  onSelect,
-  currentTechUserId,
-  busy,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSelect: (userId: string, name: string) => void;
-  currentTechUserId: string | null;
-  busy?: boolean;
-}) {
-  const [q, setQ] = useState('');
-  const candidates = getTechniciansWithProfile()
-    .filter(
-      ({ tech, profile }) =>
-        tech.kyc_status === 'approved' &&
-        profile?.status !== 'suspended' &&
-        tech.id !== currentTechUserId,
-    )
-    .filter(({ profile }) =>
-      (profile?.full_name ?? '').toLowerCase().includes(q.trim().toLowerCase()),
-    )
-    .sort((a, b) => Number(b.tech.is_available) - Number(a.tech.is_available));
-
-  return (
-    <Modal
-      open={open}
-      onClose={() => !busy && onClose()}
-      dismissible={!busy}
-      title="Reasignar técnico"
-      description="Técnicos aprobados; los disponibles primero."
-      icon={UserCog}
-      width={520}
-    >
-      <Input
-        value={q}
-        onChange={e => setQ(e.target.value)}
-        placeholder="Buscar técnico"
-        aria-label="Buscar técnico"
-        wrapperClassName="mb-3"
-      />
-      {candidates.length === 0 ? (
-        <EmptyState compact kind="no-results" title="No hay técnicos para reasignar" />
-      ) : (
-        <ul className="flex max-h-[360px] flex-col gap-2 overflow-y-auto">
-          {candidates.map(({ tech, profile }) => {
-            const name = profile?.full_name ?? 'Técnico';
-            return (
-              <li key={tech.id}>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSelect(tech.id, name)}
-                  className="flex w-full items-center gap-3 rounded-box border border-line bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Avatar name={name} size={38} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-display text-[14px] font-bold text-navy">{name}</div>
-                    <div className="flex items-center gap-1 text-[12px] text-muted">
-                      <Star size={11} className="text-warning" fill="currentColor" />
-                      {tech.rating_avg > 0 ? tech.rating_avg.toFixed(1) : 'nuevo'} · {tech.rating_count} trabajos
-                    </div>
-                  </div>
-                  <Badge tone={tech.is_available ? 'success' : 'neutral'} dot>
-                    {tech.is_available ? 'Disponible' : 'Ocupado'}
-                  </Badge>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Modal>
-  );
-}
-
 function RefundModal({
   open,
   onClose,
-  maxCents,
+  payments,
   busy,
   onConfirm,
 }: {
   open: boolean;
   onClose: () => void;
-  maxCents: number;
+  /** Pagos cobrados con saldo por devolver (tarifa base, presupuesto, legado). */
+  payments: PayRow[];
   busy: boolean;
-  onConfirm: (reason: string, amountCents: number) => void;
+  onConfirm: (paymentId: string, reason: string, amountCents: number) => void;
 }) {
+  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const pay = payments.find(p => p.id === paymentId) ?? payments[0] ?? null;
+  const maxCents = pay ? pay.amount_cents - pay.refunded_cents : 0;
   useEffect(() => {
     if (open) {
-      setAmount(String(maxCents / 100));
+      setPaymentId(null);
       setReason('');
     }
-  }, [open, maxCents]);
+  }, [open]);
+  useEffect(() => {
+    if (open) setAmount(String(maxCents / 100));
+  }, [open, maxCents, pay?.id]);
   const pesos = Number(amount.replace(/[^\d.]/g, ''));
   const cents = Number.isFinite(pesos) ? Math.round(pesos * 100) : 0;
-  const invalid = cents < 1 || cents > maxCents;
+  const invalid = !pay || cents < 1 || cents > maxCents;
   const partial = !invalid && cents < maxCents;
+  const isBase = pay?.kind === 'base_fee';
 
   return (
     <Modal
@@ -890,7 +1024,11 @@ function RefundModal({
       title="Reembolsar"
       icon={RotateCcw}
       tone="danger"
-      description="El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible."
+      description={
+        isBase
+          ? 'La tarifa base regresa a la tarjeta del cliente. El servicio no se cancela y se reajusta el saldo del técnico. No es reversible.'
+          : 'El dinero regresa al método de pago original. El reembolso total cancela el servicio; uno parcial lo deja como está. No es reversible.'
+      }
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -900,7 +1038,7 @@ function RefundModal({
             variant="destructive"
             loading={busy}
             disabled={invalid}
-            onClick={() => onConfirm(reason.trim(), cents)}
+            onClick={() => pay && onConfirm(pay.id, reason.trim(), cents)}
           >
             Reembolsar {invalid ? '' : money(cents, true)}
           </Button>
@@ -908,6 +1046,20 @@ function RefundModal({
       }
     >
       <div className="flex flex-col gap-3">
+        {payments.length > 1 && (
+          <Select
+            aria-label="Pago a reembolsar"
+            options={payments.map(p => ({
+              value: p.id,
+              label: `${paymentLabel(p)} · ${money(p.amount_cents - p.refunded_cents, true)}`,
+            }))}
+            value={pay?.id ?? null}
+            onChange={v => setPaymentId(v)}
+          />
+        )}
+        {payments.length === 1 && pay && (
+          <p className="rounded-btn bg-panel px-3 py-2 text-[12.5px] text-body">{paymentLabel(pay)}</p>
+        )}
         <Input
           label="Monto"
           prefix="$"
@@ -1008,7 +1160,8 @@ function ChatModal({
                 >
                   {m.body}
                 </div>
-                <span className="mt-1 font-mono text-[10.5px] text-faint">
+                <span className="mt-1 inline-flex items-center gap-1.5 font-mono text-[10.5px] text-faint">
+                  {sender && <UserIcon userId={sender.id} size={16} />}
                   {isAdmin ? 'Admin' : (sender?.full_name ?? 'Usuario')} · {clock(m.created_at)}
                 </span>
               </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { UserIcon } from '@/components/profile-icon';
 import { useEffect, useMemo, useState } from 'react';
 import { Download, MapPin, Pencil, Plus, Star, UserPlus } from 'lucide-react';
 import {
@@ -59,7 +60,6 @@ import {
   type TechBase,
   type ZoneRow,
 } from '@/lib/regions';
-import { initials } from '@/lib/techConsole';
 import { pctDelta, deltaLabel } from '@/lib/finance';
 
 const DAY = 864e5;
@@ -438,8 +438,8 @@ export default function RegionesPage() {
                   <div className="flex flex-col">
                     {selTechs.slice(0, 6).map(t => (
                       <a key={t.id} href={`/tecnicos/${t.id}`} className="flex items-center gap-2.5 rounded-[8px] px-1 py-2 transition-colors hover:bg-panel">
-                        <span className="relative grid h-8 w-8 place-items-center rounded-full bg-action font-display text-[11.5px] font-bold text-white">
-                          {initials(t.name)}
+                        <span className="relative inline-flex">
+                          <UserIcon userId={t.id} size={32} />
                           <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${t.available ? 'bg-success' : 'bg-muted'}`} />
                         </span>
                         <div className="min-w-0 flex-1">

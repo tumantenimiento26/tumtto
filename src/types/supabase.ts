@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       account_deletion_requests: {
@@ -156,6 +181,308 @@ export type Database = {
           },
         ]
       }
+      client_documents: {
+        Row: {
+          bucket_id: string
+          client_id: string
+          created_at: string
+          id: string
+          issued_on: string
+          ocr_data: Json | null
+          kind: Database["public"]["Enums"]["client_document_kind"]
+          review_notes: string | null
+          review_status: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_id?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          issued_on: string
+          ocr_data?: Json | null
+          kind?: Database["public"]["Enums"]["client_document_kind"]
+          review_notes?: string | null
+          review_status?: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          issued_on?: string
+          ocr_data?: Json | null
+          kind?: Database["public"]["Enums"]["client_document_kind"]
+          review_notes?: string | null
+          review_status?: Database["public"]["Enums"]["document_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_tool_assignments: {
+        Row: {
+          assign_note: string | null
+          assigned_at: string
+          assigned_by: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at: string
+          id: string
+          return_note: string | null
+          returned_at: string | null
+          returned_by: string | null
+          returned_condition:
+            | Database["public"]["Enums"]["inventory_condition"]
+            | null
+          technician_id: string
+          tool_id: string
+          updated_at: string
+        }
+        Insert: {
+          assign_note?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at?: string
+          id?: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          returned_condition?:
+            | Database["public"]["Enums"]["inventory_condition"]
+            | null
+          technician_id: string
+          tool_id: string
+          updated_at?: string
+        }
+        Update: {
+          assign_note?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          assigned_condition?: Database["public"]["Enums"]["inventory_condition"]
+          created_at?: string
+          id?: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          returned_condition?:
+            | Database["public"]["Enums"]["inventory_condition"]
+            | null
+          technician_id?: string
+          tool_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_tool_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tool_assignments_returned_by_fkey"
+            columns: ["returned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tool_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tool_assignments_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "company_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_tools: {
+        Row: {
+          acquired_on: string | null
+          acquisition_cost_cents: number | null
+          brand: string | null
+          catalog_id: string | null
+          category_id: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          photo_path: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_note: string | null
+          retired_reason:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code: string
+          status: Database["public"]["Enums"]["inventory_status"]
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          acquisition_cost_cents?: number | null
+          brand?: string | null
+          catalog_id?: string | null
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name: string
+          photo_path?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_note?: string | null
+          retired_reason?:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code: string
+          status?: Database["public"]["Enums"]["inventory_status"]
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          acquisition_cost_cents?: number | null
+          brand?: string | null
+          catalog_id?: string | null
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name?: string
+          photo_path?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_note?: string | null
+          retired_reason?:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code?: string
+          status?: Database["public"]["Enums"]["inventory_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_tools_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "tool_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tools_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_tools_retired_by_fkey"
+            columns: ["retired_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_messages: {
+        Row: {
+          admin_note: string | null
+          consent_at: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at: string
+          email: string
+          email_status: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          ip_hash: string | null
+          message: string
+          name: string
+          phone: string
+          source: string | null
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          consent_at: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email: string
+          email_status?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          ip_hash?: string | null
+          message: string
+          name: string
+          phone: string
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          consent_at?: string
+          contact_type?: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email?: string
+          email_status?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          ip_hash?: string | null
+          message?: string
+          name?: string
+          phone?: string
+          source?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_messages_handled_by_fkey"
+            columns: ["handled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coverage_zones: {
         Row: {
           created_at: string
@@ -293,6 +620,92 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      emergency_dispatch_log: {
+        Row: {
+          created_at: string
+          distance_m: number | null
+          id: string
+          notified_at: string
+          order_id: string
+          radius_m: number
+          round: number
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          distance_m?: number | null
+          id?: string
+          notified_at?: string
+          order_id: string
+          radius_m: number
+          round: number
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          distance_m?: number | null
+          id?: string
+          notified_at?: string
+          order_id?: string
+          radius_m?: number
+          round?: number
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_dispatch_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emergency_dispatch_log_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technician_public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emergency_dispatch_log_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technician_wallet_summaries"
+            referencedColumns: ["technician_id"]
+          },
+          {
+            foreignKeyName: "emergency_dispatch_log_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holidays: {
+        Row: {
+          created_at: string
+          date: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       kyc_sessions: {
         Row: {
@@ -529,6 +942,7 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          data: Json | null
           entity_id: string | null
           entity_type: string | null
           id: string
@@ -541,6 +955,7 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          data?: Json | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
@@ -553,6 +968,7 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          data?: Json | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
@@ -576,7 +992,14 @@ export type Database = {
         Row: {
           comment: string | null
           created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id: string
+          is_hidden: boolean
           reviewee_id: string
           reviewer_id: string
           score: number
@@ -586,7 +1009,14 @@ export type Database = {
         Insert: {
           comment?: string | null
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_note?: string | null
+          hidden_reason?:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id?: string
+          is_hidden?: boolean
           reviewee_id: string
           reviewer_id: string
           score: number
@@ -596,7 +1026,14 @@ export type Database = {
         Update: {
           comment?: string | null
           created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_note?: string | null
+          hidden_reason?:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id?: string
+          is_hidden?: boolean
           reviewee_id?: string
           reviewer_id?: string
           score?: number
@@ -604,6 +1041,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "order_ratings_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_ratings_reviewee_id_fkey"
             columns: ["reviewee_id"]
@@ -633,14 +1077,21 @@ export type Database = {
           cash_confirmed_at: string | null
           cash_confirmed_by: string | null
           cash_debt_recovered_cents: number
+          cash_received_cents: number | null
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
           client_id: string
+          client_reported_cents: number | null
           commission_cents: number
           created_at: string
           currency: string
           id: string
           idempotency_key: string | null
+          kind: string
           metadata: Json
           method: Database["public"]["Enums"]["payment_method"]
           mp_payment_id: string | null
@@ -648,7 +1099,17 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
           refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
           service_order_id: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
@@ -658,6 +1119,7 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_transfer_id: string | null
+          tech_credit_cents: number
           technician_id: string | null
           updated_at: string
         }
@@ -666,14 +1128,21 @@ export type Database = {
           cash_confirmed_at?: string | null
           cash_confirmed_by?: string | null
           cash_debt_recovered_cents?: number
+          cash_received_cents?: number | null
           cash_reported_at?: string | null
           cash_reported_by?: string | null
+          cash_status?: string | null
+          client_cash_responded_at?: string | null
+          client_cash_response?: string | null
+          client_dispute_reason?: string | null
           client_id: string
+          client_reported_cents?: number | null
           commission_cents?: number
           created_at?: string
           currency?: string
           id?: string
           idempotency_key?: string | null
+          kind?: string
           metadata?: Json
           method: Database["public"]["Enums"]["payment_method"]
           mp_payment_id?: string | null
@@ -681,7 +1150,17 @@ export type Database = {
           mp_status?: string | null
           paid_at?: string | null
           platform_fee_cents?: number
+          refund_attempts?: number
+          refund_reason?: string | null
+          refund_requested_at?: string | null
           refunded_cents?: number
+          review_notes?: string | null
+          review_opened_at?: string | null
+          review_outcome?: string | null
+          review_reason?: string | null
+          review_resolved_at?: string | null
+          review_resolved_by?: string | null
+          review_status?: string | null
           service_order_id: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
@@ -691,6 +1170,7 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_transfer_id?: string | null
+          tech_credit_cents?: number
           technician_id?: string | null
           updated_at?: string
         }
@@ -699,14 +1179,21 @@ export type Database = {
           cash_confirmed_at?: string | null
           cash_confirmed_by?: string | null
           cash_debt_recovered_cents?: number
+          cash_received_cents?: number | null
           cash_reported_at?: string | null
           cash_reported_by?: string | null
+          cash_status?: string | null
+          client_cash_responded_at?: string | null
+          client_cash_response?: string | null
+          client_dispute_reason?: string | null
           client_id?: string
+          client_reported_cents?: number | null
           commission_cents?: number
           created_at?: string
           currency?: string
           id?: string
           idempotency_key?: string | null
+          kind?: string
           metadata?: Json
           method?: Database["public"]["Enums"]["payment_method"]
           mp_payment_id?: string | null
@@ -714,7 +1201,17 @@ export type Database = {
           mp_status?: string | null
           paid_at?: string | null
           platform_fee_cents?: number
+          refund_attempts?: number
+          refund_reason?: string | null
+          refund_requested_at?: string | null
           refunded_cents?: number
+          review_notes?: string | null
+          review_opened_at?: string | null
+          review_outcome?: string | null
+          review_reason?: string | null
+          review_resolved_at?: string | null
+          review_resolved_by?: string | null
+          review_status?: string | null
           service_order_id?: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
@@ -724,6 +1221,7 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_transfer_id?: string | null
+          tech_credit_cents?: number
           technician_id?: string | null
           updated_at?: string
         }
@@ -745,6 +1243,13 @@ export type Database = {
           {
             foreignKeyName: "payments_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_review_resolved_by_fkey"
+            columns: ["review_resolved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -828,6 +1333,8 @@ export type Database = {
           failure_reason: string | null
           id: string
           idempotency_key: string
+          platform_topup_cents: number
+          platform_transfer_id: string | null
           status: Database["public"]["Enums"]["payout_status"]
           stripe_account_id: string | null
           stripe_payout_id: string | null
@@ -844,6 +1351,8 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           idempotency_key: string
+          platform_topup_cents?: number
+          platform_transfer_id?: string | null
           status?: Database["public"]["Enums"]["payout_status"]
           stripe_account_id?: string | null
           stripe_payout_id?: string | null
@@ -860,6 +1369,8 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           idempotency_key?: string
+          platform_topup_cents?: number
+          platform_transfer_id?: string | null
           status?: Database["public"]["Enums"]["payout_status"]
           stripe_account_id?: string | null
           stripe_payout_id?: string | null
@@ -933,6 +1444,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_icon: string
           avatar_path: string | null
           created_at: string
           full_name: string | null
@@ -944,6 +1456,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_icon: string
           avatar_path?: string | null
           created_at?: string
           full_name?: string | null
@@ -955,6 +1468,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_icon?: string
           avatar_path?: string | null
           created_at?: string
           full_name?: string | null
@@ -1018,8 +1532,54 @@ export type Database = {
           },
         ]
       }
+      schedule_surcharge_rules: {
+        Row: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        Insert: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          name: string
+          sort_order?: number
+          start_time?: string | null
+          surcharge_type: string
+          updated_at?: string
+          value: number
+          weekdays?: number[] | null
+        }
+        Update: {
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          name?: string
+          sort_order?: number
+          start_time?: string | null
+          surcharge_type?: string
+          updated_at?: string
+          value?: number
+          weekdays?: number[] | null
+        }
+        Relationships: []
+      }
       service_categories: {
         Row: {
+          base_visit_fee_cents: number | null
           commission_bps: number | null
           created_at: string
           description: string | null
@@ -1032,6 +1592,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_visit_fee_cents?: number | null
           commission_bps?: number | null
           created_at?: string
           description?: string | null
@@ -1044,6 +1605,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_visit_fee_cents?: number | null
           commission_bps?: number | null
           created_at?: string
           description?: string | null
@@ -1113,6 +1675,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id: string
+          is_revert: boolean
           note: string | null
           service_order_id: string
           to_status: Database["public"]["Enums"]["service_order_status"]
@@ -1125,6 +1688,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id?: string
+          is_revert?: boolean
           note?: string | null
           service_order_id: string
           to_status: Database["public"]["Enums"]["service_order_status"]
@@ -1137,6 +1701,7 @@ export type Database = {
             | Database["public"]["Enums"]["service_order_status"]
             | null
           id?: string
+          is_revert?: boolean
           note?: string | null
           service_order_id?: string
           to_status?: Database["public"]["Enums"]["service_order_status"]
@@ -1163,8 +1728,17 @@ export type Database = {
         Row: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -1173,6 +1747,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -1181,28 +1762,45 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
         Insert: {
           accepted_at?: string | null
           address_line?: string | null
+          assignment_mode?: string
+          base_fee_cents?: number
+          base_fee_credited_at?: string | null
+          base_fee_paid_at?: string | null
+          base_fee_refunded_at?: string | null
+          base_fee_status?: string
+          base_surcharge_cents?: number
+          base_total_cents?: number | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
+          cash_review_open?: boolean
           category_id: string
           client_address_id?: string | null
           client_id: string
@@ -1211,6 +1809,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          dispatch_deadline_at?: string | null
+          dispatch_last_round_at?: string | null
+          dispatch_radius_m?: number | null
+          dispatch_round?: number | null
+          dispatch_started_at?: string | null
+          dispatch_status?: string | null
+          emergency_surcharge_cents?: number | null
           expires_at?: string | null
           folio?: number
           id?: string
@@ -1219,28 +1824,45 @@ export type Database = {
           location: unknown
           mapbox_feature_id?: string | null
           municipality?: string | null
+          needs_manual_assignment?: boolean
           neighborhood?: string | null
           paid_at?: string | null
+          payment_model?: string
           place_name?: string | null
           postal_code?: string | null
+          priority?: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents?: number | null
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          schedule_surcharge_bps?: number
+          schedule_surcharge_cents?: number | null
+          schedule_surcharge_name?: string | null
+          schedule_surcharge_rule_id?: string | null
           scheduled_for?: string | null
           scheduled_until?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
           title?: string | null
+          unassigned_alerted_at?: string | null
           updated_at?: string
           urgent_surcharge_bps?: number
         }
         Update: {
           accepted_at?: string | null
           address_line?: string | null
+          assignment_mode?: string
+          base_fee_cents?: number
+          base_fee_credited_at?: string | null
+          base_fee_paid_at?: string | null
+          base_fee_refunded_at?: string | null
+          base_fee_status?: string
+          base_surcharge_cents?: number
+          base_total_cents?: number | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
+          cash_review_open?: boolean
           category_id?: string
           client_address_id?: string | null
           client_id?: string
@@ -1249,6 +1871,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          dispatch_deadline_at?: string | null
+          dispatch_last_round_at?: string | null
+          dispatch_radius_m?: number | null
+          dispatch_round?: number | null
+          dispatch_started_at?: string | null
+          dispatch_status?: string | null
+          emergency_surcharge_cents?: number | null
           expires_at?: string | null
           folio?: number
           id?: string
@@ -1257,20 +1886,28 @@ export type Database = {
           location?: unknown
           mapbox_feature_id?: string | null
           municipality?: string | null
+          needs_manual_assignment?: boolean
           neighborhood?: string | null
           paid_at?: string | null
+          payment_model?: string
           place_name?: string | null
           postal_code?: string | null
+          priority?: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents?: number | null
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          schedule_surcharge_bps?: number
+          schedule_surcharge_cents?: number | null
+          schedule_surcharge_name?: string | null
+          schedule_surcharge_rule_id?: string | null
           scheduled_for?: string | null
           scheduled_until?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["service_order_status"]
           technician_id?: string | null
           title?: string | null
+          unassigned_alerted_at?: string | null
           updated_at?: string
           urgent_surcharge_bps?: number
         }
@@ -1318,6 +1955,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "service_orders_schedule_surcharge_rule_id_fkey"
+            columns: ["schedule_surcharge_rule_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_surcharge_rules"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "service_orders_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
@@ -1336,6 +1980,67 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_quote_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          mime_type: string
+          quote_id: string
+          service_order_id: string
+          size_bytes: number
+          storage_path: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          mime_type: string
+          quote_id: string
+          service_order_id: string
+          size_bytes: number
+          storage_path: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime_type?: string
+          quote_id?: string
+          service_order_id?: string
+          size_bytes?: number
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_quote_attachments_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "service_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_quote_attachments_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_quote_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1389,8 +2094,10 @@ export type Database = {
           labor_cents: number
           materials_cents: number
           notes: string | null
+          reject_reason: string | null
           rejected_at: string | null
           service_order_id: string
+          submitted_at: string | null
           surcharge_cents: number
           technician_id: string
           total_cents: number
@@ -1403,8 +2110,10 @@ export type Database = {
           labor_cents?: number
           materials_cents?: number
           notes?: string | null
+          reject_reason?: string | null
           rejected_at?: string | null
           service_order_id: string
+          submitted_at?: string | null
           surcharge_cents?: number
           technician_id: string
           total_cents: number
@@ -1417,8 +2126,10 @@ export type Database = {
           labor_cents?: number
           materials_cents?: number
           notes?: string | null
+          reject_reason?: string | null
           rejected_at?: string | null
           service_order_id?: string
+          submitted_at?: string | null
           surcharge_cents?: number
           technician_id?: string
           total_cents?: number
@@ -1664,12 +2375,49 @@ export type Database = {
           },
         ]
       }
+      technician_companies: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          rfc: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          rfc?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          rfc?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       technician_documents: {
         Row: {
           bucket_id: string
           created_at: string
           id: string
           issued_on: string | null
+          ocr_data: Json | null
           kind: Database["public"]["Enums"]["technician_document_kind"]
           review_notes: string | null
           review_status: Database["public"]["Enums"]["document_review_status"]
@@ -1684,6 +2432,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on?: string | null
+          ocr_data?: Json | null
           kind: Database["public"]["Enums"]["technician_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
@@ -1698,6 +2447,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on?: string | null
+          ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["technician_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
@@ -1988,12 +2738,112 @@ export type Database = {
           },
         ]
       }
+      technician_tools: {
+        Row: {
+          catalog_id: string | null
+          created_at: string
+          custom_category_id: string | null
+          custom_name: string | null
+          id: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_category_id?: string | null
+          custom_name?: string | null
+          id?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          catalog_id?: string | null
+          created_at?: string
+          custom_category_id?: string | null
+          custom_name?: string | null
+          id?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_tools_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "tool_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_tools_custom_category_id_fkey"
+            columns: ["custom_category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_tools_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_vehicles: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          make?: string
+          model?: string
+          plate?: string
+          technician_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_vehicles_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technicians: {
         Row: {
           accepts_cash: boolean
           bank_name: string | null
           bio: string | null
           clabe: string | null
+          company_id: string | null
           created_at: string
           curp: string | null
           display_name: string | null
@@ -2005,6 +2855,7 @@ export type Database = {
           rating_count: number
           rfc: string | null
           service_radius_m: number | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
           updated_at: string
           zone_id: string | null
         }
@@ -2013,6 +2864,7 @@ export type Database = {
           bank_name?: string | null
           bio?: string | null
           clabe?: string | null
+          company_id?: string | null
           created_at?: string
           curp?: string | null
           display_name?: string | null
@@ -2024,6 +2876,7 @@ export type Database = {
           rating_count?: number
           rfc?: string | null
           service_radius_m?: number | null
+          technician_type?: Database["public"]["Enums"]["technician_type"]
           updated_at?: string
           zone_id?: string | null
         }
@@ -2032,6 +2885,7 @@ export type Database = {
           bank_name?: string | null
           bio?: string | null
           clabe?: string | null
+          company_id?: string | null
           created_at?: string
           curp?: string | null
           display_name?: string | null
@@ -2043,10 +2897,18 @@ export type Database = {
           rating_count?: number
           rfc?: string | null
           service_radius_m?: number | null
+          technician_type?: Database["public"]["Enums"]["technician_type"]
           updated_at?: string
           zone_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "technicians_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "technician_companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "technicians_id_fkey"
             columns: ["id"]
@@ -2105,12 +2967,51 @@ export type Database = {
           },
         ]
       }
+      tool_catalog: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       technician_public_profiles: {
         Row: {
           accepts_card: boolean | null
           accepts_cash: boolean | null
+          avatar_icon: string | null
           avatar_path: string | null
           bio: string | null
           display_name: string | null
@@ -2145,6 +3046,7 @@ export type Database = {
           created_at: string | null
           id: string | null
           reviewee_id: string | null
+          reviewer_avatar_icon: string | null
           score: number | null
           service_order_id: string | null
         }
@@ -2190,8 +3092,17 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -2200,6 +3111,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -2208,20 +3126,28 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -2237,8 +3163,17 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -2247,6 +3182,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -2255,20 +3197,28 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -2298,12 +3248,236 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_assign_company_tool: {
+        Args: {
+          p_assigned_at?: string
+          p_condition?: Database["public"]["Enums"]["inventory_condition"]
+          p_note?: string
+          p_technician_id: string
+          p_tool_id: string
+        }
+        Returns: {
+          assign_note: string | null
+          assigned_at: string
+          assigned_by: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at: string
+          id: string
+          return_note: string | null
+          returned_at: string | null
+          returned_by: string | null
+          returned_condition:
+            | Database["public"]["Enums"]["inventory_condition"]
+            | null
+          technician_id: string
+          tool_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_tool_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_assign_order: {
+        Args: { p_note?: string; p_order_id: string; p_technician_id: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_company_tools_by_technician: {
+        Args: never
+        Returns: {
+          technician_id: string
+          technician_name: string
+          tools: Json
+          tools_count: number
+          total_value_cents: number
+        }[]
+      }
+      admin_company_tools_outstanding: {
+        Args: { p_older_than_days?: number }
+        Returns: {
+          acquisition_cost_cents: number
+          assigned_at: string
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          assignment_id: string
+          days_held: number
+          serial_or_code: string
+          technician_id: string
+          technician_name: string
+          tool_id: string
+          tool_name: string
+        }[]
+      }
+      admin_custom_tools: {
+        Args: never
+        Returns: {
+          category_ids: string[]
+          first_seen: string
+          name: string
+          technicians_count: number
+        }[]
+      }
+      admin_delete_holiday: { Args: { p_date: string }; Returns: undefined }
+      admin_delete_schedule_rule: { Args: { p_id: string }; Returns: undefined }
+      admin_emergency_history: { Args: { p_order_id: string }; Returns: Json }
+      admin_escalate_dispute: {
+        Args: { p_dispute_id: string; p_note?: string }
+        Returns: {
+          created_at: string
+          id: string
+          opened_by: string
+          outcome: string | null
+          reason: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["dispute_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "disputes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_find_technicians_by_plate: {
+        Args: { p_query: string }
+        Returns: {
+          color: string
+          is_primary: boolean
+          make: string
+          model: string
+          plate: string
+          technician_id: string
+          technician_name: string
+          year: number
+        }[]
+      }
+      admin_hide_rating: {
+        Args: {
+          p_note?: string
+          p_rating_id: string
+          p_reason: Database["public"]["Enums"]["rating_moderation_reason"]
+        }
+        Returns: {
+          comment: string | null
+          created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
+          id: string
+          is_hidden: boolean
+          reviewee_id: string
+          reviewer_id: string
+          score: number
+          service_order_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_ratings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_list_admin_roles: {
         Args: never
         Returns: {
           admin_role: string
           email: string
           user_id: string
+        }[]
+      }
+      admin_list_cash_reviews: {
+        Args: never
+        Returns: {
+          client_dispute_reason: string
+          client_id: string
+          client_name: string
+          client_reported_cents: number
+          expected_cents: number
+          folio: number
+          order_id: string
+          payment_id: string
+          received_cents: number
+          review_opened_at: string
+          review_reason: string
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string
+          technician_name: string
         }[]
       }
       admin_list_coverage_zones: {
@@ -2317,13 +3491,44 @@ export type Database = {
           technician_count: number
         }[]
       }
+      admin_preview_schedule_surcharge: {
+        Args: { p_category_id: string; p_ts?: string }
+        Returns: Json
+      }
+      admin_promote_custom_tool: {
+        Args: { p_category_id?: string; p_custom_name: string; p_name: string }
+        Returns: {
+          category_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tool_catalog"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_reassign_order: {
         Args: { p_note?: string; p_order_id: string; p_technician_id: string }
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -2332,6 +3537,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -2340,20 +3552,28 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -2368,6 +3588,7 @@ export type Database = {
         Args: {
           p_amount_cents?: number
           p_order_id: string
+          p_payment_id?: string
           p_reason?: string
           p_stripe_refund_id?: string
         }
@@ -2376,14 +3597,21 @@ export type Database = {
           cash_confirmed_at: string | null
           cash_confirmed_by: string | null
           cash_debt_recovered_cents: number
+          cash_received_cents: number | null
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
           client_id: string
+          client_reported_cents: number | null
           commission_cents: number
           created_at: string
           currency: string
           id: string
           idempotency_key: string | null
+          kind: string
           metadata: Json
           method: Database["public"]["Enums"]["payment_method"]
           mp_payment_id: string | null
@@ -2391,7 +3619,17 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
           refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
           service_order_id: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
@@ -2401,6 +3639,7 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_transfer_id: string | null
+          tech_credit_cents: number
           technician_id: string | null
           updated_at: string
         }
@@ -2410,6 +3649,97 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_reject_request: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_report_cash_by_technician: {
+        Args: { p_from: string; p_technician_id?: string; p_to: string }
+        Returns: {
+          base_fee_credited_cents: number
+          cash_awaiting_client_cents: number
+          cash_client_confirmed_cents: number
+          cash_disputed_cents: number
+          cash_expected_cents: number
+          cash_reported_cents: number
+          commission_generated_cents: number
+          commission_pending_cents: number
+          commission_recovered_cents: number
+          quotes_rejected: number
+          reviews_open: number
+          schedule_surcharge_credited_cents: number
+          services_count: number
+          technician_id: string
+          technician_name: string
+        }[]
       }
       admin_report_cold_zones: {
         Args: { p_from: string; p_to: string }
@@ -2428,17 +3758,135 @@ export type Database = {
         }[]
       }
       admin_report_kpis: {
-        Args: { p_from: string; p_to: string }
+        Args: {
+          p_from: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_to: string
+        }
         Returns: Json
       }
+      admin_report_payments: {
+        Args: {
+          p_cash_status?: string
+          p_from: string
+          p_limit?: number
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_offset?: number
+          p_only_review?: boolean
+          p_to: string
+        }
+        Returns: {
+          base_fee_cents: number
+          base_fee_status: string
+          base_method: string
+          base_refunded_cents: number
+          base_surcharge_cents: number
+          base_total_cents: number
+          cash_expected_cents: number
+          cash_received_cents: number
+          cash_reported_at: string
+          cash_review_open: boolean
+          cash_status: string
+          category_name: string
+          client_id: string
+          client_name: string
+          client_response: string
+          closed_by_quote_rejection: boolean
+          commission_cents: number
+          created_at: string
+          emergency_surcharge_cents: number
+          folio: number
+          order_id: string
+          payment_model: string
+          quote_method: string
+          quote_status: string
+          quote_total_cents: number
+          schedule_rule_name: string
+          schedule_surcharge_cents: number
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string
+          technician_name: string
+          total_cents: number
+          total_count: number
+        }[]
+      }
       admin_report_ticket_by_category: {
-        Args: { p_from: string; p_to: string }
+        Args: {
+          p_from: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_to: string
+        }
         Returns: {
           avg_ticket_cents: number
           category_id: string
           category_name: string
           paid_orders: number
         }[]
+      }
+      admin_resolve_cash_review: {
+        Args: {
+          p_notes?: string
+          p_order_id: string
+          p_outcome: string
+          p_received_cents?: number
+        }
+        Returns: {
+          amount_cents: number
+          cash_confirmed_at: string | null
+          cash_confirmed_by: string | null
+          cash_debt_recovered_cents: number
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_id: string
+          client_reported_cents: number | null
+          commission_cents: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          metadata: Json
+          method: Database["public"]["Enums"]["payment_method"]
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          mp_status: string | null
+          paid_at: string | null
+          platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_dispute_id: string | null
+          stripe_fee_cents: number
+          stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
+          stripe_transfer_id: string | null
+          tech_credit_cents: number
+          technician_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       admin_resolve_dispute: {
         Args: { p_dispute_id: string; p_notes?: string; p_outcome: string }
@@ -2473,6 +3921,7 @@ export type Database = {
           bank_name: string | null
           bio: string | null
           clabe: string | null
+          company_id: string | null
           created_at: string
           curp: string | null
           display_name: string | null
@@ -2484,6 +3933,280 @@ export type Database = {
           rating_count: number
           rfc: string | null
           service_radius_m: number | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
+          updated_at: string
+          zone_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "technicians"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_restore_rating: {
+        Args: { p_note?: string; p_rating_id: string }
+        Returns: {
+          comment: string | null
+          created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
+          id: string
+          is_hidden: boolean
+          reviewee_id: string
+          reviewer_id: string
+          score: number
+          service_order_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_ratings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_retire_company_tool: {
+        Args: {
+          p_note?: string
+          p_reason: Database["public"]["Enums"]["inventory_retire_reason"]
+          p_tool_id: string
+        }
+        Returns: {
+          acquired_on: string | null
+          acquisition_cost_cents: number | null
+          brand: string | null
+          catalog_id: string | null
+          category_id: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          photo_path: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_note: string | null
+          retired_reason:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code: string
+          status: Database["public"]["Enums"]["inventory_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_tools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_retry_base_fee_refund: {
+        Args: { p_order_id: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_return_company_tool: {
+        Args: {
+          p_condition?: Database["public"]["Enums"]["inventory_condition"]
+          p_note?: string
+          p_returned_at?: string
+          p_to_repair?: boolean
+          p_tool_id: string
+        }
+        Returns: {
+          assign_note: string | null
+          assigned_at: string
+          assigned_by: string | null
+          assigned_condition: Database["public"]["Enums"]["inventory_condition"]
+          created_at: string
+          id: string
+          return_note: string | null
+          returned_at: string | null
+          returned_by: string | null
+          returned_condition:
+            | Database["public"]["Enums"]["inventory_condition"]
+            | null
+          technician_id: string
+          tool_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_tool_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_category_base_fee: {
+        Args: { p_category_id: string; p_cents: number }
+        Returns: {
+          base_visit_fee_cents: number | null
+          commission_bps: number | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_categories"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_company_tool_repair: {
+        Args: { p_in_repair: boolean; p_note?: string; p_tool_id: string }
+        Returns: {
+          acquired_on: string | null
+          acquisition_cost_cents: number | null
+          brand: string | null
+          catalog_id: string | null
+          category_id: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          photo_path: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_note: string | null
+          retired_reason:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code: string
+          status: Database["public"]["Enums"]["inventory_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_tools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_schedule_rule_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_surcharge_rules"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_technician_type: {
+        Args: {
+          p_company_id?: string
+          p_note?: string
+          p_technician_id: string
+          p_type: Database["public"]["Enums"]["technician_type"]
+        }
+        Returns: {
+          accepts_cash: boolean
+          bank_name: string | null
+          bio: string | null
+          clabe: string | null
+          company_id: string | null
+          created_at: string
+          curp: string | null
+          display_name: string | null
+          home_address: string | null
+          id: string
+          is_available: boolean
+          kyc_status: Database["public"]["Enums"]["kyc_status"]
+          rating_avg: number
+          rating_count: number
+          rfc: string | null
+          service_radius_m: number | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
           updated_at: string
           zone_id: string | null
         }
@@ -2500,6 +4223,7 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          avatar_icon: string
           avatar_path: string | null
           created_at: string
           full_name: string | null
@@ -2517,8 +4241,220 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_suggest_technicians: {
+        Args: { p_order_id: string }
+        Returns: {
+          active_orders: number
+          display_name: string
+          distance_m: number
+          is_available: boolean
+          rating_avg: number
+          rating_count: number
+          technician_id: string
+          zone_match: boolean
+        }[]
+      }
+      admin_update_contact_message: {
+        Args: {
+          p_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["contact_status"]
+        }
+        Returns: {
+          admin_note: string | null
+          consent_at: string
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at: string
+          email: string
+          email_status: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          ip_hash: string | null
+          message: string
+          name: string
+          phone: string
+          source: string | null
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+          user_agent: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "contact_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_company_tool: {
+        Args: {
+          p_acquired_on?: string
+          p_acquisition_cost_cents?: number
+          p_brand?: string
+          p_catalog_id?: string
+          p_category_id?: string
+          p_id?: string
+          p_model?: string
+          p_name?: string
+          p_photo_path?: string
+          p_serial_or_code?: string
+        }
+        Returns: {
+          acquired_on: string | null
+          acquisition_cost_cents: number | null
+          brand: string | null
+          catalog_id: string | null
+          category_id: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          photo_path: string | null
+          retired_at: string | null
+          retired_by: string | null
+          retired_note: string | null
+          retired_reason:
+            | Database["public"]["Enums"]["inventory_retire_reason"]
+            | null
+          serial_or_code: string
+          status: Database["public"]["Enums"]["inventory_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_tools"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_holiday: {
+        Args: { p_date: string; p_name: string }
+        Returns: {
+          created_at: string
+          date: string
+          name: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "holidays"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_schedule_rule: {
+        Args: {
+          p_end_time?: string
+          p_id: string
+          p_is_active?: boolean
+          p_kind: string
+          p_name: string
+          p_sort_order?: number
+          p_start_time?: string
+          p_surcharge_type?: string
+          p_value?: number
+          p_weekdays?: number[]
+        }
+        Returns: {
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          sort_order: number
+          start_time: string | null
+          surcharge_type: string
+          updated_at: string
+          value: number
+          weekdays: number[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_surcharge_rules"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_waive_base_fee: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      advance_emergency_dispatch: { Args: never; Returns: number }
+      alert_unassigned_requests: { Args: never; Returns: number }
       anonymize_user_account: {
         Args: { p_user_id: string }
+        Returns: undefined
+      }
+      apply_base_fee_refund: {
+        Args: { p_payment_id: string; p_stripe_refund_id: string }
         Returns: undefined
       }
       apply_stripe_account_payout: {
@@ -2599,6 +4535,7 @@ export type Database = {
           bank_name: string | null
           bio: string | null
           clabe: string | null
+          company_id: string | null
           created_at: string
           curp: string | null
           display_name: string | null
@@ -2610,6 +4547,7 @@ export type Database = {
           rating_count: number
           rfc: string | null
           service_radius_m: number | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
           updated_at: string
           zone_id: string | null
         }
@@ -2624,6 +4562,7 @@ export type Database = {
         Args: { p_checkout_session_id: string; p_payment_id: string }
         Returns: undefined
       }
+      auto_confirm_cash_payments: { Args: never; Returns: number }
       cancel_account_deletion: {
         Args: never
         Returns: {
@@ -2656,6 +4595,8 @@ export type Database = {
           failure_reason: string | null
           id: string
           idempotency_key: string
+          platform_topup_cents: number
+          platform_transfer_id: string | null
           status: Database["public"]["Enums"]["payout_status"]
           stripe_account_id: string | null
           stripe_payout_id: string | null
@@ -2698,13 +4639,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      client_address_verified: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       close_service_order: {
         Args: { p_note?: string; p_order_id: string }
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -2713,6 +4667,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -2721,20 +4682,28 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -2756,14 +4725,21 @@ export type Database = {
           cash_confirmed_at: string | null
           cash_confirmed_by: string | null
           cash_debt_recovered_cents: number
+          cash_received_cents: number | null
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
           client_id: string
+          client_reported_cents: number | null
           commission_cents: number
           created_at: string
           currency: string
           id: string
           idempotency_key: string | null
+          kind: string
           metadata: Json
           method: Database["public"]["Enums"]["payment_method"]
           mp_payment_id: string | null
@@ -2771,7 +4747,17 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
           refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
           service_order_id: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
@@ -2781,12 +4767,99 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_transfer_id: string | null
+          tech_credit_cents: number
           technician_id: string | null
           updated_at: string
         }
         SetofOptions: {
           from: "*"
           to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_emergency_request: {
+        Args: {
+          p_address_line?: string
+          p_category_id: string
+          p_client_address_id?: string
+          p_client_id?: string
+          p_description?: string
+          p_lat: number
+          p_lng: number
+          p_mapbox_feature_id?: string
+          p_municipality?: string
+          p_neighborhood?: string
+          p_place_name?: string
+          p_postal_code?: string
+          p_raw_mapbox_feature?: Json
+          p_state?: string
+        }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2816,8 +4889,17 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -2826,6 +4908,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -2834,20 +4923,116 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_unassigned_request: {
+        Args: {
+          p_address_line?: string
+          p_category_id: string
+          p_client_address_id?: string
+          p_client_id?: string
+          p_description?: string
+          p_lat: number
+          p_lng: number
+          p_mapbox_feature_id?: string
+          p_municipality?: string
+          p_neighborhood?: string
+          p_place_name?: string
+          p_postal_code?: string
+          p_raw_mapbox_feature?: Json
+          p_scheduled_for?: string
+          p_scheduled_until?: string
+          p_state?: string
+        }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -2859,7 +5044,68 @@ export type Database = {
         }
       }
       deactivate_device_token: { Args: { p_token: string }; Returns: undefined }
+      dispute_cash_payment: {
+        Args: { p_order_id: string; p_paid_cents?: number; p_reason?: string }
+        Returns: {
+          amount_cents: number
+          cash_confirmed_at: string | null
+          cash_confirmed_by: string | null
+          cash_debt_recovered_cents: number
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_id: string
+          client_reported_cents: number | null
+          commission_cents: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          metadata: Json
+          method: Database["public"]["Enums"]["payment_method"]
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          mp_status: string | null
+          paid_at: string | null
+          platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_dispute_id: string | null
+          stripe_fee_cents: number
+          stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
+          stripe_transfer_id: string | null
+          tech_credit_cents: number
+          technician_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       expire_stale_requests: { Args: never; Returns: number }
+      expire_unpaid_base_fees: { Args: never; Returns: number }
       find_nearby_technicians: {
         Args: {
           p_accepts_cash?: boolean
@@ -2872,6 +5118,7 @@ export type Database = {
         }
         Returns: {
           accepts_cash: boolean
+          avatar_icon: string
           display_name: string
           distance_m: number
           hora_cents: number
@@ -2882,6 +5129,40 @@ export type Database = {
           visita_cents: number
           zone_id: string
         }[]
+      }
+      get_emergency_terms: {
+        Args: { p_category_id: string }
+        Returns: {
+          mode: string
+          surcharge_bps: number
+          surcharge_fixed_cents: number
+          timeout_minutes: number
+        }[]
+      }
+      get_order_payment_summary: { Args: { p_order_id: string }; Returns: Json }
+      get_request_terms: {
+        Args: {
+          p_category_id: string
+          p_scheduled_for?: string
+          p_technician_id?: string
+        }
+        Returns: {
+          applies: boolean
+          base_fee_cents: number
+          schedule_rule_id: string
+          schedule_rule_name: string
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number
+          schedule_surcharge_type: string
+          schedule_surcharge_value: number
+          source: string
+          total_cents: number
+          visit_base_cents: number
+        }[]
+      }
+      get_technician_cash_summary: {
+        Args: { p_technician_id?: string }
+        Returns: Json
       }
       get_technician_wallet: {
         Args: { p_technician_id?: string }
@@ -2936,6 +5217,8 @@ export type Database = {
           failure_reason: string | null
           id: string
           idempotency_key: string
+          platform_topup_cents: number
+          platform_transfer_id: string | null
           status: Database["public"]["Enums"]["payout_status"]
           stripe_account_id: string | null
           stripe_payout_id: string | null
@@ -2953,6 +5236,7 @@ export type Database = {
         Args: { p_error?: string; p_event_id: string }
         Returns: undefined
       }
+      notify_admins_contact_message: { Args: { p_id: string }; Returns: number }
       open_dispute: {
         Args: { p_order_id: string; p_reason: string }
         Returns: {
@@ -2975,7 +5259,96 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      order_technician_location: {
+        Args: { p_order_id: string }
+        Returns: {
+          accuracy_m: number
+          heading: number
+          lat: number
+          lng: number
+          recorded_at: string
+        }[]
+      }
+      order_technician_vehicle: {
+        Args: { p_order_id: string }
+        Returns: {
+          color: string
+          make: string
+          model: string
+          plate: string
+          year: number
+        }[]
+      }
+      prepare_payout_topup: { Args: { p_request_id: string }; Returns: Json }
       prepare_stripe_checkout: { Args: { p_order_id: string }; Returns: Json }
+      record_base_fee_refund_failure: {
+        Args: { p_error?: string; p_payment_id: string }
+        Returns: {
+          amount_cents: number
+          cash_confirmed_at: string | null
+          cash_confirmed_by: string | null
+          cash_debt_recovered_cents: number
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_id: string
+          client_reported_cents: number | null
+          commission_cents: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          metadata: Json
+          method: Database["public"]["Enums"]["payment_method"]
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          mp_status: string | null
+          paid_at: string | null
+          platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_dispute_id: string | null
+          stripe_fee_cents: number
+          stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
+          stripe_transfer_id: string | null
+          tech_credit_cents: number
+          technician_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_payout_topup: {
+        Args: {
+          p_request_id: string
+          p_topup_cents: number
+          p_transfer_id: string
+        }
+        Returns: undefined
+      }
       register_device_token: {
         Args: {
           p_expo_push_token?: string
@@ -3000,13 +5373,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      release_service_order: {
-        Args: { p_order_id: string; p_reason?: string }
+      reject_quote: {
+        Args: { p_quote_id: string; p_reason?: string }
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -3015,6 +5397,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -3023,20 +5412,99 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      release_service_order: {
+        Args: { p_order_id: string; p_reason?: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -3054,14 +5522,21 @@ export type Database = {
           cash_confirmed_at: string | null
           cash_confirmed_by: string | null
           cash_debt_recovered_cents: number
+          cash_received_cents: number | null
           cash_reported_at: string | null
           cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
           client_id: string
+          client_reported_cents: number | null
           commission_cents: number
           created_at: string
           currency: string
           id: string
           idempotency_key: string | null
+          kind: string
           metadata: Json
           method: Database["public"]["Enums"]["payment_method"]
           mp_payment_id: string | null
@@ -3069,7 +5544,17 @@ export type Database = {
           mp_status: string | null
           paid_at: string | null
           platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
           refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
           service_order_id: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
@@ -3079,6 +5564,7 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_transfer_id: string | null
+          tech_credit_cents: number
           technician_id: string | null
           updated_at: string
         }
@@ -3149,6 +5635,8 @@ export type Database = {
           failure_reason: string | null
           id: string
           idempotency_key: string
+          platform_topup_cents: number
+          platform_transfer_id: string | null
           status: Database["public"]["Enums"]["payout_status"]
           stripe_account_id: string | null
           stripe_payout_id: string | null
@@ -3158,6 +5646,102 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "payout_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      revert_service_order_status: {
+        Args: { p_order_id: string; p_reason?: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cash_review_open: boolean
+          category_id: string
+          client_address_id: string | null
+          client_id: string
+          commission_bps: number | null
+          commission_cents: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
+          expires_at: string | null
+          folio: number
+          id: string
+          is_disputed: boolean
+          is_urgent: boolean
+          location: unknown
+          mapbox_feature_id: string | null
+          municipality: string | null
+          needs_manual_assignment: boolean
+          neighborhood: string | null
+          paid_at: string | null
+          payment_model: string
+          place_name: string | null
+          postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
+          quoted_subtotal_cents: number | null
+          quoted_total_cents: number | null
+          raw_mapbox_feature: Json | null
+          requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
+          scheduled_for: string | null
+          scheduled_until: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["service_order_status"]
+          technician_id: string | null
+          title: string | null
+          unassigned_alerted_at: string | null
+          updated_at: string
+          urgent_surcharge_bps: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      send_quote: {
+        Args: { p_quote_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          labor_cents: number
+          materials_cents: number
+          notes: string | null
+          reject_reason: string | null
+          rejected_at: string | null
+          service_order_id: string
+          submitted_at: string | null
+          surcharge_cents: number
+          technician_id: string
+          total_cents: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_quotes"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3216,7 +5800,14 @@ export type Database = {
         Returns: {
           comment: string | null
           created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_note: string | null
+          hidden_reason:
+            | Database["public"]["Enums"]["rating_moderation_reason"]
+            | null
           id: string
+          is_hidden: boolean
           reviewee_id: string
           reviewer_id: string
           score: number
@@ -3245,8 +5836,10 @@ export type Database = {
           labor_cents: number
           materials_cents: number
           notes: string | null
+          reject_reason: string | null
           rejected_at: string | null
           service_order_id: string
+          submitted_at: string | null
           surcharge_cents: number
           technician_id: string
           total_cents: number
@@ -3255,6 +5848,66 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "service_quotes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      technician_confirm_cash: {
+        Args: { p_order_id: string; p_received_cents?: number }
+        Returns: {
+          amount_cents: number
+          cash_confirmed_at: string | null
+          cash_confirmed_by: string | null
+          cash_debt_recovered_cents: number
+          cash_received_cents: number | null
+          cash_reported_at: string | null
+          cash_reported_by: string | null
+          cash_status: string | null
+          client_cash_responded_at: string | null
+          client_cash_response: string | null
+          client_dispute_reason: string | null
+          client_id: string
+          client_reported_cents: number | null
+          commission_cents: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string | null
+          kind: string
+          metadata: Json
+          method: Database["public"]["Enums"]["payment_method"]
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          mp_status: string | null
+          paid_at: string | null
+          platform_fee_cents: number
+          refund_attempts: number
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refunded_cents: number
+          review_notes: string | null
+          review_opened_at: string | null
+          review_outcome: string | null
+          review_reason: string | null
+          review_resolved_at: string | null
+          review_resolved_by: string | null
+          review_status: string | null
+          service_order_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_dispute_id: string | null
+          stripe_fee_cents: number
+          stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
+          stripe_transfer_id: string | null
+          tech_credit_cents: number
+          technician_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3268,8 +5921,17 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assignment_mode: string
+          base_fee_cents: number
+          base_fee_credited_at: string | null
+          base_fee_paid_at: string | null
+          base_fee_refunded_at: string | null
+          base_fee_status: string
+          base_surcharge_cents: number
+          base_total_cents: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          cash_review_open: boolean
           category_id: string
           client_address_id: string | null
           client_id: string
@@ -3278,6 +5940,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           description: string | null
+          dispatch_deadline_at: string | null
+          dispatch_last_round_at: string | null
+          dispatch_radius_m: number | null
+          dispatch_round: number | null
+          dispatch_started_at: string | null
+          dispatch_status: string | null
+          emergency_surcharge_cents: number | null
           expires_at: string | null
           folio: number
           id: string
@@ -3286,20 +5955,28 @@ export type Database = {
           location: unknown
           mapbox_feature_id: string | null
           municipality: string | null
+          needs_manual_assignment: boolean
           neighborhood: string | null
           paid_at: string | null
+          payment_model: string
           place_name: string | null
           postal_code: string | null
+          priority: Database["public"]["Enums"]["service_priority"]
           quoted_subtotal_cents: number | null
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          schedule_surcharge_bps: number
+          schedule_surcharge_cents: number | null
+          schedule_surcharge_name: string | null
+          schedule_surcharge_rule_id: string | null
           scheduled_for: string | null
           scheduled_until: string | null
           state: string | null
           status: Database["public"]["Enums"]["service_order_status"]
           technician_id: string | null
           title: string | null
+          unassigned_alerted_at: string | null
           updated_at: string
           urgent_surcharge_bps: number
         }
@@ -3424,6 +6101,9 @@ export type Database = {
       }
     }
     Enums: {
+      client_document_kind: "proof_of_address"
+      contact_status: "new" | "handled" | "archived"
+      contact_type: "client" | "company" | "technician" | "other"
       deletion_request_status:
         | "pending"
         | "cancelled"
@@ -3440,6 +6120,9 @@ export type Database = {
       dispute_status: "open" | "in_review" | "resolved" | "rejected"
       document_review_status: "pending" | "approved" | "rejected"
       evidence_kind: "arrival" | "work" | "final" | "other" | "request"
+      inventory_condition: "new" | "good" | "fair" | "damaged"
+      inventory_retire_reason: "damage" | "loss" | "theft" | "end_of_life"
+      inventory_status: "available" | "assigned" | "in_repair" | "retired"
       kyc_status:
         | "not_started"
         | "pending"
@@ -3477,6 +6160,13 @@ export type Database = {
         | "cancelled"
         | "held"
       profile_status: "active" | "suspended" | "deleted"
+      rating_moderation_reason:
+        | "offensive"
+        | "fraudulent"
+        | "duplicate"
+        | "cancelled_service"
+        | "client_error"
+        | "other"
       service_order_status:
         | "requested"
         | "accepted"
@@ -3490,10 +6180,12 @@ export type Database = {
         | "closed"
         | "expired"
         | "cancelled"
+      service_priority: "normal" | "emergency"
       technician_document_kind:
         | "criminal_record"
         | "proof_of_address"
         | "bank_statement"
+      technician_type: "tumtto" | "third_party" | "independent"
       ticket_status: "open" | "pending" | "in_progress" | "resolved" | "closed"
       user_role: "client" | "technician" | "admin"
     }
@@ -3621,8 +6313,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
+      client_document_kind: ["proof_of_address"],
+      contact_status: ["new", "handled", "archived"],
+      contact_type: ["client", "company", "technician", "other"],
       deletion_request_status: [
         "pending",
         "cancelled",
@@ -3641,6 +6339,9 @@ export const Constants = {
       dispute_status: ["open", "in_review", "resolved", "rejected"],
       document_review_status: ["pending", "approved", "rejected"],
       evidence_kind: ["arrival", "work", "final", "other", "request"],
+      inventory_condition: ["new", "good", "fair", "damaged"],
+      inventory_retire_reason: ["damage", "loss", "theft", "end_of_life"],
+      inventory_status: ["available", "assigned", "in_repair", "retired"],
       kyc_status: [
         "not_started",
         "pending",
@@ -3682,6 +6383,14 @@ export const Constants = {
         "held",
       ],
       profile_status: ["active", "suspended", "deleted"],
+      rating_moderation_reason: [
+        "offensive",
+        "fraudulent",
+        "duplicate",
+        "cancelled_service",
+        "client_error",
+        "other",
+      ],
       service_order_status: [
         "requested",
         "accepted",
@@ -3696,11 +6405,13 @@ export const Constants = {
         "expired",
         "cancelled",
       ],
+      service_priority: ["normal", "emergency"],
       technician_document_kind: [
         "criminal_record",
         "proof_of_address",
         "bank_statement",
       ],
+      technician_type: ["tumtto", "third_party", "independent"],
       ticket_status: ["open", "pending", "in_progress", "resolved", "closed"],
       user_role: ["client", "technician", "admin"],
     },

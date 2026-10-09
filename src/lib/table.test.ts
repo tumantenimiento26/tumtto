@@ -30,3 +30,18 @@ test('ventana de paginación', () => {
   expect(pageWindow(9, 10)).toEqual([5, 6, 7, 8, 9]);
   expect(pageWindow(4, 10)).toEqual([2, 3, 4, 5, 6]);
 });
+
+type P = { id: string; n: number; pin: number | null };
+const pcols: DataColumn<P>[] = [{ key: 'n', header: 'N', render: () => null, sortValue: r => r.n }];
+const prows: P[] = [
+  { id: 'a', n: 1, pin: null },
+  { id: 'b', n: 5, pin: 1 },
+  { id: 'c', n: 3, pin: 0 },
+  { id: 'd', n: 9, pin: null },
+];
+test('sortRows fija filas arriba por rango y el resto sigue el orden elegido', () => {
+  const pin = (r: P) => r.pin;
+  expect(sortRows(prows, pcols, { key: 'n', dir: 'desc' }, pin).map(r => r.id)).toEqual(['c', 'b', 'd', 'a']);
+  expect(sortRows(prows, pcols, { key: 'n', dir: 'asc' }, pin).map(r => r.id)).toEqual(['c', 'b', 'a', 'd']);
+  expect(sortRows(prows, pcols, null, pin).map(r => r.id)).toEqual(['c', 'b', 'a', 'd']);
+});

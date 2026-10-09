@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { UserIcon } from '@/components/profile-icon';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Download, Send, Check, Wallet, ExternalLink, X } from 'lucide-react';
+import { Download, Send, Check, Wallet, ExternalLink, X, Gavel, ChevronRight, RotateCcw } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -18,6 +20,10 @@ import {
   Tabs,
   toast,
   type DataColumn,
+  PeriodFilters,
+  periodLabel,
+  toPeriod,
+  Chip,
 } from '@/components/ds';
 import { exportCsv } from '@/components/admin';
 import { useAction } from '@/components/use-action';
@@ -26,13 +32,16 @@ import {
   fetchReportKpis,
   getAllLedger,
   getAllPayments,
+  getCashReviewOrders,
   getProfile,
   getRequest,
   getSettingInt,
   getTechnician,
   loadExtras,
   loadWorld,
+  getFailedBaseRefunds,
   rejectPayout,
+  retryBaseFeeRefund,
   sendPayout,
   useExtras,
   useTick,
@@ -40,11 +49,13 @@ import {
   useWorldReady,
   type PayoutRequest,
   type ReportKpis,
+  slugify,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
+import { kindLabel } from '@/lib/payments';
 import { fmtDate } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
-import { initials } from '@/lib/techConsole';
+import { rangePreset, type DateRange } from '@/lib/calendar';
 import {
   aggregate,
   bucketGoal,
@@ -54,7 +65,8 @@ import {
   pctDelta,
   periodTotals,
   rangeBuckets,
-  type FinRange,
+  isWeekly,
+  canRejectPayout,
 } from '@/lib/finance';
 import {
   KpiCard,
@@ -64,9 +76,18 @@ import {
   money,
   shortMoney,
 } from './_components/fin-parts';
+import { CashByTechnician, PaymentsReport } from './_components/CashPanels';
 
-type Tab = 'tx' | 'po' | 'wal' | 'mes';
+type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'cash' | 'svc';
+const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'cash', 'svc'];
 type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
+const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'wallet', label: 'Mercado Pago' },
+  { value: 'oxxo', label: 'OXXO' },
+  { value: 'cash', label: 'Efectivo' },
+];
 
 const PAY_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   paid: { label: 'Pagado', tone: 'success' },
@@ -92,6 +113,7 @@ const techName = (id: string) =>
 interface TxRow {
   id: string;
   orderId: string;
+  kind: string;
   client: string;
   method: string;
   amount: number;
@@ -107,10 +129,14 @@ export default function FinanzasPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const canFinance = useAuth().can('finanzas');
-  const [range, setRange] = useState<FinRange>('30d');
+  const { can } = useAuth();
+  const canFinance = can('finanzas');
+  const [range, setRange] = useState<NonNullable<DateRange>>(() => rangePreset('30d')!);
   const [tab, setTab] = useState<Tab>('tx');
   const [method, setMethod] = useState<MethodFilter>('all');
+  const period = useMemo(() => toPeriod(range), [range]);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const deepLinked = useRef(false);
   const [batchOpen, setBatchOpen] = useState(false);
   // GMV del periodo: una sola definición (RPC admin_report_kpis, la misma de
   // Reportes); los pagos del snapshot solo alimentan la gráfica por día.
@@ -118,7 +144,20 @@ export default function FinanzasPage() {
 
   useEffect(() => {
     void loadExtras();
+    // /finanzas?tab=cash|svc
+    const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+    if (t && TABS.includes(t)) {
+      setTab(t);
+      deepLinked.current = true;
+    }
   }, []);
+  // Con ?tab= el contenido queda bajo los KPIs: llévalo a la vista al cargar.
+  useEffect(() => {
+    if (ready && deepLinked.current) {
+      deepLinked.current = false;
+      tabsRef.current?.scrollIntoView({ block: 'start' });
+    }
+  }, [ready]);
   useEffect(() => {
     let live = true;
     const b = rangeBuckets(range, new Date());
@@ -178,6 +217,7 @@ export default function FinanzasPage() {
           return {
             id: p.id,
             orderId: p.service_order_id,
+            kind: p.kind,
             client: o ? getProfile(o.client_id)?.full_name ?? 'Cliente' : 'Cliente',
             method: p.method,
             amount: p.amount_cents,
@@ -213,6 +253,7 @@ export default function FinanzasPage() {
   const payouts = extras.payouts;
   const pendingPO = payouts.filter(p => p.status === 'pending');
   const heldPO = payouts.filter(p => p.status === 'held');
+  const failedRefunds = getFailedBaseRefunds();
   const gmv = kpis ? Number(kpis.current.gmv_cents) : m.cur.gross;
   const gmvPrev = kpis ? Number(kpis.previous.gmv_cents) : m.prev.gross;
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
@@ -231,6 +272,12 @@ export default function FinanzasPage() {
       header: 'Servicio',
       sortValue: r => orderCode(r.orderId),
       render: r => <span className="font-mono text-[12.5px] font-semibold text-primary">{orderCode(r.orderId)}</span>,
+    },
+    {
+      key: 'kind',
+      header: 'Concepto',
+      sortValue: r => r.kind,
+      render: r => <span className="font-sans text-[12.5px] text-body">{kindLabel(r.kind)}</span>,
     },
     { key: 'client', header: 'Cliente', sortValue: r => r.client, render: r => <span className="font-sans text-[13px] text-navy">{r.client}</span> },
     {
@@ -262,10 +309,11 @@ export default function FinanzasPage() {
 
   const onExport = () => {
     exportCsv(
-      `transacciones-${range}.csv`,
+      `transacciones-${slugify(periodLabel(range))}.csv`,
       txRows.map(t => ({
         Pago: t.id,
         Servicio: orderCode(t.orderId),
+        Concepto: kindLabel(t.kind),
         Cliente: t.client,
         Método: methodMeta(t.method).label,
         Monto: t.amount / 100,
@@ -297,7 +345,9 @@ export default function FinanzasPage() {
       }
       toast.success(
         `${sent} de ${approved.length} retiros enviados`,
-        held ? `${held} retenidos por disputa abierta (lote ${batch.id.slice(0, 6).toUpperCase()})` : undefined,
+        held
+          ? `${held} retenidos por disputa abierta (lote ${batch.id.slice(0, 6).toUpperCase()}); se liberan al resolver la disputa del técnico.`
+          : undefined,
       );
       return sent === approved.length;
     });
@@ -308,18 +358,15 @@ export default function FinanzasPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Finanzas"
-        description="Cobros con tarjeta (Stripe) y efectivo, comisión de plataforma y retiros a técnicos."
+        description="Tarifa base con tarjeta (Stripe), presupuestos en efectivo, comisión de plataforma y retiros a técnicos."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Segmented
-              options={[
-                { value: '7d', label: '7 días' },
-                { value: '30d', label: '30 días' },
-                { value: '90d', label: '90 días' },
-              ]}
-              value={range}
-              onChange={setRange}
-            />
+            <PeriodFilters value={range} onChange={setRange} kicker="Finanzas">
+              <section>
+                <Kicker className="mb-2.5">Método de pago · transacciones</Kicker>
+                <Segmented size="sm" options={METHOD_OPTIONS} value={method} onChange={setMethod} />
+              </section>
+            </PeriodFilters>
             <Button variant="secondary" icon={Download} onClick={onExport}>
               Exportar
             </Button>
@@ -334,11 +381,39 @@ export default function FinanzasPage() {
         <KpiCard index={3} label="Por cobrar · efectivo" value={money(m.owed[0])} delta={deltaLabel(pctDelta(m.owed[0], m.owed[1]))} negative />
       </div>
 
+      {/* Conceptos separados del cobro (modelo v2), del RPC admin_report_kpis */}
+      {kpis?.current.base_fee_cents != null && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" aria-label="Desglose del cobro">
+          {(
+            [
+              ['Tarifa base de visita', 'base_fee_cents', true],
+              ['Recargos de horario', 'schedule_surcharge_cents', true],
+              ['Recargos de emergencia', 'emergency_surcharge_cents', true],
+              ['Cotizaciones (efectivo)', 'quote_cents', true],
+              ['Cotizaciones rechazadas', 'quotes_rejected', false],
+            ] as const
+          ).map(([label, key, isMoney], i) => {
+            const a = Number(kpis.current[key] ?? 0);
+            const b = Number(kpis.previous[key] ?? 0);
+            return (
+              <KpiCard
+                key={key}
+                index={4 + i}
+                label={label}
+                value={isMoney ? money(a) : String(a)}
+                delta={deltaLabel(pctDelta(a, b))}
+                negative={key === 'quotes_rejected'}
+              />
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card padded>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <Kicker>Ingresos por {range === '90d' ? 'semana' : 'día'}</Kicker>
+              <Kicker>Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
               <div className="mt-1 font-display text-[20px] font-extrabold text-navy tabular">
                 {money(m.bars.reduce((s, b) => s + b.gross, 0))}
               </div>
@@ -356,7 +431,7 @@ export default function FinanzasPage() {
             data={m.bars}
             labels={labels}
             goal={m.goal}
-            goalLabel={`Meta ${range === '90d' ? 'semanal' : 'diaria'} ${shortMoney(m.goal)}`}
+            goalLabel={`Meta ${isWeekly(range) ? 'semanal' : 'diaria'} ${shortMoney(m.goal)}`}
           />
         </Card>
         <Card padded>
@@ -365,6 +440,61 @@ export default function FinanzasPage() {
         </Card>
       </div>
 
+      {getCashReviewOrders().length > 0 && (
+        <Link
+          href="/revision-efectivo"
+          className="flex items-center gap-3 rounded-xl border border-line bg-error-soft px-4 py-3 hover:border-error"
+        >
+          <Gavel size={16} className="text-error" aria-hidden />
+          <span className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
+            {getCashReviewOrders().length}{' '}
+            {getCashReviewOrders().length === 1 ? 'revisión de efectivo abierta' : 'revisiones de efectivo abiertas'}
+            <span className="ml-2 font-normal text-muted">El efectivo no cuadra entre técnico y cliente</span>
+          </span>
+          <span className="inline-flex items-center gap-1 font-sans text-[13px] font-semibold text-primary">
+            Revisar <ChevronRight size={14} aria-hidden />
+          </span>
+        </Link>
+      )}
+
+      {failedRefunds.length > 0 && (
+        <Card padded>
+          <div className="mb-2 flex items-center gap-2">
+            <RotateCcw size={16} className="text-error" aria-hidden />
+            <h2 className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
+              Reembolsos fallidos ({failedRefunds.length})
+              <span className="ml-2 font-normal text-muted">
+                Stripe rechazó el reembolso de la visita 10 veces; ya no se reintenta solo.
+              </span>
+            </h2>
+          </div>
+          <div className="flex flex-col">
+            {failedRefunds.map(o => (
+              <div key={o.id} className="flex flex-wrap items-center gap-3 border-t border-divider py-2.5 first:border-t-0">
+                <Link href={`/servicios/${o.id}`} className="font-mono text-[12.5px] font-semibold text-primary hover:underline">
+                  {orderCode(o.id)}
+                </Link>
+                <span className="min-w-0 flex-1 truncate font-sans text-[13px] text-body">
+                  {getProfile(o.client_id)?.full_name ?? 'Cliente'} · {fechaCorta(o.updated_at)}
+                </span>
+                <span className="font-mono text-[13px] font-semibold text-navy tabular">{money(o.base_total_cents ?? 0)}</span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={RotateCcw}
+                  loading={busy === `rf-${o.id}`}
+                  disabled={!!busy || !canFinance}
+                  onClick={() => void run(`rf-${o.id}`, () => retryBaseFeeRefund(o.id), 'Reembolso en proceso de nuevo')}
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div ref={tabsRef} className="scroll-mt-4">
       <Card padded={false} className="overflow-hidden">
         <div className="border-b border-line px-5 pt-3">
           <Tabs
@@ -373,6 +503,8 @@ export default function FinanzasPage() {
               { value: 'po', label: 'Retiros', count: pendingPO.length + heldPO.length },
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
+              { value: 'cash', label: 'Efectivo por técnico' },
+              { value: 'svc', label: 'Pagos por servicio' },
             ]}
             value={tab}
             onChange={setTab}
@@ -381,20 +513,13 @@ export default function FinanzasPage() {
 
         {tab === 'tx' && (
           <>
-            <div className="p-5 pb-3">
-              <Segmented
-                size="sm"
-                options={[
-                  { value: 'all', label: 'Todos' },
-                  { value: 'card', label: 'Tarjeta' },
-                  { value: 'wallet', label: 'Mercado Pago' },
-                  { value: 'oxxo', label: 'OXXO' },
-                  { value: 'cash', label: 'Efectivo' },
-                ]}
-                value={method}
-                onChange={setMethod}
-              />
-            </div>
+            {method !== 'all' && (
+              <div className="p-5 pb-3">
+                <Chip active onRemove={() => setMethod('all')}>
+                  {METHOD_OPTIONS.find(o => o.value === method)?.label}
+                </Chip>
+              </div>
+            )}
             <DataTable
               rows={txRows}
               rowKey={r => r.id}
@@ -412,7 +537,7 @@ export default function FinanzasPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="font-sans text-[13px] text-muted">
                 Los técnicos solicitan retiros desde su app · se aprueban aquí (en lote) y se envían por Stripe Connect.
-                Los técnicos con una disputa abierta quedan <b>retenidos</b> hasta resolverla.
+                Los técnicos con una disputa abierta quedan <b>retenidos</b>: al resolver su última disputa el retiro vuelve a pendientes.
               </p>
               {payoutsReal && pendingPO.length > 0 && (
                 <Button icon={Send} onClick={() => setBatchOpen(true)} disabled={!!busy}>
@@ -436,9 +561,7 @@ export default function FinanzasPage() {
                   const tech = getTechnician(p.technician_id);
                   return (
                     <div key={p.id} className="flex flex-wrap items-center gap-3 border-t border-divider py-3 first:border-t-0">
-                      <span className="grid h-9 w-9 place-items-center rounded-full bg-action font-display text-[12px] font-bold text-white">
-                        {initials(techName(p.technician_id))}
-                      </span>
+                      <UserIcon userId={p.technician_id} size={36} />
                       <div className="min-w-0 flex-1">
                         <div className="font-sans text-[13.5px] font-semibold text-navy">{techName(p.technician_id)}</div>
                         <div className="font-mono text-[11.5px] text-muted">
@@ -450,8 +573,16 @@ export default function FinanzasPage() {
                       </div>
                       <span className="font-display text-[15px] font-extrabold text-navy tabular">{money(p.amount_cents)}</span>
                       <Badge tone={st.tone}>{st.label}</Badge>
-                      {(p.status === 'pending' || p.status === 'held') && (
-                        <Button size="sm" variant="ghost" icon={X} loading={busy === `rj-${p.id}`} disabled={!!busy} onClick={() => void run(`rj-${p.id}`, () => rejectPayout(p.id), 'Retiro rechazado')}>
+                      {canRejectPayout(p.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={X}
+                          loading={busy === `rj-${p.id}`}
+                          disabled={!!busy}
+                          title={p.status === 'approved' ? 'Aún no se envía: el monto vuelve al saldo del técnico' : undefined}
+                          onClick={() => void run(`rj-${p.id}`, () => rejectPayout(p.id), 'Retiro rechazado · el monto volvió al saldo del técnico')}
+                        >
                           Rechazar
                         </Button>
                       )}
@@ -468,7 +599,10 @@ export default function FinanzasPage() {
                               if (!batch) return null;
                               const after = useExtras.getState().payouts.find(x => x.id === p.id);
                               if (after?.status === 'held')
-                                toast.warning('Retiro retenido', 'El técnico tiene una disputa abierta; se libera al resolverla.');
+                                toast.warning(
+                                  'Retiro retenido',
+                                  'Se libera al resolver la disputa del técnico: vuelve a pendientes para aprobarlo.',
+                                );
                               return true;
                             }, 'Retiro procesado')
                           }
@@ -509,7 +643,7 @@ export default function FinanzasPage() {
                     <tr key={w.id} className="border-t border-divider">
                       <td className="py-2.5">
                         <button type="button" onClick={() => router.push(`/tecnicos/${w.id}`)} className="inline-flex items-center gap-2.5 font-sans text-[13.5px] font-semibold text-navy hover:text-primary">
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-action font-display text-[11.5px] font-bold text-white">{initials(w.name)}</span>
+                          <UserIcon userId={w.id} size={32} />
                           {w.name}
                           <ExternalLink size={12} className="text-faint" />
                         </button>
@@ -530,6 +664,9 @@ export default function FinanzasPage() {
             )}
           </div>
         )}
+
+        {tab === 'cash' && <CashByTechnician from={period.from} to={period.to} label={periodLabel(range)} />}
+        {tab === 'svc' && <PaymentsReport from={period.from} to={period.to} label={periodLabel(range)} />}
 
         {tab === 'mes' && (
           <div className="p-5">
@@ -558,6 +695,7 @@ export default function FinanzasPage() {
           </div>
         )}
       </Card>
+      </div>
 
       <Modal
         open={batchOpen}

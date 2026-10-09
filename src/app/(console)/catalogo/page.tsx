@@ -475,6 +475,7 @@ function CategoryEditor({
             <Kicker>Comisión</Kicker>
             <Toggle
               checked={custom}
+              disabled={!canFinance}
               onChange={next => {
                 setCustom(next);
                 if (next && !pct) setPct(String(globalPct));
@@ -495,6 +496,7 @@ function CategoryEditor({
                 value={pct}
                 onChange={e => setPct(e.target.value)}
                 suffix="%"
+                disabled={!canFinance}
                 error={pctError}
                 aria-label={`Comisión de ${cat.name}`}
               />

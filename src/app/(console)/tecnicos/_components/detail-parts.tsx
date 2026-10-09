@@ -25,6 +25,7 @@ import {
   Textarea,
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
+import { useAuth } from '@/lib/auth';
 import { isValidClabe } from '@/lib/clabe';
 import { fmtDate } from '@/lib/dates';
 import {
@@ -497,6 +498,8 @@ export function RatesCard({ techId, rates }: { techId: string; rates: RateRow[] 
 /* ── Datos bancarios (CLABE con dígito verificador) ─────────────────────── */
 
 export function BankCard({ tech }: { tech: Tech }) {
+  // La CLABE es el destino de los retiros: solo finanzas la cambia (onboarding la ve).
+  const canEdit = useAuth().can('finanzas');
   const [editing, setEditing] = useState(false);
   const [clabe, setClabe] = useState(tech.clabe ?? '');
   const [bank, setBank] = useState(tech.bank_name ?? '');
@@ -536,11 +539,11 @@ export function BankCard({ tech }: { tech: Tech }) {
                 Guardar
               </Button>
             </div>
-          ) : (
+          ) : canEdit ? (
             <Button size="sm" variant="ghost" icon={Landmark} onClick={() => setEditing(true)}>
               Editar
             </Button>
-          )
+          ) : null
         }
       />
       {editing ? (

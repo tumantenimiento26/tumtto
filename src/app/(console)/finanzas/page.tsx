@@ -49,6 +49,7 @@ import {
   useWorldReady,
   type PayoutRequest,
   type ReportKpis,
+  slugify,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
 import { kindLabel } from '@/lib/payments';
@@ -308,7 +309,7 @@ export default function FinanzasPage() {
 
   const onExport = () => {
     exportCsv(
-      `transacciones-${periodLabel(range).replace(/\W+/g, '-')}.csv`,
+      `transacciones-${slugify(periodLabel(range))}.csv`,
       txRows.map(t => ({
         Pago: t.id,
         Servicio: orderCode(t.orderId),

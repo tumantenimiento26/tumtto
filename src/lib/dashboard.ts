@@ -3,6 +3,7 @@
 // actividad. Sin React ni store para poder probarla con vitest.
 
 import { orderCode } from './orderCode';
+import { MX_TZ, mxParts } from '@/lib/dates';
 
 /** Rápidos del hero o un rango libre del date picker (inclusive, por día). */
 export type DashRange = 'hoy' | '7d' | '30d' | { from: Date; to: Date };
@@ -200,7 +201,7 @@ export function sparkPaths(values: number[]): {
 
 /** Saludo según la hora (mismo corte que el prototipo). */
 export function greeting(d: Date): string {
-  const h = d.getHours();
+  const h = mxParts(d).hour;
   return h < 6
     ? 'Buenas noches'
     : h < 12
@@ -212,16 +213,17 @@ export function greeting(d: Date): string {
 
 /** "LUNES 28 DE SEP · 02:25". */
 export function clockLabel(d: Date): string {
-  const day = d.toLocaleDateString('es-MX', { weekday: 'long' });
+  const day = d.toLocaleDateString('es-MX', { timeZone: MX_TZ, weekday: 'long' });
   const month = d
-    .toLocaleDateString('es-MX', { month: 'short' })
+    .toLocaleDateString('es-MX', { timeZone: MX_TZ, month: 'short' })
     .replace('.', '');
   const time = d.toLocaleTimeString('es-MX', {
+    timeZone: MX_TZ,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   });
-  return `${day} ${d.getDate()} de ${month} · ${time}`.toUpperCase();
+  return `${day} ${Number(mxParts(d).ymd.slice(8))} de ${month} · ${time}`.toUpperCase();
 }
 
 /* ── Pipeline (donut) ─────────────────────────────────────────────────── */

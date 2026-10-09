@@ -27,6 +27,7 @@ import {
 } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import { useAuth } from '@/lib/auth';
+import { MX_TZ } from '@/lib/dates';
 import { timeAgo } from '@/lib/data/notifications';
 import {
   loadContactMessages,
@@ -62,6 +63,7 @@ const EMAIL_TONE: Record<string, Tone> = {
 
 const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('es-MX', {
+    timeZone: MX_TZ,
     day: 'numeric',
     month: 'short',
     year: 'numeric',

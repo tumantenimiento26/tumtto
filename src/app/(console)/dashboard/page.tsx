@@ -57,6 +57,7 @@ import {
   type RecentRow,
 } from './_components/Panels';
 import { money } from './_components/shared';
+import { MX_TZ } from '@/lib/dates';
 
 /** Minutos en ruta/en sitio/trabajando sin actualización antes de avisar. */
 const STUCK_MIN = 45;
@@ -285,6 +286,7 @@ export default function DashboardPage() {
           sub: `Espera asignación desde las ${new Date(
             o.created_at,
           ).toLocaleTimeString('es-MX', {
+            timeZone: MX_TZ,
             hour: '2-digit',
             minute: '2-digit',
           })}`,

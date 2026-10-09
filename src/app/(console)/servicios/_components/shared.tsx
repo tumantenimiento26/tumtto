@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { snackbar, type Tone } from '@/components/ds';
 import type { OrderStatus } from '@/lib/serviciosFilter';
+import { MX_TZ } from '@/lib/dates';
 
 // Piezas compartidas por Servicios y Clientes (consola-b).
 
@@ -80,6 +81,7 @@ export function timeAgo(iso: string | null | undefined): string {
   const d = Math.round(h / 24);
   if (d < 30) return `hace ${d} d`;
   return new Date(iso).toLocaleDateString('es-MX', {
+    timeZone: MX_TZ,
     day: '2-digit',
     month: 'short',
   });
@@ -87,6 +89,7 @@ export function timeAgo(iso: string | null | undefined): string {
 
 export const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-MX', {
+    timeZone: MX_TZ,
     hour: '2-digit',
     minute: '2-digit',
   });

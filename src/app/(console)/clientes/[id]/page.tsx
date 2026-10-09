@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MX_TZ } from '@/lib/dates';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Ban,
@@ -69,7 +70,7 @@ type TabId = 'historial' | 'direcciones' | 'pagos' | 'disputas' | 'notas';
 type AddressRow = ReturnType<typeof getAddresses>[number];
 
 const since = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' });
+  new Date(iso).toLocaleDateString('es-MX', { timeZone: MX_TZ, month: 'short', year: 'numeric' });
 
 export default function ClientDetailPage() {
   useTick();

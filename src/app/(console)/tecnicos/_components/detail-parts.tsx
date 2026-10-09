@@ -39,7 +39,7 @@ import {
   upsertTechRate,
   type TechDocument,
 } from '@/lib/data/store';
-import { DOC_LABEL, RATE_MAX, RATE_MIN, docValidity, rateError } from '@/lib/techConsole';
+import { DOC_LABEL, RATE_MAX, RATE_MIN, docValidity, extractedData, rateError } from '@/lib/techConsole';
 
 type Tech = NonNullable<ReturnType<typeof getTechnician>>;
 
@@ -82,6 +82,33 @@ export function KV({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+/** «Datos leídos» de un documento (OCR / Didit); badge «Simulado» en demo. */
+export function OcrSummary({ data, title = 'Datos leídos' }: { data: unknown; title?: string }) {
+  const ocr = extractedData(data);
+  if (!ocr || ocr.fields.length === 0) return null;
+  return (
+    <div className="rounded-btn border border-divider bg-panel px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-muted">
+          {title}
+          {ocr.confidence != null && ` · ${Math.round(ocr.confidence * 100)}%`}
+        </span>
+        {ocr.simulated && <Badge tone="neutral">Simulado</Badge>}
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12px]">
+        {ocr.fields.map(f => (
+          <div key={f.label} className="contents">
+            <dt className="text-muted">{f.label}</dt>
+            <dd className="truncate text-right font-semibold text-navy" title={f.value}>
+              {f.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -162,6 +189,11 @@ export function DocTile({ doc, canReview }: { doc: TechDocument; canReview: bool
           {validity?.expired && doc.review_status !== 'rejected' ? 'Vencido' : meta.label}
         </Badge>
       </div>
+      {doc.ocr_data != null && (
+        <div className="px-3.5 pb-3">
+          <OcrSummary data={doc.ocr_data} />
+        </div>
+      )}
       {canReview && doc.review_status === 'pending' && (
         <div className="flex flex-col gap-2 border-t border-divider px-3.5 py-2.5">
           {rejecting && (

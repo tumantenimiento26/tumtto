@@ -70,6 +70,7 @@ import {
   type KycGroup,
   type TechListFilters,
 } from '@/lib/techConsole';
+import { ImportButton } from '@/components/import-dialog';
 
 interface Row {
   id: string;
@@ -335,9 +336,12 @@ export default function TecnicosPage() {
         title="Técnicos"
         description="Red PRO y cola de verificación. Meta: resolver cada KYC en menos de 24 h hábiles."
         actions={
-          <Button variant="secondary" icon={Download} onClick={() => onExport(filtered)}>
-            Exportar
-          </Button>
+          <>
+            <ImportButton entity="tecnicos" />
+            <Button variant="secondary" icon={Download} onClick={() => onExport(filtered)}>
+              Exportar
+            </Button>
+          </>
         }
       />
 

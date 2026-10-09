@@ -19,6 +19,7 @@ import {
   useExtras,
   type ClientDocument,
 } from '@/lib/data/store';
+import { OcrSummary } from '../../tecnicos/_components/detail-parts';
 
 export const issuedOn = (d: string) =>
   fmtDate(`${d}T12:00:00`, { day: '2-digit', month: 'short', year: 'numeric' });
@@ -163,6 +164,7 @@ export function ClientDocCard({ clientId, name }: { clientId: string; name: stri
             <FileText size={14} className="text-primary" />
             Emitido el {issuedOn(doc.issued_on)}
           </div>
+          <OcrSummary data={doc.ocr_data} />
           {doc.review_status === 'rejected' && doc.review_notes && (
             <p className="rounded-btn bg-error-soft px-3 py-2 text-[12.5px] text-error">
               Motivo: {doc.review_notes}

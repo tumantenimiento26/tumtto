@@ -72,6 +72,7 @@ import {
   CardHead,
   CheckRow,
   DocTile,
+  OcrSummary,
   EditProfileSheet,
   IneTile,
   KV,
@@ -331,12 +332,22 @@ export default function TecnicoDetailPage() {
               <KV label="Registro" value={fecha(profile.created_at)} />
             </Card>
             <Card padded className="animate-up">
-              <CardHead title="Verificaciones automáticas · Didit" />
+              <CardHead
+                title="Verificaciones automáticas · Didit"
+                action={
+                  (latest?.raw_decision as { simulated?: boolean } | null)?.simulated ? (
+                    <Badge tone="neutral">Simulado</Badge>
+                  ) : undefined
+                }
+              />
               {latest ? (
                 <>
                   {diditChecks(latest.raw_decision).map(c => (
                     <CheckRow key={c.label} label={c.label} ok={c.ok} />
                   ))}
+                  <div className="my-2">
+                    <OcrSummary data={latest.raw_decision} title="Datos de la INE" />
+                  </div>
                   <KV label="Sesión" value={latest.didit_session_id.slice(0, 12)} mono />
                   <KV
                     label="Estado"

@@ -238,3 +238,47 @@ export function diditChecks(
   ];
   return MAP.filter(([k]) => k in r).map(([k, label]) => ({ label, ok: pick(k) }));
 }
+
+const OCR_LABEL: Record<string, string> = {
+  tipo_documento: 'Documento',
+  emisor: 'Emisor',
+  nombre: 'Nombre',
+  titular: 'Titular',
+  folio: 'Folio',
+  resultado: 'Resultado',
+  domicilio: 'Domicilio',
+  numero_servicio: 'No. de servicio',
+  clabe: 'CLABE',
+  fecha_emision: 'Fecha de emisión',
+  full_name: 'Nombre',
+  document_type: 'Documento',
+  document_number: 'Número',
+  personal_number: 'CURP',
+  date_of_birth: 'Nacimiento',
+  expiration_date: 'Vigencia',
+  address: 'Domicilio',
+};
+
+/**
+ * Datos leídos de un documento: `ocr_data.fields` (documentos) o
+ * `raw_decision.id_verification` (Didit). Hoy ambos son simulados
+ * (`simulated: true`) mientras no hay proveedor OCR ni llaves Didit reales.
+ */
+export function extractedData(raw: unknown): {
+  simulated: boolean;
+  confidence: number | null;
+  fields: { label: string; value: string }[];
+} | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const src = (r.fields ?? r.id_verification) as Record<string, unknown> | undefined;
+  if (!src || typeof src !== 'object') return null;
+  const fields: { label: string; value: string }[] = [];
+  for (const [k, label] of Object.entries(OCR_LABEL)) {
+    const v = src[k];
+    if (v == null || v === '' || fields.some(f => f.label === label)) continue;
+    fields.push({ label, value: String(v) });
+  }
+  const confidence = typeof r.confidence === 'number' ? r.confidence : null;
+  return { simulated: r.simulated === true, confidence, fields };
+}

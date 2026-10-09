@@ -794,6 +794,15 @@ export function withHistory(w: World): {
       bucket_id: 'comprobante-domicilio',
       storage_path: `${clientId}/proof_of_address-${i + 1}.pdf`,
       issued_on: ymd(now - (10 + i * 15) * DAY),
+      ocr_data: {
+        simulated: true,
+        confidence: 0.93,
+        fields: {
+          tipo_documento: 'Comprobante de domicilio',
+          emisor: 'CFE Suministrador de Servicios Básicos',
+          fecha_emision: ymd(now - (10 + i * 15) * DAY),
+        },
+      },
       review_status: status,
       review_notes: notes,
       reviewed_by: reviewed ? 'u-admin' : null,

@@ -188,6 +188,7 @@ export type Database = {
           created_at: string
           id: string
           issued_on: string
+          ocr_data: Json | null
           kind: Database["public"]["Enums"]["client_document_kind"]
           review_notes: string | null
           review_status: Database["public"]["Enums"]["document_review_status"]
@@ -202,6 +203,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on: string
+          ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
@@ -216,6 +218,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on?: string
+          ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
@@ -2414,6 +2417,7 @@ export type Database = {
           created_at: string
           id: string
           issued_on: string | null
+          ocr_data: Json | null
           kind: Database["public"]["Enums"]["technician_document_kind"]
           review_notes: string | null
           review_status: Database["public"]["Enums"]["document_review_status"]
@@ -2428,6 +2432,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on?: string | null
+          ocr_data?: Json | null
           kind: Database["public"]["Enums"]["technician_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
@@ -2442,6 +2447,7 @@ export type Database = {
           created_at?: string
           id?: string
           issued_on?: string | null
+          ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["technician_document_kind"]
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]

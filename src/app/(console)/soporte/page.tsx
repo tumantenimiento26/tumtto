@@ -9,7 +9,6 @@ import {
   Check,
   CheckCircle2,
   FileText,
-  Download,
   Plus,
   Search,
   Send,
@@ -74,7 +73,6 @@ import { formatPhone } from '@/lib/phone';
 import { loadContactMessages, useContact } from '@/lib/data/contactStore';
 import { newContactCount } from '@/lib/contactAdmin';
 import { ContactView } from './_components/ContactView';
-import { exportSupportTab } from './_components/exportSupport';
 import { ClientDocActions, issuedOn } from '../clientes/_components/ClientDocCard';
 import { OcrSummary } from '../tecnicos/_components/detail-parts';
 import { orderCode } from '@/lib/orderCode';
@@ -175,14 +173,9 @@ export default function SoportePage() {
         title="Soporte y disputas"
         description="Una disputa no detiene el servicio: la orden sigue su curso mientras se resuelve."
         actions={
-          <>
-            <Button variant="secondary" icon={Download} onClick={() => exportSupportTab(tab)}>
-              Exportar
-            </Button>
-            <Button icon={Plus} onClick={() => setNewTicketOpen(true)}>
-              Nuevo ticket
-            </Button>
-          </>
+          <Button icon={Plus} onClick={() => setNewTicketOpen(true)}>
+            Nuevo ticket
+          </Button>
         }
       />
 

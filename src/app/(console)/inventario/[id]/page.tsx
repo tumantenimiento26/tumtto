@@ -30,6 +30,7 @@ import {
   shortDate,
   toolActions,
 } from '@/lib/inventory';
+import { CompanyToolFilesCard } from '@/components/ToolFiles';
 import { CardHead, KV, fecha } from '../../tecnicos/_components/detail-parts';
 import { NO_PERMISSION, StatusBadge, ToolThumb, conditionLabel } from '../_components/shared';
 import { ToolFormSheet } from '../_components/ToolFormSheet';
@@ -186,6 +187,8 @@ export default function ToolDetailPage() {
           )}
         </Card>
       </div>
+
+      <CompanyToolFilesCard toolId={tool.id} canEdit={canEdit} />
 
       <Card padded className="animate-up">
         <CardHead title="Bitácora" />

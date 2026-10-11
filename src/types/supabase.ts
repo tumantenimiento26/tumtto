@@ -2967,6 +2967,73 @@ export type Database = {
           },
         ]
       }
+      tool_attachments: {
+        Row: {
+          company_tool_id: string | null
+          created_at: string
+          expires_on: string | null
+          file_name: string
+          file_path: string
+          id: string
+          kind: Database["public"]["Enums"]["tool_attachment_kind"]
+          mime_type: string
+          size_bytes: number
+          technician_tool_id: string | null
+          title: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          company_tool_id?: string | null
+          created_at?: string
+          expires_on?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          kind: Database["public"]["Enums"]["tool_attachment_kind"]
+          mime_type: string
+          size_bytes: number
+          technician_tool_id?: string | null
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          company_tool_id?: string | null
+          created_at?: string
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["tool_attachment_kind"]
+          mime_type?: string
+          size_bytes?: number
+          technician_tool_id?: string | null
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_attachments_company_tool_id_fkey"
+            columns: ["company_tool_id"]
+            isOneToOne: false
+            referencedRelation: "company_tools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_attachments_technician_tool_id_fkey"
+            columns: ["technician_tool_id"]
+            isOneToOne: false
+            referencedRelation: "technician_tools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_catalog: {
         Row: {
           category_id: string | null
@@ -6187,6 +6254,7 @@ export type Database = {
         | "bank_statement"
       technician_type: "tumtto" | "third_party" | "independent"
       ticket_status: "open" | "pending" | "in_progress" | "resolved" | "closed"
+      tool_attachment_kind: "photo" | "warranty" | "manual" | "invoice" | "other"
       user_role: "client" | "technician" | "admin"
     }
     CompositeTypes: {
@@ -6413,6 +6481,7 @@ export const Constants = {
       ],
       technician_type: ["tumtto", "third_party", "independent"],
       ticket_status: ["open", "pending", "in_progress", "resolved", "closed"],
+      tool_attachment_kind: ["photo", "warranty", "manual", "invoice", "other"],
       user_role: ["client", "technician", "admin"],
     },
   },

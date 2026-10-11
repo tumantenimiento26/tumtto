@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Wrench, X, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, Modal } from '@/components/ds';
+import { TechToolFiles } from '@/components/ToolFiles';
 import { useAction } from '@/components/use-action';
 import { useAuth } from '@/lib/auth';
 import {
@@ -70,6 +71,13 @@ export function ToolsCard({ techId }: { techId: string }) {
             </div>
           ))}
         </div>
+      )}
+      {!missing && (
+        <TechToolFiles
+          techToolIds={tools.map(t => t.rowId)}
+          names={Object.fromEntries(tools.map(t => [t.rowId, t.name]))}
+          canDelete={canEdit}
+        />
       )}
       <Modal
         open={!!removing}

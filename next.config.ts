@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import pkg from './package.json';
 
 // CSP: la consola habla solo con Supabase (REST/Realtime/Storage), Mapbox y
 // Google Fonts. `unsafe-inline`/`unsafe-eval` en script por el runtime de Next
@@ -25,6 +26,13 @@ const CSP = [
 ].join('; ');
 
 const nextConfig: NextConfig = {
+  // Datos de la compilación que muestra el login de la consola (lib/buildInfo).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7),
+    NEXT_PUBLIC_BUILD_ENV: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+  },
   async headers() {
     return [
       {

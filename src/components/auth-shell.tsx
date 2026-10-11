@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, ChevronLeft } from 'lucide-react';
 import { BrandMark } from '@/components/ui';
+import { BUILD, envLabel } from '@/lib/buildInfo';
 
 // Marco de las páginas públicas de acceso (login, registro de técnico,
 // contraseña nueva, callback de correo, invitación) — handoff web A2/B:
@@ -137,27 +138,122 @@ function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
   );
 }
 
-/** Reseña de ejemplo del panel de login (handoff A2). */
-export function AsideReview() {
+/**
+ * Panel de la consola en el login: logo animado, fecha y hora de la ZMG, y la
+ * versión/entorno de esta compilación (para saber a qué despliegue entras).
+ */
+export function AsideConsole() {
+  // Reloj solo en cliente: evita desajuste de hidratación con el HTML del server.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const tz = { timeZone: 'America/Mexico_City' } as const;
+  const env = envLabel(BUILD.env);
+  const built = BUILD.builtAt
+    ? new Date(BUILD.builtAt).toLocaleString('es-MX', {
+        ...tz,
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '—';
+
   return (
-    <div className="flex items-center gap-4 rounded-box border border-lp-line bg-lp-card p-4 backdrop-blur-md">
-      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary font-display text-[14px] font-bold text-white">
-        MC
-      </span>
-      <div>
-        <p
-          className="text-[14px] tracking-[2px] text-warning"
-          aria-label="5 de 5"
-        >
-          ★★★★★
-        </p>
-        <p className="font-display text-[15px] font-bold">
-          “Excelente trabajo, muy puntual.”
-        </p>
-        <p className="text-[12.5px] text-lp-muted">
-          María · Calentador · Zapopan
-        </p>
+    <div className="rounded-box border border-lp-line bg-lp-card p-5 backdrop-blur-md">
+      <div className="flex items-center gap-5">
+        <div className="relative grid h-[84px] w-[84px] flex-shrink-0 place-items-center">
+          <span
+            aria-hidden
+            className="absolute inset-0 animate-pulse-ring rounded-[22px] border-2 border-cyan/60"
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 animate-pulse-ring rounded-[22px] border border-cyan/40 [animation-delay:1.2s]"
+          />
+          <BrandMark
+            size={72}
+            animated
+            className="logo-in rounded-[18px] shadow-[0_0_40px_rgba(24,193,255,0.45)]"
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-cyan">
+            {now
+              ? now.toLocaleDateString('es-MX', { ...tz, weekday: 'long' })
+              : '\u00a0'}
+          </p>
+          <p className="mt-0.5 font-display text-[19px] font-bold leading-tight">
+            {now
+              ? now.toLocaleDateString('es-MX', {
+                  ...tz,
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })
+              : '\u00a0'}
+          </p>
+          <p className="tabular mt-1 font-mono text-[26px] font-semibold leading-none">
+            {now
+              ? now.toLocaleTimeString('es-MX', { ...tz, hour12: false })
+              : '--:--:--'}
+            <span className="ml-2 text-[11px] font-medium text-lp-muted">
+              CDMX
+            </span>
+          </p>
+        </div>
       </div>
+
+      <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-lp-line pt-4 text-[12.5px]">
+        <div>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-lp-muted">
+            Versión
+          </dt>
+          <dd className="mt-1 font-mono font-semibold">
+            v{BUILD.version}
+            {BUILD.sha && (
+              <span className="ml-1.5 text-lp-muted">· {BUILD.sha}</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-lp-muted">
+            Entorno
+          </dt>
+          <dd className="mt-1 inline-flex items-center gap-1.5 font-semibold">
+            <span
+              aria-hidden
+              className={`h-2 w-2 rounded-full ${
+                env.tone === 'ok'
+                  ? 'bg-success'
+                  : env.tone === 'warn'
+                  ? 'bg-warning'
+                  : 'bg-cyan'
+              }`}
+            />
+            {env.label}
+          </dd>
+        </div>
+        <div>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-lp-muted">
+            Compilado
+          </dt>
+          <dd className="mt-1 font-semibold">{built}</dd>
+        </div>
+      </dl>
+
+      <style>{`
+        @keyframes logo-in {
+          0% { opacity: 0; transform: scale(.6) rotate(-12deg); }
+          60% { opacity: 1; transform: scale(1.06) rotate(2deg); }
+          100% { transform: none; }
+        }
+        .logo-in { animation: logo-in .9s cubic-bezier(.2,.8,.2,1) both; }
+        @media (prefers-reduced-motion: reduce) {
+          .logo-in, .animate-pulse-ring { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }

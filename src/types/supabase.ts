@@ -1773,6 +1773,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -1835,6 +1836,7 @@ export type Database = {
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          revenue_model?: string
           schedule_surcharge_bps?: number
           schedule_surcharge_cents?: number | null
           schedule_surcharge_name?: string | null
@@ -1897,6 +1899,7 @@ export type Database = {
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          revenue_model?: string
           schedule_surcharge_bps?: number
           schedule_surcharge_cents?: number | null
           schedule_surcharge_name?: string | null
@@ -2368,6 +2371,69 @@ export type Database = {
           },
           {
             foreignKeyName: "technician_categories_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_commissions: {
+        Row: {
+          base_collected_cents: number
+          commission_cents: number
+          commission_type: string
+          commission_value: number
+          computed_at: string
+          created_at: string
+          gross_collected_cents: number
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents: number
+          service_order_id: string
+          snapshot_at: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          base_collected_cents?: number
+          commission_cents: number
+          commission_type: string
+          commission_value: number
+          computed_at?: string
+          created_at?: string
+          gross_collected_cents?: number
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents?: number
+          service_order_id: string
+          snapshot_at?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          base_collected_cents?: number
+          commission_cents?: number
+          commission_type?: string
+          commission_value?: number
+          computed_at?: string
+          created_at?: string
+          gross_collected_cents?: number
+          order_status?: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents?: number
+          service_order_id?: string
+          snapshot_at?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_commissions_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: true
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_commissions_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
@@ -3204,6 +3270,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3275,6 +3342,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3397,6 +3465,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3630,6 +3699,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3767,6 +3837,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3888,6 +3959,19 @@ export type Database = {
           category_id: string
           category_name: string
           paid_orders: number
+        }[]
+      }
+      admin_report_technician_commissions: {
+        Args: { p_from: string; p_technician_id?: string; p_to: string }
+        Returns: {
+          admin_net_cents: number
+          base_collected_cents: number
+          commission_cents: number
+          gross_collected_cents: number
+          quote_collected_cents: number
+          services_count: number
+          technician_id: string
+          technician_name: string
         }[]
       }
       admin_resolve_cash_review: {
@@ -4121,6 +4205,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4248,6 +4333,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_set_technician_commission: {
+        Args: { p_type: string; p_value: number }
+        Returns: Json
       }
       admin_set_technician_type: {
         Args: {
@@ -4493,6 +4582,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4760,6 +4850,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4910,6 +5001,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5001,6 +5093,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5089,6 +5182,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5231,6 +5325,7 @@ export type Database = {
         Args: { p_technician_id?: string }
         Returns: Json
       }
+      get_technician_commission_config: { Args: never; Returns: Json }
       get_technician_wallet: {
         Args: { p_technician_id?: string }
         Returns: {
@@ -5490,6 +5585,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5561,6 +5657,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5767,6 +5864,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -6033,6 +6131,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null

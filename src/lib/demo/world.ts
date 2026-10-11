@@ -440,6 +440,7 @@ function build(): World {
       scheduled_for: null,
       scheduled_until: null,
       payment_model: 'legacy',
+      revenue_model: 'technician_owned',
       base_fee_cents: 0,
       base_surcharge_cents: 0,
       base_total_cents: 0,

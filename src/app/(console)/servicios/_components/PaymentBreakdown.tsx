@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Gavel, HandCoins, Receipt, RotateCcw, XCircle } from 'lucide-react';
+import { Banknote, Building2, CreditCard, Gavel, HandCoins, Receipt, RotateCcw, XCircle } from 'lucide-react';
 import { Badge, Button, Card, Input, Kicker, Modal, Textarea } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
 import { useAction } from '@/components/use-action';
 import {
   fetchOrderPaymentSummary,
+  getOrderCommission,
   getOrderPayments,
   getOrderQuotes,
   quotePaymentOf,
@@ -30,6 +31,7 @@ import {
   type PaymentSummary,
 } from '@/lib/payments';
 import { surchargeBadge } from '@/lib/scheduleRules';
+import { commissionRateLabel, isAdminOwned } from '@/lib/commission';
 import { money } from './shared';
 
 const when = (iso: string | null) =>
@@ -95,6 +97,9 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
   const cash = q.cashStatus ? (CASH_STATUS[q.cashStatus] ?? { label: q.cashStatus, tone: 'neutral' as const }) : null;
   const base = b ? (BASE_STATUS[b.status] ?? { label: b.status, tone: 'neutral' as const }) : null;
   const commission = quotePay?.commission_cents ?? order.commission_cents ?? 0;
+  // TUM-01: en admin_owned todo lo cobrado es de Tu Mantenimiento; el técnico gana su comisión.
+  const adminOwned = isAdminOwned(order);
+  const snap = adminOwned ? getOrderCommission(order.id) : null;
   const c = s.concepts;
   const qs = s.quoteState;
   const qStatus = QUOTE_STATUS[qs.status];
@@ -332,7 +337,47 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         )}
       </section>
 
-      {s.paymentModel === 'base_cash' && commission > 0 && (
+      {adminOwned && (
+        <section aria-label="Ingreso y comisión" className="mt-4 border-t border-divider pt-3 text-[13.5px]">
+          <h3 className="mb-2 flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
+            <Building2 size={15} className="text-primary" aria-hidden /> Dinero de Tu Mantenimiento
+          </h3>
+          {snap ? (
+            <>
+              <dl className="flex flex-col gap-1.5">
+                <Line label="Tarifa base cobrada" value={money(snap.base_collected_cents, true)} />
+                <Line label="Efectivo cobrado" value={money(snap.quote_collected_cents, true)} />
+                <Line label="Ingreso Tu Mantenimiento" value={money(snap.gross_collected_cents, true)} strong />
+                <Line
+                  label={`Comisión técnico · ${commissionRateLabel(snap.commission_type, snap.commission_value)}`}
+                  value={`−${money(snap.commission_cents, true)}`}
+                />
+                <Line
+                  label="Neto Tu Mantenimiento"
+                  value={money(snap.gross_collected_cents - snap.commission_cents, true)}
+                  tone="success"
+                />
+              </dl>
+              <p className="mt-1.5 text-[12px] text-muted">
+                Tarifa congelada el {when(snap.snapshot_at)}; recalculada el {when(snap.computed_at)} con los montos cobrados.
+              </p>
+            </>
+          ) : (
+            <p className="text-[12.5px] text-muted">
+              Todo lo que paga el cliente es ingreso de Tu Mantenimiento. La comisión del técnico se calcula al terminar
+              el servicio (o al cancelarse después de iniciar la visita).
+            </p>
+          )}
+          {q.receivedCents != null && q.receivedCents > 0 && quotePay?.status !== 'failed' && (
+            <p className="mt-1.5 rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+              El efectivo ({money(q.receivedCents, true)}) es de Tu Mantenimiento: el técnico debe entregarlo o
+              depositarlo. No se descuenta comisión de su saldo.
+            </p>
+          )}
+        </section>
+      )}
+
+      {!adminOwned && s.paymentModel === 'base_cash' && commission > 0 && (
         <div className="mt-4 flex flex-col gap-1.5 border-t border-divider pt-3 text-[13.5px]">
           <dl className="flex flex-col gap-1.5">
             <Line

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Gavel, SlidersHorizontal } from 'lucide-react';
 import {
+  Badge,
   Button,
   Card,
   Chip,
@@ -18,7 +19,8 @@ import {
 } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
 import { useAuth } from '@/lib/auth';
-import { fetchCashReviews, loadWorld, useTick, useWorldFailed, useWorldReady } from '@/lib/data/store';
+import { fetchCashReviews, getRequest, loadWorld, useTick, useWorldFailed, useWorldReady } from '@/lib/data/store';
+import { isAdminOwned } from '@/lib/commission';
 import { orderCode } from '@/lib/orderCode';
 import {
   EMPTY_CASH_REVIEW_FILTERS,
@@ -157,7 +159,10 @@ export default function RevisionEfectivoPage() {
                     >
                       {orderCode(r.order_id)} <ExternalLink size={11} aria-hidden />
                     </Link>
-                    <div className="font-sans text-[13.5px] font-semibold text-navy">{reviewReason(r.review_reason)}</div>
+                    <div className="flex flex-wrap items-center gap-2 font-sans text-[13.5px] font-semibold text-navy">
+                      {reviewReason(r.review_reason)}
+                      {isAdminOwned(getRequest(r.order_id)) && <Badge tone="info">Efectivo de Tu Mantenimiento</Badge>}
+                    </div>
                     <div className="font-sans text-[12.5px] text-muted">
                       {r.technician_name ?? 'Técnico'} · {r.client_name ?? 'Cliente'} · {ago(r.review_opened_at)}
                     </div>

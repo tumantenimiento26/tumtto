@@ -56,6 +56,8 @@ import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY } from '@/lib/unassigned';
 import { ScheduleSurchargeSection } from './_components/ScheduleSurchargeSection';
 import { CompaniesSection } from './_components/CompaniesSection';
 import { ToolCatalogSection } from './_components/ToolCatalogSection';
+import { TechnicianCommissionSection } from './_components/TechnicianCommissionSection';
+import { ADMIN_OWNED_FLAG_KEY } from '@/lib/commission';
 import {
   changedSettings,
   pctToBps,
@@ -81,7 +83,7 @@ const METHODS = [
   { key: 'card', label: 'Tarjeta', note: 'Stripe · Visa / Mastercard' },
   { key: 'oxxo', label: 'OXXO Pay', note: 'Stripe · referencia' },
   { key: 'wallet', label: 'Monedero', note: 'Saldo en cuenta' },
-  { key: 'cash', label: 'Efectivo', note: 'El técnico cobra y adeuda la comisión' },
+  { key: 'cash', label: 'Efectivo', note: 'El técnico cobra; con dinero de Tu Mantenimiento lo entrega y gana su comisión' },
 ] as const;
 
 /**
@@ -99,6 +101,8 @@ function readForm(): SettingsMap {
     account_deletion_grace_days: getSettingInt('account_deletion_grace_days', 30),
     enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
     admin_require_aal2: getSettingBool('admin_require_aal2', false),
+    // TUM-01: seed del backend = true (los servicios nuevos son de Tu Mantenimiento).
+    [ADMIN_OWNED_FLAG_KEY]: getSettingBool(ADMIN_OWNED_FLAG_KEY, true),
     [ALERT_MINUTES_KEY]: getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT),
     [EMERGENCY_KEYS.initialRadiusM]: em.initialRadiusM,
     [EMERGENCY_KEYS.stepM]: em.stepM,
@@ -113,6 +117,7 @@ function readForm(): SettingsMap {
 
 const LABELS: Record<string, string> = {
   commission_bps: 'Comisión global',
+  payment_model_admin_owned_enabled: 'Dinero de Tu Mantenimiento',
   emergency_initial_radius_m: 'Radio inicial de emergencia',
   emergency_radius_step_m: 'Incremento de radio',
   emergency_max_radius_m: 'Radio máximo de emergencia',
@@ -310,11 +315,19 @@ export default function ConfigPage() {
         <div key={active} className="animate-up flex min-w-0 flex-col gap-4">
           {active === 'commission' && (
             <>
+              <Section title="Modelo de ingresos">
+                {toggleField(
+                  ADMIN_OWNED_FLAG_KEY,
+                  'Dinero de Tu Mantenimiento',
+                  'Activo: en los servicios nuevos todo lo cobrado (visita y efectivo) es de Tu Mantenimiento y el técnico gana su comisión. Apagado: el técnico conserva el dinero y adeuda la comisión de plataforma (modelo anterior). Los servicios existentes no cambian.',
+                )}
+              </Section>
+              <TechnicianCommissionSection />
               <Section title="Comisión de la plataforma">
                 {pctField(
                   'commission_bps',
                   'Comisión global',
-                  'Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
+                  'Solo para servicios del modelo anterior (el técnico conserva el dinero). Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
                 )}
               </Section>
               <Section title="Costo estimado de Stripe">

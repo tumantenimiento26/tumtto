@@ -34,6 +34,20 @@ import {
   type ReviewOutcome,
 } from '@/lib/payments';
 import { canRejectPayout } from '@/lib/finance';
+import {
+  ADMIN_OWNED_FLAG_KEY,
+  COMMISSION_SETTING_KEY,
+  commissionFromSetting,
+  commissionReport,
+  parseCommissionConfig,
+  revenueModelOf,
+  snapshotCommission,
+  snapshotDue,
+  type TechCommissionReportRow,
+  type TechnicianCommission,
+  type TechnicianCommissionConfig,
+  type TechnicianCommissionType,
+} from '@/lib/commission';
 import { rejectionNotes } from '@/lib/clientDocs';
 import {
   evaluateSurcharge,
@@ -136,6 +150,8 @@ let settings: PlatformSetting[] = [];
 let tickets: Ticket[] = [];
 let ticketMessages: TicketMessage[] = [];
 let adminEvents: AdminEvent[] = [];
+/** TUM-01: snapshots de technician_commissions (RLS: solo finanzas; otros ven []). */
+let commissions: TechnicianCommission[] = [];
 let lastFetched = 0;
 
 // ── Soporte y bitácora ───────────────────────────────────────────────────────
@@ -169,6 +185,7 @@ const EVENT_LABEL: Record<string, string> = {
   request_rejected: 'Solicitud rechazada',
   order_refunded: 'Reembolso emitido',
   setting_updated: 'Ajuste actualizado',
+  technician_commission_updated: 'Comisión del técnico actualizada',
   zone_upserted: 'Zona guardada',
   technician_type_changed: 'Tipo de técnico cambiado',
   vehicle_added: 'Vehículo agregado',
@@ -302,6 +319,7 @@ export function loadWorld(force = false): Promise<void> {
         ticketRows,
         ticketMessageRows,
         adminEventRows,
+        commissionRows,
       ] = await Promise.all([
         fetchAll('profiles'),
         fetchAll('service_categories'),
@@ -341,6 +359,7 @@ export function loadWorld(force = false): Promise<void> {
           ),
           'admin_events',
         ),
+        optional(fetchAll('technician_commissions', ['service_order_id']), 'technician_commissions'),
       ]);
       world = {
         profiles,
@@ -362,6 +381,7 @@ export function loadWorld(force = false): Promise<void> {
       tickets = ticketRows;
       ticketMessages = ticketMessageRows;
       adminEvents = adminEventRows;
+      commissions = commissionRows;
       // service_orders.folio alimenta orderCode() → SVC-<folio>.
       registerFolios(orders);
       lastFetched = Date.now();
@@ -1794,7 +1814,9 @@ export async function fetchOrderPaymentSummary(orderId: string): Promise<Payment
   try {
     const { data, error } = await supabase.rpc('get_order_payment_summary', { p_order_id: orderId });
     if (error) throw error;
-    return parsePaymentSummary(data) ?? local();
+    const parsed = parsePaymentSummary(data);
+    // El RPC no trae revenue_model: se toma de la orden del snapshot.
+    return parsed ? { ...parsed, revenueModel: revenueModelOf(getRequest(orderId)) } : local();
   } catch (e) {
     console.warn('[data] get_order_payment_summary', e);
     return local();
@@ -1880,6 +1902,123 @@ export async function fetchPaymentsReport(
     return { rows, total: Number(rows[0]?.total_count ?? 0) };
   } catch (e) {
     console.warn('[data] admin_report_payments', e);
+    return null;
+  }
+}
+
+// ── TUM-01: dinero de Tu Mantenimiento + comisión del técnico ───────────────
+
+/** Maqueta: tarifa congelada por orden al primer snapshot (como el backend). */
+const mockSnapshots = new Map<string, TechnicianCommission>();
+function mockCommissionRate() {
+  return commissionFromSetting(settings.find(x => x.key === COMMISSION_SETTING_KEY)?.value);
+}
+/** Maqueta: snapshots derivados de las órdenes admin_owned en estado terminal. */
+function mockCommissions(): TechnicianCommission[] {
+  const rate = mockCommissionRate();
+  for (const o of w().orders) {
+    if (!snapshotDue(o)) continue;
+    const prev = mockSnapshots.get(o.id) ?? null;
+    const at = prev ? o.updated_at : (o.completed_at ?? o.paid_at ?? o.cancelled_at ?? o.updated_at);
+    const next = snapshotCommission(o, getOrderPayments(o.id), rate, prev, at);
+    if (next) mockSnapshots.set(o.id, next);
+  }
+  return [...mockSnapshots.values()];
+}
+
+/** Snapshots de comisión (technician_commissions) del snapshot cargado. */
+export const getTechnicianCommissions = () => (MOCK ? mockCommissions() : commissions);
+export const getOrderCommission = (orderId: string) =>
+  getTechnicianCommissions().find(c => c.service_order_id === orderId) ?? null;
+
+/** Config vigente (get_technician_commission_config). null = no disponible. */
+export async function fetchTechnicianCommissionConfig(): Promise<TechnicianCommissionConfig | null> {
+  if (MOCK) {
+    const rate = mockCommissionRate();
+    return {
+      ...rate,
+      updatedAt: settings.find(x => x.key === COMMISSION_SETTING_KEY)?.updated_at ?? null,
+      adminOwnedEnabled: getSettingBool(ADMIN_OWNED_FLAG_KEY, true),
+    };
+  }
+  try {
+    const { data, error } = await supabase.rpc('get_technician_commission_config');
+    if (error) throw error;
+    return parseCommissionConfig(data);
+  } catch (e) {
+    console.warn('[data] get_technician_commission_config', e);
+    return null;
+  }
+}
+
+/** Guarda la comisión del técnico (admin_set_technician_commission, finanzas). */
+export async function setTechnicianCommission(
+  type: TechnicianCommissionType,
+  value: number,
+): Promise<TechnicianCommissionConfig | null> {
+  if (!Number.isInteger(value) || value < 0 || (type === 'percent' && value > 10_000)) {
+    notifyError('Valor de comisión inválido: monto fijo de 0 o más, o porcentaje entre 0 y 100.');
+    return null;
+  }
+  if (MOCK) {
+    const now = new Date().toISOString();
+    const i = settings.findIndex(x => x.key === COMMISSION_SETTING_KEY);
+    const old = i >= 0 ? settings[i].value : null;
+    const val = { type, value };
+    if (i >= 0) settings[i] = { ...settings[i], value: val, updated_at: now };
+    else
+      settings = [
+        ...settings,
+        { id: `mock-set-${COMMISSION_SETTING_KEY}`, key: COMMISSION_SETTING_KEY, value: val, description: null, created_at: now, updated_at: now },
+      ];
+    adminEvents = [
+      ...adminEvents,
+      {
+        id: `mock-ae-tc-${Date.now()}`,
+        actor_id: MOCK_ADMIN_ID,
+        entity_type: 'platform_settings',
+        entity_id: `mock-set-${COMMISSION_SETTING_KEY}`,
+        event_type: 'technician_commission_updated',
+        payload: { key: COMMISSION_SETTING_KEY, old, new: val },
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+    bump();
+    return fetchTechnicianCommissionConfig();
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_set_technician_commission', { p_type: type, p_value: value });
+      if (error) throw error;
+      const cfg = parseCommissionConfig(data);
+      if (!cfg) throw new Error('respuesta inválida de admin_set_technician_commission');
+      return cfg;
+    },
+    e => pgMessage(e, 'No se pudo guardar la comisión del técnico.'),
+  );
+}
+
+/** Reporte «Comisiones de técnicos» (admin_report_technician_commissions, finanzas). null = no disponible. */
+export async function fetchTechnicianCommissionReport(
+  from: Date,
+  to: Date,
+  technicianId: string | null = null,
+): Promise<TechCommissionReportRow[] | null> {
+  if (MOCK) {
+    await loadWorld();
+    return commissionReport(getTechnicianCommissions(), from.getTime(), to.getTime(), personOrNull, technicianId);
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_report_technician_commissions', {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+      ...(technicianId ? { p_technician_id: technicianId } : {}),
+    });
+    if (error) throw error;
+    return data ?? [];
+  } catch (e) {
+    console.warn('[data] admin_report_technician_commissions', e);
     return null;
   }
 }

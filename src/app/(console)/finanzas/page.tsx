@@ -76,10 +76,10 @@ import {
   money,
   shortMoney,
 } from './_components/fin-parts';
-import { CashByTechnician, PaymentsReport } from './_components/CashPanels';
+import { CashByTechnician, PaymentsReport, TechnicianCommissions } from './_components/CashPanels';
 
-type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'cash' | 'svc';
-const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'cash', 'svc'];
+type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'cash' | 'com' | 'svc';
+const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'cash', 'com', 'svc'];
 type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
 const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
@@ -380,6 +380,15 @@ export default function FinanzasPage() {
         <KpiCard index={2} label="Pagado a técnicos" value={money(m.paid[0])} delta={deltaLabel(pctDelta(m.paid[0], m.paid[1]))} />
         <KpiCard index={3} label="Por cobrar · efectivo" value={money(m.owed[0])} delta={deltaLabel(pctDelta(m.owed[0], m.owed[1]))} negative />
       </div>
+      <p className="-mt-3 font-sans text-[12px] text-muted">
+        «Comisión plataforma» y «Por cobrar · efectivo» solo cuentan servicios del modelo anterior (el técnico conserva
+        el dinero). En servicios con dinero de Tu Mantenimiento todo lo cobrado es ingreso de Tu Mantenimiento y el
+        técnico gana su comisión: ve la pestaña{' '}
+        <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setTab('com')}>
+          Comisiones de técnicos
+        </button>
+        .
+      </p>
 
       {/* Conceptos separados del cobro (modelo v2), del RPC admin_report_kpis */}
       {kpis?.current.base_fee_cents != null && (
@@ -504,6 +513,7 @@ export default function FinanzasPage() {
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
               { value: 'cash', label: 'Efectivo por técnico' },
+              { value: 'com', label: 'Comisiones de técnicos' },
               { value: 'svc', label: 'Pagos por servicio' },
             ]}
             value={tab}
@@ -666,6 +676,7 @@ export default function FinanzasPage() {
         )}
 
         {tab === 'cash' && <CashByTechnician from={period.from} to={period.to} label={periodLabel(range)} />}
+        {tab === 'com' && <TechnicianCommissions from={period.from} to={period.to} label={periodLabel(range)} />}
         {tab === 'svc' && <PaymentsReport from={period.from} to={period.to} label={periodLabel(range)} />}
 
         {tab === 'mes' && (

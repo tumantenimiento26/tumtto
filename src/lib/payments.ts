@@ -5,6 +5,7 @@
 
 import type { Database, Json } from '@/types/supabase';
 import type { NullableCols } from '@/types/rpc';
+import { isAdminOwned, revenueModelOf, type RevenueModel } from '@/lib/commission';
 
 type T = Database['public']['Tables'];
 type Fn = Database['public']['Functions'];
@@ -82,6 +83,17 @@ export const OUTCOMES: { value: ReviewOutcome; label: string; hint: string }[] =
     hint: 'El técnico asume el faltante: se revierte la comisión de ese efectivo y no se cobra al cliente.',
   },
 ];
+/**
+ * Pistas de cada resultado en órdenes admin_owned (TUM-01): el efectivo es de
+ * Tu Mantenimiento y no hay comisión que recalcular; el resultado solo fija
+ * cuánto efectivo debe entregar el técnico.
+ */
+export const OUTCOMES_ADMIN_OWNED: typeof OUTCOMES = [
+  { ...OUTCOMES[0], hint: 'Se acepta el monto que reportó el técnico: es lo que debe entregar a Tu Mantenimiento.' },
+  { ...OUTCOMES[1], hint: 'Se fija el monto realmente cobrado: es lo que el técnico debe entregar a Tu Mantenimiento.' },
+  { ...OUTCOMES[2], hint: 'No hubo cobro: el técnico no entrega efectivo de este servicio y no se cobra al cliente.' },
+];
+export const outcomesFor = (model: RevenueModel) => (model === 'admin_owned' ? OUTCOMES_ADMIN_OWNED : OUTCOMES);
 export const OUTCOME_LABEL: Record<string, string> = Object.fromEntries(
   OUTCOMES.map(o => [o.value, o.label]),
 );
@@ -221,6 +233,8 @@ export interface Concepts {
 export interface PaymentSummary {
   orderId: string;
   paymentModel: 'legacy' | 'base_cash';
+  /** TUM-01: admin_owned = todo el dinero es de Tu Mantenimiento; el técnico gana su comisión. */
+  revenueModel: RevenueModel;
   base: BaseSummary | null;
   quote: QuoteSummary;
   /** null en órdenes del modelo anterior (no hay conceptos separados). */
@@ -281,6 +295,7 @@ export function buildPaymentSummary(
   return {
     orderId: order.id,
     paymentModel: isBaseCash ? 'base_cash' : 'legacy',
+    revenueModel: revenueModelOf(order),
     concepts: isBaseCash ? conceptsOf(order, closedByRejection) : null,
     quoteState: quoteStateOf(quotes, attachmentsCount),
     closedByQuoteRejection: closedByRejection,
@@ -327,6 +342,8 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
   return {
     orderId: str(j.order_id) ?? '',
     paymentModel: j.payment_model === 'base_cash' ? 'base_cash' : 'legacy',
+    // get_order_payment_summary no trae revenue_model: quien llama lo toma de la orden.
+    revenueModel: j.revenue_model === 'admin_owned' ? 'admin_owned' : 'technician_owned',
     concepts: c
       ? {
           visitCents: num0(c.visit_cents),
@@ -456,8 +473,10 @@ export function applyCashResolution(
       : outcome === 'not_collected'
         ? 0
         : (pay.cash_received_cents ?? pay.amount_cents);
-  const commission =
-    outcome === 'confirm_technician'
+  // admin_owned: el efectivo es de Tu Mantenimiento, no hay comisión de plataforma.
+  const commission = isAdminOwned(order)
+    ? 0
+    : outcome === 'confirm_technician'
       ? pay.commission_cents
       : commissionOf(received, order.commission_bps ?? 1500);
   const payment: PayRow = {
@@ -649,8 +668,11 @@ export function cashByTechnician(
     const t = o.base_fee_credited_at ? Date.parse(o.base_fee_credited_at) : NaN;
     if (!(t >= from && t < to)) continue;
     const r = acc.get(o.technician_id) ?? emptyCashRow(o.technician_id, nameOf(o.technician_id));
-    r.base_fee_credited_cents += o.base_fee_cents ?? 0;
-    r.schedule_surcharge_credited_cents += o.schedule_surcharge_cents ?? 0;
+    // admin_owned: la tarifa base no se acredita al técnico (es de Tu Mantenimiento).
+    if (!isAdminOwned(o)) {
+      r.base_fee_credited_cents += o.base_fee_cents ?? 0;
+      r.schedule_surcharge_credited_cents += o.schedule_surcharge_cents ?? 0;
+    }
     if (credits!.rejected.has(o.id)) r.quotes_rejected += 1;
     acc.set(o.technician_id, r);
   }

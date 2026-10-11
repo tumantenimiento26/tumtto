@@ -160,7 +160,7 @@ export default function CatalogoPage() {
                       Slug: c.slug,
                       Publicada: c.is_active ? 'Sí' : 'No',
                       'Tarifa base (MXN)': c.base_visit_fee_cents != null ? c.base_visit_fee_cents / 100 : '',
-                      'Comisión (%)': c.commission_bps != null ? c.commission_bps / 100 : 'Global',
+                      'Comisión plataforma · modelo anterior (%)': c.commission_bps != null ? c.commission_bps / 100 : 'Global',
                       'Rango de visita': rangeLabel(st),
                       Técnicos: st.technicians,
                       Servicios: c.services,
@@ -500,7 +500,11 @@ function CategoryEditor({
           </section>
 
           <section className="flex flex-col gap-3">
-            <Kicker>Comisión</Kicker>
+            <Kicker>Comisión de plataforma</Kicker>
+            <p className="-mt-1 font-sans text-[12px] text-muted">
+              Solo aplica a servicios del modelo anterior (el técnico conserva el dinero). Con dinero de Tu
+              Mantenimiento, el técnico gana la comisión de Configuración › Comisiones.
+            </p>
             <Toggle
               checked={custom}
               disabled={!canFinance}

@@ -42,7 +42,7 @@ import { money } from './fin-parts';
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'error' | 'warning' }) {
   return (
-    <div className="min-w-0 rounded-card border border-line bg-white px-3.5 py-3">
+    <div className="min-w-0 rounded-card border border-line bg-card px-3.5 py-3">
       <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted">{label}</div>
       <div
         className={`mt-1 font-display text-[18px] font-extrabold tabular ${

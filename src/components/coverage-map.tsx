@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Layers, HardHat, Flame, Hexagon, Map as MapIcon } from 'lucide-react';
 import { coverageRing, geometryCenter, type LngLat } from '@/lib/geo';
 import { HEAT_GRADIENT, HEAT_STOPS, heatColor } from '@/lib/heatScale';
+import { useTheme } from '@/lib/theme';
 
 /**
  * Mapa de cobertura ZMG (Mapbox GL) con datos reales: zonas de
@@ -108,6 +109,8 @@ export function CoverageMap({
   const zonesRef = useRef(zones);
   zonesRef.current = zones;
   const [ready, setReady] = useState(false);
+  // El estilo base y las etiquetas siguen el tema: al cambiarlo se recrea el mapa.
+  const dark = useTheme(s => s.theme) === 'dark';
   const [noToken, setNoToken] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     zonas: true,
@@ -134,7 +137,7 @@ export function CoverageMap({
 
       map = new mapboxgl.Map({
         container: host.current,
-        style: 'mapbox://styles/mapbox/light-v11',
+        style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
         center: ZMG_CENTER,
         zoom: 9.9,
         pitch: 0,
@@ -204,8 +207,8 @@ export function CoverageMap({
             'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
           },
           paint: {
-            'text-color': '#0E2C56',
-            'text-halo-color': 'rgba(255,255,255,.92)',
+            'text-color': dark ? '#E8EEF7' : '#0E2C56',
+            'text-halo-color': dark ? 'rgba(7,17,31,.9)' : 'rgba(255,255,255,.92)',
             'text-halo-width': 1.6,
           },
         });
@@ -225,7 +228,7 @@ export function CoverageMap({
             paint: {
               'circle-radius': 5,
               'circle-color': '#0A6BCF',
-              'circle-stroke-color': '#fff',
+              'circle-stroke-color': dark ? '#07111F' : '#fff',
               'circle-stroke-width': 1.5,
               'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 14, 0.85],
               'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 14, 1],
@@ -309,10 +312,11 @@ export function CoverageMap({
     return () => {
       cancelled = true;
       mapRef.current = null;
+      setReady(false);
       map?.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dark]);
 
   /* datos → fuentes (zonas/demanda/técnicos cambian con el snapshot) */
   useEffect(() => {
@@ -394,7 +398,7 @@ export function CoverageMap({
         <button
           onClick={() => setPanelOpen(o => !o)}
           aria-expanded={panelOpen}
-          className="inline-flex items-center gap-2 rounded-full border border-line bg-white/95 px-3.5 py-2 text-[12.5px] font-semibold text-navy shadow-hover backdrop-blur transition-colors hover:bg-surface"
+          className="inline-flex items-center gap-2 rounded-full border border-line bg-card/95 px-3.5 py-2 text-[12.5px] font-semibold text-navy shadow-hover backdrop-blur transition-colors hover:bg-surface"
         >
           <Layers size={14} className="text-primary" /> Capas
           <span className="rounded-full bg-info-soft px-1.5 py-px font-mono text-[10px] text-primary">
@@ -403,7 +407,7 @@ export function CoverageMap({
         </button>
 
         {panelOpen && (
-          <div className="mt-2 w-60 origin-top-right animate-[capas-in_.18s_cubic-bezier(.2,.7,.3,1)] rounded-xl border border-line bg-white/95 p-3 shadow-hover backdrop-blur">
+          <div className="mt-2 w-60 origin-top-right animate-[capas-in_.18s_cubic-bezier(.2,.7,.3,1)] rounded-xl border border-line bg-card/95 p-3 shadow-hover backdrop-blur">
             {LAYER_DEFS.map(l => {
               const on = layers[l.key];
               return (

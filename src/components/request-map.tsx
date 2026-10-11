@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Map as MapIcon, MapPin } from 'lucide-react';
 import type { LngLat } from '@/lib/geo';
+import { useTheme } from '@/lib/theme';
 
 /**
  * Mapa de una sola solicitud: pin en la ubicación del servicio (Mapbox GL, el
@@ -22,6 +23,7 @@ export function RequestMap({
   const [noToken, setNoToken] = useState(false);
   const lng = center?.[0];
   const lat = center?.[1];
+  const dark = useTheme(s => s.theme) === 'dark';
 
   useEffect(() => {
     if (lng == null || lat == null) return;
@@ -39,7 +41,7 @@ export function RequestMap({
       mapboxgl.accessToken = token;
       map = new mapboxgl.Map({
         container: host.current,
-        style: 'mapbox://styles/mapbox/light-v11',
+        style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
         center: [lng, lat],
         zoom: 14,
         attributionControl: false,
@@ -55,7 +57,7 @@ export function RequestMap({
       cancelled = true;
       map?.remove();
     };
-  }, [lng, lat]);
+  }, [lng, lat, dark]);
 
   if (lng == null || lat == null || noToken) {
     return (

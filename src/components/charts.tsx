@@ -174,7 +174,7 @@ function CChip({
       className={`rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors ${
         on
           ? 'border-primary bg-primary text-white'
-          : 'border-line bg-white text-muted hover:border-primary/40 hover:text-primary'
+          : 'border-line bg-card text-muted hover:border-primary/40 hover:text-primary'
       }`}
     >
       {children}

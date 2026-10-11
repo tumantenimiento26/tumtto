@@ -14,7 +14,9 @@ import {
   toast,
 } from '@/components/ds';
 import {
+  createEmergencyRequest,
   createRequest,
+  getEmergencyConfig,
   getAddresses,
   getCategories,
   getClients,
@@ -24,6 +26,7 @@ import {
 } from '@/lib/data/store';
 import type { ServiceRequest } from '@/lib/demo/world';
 import { orderCode } from '@/lib/orderCode';
+import { isEmergency, surchargeLabel } from '@/lib/emergency';
 import { formatPhone } from '@/lib/phone';
 
 const SLOTS = [
@@ -52,7 +55,7 @@ type Values = {
   addressId: string | null;
   date: Date | null;
   slot: string | null;
-  urgent: boolean;
+  emergency: boolean;
   title: string;
   description: string;
 };
@@ -90,7 +93,7 @@ export function ServiceFormSheet({
     addressId: order?.client_address_id ?? null,
     date: null,
     slot: null,
-    urgent: order?.is_urgent ?? false,
+    emergency: order ? isEmergency(order) : false,
     title: order?.title ?? '',
     description: order?.description ?? '',
   });
@@ -185,13 +188,29 @@ export function ServiceFormSheet({
         const ok = await updateOrder(order.id, {
           title: v.title.trim() || null,
           description: v.description.trim(),
-          is_urgent: v.urgent,
           category_id: v.categoryId!,
         });
         if (ok !== null) {
           toast.success('Servicio actualizado', orderCode(order.id));
           onClose();
         }
+        return;
+      }
+      // Emergencia: nace sin técnico y arranca el despacho automático por rondas.
+      if (v.emergency) {
+        const em = await createEmergencyRequest({
+          client_id: v.clientId!,
+          category_id: v.categoryId!,
+          client_address_id: v.addressId,
+          description: v.description.trim(),
+        });
+        if (!em) return;
+        toast.success(
+          'Emergencia creada',
+          `${orderCode(em.id)} · buscando técnico cercano`,
+        );
+        onClose();
+        onCreated?.(em.id);
         return;
       }
       // Agenda: la franja viaja como scheduled_for/until (hora ZMG, UTC-6 fijo).
@@ -202,7 +221,6 @@ export function ServiceFormSheet({
         client_address_id: v.addressId,
         title: v.title.trim() || null,
         description: v.description.trim(),
-        is_urgent: v.urgent,
         // Técnico elegido: la solicitud queda dirigida a él (requested_technician_id).
         technician_id: v.techId || null,
         scheduled_for: from,
@@ -292,6 +310,7 @@ export function ServiceFormSheet({
                 onChange={id => set('addressId', id)}
               />
             </Field>
+            {!v.emergency && (
             <Field
               label="Técnico"
               hint="Solo técnicos aprobados. Si no eliges, se ofrece a los cercanos."
@@ -303,11 +322,12 @@ export function ServiceFormSheet({
                 onChange={id => set('techId', id)}
               />
             </Field>
+            )}
           </>
         )}
       </div>
 
-      {!editing && (
+      {!editing && !v.emergency && (
         <>
           <FormSection>Agenda</FormSection>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -335,21 +355,33 @@ export function ServiceFormSheet({
 
       <FormSection>Detalle</FormSection>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between rounded-box border border-line bg-panel px-4 py-3">
-          <div>
-            <div className="font-display text-[14px] font-bold text-navy">
-              Urgente
+        {(!editing || v.emergency) && (
+          <div
+            className={`flex items-center justify-between gap-3 rounded-box border px-4 py-3 ${
+              v.emergency ? 'border-error-line bg-error-soft' : 'border-line bg-panel'
+            }`}
+          >
+            <div>
+              <div className="font-display text-[14px] font-bold text-navy">
+                Emergencia
+              </div>
+              <div className="text-[12.5px] text-muted">
+                {editing
+                  ? 'La prioridad se fija al crear la solicitud.'
+                  : (() => {
+                      const c = getEmergencyConfig();
+                      return `Recargo ${surchargeLabel(c.surchargeMode, c.surchargeBps, c.surchargeFixedCents)} · se avisa por rondas al técnico más cercano, sin elegir técnico ni agenda`;
+                    })()}
+              </div>
             </div>
-            <div className="text-[12.5px] text-muted">
-              Aplica recargo de 20% al cotizar
-            </div>
+            <Toggle
+              checked={v.emergency}
+              disabled={editing}
+              onChange={x => set('emergency', x)}
+              aria-label="Emergencia"
+            />
           </div>
-          <Toggle
-            checked={v.urgent}
-            onChange={x => set('urgent', x)}
-            aria-label="Urgente"
-          />
-        </div>
+        )}
         <Input
           label="Título (opcional)"
           value={v.title}

@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { Button, DateRangePicker, Kicker, Sheet, rangeLabel } from '@/components/ds';
+import { rangePreset } from '@/lib/calendar';
 import type { DashRange } from '@/lib/dashboard';
 import { clockLabel, greeting, sparkPaths } from '@/lib/dashboard';
 import { BAND, useCountUp } from './shared';
@@ -19,7 +21,7 @@ export interface BandKpi {
   onClick?: () => void;
 }
 
-const RANGES: { value: DashRange; label: string }[] = [
+const RANGES: { value: Exclude<DashRange, object>; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
   { value: '7d', label: '7 días' },
   { value: '30d', label: '30 días' },
@@ -102,6 +104,13 @@ export function DashBand({
   onRange: (r: DashRange) => void;
   kpis: BandKpi[];
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const custom = typeof range === 'object';
+  // Rango del date picker: los rápidos se traducen a fechas para mostrarlos marcados.
+  const asDates =
+    typeof range === 'object'
+      ? range
+      : rangePreset(range === 'hoy' ? 'today' : range)!;
   // Reloj vivo; arranca en null para no desincronizar el render del servidor.
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -143,6 +152,7 @@ export function DashBand({
             Operación en vivo · Zona Metropolitana de Guadalajara
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
         <div
           role="tablist"
           aria-label="Periodo"
@@ -168,7 +178,57 @@ export function DashBand({
             );
           })}
         </div>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className={`inline-flex h-10 items-center gap-2 rounded-btn px-3.5 text-[13px] font-semibold transition-colors ${
+            custom ? 'bg-white text-[#0E2C56]' : 'bg-white/[0.07] text-[#B8C4D6] hover:text-white'
+          }`}
+        >
+          <SlidersHorizontal size={15} />
+          {custom ? rangeLabel(range) : 'Filtros'}
+        </button>
+        </div>
       </div>
+      <Sheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        width={400}
+        kicker="Dashboard"
+        title="Filtros"
+        footer={
+          <Button full onClick={() => setFiltersOpen(false)}>
+            Listo
+          </Button>
+        }
+      >
+        <section className="flex flex-col items-start gap-3">
+          <Kicker>Periodo</Kicker>
+          <div className="flex flex-wrap gap-2">
+            {RANGES.map(r => (
+              <button
+                key={String(r.value)}
+                type="button"
+                onClick={() => onRange(r.value)}
+                aria-pressed={r.value === range}
+                className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${
+                  r.value === range
+                    ? 'border-action bg-action text-white'
+                    : 'border-line bg-card text-navy hover:bg-tint'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <DateRangePicker
+            label="Periodo"
+            value={asDates}
+            allowAll={false}
+            onChange={r => r && onRange(r)}
+          />
+        </section>
+      </Sheet>
       <div className="relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-2.5">
         {kpis.map((k, i) => (
           <Kpi key={k.label} k={k} index={i} />

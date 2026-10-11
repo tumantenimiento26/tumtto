@@ -175,3 +175,14 @@ describe('KPIs', () => {
     expect(greeting(new Date(2026, 0, 1, 2))).toBe('Buenas noches');
   });
 });
+
+describe('buckets con rango libre', () => {
+  test('1 día por franjas, ≤31 por día, más por semana', () => {
+    const d = (m: number, day: number) => new Date(2026, m, day);
+    expect(buckets({ from: d(8, 3), to: d(8, 3) })).toHaveLength(12);
+    expect(buckets({ from: d(8, 1), to: d(8, 10) })).toHaveLength(10);
+    const w = buckets({ from: d(6, 1), to: d(8, 30) });
+    expect(w[0].end - w[0].start).toBe(7 * 864e5);
+    expect(rangeMs({ from: d(8, 1), to: d(8, 10) })).toBe(10 * 864e5);
+  });
+});

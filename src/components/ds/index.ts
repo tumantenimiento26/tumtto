@@ -4,7 +4,16 @@ export type { ButtonVariant, ButtonSize } from './button';
 export { Field, Input, Textarea, Checkbox, controlClass } from './field';
 export { Select } from './select';
 export type { SelectOption } from './select';
-export { DatePicker, DateRangePicker, rangeLabel } from './date';
+export {
+  DatePicker,
+  DateRangePicker,
+  PeriodFilters,
+  QuickRange,
+  isPreset,
+  periodLabel,
+  rangeLabel,
+  toPeriod,
+} from './date';
 export {
   Kicker,
   PageHeader,

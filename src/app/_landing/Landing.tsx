@@ -4,7 +4,8 @@ import { useRef } from 'react';
 import './landing.css';
 import { useReducedMotion, useReveal } from './hooks';
 import { Background, Hero, Nav, Stats } from './top';
-import { Categories, HowItWorks, Verified, Works } from './middle';
+import { ContactSection, WhatsAppFab } from './contact';
+import { Categories, HowItWorks, Verified } from './middle';
 import {
   Coverage,
   Faq,
@@ -40,15 +41,16 @@ export function Landing() {
         <Categories reduced={reduced} />
         <HowItWorks />
         <Verified reduced={reduced} />
-        <Works reduced={reduced} />
         <Reviews />
         <Coverage />
         <Pricing />
         <ForTechs />
         <Faq />
         <FinalCta />
+        <ContactSection />
       </main>
       <Footer />
+      <WhatsAppFab />
     </div>
   );
 }

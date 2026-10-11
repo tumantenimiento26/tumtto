@@ -209,18 +209,4 @@ export function demandHeatmap(orders: Order[], p: Period): number[][] {
 }
 
 /** CSV simple (comillas escapadas, separador coma, BOM para Excel). */
-export function toCsv(rows: Record<string, string | number>[]): string {
-  if (!rows.length) return '';
-  const cols = Object.keys(rows[0]);
-  const esc = (v: string | number) => {
-    const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return (
-    '﻿' +
-    [
-      cols.join(','),
-      ...rows.map(r => cols.map(c => esc(r[c] ?? '')).join(',')),
-    ].join('\n')
-  );
-}
+export { toCsv } from './csv';

@@ -13,6 +13,7 @@ import {
   Plug,
   KeyRound,
   Snowflake,
+  Download,
   Plus,
   Trash2,
   Search,
@@ -51,8 +52,13 @@ import {
   useWorldReady,
   useWorldFailed,
   loadWorld,
+  setCategoryBaseFee,
 } from '@/lib/data/store';
+import { useAuth } from '@/lib/auth';
+import { parseRuleValue } from '@/lib/scheduleRules';
+import { money } from '../servicios/_components/shared';
 import { addIncluded, categoryStats, rangeLabel } from '@/lib/catalogStats';
+import { exportCsv } from '@/components/admin';
 
 const ICONS: Record<string, LucideIcon> = {
   wrench: Wrench,
@@ -140,9 +146,35 @@ export default function CatalogoPage() {
         title="Catálogo de servicios"
         description="Categorías que ve el cliente en la app, con rangos de precio y comisión."
         actions={
-          <Button icon={Plus} onClick={() => setCreating(true)}>
-            Nueva categoría
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={Download}
+              onClick={() =>
+                exportCsv(
+                  'catalogo-servicios.csv',
+                  filtered.map(c => {
+                    const st = categoryStats(c.id, data);
+                    return {
+                      Categoría: c.name,
+                      Slug: c.slug,
+                      Publicada: c.is_active ? 'Sí' : 'No',
+                      'Tarifa base (MXN)': c.base_visit_fee_cents != null ? c.base_visit_fee_cents / 100 : '',
+                      'Comisión (%)': c.commission_bps != null ? c.commission_bps / 100 : 'Global',
+                      'Rango de visita': rangeLabel(st),
+                      Técnicos: st.technicians,
+                      Servicios: c.services,
+                    };
+                  }),
+                )
+              }
+            >
+              Exportar
+            </Button>
+            <Button icon={Plus} onClick={() => setCreating(true)}>
+              Nueva categoría
+            </Button>
+          </>
         }
       />
 
@@ -220,6 +252,16 @@ export default function CatalogoPage() {
                 >
                   {c.is_active ? 'Publicada' : 'Pausada'}
                 </span>
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-btn bg-panel px-3 py-2">
+                  <span className="font-sans text-[12px] text-muted">Tarifa base de visita</span>
+                  {c.base_visit_fee_cents != null ? (
+                    <span className="font-mono text-[13px] font-semibold text-navy tabular">
+                      {money(c.base_visit_fee_cents)}
+                    </span>
+                  ) : (
+                    <Badge tone="warning">Sin configurar</Badge>
+                  )}
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-y-1 font-sans text-[12.5px] text-muted">
                   <span>{inc ? `${inc} servicios` : 'Sin servicios'}</span>
                   <span className="text-right">{s.technicians} técnicos</span>
@@ -272,6 +314,10 @@ function CategoryEditor({
   const [pct, setPct] = useState(
     cat.commission_bps != null ? String(cat.commission_bps / 100) : '',
   );
+  const canFinance = useAuth().can('finanzas');
+  const [baseText, setBaseText] = useState(
+    cat.base_visit_fee_cents != null ? String(cat.base_visit_fee_cents / 100) : '',
+  );
   const [chip, setChip] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -284,25 +330,42 @@ function CategoryEditor({
       ? 'Escribe un porcentaje entre 0 y 100.'
       : null;
   const nameError = !name.trim() ? 'La categoría necesita un nombre.' : null;
-  const dirty =
+  // Tarifa base: vacío = sin configurar (solo válido mientras siga así).
+  const baseCents = baseText.trim() === '' ? null : parseRuleValue('fixed', baseText);
+  const baseError =
+    baseCents != null && (Number.isNaN(baseCents) || baseCents < 0)
+      ? 'Escribe un monto en pesos (0 si la visita no se cobra).'
+      : baseCents == null && cat.base_visit_fee_cents != null
+        ? 'Indica el monto; usa 0 si la visita no se cobra.'
+        : null;
+  const baseChanged = canFinance && baseCents !== null && baseCents !== (cat.base_visit_fee_cents ?? null);
+  const profileChanged =
     name.trim() !== cat.name ||
     description !== (cat.description ?? '') ||
     (custom ? Math.round(n * 100) : null) !== (cat.commission_bps ?? null);
+  const dirty = profileChanged || baseChanged;
 
   async function save() {
-    if (nameError || pctError) {
+    if (nameError || pctError || (canFinance && baseError)) {
       setShake(true);
       setTimeout(() => setShake(false), 450);
       return;
     }
     const ok = await run(
       'save',
-      () =>
-        updateCategory(cat.id, {
-          name: name.trim(),
-          description: description.trim() || null,
-          commission_bps: custom ? Math.round(n * 100) : null,
-        }),
+      async () => {
+        // La tarifa base va por su RPC (finanzas); el resto, por la tabla.
+        if (profileChanged) {
+          const r = await updateCategory(cat.id, {
+            name: name.trim(),
+            description: description.trim() || null,
+            commission_bps: custom ? Math.round(n * 100) : null,
+          });
+          if (r === null) return null;
+        }
+        if (baseChanged && baseCents != null) return setCategoryBaseFee(cat.id, baseCents);
+        return true;
+      },
       `Categoría guardada · ${name.trim()}`,
     );
     if (ok) onClose();
@@ -396,6 +459,33 @@ function CategoryEditor({
           </section>
 
           <section className="flex flex-col gap-3">
+            <Kicker>Tarifa base de visita</Kicker>
+            <Input
+              type="number"
+              min={0}
+              step="1"
+              prefix="$"
+              suffix="MXN"
+              value={baseText}
+              onChange={e => setBaseText(e.target.value)}
+              disabled={!canFinance}
+              error={canFinance ? baseError : null}
+              placeholder="Sin configurar"
+              aria-label={`Tarifa base de visita de ${cat.name}`}
+              hint={
+                canFinance
+                  ? 'Lo que el cliente paga en la app por la visita. Se congela en cada solicitud nueva.'
+                  : 'Solo finanzas puede cambiar la tarifa base.'
+              }
+            />
+            {cat.base_visit_fee_cents == null && (
+              <p className="rounded-btn bg-warning-soft px-3 py-2 font-sans text-[12.5px] text-body">
+                Sin configurar: las solicitudes usan la tarifa de visita del técnico o el mínimo de la categoría.
+              </p>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3">
             <Kicker>Rango de precio</Kicker>
             <div className="flex items-center justify-between rounded-box border border-line bg-panel px-4 py-3">
               <span className="font-mono text-[15px] font-semibold text-navy tabular">
@@ -413,6 +503,7 @@ function CategoryEditor({
             <Kicker>Comisión</Kicker>
             <Toggle
               checked={custom}
+              disabled={!canFinance}
               onChange={next => {
                 setCustom(next);
                 if (next && !pct) setPct(String(globalPct));
@@ -433,6 +524,7 @@ function CategoryEditor({
                 value={pct}
                 onChange={e => setPct(e.target.value)}
                 suffix="%"
+                disabled={!canFinance}
                 error={pctError}
                 aria-label={`Comisión de ${cat.name}`}
               />

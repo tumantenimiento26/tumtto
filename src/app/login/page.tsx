@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
-  KeyRound,
   Lock,
   LogOut,
   Mail,
@@ -16,9 +15,11 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { Button, Field, Input, Kicker } from '@/components/ds';
-import { AsideReview, AuthShell } from '@/components/auth-shell';
+import { AsideConsole, AuthShell } from '@/components/auth-shell';
+import { BrandMark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { MOCK, SKIP_MFA } from '@/lib/mock';
 import { APP_STORE_URL, PLAY_STORE_URL, schemeUrl } from '@/lib/appLinks';
 import {
   EMAIL_RE,
@@ -50,13 +51,13 @@ function authMessage(raw: string): string {
 }
 
 const ASIDE = {
-  kicker: 'Servicios a domicilio · ZMG',
-  title: 'Tu casa en buenas manos.',
-  lead: 'Entra para solicitar, seguir y pagar tus servicios, o para operar la plataforma si eres parte del equipo.',
+  kicker: 'Consola de operación · ZMG',
+  title: 'Opera Tumantenimiento.',
+  lead: 'Acceso exclusivo para el equipo: solicitudes, técnicos, pagos y regiones en un solo lugar.',
   bullets: [
-    'Técnicos verificados uno por uno',
-    'Pago protegido al terminar',
-    'Garantía de 30 días por escrito',
+    'Verificación en dos pasos para cada administrador',
+    'Permisos por rol: super admin, finanzas y soporte',
+    'Acciones sensibles registradas en la bitácora',
   ],
 };
 
@@ -142,6 +143,8 @@ export default function LoginPage() {
       return fail(authMessage(error));
     }
     setLock({ attempts: 0, lockUntil: 0 });
+    // Maqueta: no hay sesión real en Supabase que consultar → directo a la consola.
+    if (MOCK) return enterConsole();
     await routeAfterSignIn();
   }
 
@@ -172,6 +175,7 @@ export default function LoginPage() {
       return;
     }
 
+    if (SKIP_MFA) return enterConsole();
     const { data: aal } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.currentLevel === 'aal2') return enterConsole();
@@ -189,8 +193,9 @@ export default function LoginPage() {
   function enterConsole() {
     setLoading(false);
     setStep('redirect');
-    // ponytail: el splash es un puente de marca; el dashboard ya está precargado.
-    setTimeout(() => router.replace('/dashboard'), 900);
+    // ponytail: el splash es un puente de marca (deja ver el trazo del logo);
+    // el dashboard ya está precargado.
+    setTimeout(() => router.replace('/dashboard'), 1500);
   }
 
   // ── Verificación en dos pasos ────────────────────────────────────────────
@@ -297,7 +302,7 @@ export default function LoginPage() {
   const shakeCls = shake ? 'animate-shake' : '';
 
   return (
-    <AuthShell aside={{ ...ASIDE, children: <AsideReview /> }}>
+    <AuthShell aside={{ ...ASIDE, children: <AsideConsole /> }}>
       {step === 'login' && (
         <div className="animate-up">
           {signedOut && (
@@ -309,9 +314,13 @@ export default function LoginPage() {
               Cerraste sesión. Vuelve cuando quieras.
             </p>
           )}
-          <h1 className={H1}>Inicia sesión</h1>
+          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-info-soft px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-primary">
+            <ShieldCheck size={13} aria-hidden /> Solo equipo
+          </p>
+          <h1 className={H1}>Acceso a la consola</h1>
           <p className="mt-1 text-[14.5px] text-muted">
-            Clientes, técnicos y equipo de Tumantenimiento.
+            Entra con tu cuenta de administrador. ¿Eres cliente o técnico?
+            Usa la app de Tumantenimiento.
           </p>
 
           <form
@@ -666,9 +675,9 @@ export default function LoginPage() {
           className="flex animate-up flex-col items-center py-10 text-center"
           role="status"
         >
-          <span className="relative flex h-16 w-16 items-center justify-center">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary/20 motion-reduce:hidden" />
-            <KeyRound size={28} className="relative text-primary" aria-hidden />
+          <span className="relative flex h-20 w-20 items-center justify-center">
+            <span className="absolute inset-0 animate-ping rounded-[22px] bg-primary/20 motion-reduce:hidden" />
+            <BrandMark size={80} animated className="relative rounded-[18px] shadow-[0_12px_32px_rgba(10,107,207,0.35)]" />
           </span>
           <h1 className="mt-5 font-display text-[22px] font-extrabold text-navy">
             Entrando a la consola…

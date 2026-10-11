@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MX_TZ } from '@/lib/dates';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Ban,
@@ -39,7 +40,7 @@ import {
   getCategories,
   getClientRequests,
   getNotes,
-  getPayment,
+  getOrderPayments,
   getProfile,
   loadExtras,
   loadWorld,
@@ -52,23 +53,24 @@ import {
   useWorldReady,
 } from '@/lib/data/store';
 import type { Payment, ServiceRequest } from '@/lib/demo/world';
+import { paymentLabel } from '@/lib/payments';
 import { orderCode } from '@/lib/orderCode';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
   CategoryTile,
-  METHOD_LABEL,
   STATUS,
   money,
   timeAgo,
 } from '../../servicios/_components/shared';
 import { ClientFormSheet } from '../_components/ClientFormSheet';
+import { ClientDocCard } from '../_components/ClientDocCard';
 
 type TabId = 'historial' | 'direcciones' | 'pagos' | 'disputas' | 'notas';
 type AddressRow = ReturnType<typeof getAddresses>[number];
 
 const since = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' });
+  new Date(iso).toLocaleDateString('es-MX', { timeZone: MX_TZ, month: 'short', year: 'numeric' });
 
 export default function ClientDetailPage() {
   useTick();
@@ -117,14 +119,15 @@ export default function ClientDetailPage() {
   const cats = getCategories();
   const catOf = (cid: string) => cats.find(c => c.id === cid);
   const payments = requests
-    .map(r => ({ req: r, pay: getPayment(r.id) }))
+    .flatMap(r => getOrderPayments(r.id).map(pay => ({ req: r, pay })))
     .filter((x): x is { req: ServiceRequest; pay: Payment } => x.pay != null);
   const disputes = getAllDisputes().filter(
     d => d.opened_by === id || requests.some(r => r.id === d.service_order_id),
   );
   const spentCents = requests.reduce((s, r) => s + (r.quoted_total_cents ?? 0), 0);
   const ticketCents = requests.length ? Math.round(spentCents / requests.length) : null;
-  const ratings = orderRatings.filter(r => r.reviewer_id === id);
+  // Las ocultas por moderación no cuentan en el promedio.
+  const ratings = orderRatings.filter(r => r.reviewer_id === id && !r.is_hidden);
   const avgRating = ratings.length
     ? ratings.reduce((s, r) => s + r.score, 0) / ratings.length
     : null;
@@ -155,7 +158,7 @@ export default function ClientDetailPage() {
 
       <Card padded className="animate-up">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={name} size={58} />
+          <Avatar name={name} userId={id} size={58} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-[24px] font-extrabold tracking-[-0.5px] text-navy">
@@ -202,6 +205,8 @@ export default function ClientDetailPage() {
           )}
         </div>
       </Card>
+
+      <ClientDocCard clientId={id} name={name} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Servicios" value={String(requests.length)} />
@@ -321,7 +326,7 @@ export default function ClientDetailPage() {
                   <li key={pay.id} className="flex items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="font-display text-[14px] font-bold text-navy">
-                        {METHOD_LABEL[pay.method] ?? pay.method}
+                        {paymentLabel(pay)}
                       </div>
                       <div className="font-mono text-[11.5px] text-muted">
                         {orderCode(req.id)} · {timeAgo(pay.paid_at ?? pay.created_at)}

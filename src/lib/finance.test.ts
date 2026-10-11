@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aggregate,
   bucketGoal,
+  canRejectPayout,
   deltaLabel,
   methodSplit,
   monthlySummary,
@@ -78,5 +79,27 @@ describe('methodSplit / monthlySummary / goal', () => {
   it('meta por bucket', () => {
     expect(bucketGoal(30_000, '7d')).toBe(1000);
     expect(bucketGoal(30_000, '90d')).toBe(7000);
+  });
+});
+
+describe('rangeBuckets con rango libre', () => {
+  it('diario hasta 31 días, semanal después; respeta los extremos', () => {
+    const from = new Date(2026, 8, 1);
+    const d = rangeBuckets({ from, to: new Date(2026, 8, 10) });
+    expect(d).toHaveLength(10);
+    expect(d[0].from).toBe(from.getTime());
+    const w = rangeBuckets({ from, to: new Date(2026, 10, 15) });
+    expect(w.length).toBe(11);
+    expect(w[w.length - 1].to).toBe(new Date(2026, 10, 16).getTime());
+    expect(bucketGoal(30_000, { from, to: new Date(2026, 10, 15) })).toBe(7000);
+  });
+});
+
+describe('canRejectPayout', () => {
+  it('permite rechazar pendientes, retenidos y aprobados sin enviar', () => {
+    for (const st of ['pending', 'held', 'approved']) expect(canRejectPayout(st)).toBe(true);
+  });
+  it('no permite rechazar lo que ya salió o terminó', () => {
+    for (const st of ['processing', 'paid', 'failed', 'cancelled']) expect(canRejectPayout(st)).toBe(false);
   });
 });

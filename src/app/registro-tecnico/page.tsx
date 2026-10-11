@@ -460,11 +460,17 @@ export default function RegistroTecnicoPage() {
                     label={
                       <span className="text-[13.5px] text-body">
                         Acepto los{' '}
-                        {/* ponytail: /terminos y /privacidad aún no existen */}
+                        {/* ponytail: /terminos aún no existe. */}
                         <b className="font-semibold text-navy">Términos</b> y el{' '}
-                        <b className="font-semibold text-navy">
+                        <Link
+                          href="/aviso-de-privacidad"
+                          target="_blank"
+                          rel="noopener"
+                          onClick={e => e.stopPropagation()}
+                          className="font-semibold text-primary underline underline-offset-2"
+                        >
                           Aviso de Privacidad
-                        </b>{' '}
+                        </Link>{' '}
                         de Tumantenimiento.
                       </span>
                     }

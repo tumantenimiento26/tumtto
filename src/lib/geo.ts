@@ -23,6 +23,18 @@ export function wkbPoint(hex: unknown): LngLat | null {
   return [view.getFloat64(offset, little), view.getFloat64(offset + 8, little)];
 }
 
+/** Distancia en metros entre dos puntos (haversine). */
+export function distanceM(a: LngLat, b: LngLat): number {
+  const R = 6_371_000;
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b[1] - a[1]);
+  const dLng = rad(b[0] - a[0]);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.min(1, Math.sqrt(h))));
+}
+
 /** Centroide (promedio de vértices) de un Polygon/MultiPolygon GeoJSON. */
 export function geometryCenter(geometry: {
   type: string;

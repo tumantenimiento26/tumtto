@@ -14,6 +14,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { can as canRole, roleFromMetadata, type AdminRole, type Permission } from '@/lib/rbac';
 import type { Database } from '@/types/supabase';
+import { MOCK } from '@/lib/mock';
 
 // Mirrors the mobile dual-layer rule: a Supabase session AND a matching
 // `profiles` row (id = auth user id). Session without row ≠ authenticated.
@@ -163,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(() => {
+    if (MOCK) return mockAuth(signOut);
     const adminRole = roleFromMetadata(state.session?.user.app_metadata);
     return {
       ...state,
@@ -176,6 +178,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [state, signIn, signOut, retryUsuario]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+/** Admin falso para el modo maqueta (ver lib/mock.ts). */
+function mockAuth(signOut: () => Promise<void>): AuthContextValue {
+  const now = new Date().toISOString();
+  return {
+    session: { user: { id: 'demo-admin', email: 'demo@tumtto.local', app_metadata: {} } } as Session,
+    usuario: {
+      id: 'demo-admin',
+      full_name: 'Admin (maqueta)',
+      phone: null,
+      role: 'admin',
+      avatar_path: null,
+      status: 'active',
+      stripe_customer_id: null,
+      created_at: now,
+      updated_at: now,
+    } as Usuario,
+    loading: false,
+    usuarioError: null,
+    resolving: false,
+    isAdmin: true,
+    adminRole: 'super_admin',
+    can: () => true,
+    signIn: async () => ({ error: null }),
+    signOut,
+    retryUsuario: async () => {},
+  };
 }
 
 /** App-wide auth — must be rendered inside `<AuthProvider>` (root layout). */

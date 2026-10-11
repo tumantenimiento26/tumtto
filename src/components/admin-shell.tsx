@@ -15,6 +15,7 @@ import {
   IdCard,
   LayoutDashboard,
   LifeBuoy,
+  Mail,
   LogOut,
   Map,
   Moon,
@@ -23,6 +24,7 @@ import {
   Scale,
   Search,
   Settings,
+  Siren,
   Sun,
   User,
   Users,
@@ -33,7 +35,9 @@ import {
   Banknote,
   CreditCard,
   Info,
+  Package,
   type LucideIcon,
+  Menu as MenuIcon,
 } from 'lucide-react';
 
 import { PageTransition } from './motion';
@@ -44,6 +48,7 @@ import {
   getAllRequests,
   getClients,
   getOpenSupportCount,
+  getCashReviewOrders,
   getPendingKyc,
   getProfile,
   getTechniciansWithProfile,
@@ -104,11 +109,11 @@ export const useShell = create<ShellState>()(
   ),
 );
 
-/** ¿Ventana angosta (<1100px)? En ese caso el sidebar es riel + cajón. */
+/** ¿Celular o tablet (≤1024px)? Ahí no hay riel: menú hamburguesa + cajón. */
 function useNarrow() {
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1099px)');
+    const mq = window.matchMedia('(max-width: 1024px)');
     const on = () => setNarrow(mq.matches);
     on();
     mq.addEventListener('change', on);
@@ -134,6 +139,8 @@ function useNavGroups(): NavGroup[] {
   const { unread } = useNotifications();
   const { can } = useAuth();
   const finanzas = can('finanzas');
+  // Soporte o finanzas resuelven revisiones de efectivo (página propia).
+  const efectivo = finanzas || can('soporte');
   return [
     {
       label: 'General',
@@ -163,8 +170,10 @@ function useNavGroups(): NavGroup[] {
       label: 'Operación',
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
+        { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
         ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
+        ...(efectivo ? [{ href: '/revision-efectivo', icon: Banknote, label: 'Revisión de efectivo', badge: () => getCashReviewOrders().length }] : []),
         {
           href: '/soporte',
           icon: Scale,
@@ -198,9 +207,11 @@ const CRUMB: Record<string, [string, string]> = {
   '/clientes': ['Usuarios', 'Clientes'],
   '/tecnicos': ['Usuarios', 'Técnicos'],
   '/servicios': ['Operación', 'Servicios'],
+  '/inventario': ['Operación', 'Inventario'],
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
   '/soporte': ['Operación', 'Soporte'],
+  '/revision-efectivo': ['Operación', 'Revisión de efectivo'],
   '/reportes': ['Analítica', 'Reportes'],
   '/catalogo': ['Sistema', 'Catálogo'],
   '/config': ['Sistema', 'Configuración'],
@@ -208,6 +219,7 @@ const CRUMB: Record<string, [string, string]> = {
 };
 const DETAIL_TITLE: Record<string, string> = {
   '/servicios': 'Detalle de servicio',
+  '/inventario': 'Detalle de herramienta',
   '/clientes': 'Detalle de cliente',
   '/tecnicos': 'Detalle de técnico',
 };
@@ -568,7 +580,9 @@ const NOTIF_ICON: Record<NotifType, { icon: LucideIcon; tile: string }> = {
   kyc: { icon: IdCard, tile: 'bg-warning-soft text-warning-ink' },
   disputas: { icon: Scale, tile: 'bg-error-soft text-error' },
   tickets: { icon: LifeBuoy, tile: 'bg-info-soft text-primary' },
+  contacto: { icon: Mail, tile: 'bg-info-soft text-primary' },
   retiros: { icon: Banknote, tile: 'bg-success-soft text-success' },
+  emergencias: { icon: Siren, tile: 'bg-error-soft text-error' },
   servicios: { icon: Wrench, tile: 'bg-warning-soft text-warning-ink' },
   pagos: { icon: CreditCard, tile: 'bg-error-soft text-error' },
   sistema: { icon: Info, tile: 'bg-chip text-muted' },
@@ -681,7 +695,7 @@ function NotificationsPanel({
 }
 
 /* ── Header ── */
-function Header({ onMenu }: { onMenu: () => void }) {
+function Header({ onMenu, narrow }: { onMenu: () => void; narrow: boolean }) {
   const pathname = usePathname();
   const { setPalette, notifs, setNotifs } = useShell();
   const { theme, toggle } = useTheme();
@@ -694,7 +708,12 @@ function Header({ onMenu }: { onMenu: () => void }) {
 
   return (
     <header className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-line bg-card px-4 md:gap-5 md:px-6">
-      <IconButton icon={PanelLeft} label="Menú (⌘B)" onClick={onMenu} />
+      <IconButton
+        icon={narrow ? MenuIcon : PanelLeft}
+        label={narrow ? 'Abrir menú' : 'Menú (⌘B)'}
+        onClick={onMenu}
+        size={narrow ? 44 : 40}
+      />
       <div className="min-w-0">
         <Kicker className="!text-[10px]">{group}</Kicker>
         <p className="truncate font-display text-[16px] font-bold text-navy">
@@ -799,6 +818,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     hydrateTheme();
     return () => applyTheme(null);
   }, [hydrateTheme]);
+  // Marca en <body> (no en el shell) para que modales/menús en portal también
+  // reciban las reglas táctiles de globals.css.
+  useEffect(() => {
+    document.body.dataset.console = '';
+    return () => {
+      delete document.body.dataset.console;
+    };
+  }, []);
 
   // Primer snapshot del backend al montar la consola (el gate ya validó admin)
   // + realtime (órdenes, disputas, tickets, retiros) y recarga al volver el foco.
@@ -845,9 +872,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
-      {/* Riel/sidebar en flujo (angosto: siempre riel) */}
-      <div className="relative z-30 flex-shrink-0">
-        <Sidebar compact={narrow || compact} onToggle={onMenu} />
+      {/* Sidebar en flujo solo en escritorio (>1024px); en celular/tablet vive en el cajón. */}
+      <div className="relative z-30 hidden flex-shrink-0 min-[1025px]:block">
+        <Sidebar compact={compact} onToggle={onMenu} />
       </div>
       {/* Angosto: versión completa encima con scrim */}
       {narrow && drawer && (
@@ -867,7 +894,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenu={onMenu} />
+        <Header onMenu={onMenu} narrow={narrow} />
         <OfflineBanner />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
           {navigating ? (

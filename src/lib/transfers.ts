@@ -235,6 +235,72 @@ export const canReviewTransfer = (status: string | null | undefined) => status =
 export const isTransferRefundPending = (o: { base_fee_method?: string | null; base_fee_status: string }) =>
   o.base_fee_method === 'transfer' && o.base_fee_status === 'refund_pending';
 
+// ── Adelantos pendientes (decisión 7) ────────────────────────────────────────
+
+/** Estados de orden en que el servicio ya terminó (o murió después de la visita). */
+export const FINISHED_ORDER_STATUSES = ['completed', 'paid', 'closed', 'cancelled', 'expired'] as const;
+type OwedOrder = {
+  id: string;
+  status: string;
+  payment_model: string;
+  base_fee_status: string;
+  base_total_cents: number | null;
+  client_id: string;
+  completed_at: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  updated_at: string;
+};
+/** El servicio terminó y el adelanto sigue sin pagar (pendiente de transferencia o en revisión): lo debe el cliente. */
+export const isAdvanceOwed = (o: Omit<OwedOrder, 'id' | 'client_id' | 'base_total_cents' | 'completed_at' | 'paid_at' | 'cancelled_at' | 'updated_at'>) =>
+  o.payment_model === 'base_cash' &&
+  (o.base_fee_status === 'awaiting_transfer' || o.base_fee_status === 'in_review') &&
+  (FINISHED_ORDER_STATUSES as readonly string[]).includes(o.status);
+export const finishedAt = (o: Pick<OwedOrder, 'completed_at' | 'paid_at' | 'cancelled_at' | 'updated_at'>) =>
+  o.completed_at ?? o.cancelled_at ?? o.paid_at ?? o.updated_at;
+
+export interface LatestProof {
+  id: string;
+  service_order_id: string;
+  status: string;
+  reject_reason: string | null;
+  created_at: string;
+}
+export interface OwedAdvance {
+  orderId: string;
+  status: string;
+  baseStatus: string;
+  clientId: string;
+  amountCents: number;
+  finishedAt: string;
+  proof: LatestProof | null;
+}
+/** Último comprobante por orden (el más reciente por created_at). */
+export function latestProofByOrder(proofs: LatestProof[]): Map<string, LatestProof> {
+  const m = new Map<string, LatestProof>();
+  for (const p of proofs) {
+    const cur = m.get(p.service_order_id);
+    if (!cur || p.created_at > cur.created_at) m.set(p.service_order_id, p);
+  }
+  return m;
+}
+/** Adelantos adeudados en servicios terminados, el más antiguo primero. */
+export function owedAdvances(orders: OwedOrder[], proofs: LatestProof[]): OwedAdvance[] {
+  const latest = latestProofByOrder(proofs);
+  return orders
+    .filter(isAdvanceOwed)
+    .map(o => ({
+      orderId: o.id,
+      status: o.status,
+      baseStatus: o.base_fee_status,
+      clientId: o.client_id,
+      amountCents: o.base_total_cents ?? 0,
+      finishedAt: finishedAt(o),
+      proof: latest.get(o.id) ?? null,
+    }))
+    .sort((a, b) => a.finishedAt.localeCompare(b.finishedAt));
+}
+
 /** Estado del adelanto en el detalle de la orden: hay algo que el admin debe mirar. */
 export const transferNeedsReview = (baseStatus: string | null | undefined) => baseStatus === 'in_review';
 

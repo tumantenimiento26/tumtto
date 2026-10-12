@@ -5,6 +5,7 @@ import { ErrorPage, PageHeader, ScreenSkeleton, Tabs } from '@/components/ds';
 import { useAuth } from '@/lib/auth';
 import {
   getCashReviewOrders,
+  getOwedAdvanceOrders,
   getTransferReviewOrders,
   loadWorld,
   useTick,
@@ -12,15 +13,17 @@ import {
   useWorldReady,
 } from '@/lib/data/store';
 import { CashReviewPanel } from './_components/CashReviewPanel';
+import { OwedAdvancesPanel } from './_components/OwedAdvancesPanel';
 import { TransfersPanel } from './_components/TransfersPanel';
 
-type Tab = 'transferencias' | 'efectivo';
+type Tab = 'transferencias' | 'adelantos' | 'efectivo';
+const TABS: Tab[] = ['transferencias', 'adelantos', 'efectivo'];
 
 /**
  * «Revisión de pagos» (TUM-03; antes «Revisión de efectivo»): transferencias
  * del adelanto por cotejar y el efectivo que no cuadra. Backend: los RPC de
  * ambas colas aceptan soporte o finanzas.
- * ?tab=efectivo · ?transfer=<id> abre el detalle de un comprobante.
+ * ?tab=adelantos|efectivo · ?transfer=<id> abre el detalle de un comprobante.
  */
 export default function RevisionPagosPage() {
   useTick();
@@ -34,14 +37,15 @@ export default function RevisionPagosPage() {
   // Sin useSearchParams para no exigir Suspense en esta página.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    if (q.get('tab') === 'efectivo') setTab('efectivo');
+    const t = q.get('tab') as Tab | null;
+    if (t && TABS.includes(t)) setTab(t);
     setInitialTransfer(q.get('transfer'));
   }, []);
 
   function changeTab(t: Tab) {
     setTab(t);
     const url = new URL(window.location.href);
-    url.search = t === 'efectivo' ? '?tab=efectivo' : '';
+    url.search = t === 'transferencias' ? '' : `?tab=${t}`;
     window.history.replaceState(null, '', url);
   }
 
@@ -53,17 +57,20 @@ export default function RevisionPagosPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Revisión de pagos"
-        description="Coteja las transferencias del adelanto de la visita y resuelve el efectivo que no cuadra."
+        description="Coteja las transferencias del adelanto de la visita, da seguimiento a las visitas que siguen sin pagar y resuelve el efectivo que no cuadra."
       />
       <Tabs
         tabs={[
           { value: 'transferencias', label: 'Transferencias', count: getTransferReviewOrders().length },
+          { value: 'adelantos', label: 'Adelantos pendientes', count: getOwedAdvanceOrders().length },
           { value: 'efectivo', label: 'Efectivo', count: getCashReviewOrders().length },
         ]}
         value={tab}
         onChange={changeTab}
       />
-      {tab === 'transferencias' ? <TransfersPanel initialTransfer={initialTransfer} /> : <CashReviewPanel />}
+      {tab === 'transferencias' && <TransfersPanel initialTransfer={initialTransfer} />}
+      {tab === 'adelantos' && <OwedAdvancesPanel />}
+      {tab === 'efectivo' && <CashReviewPanel />}
     </div>
   );
 }

@@ -12,6 +12,8 @@ import {
   filterTransfers,
   folioOf,
   groupDigits,
+  isAdvanceOwed,
+  owedAdvances,
   isTransferRefundPending,
   listArgs,
   pageCount,
@@ -222,5 +224,56 @@ describe('maqueta', () => {
     const s = buildPaymentSummary(o, pm.payments.filter(p => p.service_order_id === o.id));
     expect(s.base?.method).toBe('transfer');
     expect(pm.payments.find(p => p.service_order_id === o.id && p.kind === 'base_fee')?.method).toBe('transfer');
+  });
+});
+
+describe('adelantos pendientes (decisión 7)', () => {
+  const o = (p: Partial<Parameters<typeof owedAdvances>[0][number]>) => ({
+    id: 'o',
+    status: 'completed',
+    payment_model: 'base_cash',
+    base_fee_status: 'awaiting_transfer',
+    base_total_cents: 30000,
+    client_id: 'c',
+    completed_at: '2026-10-05T00:00:00Z',
+    paid_at: null,
+    cancelled_at: null,
+    updated_at: '2026-10-06T00:00:00Z',
+    ...p,
+  });
+
+  it('solo servicios terminados con el adelanto sin pagar, el más antiguo primero, con su último comprobante', () => {
+    const rows = owedAdvances(
+      [
+        o({ id: 'a' }),
+        o({ id: 'b', status: 'cancelled', base_fee_status: 'in_review', completed_at: null, cancelled_at: '2026-10-01T00:00:00Z' }),
+        o({ id: 'c', status: 'working' }),
+        o({ id: 'd', base_fee_status: 'paid' }),
+        o({ id: 'e', payment_model: 'legacy' }),
+      ],
+      [
+        { id: 'p1', service_order_id: 'a', status: 'rejected', reject_reason: 'x', created_at: '2026-10-02T00:00:00Z' },
+        { id: 'p2', service_order_id: 'a', status: 'rejected', reject_reason: 'y', created_at: '2026-10-03T00:00:00Z' },
+      ],
+    );
+    expect(rows.map(r => r.orderId)).toEqual(['b', 'a']);
+    expect(rows[1].proof?.id).toBe('p2');
+    expect(rows[0].proof).toBeNull();
+    expect(rows[0].finishedAt).toBe('2026-10-01T00:00:00Z');
+  });
+
+  it('la maqueta trae adelantos adeudados con y sin comprobante', () => {
+    const base = demoWorld();
+    const pm = paymentModelDemo(base, {
+      clientIds: base.profiles.filter(p => p.role === 'client').map(p => p.id),
+      techIds: base.technicians.map(t => t.id),
+      catIds: base.categories.map(c => c.id),
+      now: Date.now(),
+    });
+    const rows = owedAdvances(pm.orders, demoTransfers(pm.orders, Date.now()));
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows.some(r => r.proof === null)).toBe(true);
+    expect(rows.some(r => r.proof?.status === 'submitted')).toBe(true);
+    expect(rows.every(r => isAdvanceOwed({ status: r.status, payment_model: 'base_cash', base_fee_status: r.baseStatus }))).toBe(true);
   });
 });

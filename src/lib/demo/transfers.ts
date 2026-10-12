@@ -30,6 +30,8 @@ const SPECS: Spec[] = [
   { id: 'ptr-4031-b', folio: 4031, at: 40, file: 'comprobante-spei.pdf', reference: 'SPEI 7781200', status: 'accepted', reviewedAfter: 25 },
   { id: 'ptr-4032-a', folio: 4032, at: 4, file: 'spei.pdf', reference: 'Santander 99812', status: 'submitted' },
   { id: 'ptr-4033-a', folio: 4033, at: 7, file: 'deposito.jpg', reference: 'OXXO-DEP 4410', status: 'accepted', reviewedAfter: 180 },
+  { id: 'ptr-4036-a', folio: 4036, at: 30, file: 'pago.jpg', reference: 'HSBC 77100', status: 'rejected', reason: 'No se encontró el depósito', reviewedAfter: 300 },
+  { id: 'ptr-4037-a', folio: 4037, at: 200, file: 'comprobante-banorte.pdf', reference: 'Banorte 88120', status: 'submitted' },
   { id: 'ptr-4034-a', folio: 4034, at: 3, file: 'transfer.png', reference: 'Banorte 30021', status: 'cancelled', reviewedAfter: 6 },
 ];
 

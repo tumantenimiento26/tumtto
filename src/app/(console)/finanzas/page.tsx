@@ -80,10 +80,11 @@ import { CashByTechnician, PaymentsReport, TechnicianCommissions } from './_comp
 
 type Tab = 'tx' | 'po' | 'wal' | 'mes' | 'cash' | 'com' | 'svc';
 const TABS: Tab[] = ['tx', 'po', 'wal', 'mes', 'cash', 'com', 'svc'];
-type MethodFilter = 'all' | 'card' | 'wallet' | 'oxxo' | 'cash';
+type MethodFilter = 'all' | 'card' | 'transfer' | 'wallet' | 'oxxo' | 'cash';
 const METHOD_OPTIONS: { value: MethodFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
   { value: 'card', label: 'Tarjeta' },
+  { value: 'transfer', label: 'Transferencia' },
   { value: 'wallet', label: 'Mercado Pago' },
   { value: 'oxxo', label: 'OXXO' },
   { value: 'cash', label: 'Efectivo' },

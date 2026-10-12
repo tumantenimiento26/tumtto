@@ -20,6 +20,8 @@ const CSP = [
   `connect-src 'self' https://*.supabase.co wss://*.supabase.co${SB_HTTP}${SB_WS} https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com`,
   "worker-src 'self' blob:",
   "child-src blob:",
+  // TUM-03: vista previa del comprobante PDF (URL firmada de Storage; blob: en maqueta).
+  `frame-src 'self' blob: https://*.supabase.co${SB_HTTP}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

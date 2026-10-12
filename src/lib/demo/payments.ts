@@ -161,6 +161,13 @@ const SPECS: Spec[] = [
     baseStatus: 'refund_pending', basePay: 'paid', path: ['requested', 'cancelled'] },
   { folio: 4034, agoH: 3, cat: 5, tech: 1, status: 'working', title: 'Cambio de chapa', admin: true, base: 25000,
     baseStatus: 'paid', basePay: 'paid', path: ['requested', 'accepted', 'enroute', 'onsite', 'working'] },
+  // Decisión 7: servicio terminado con el adelanto aún sin pagar (queda adeudado por el cliente).
+  { folio: 4036, agoH: 48, cat: 1, tech: 0, status: 'completed', title: 'Cambio de contactos', admin: true, transfer: true, base: 30000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'working', 'completed'] },
+  { folio: 4037, agoH: 75, cat: 0, tech: 1, status: 'paid', title: 'Destape de coladera', admin: true, transfer: true, base: 35000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'working', 'completed', 'paid'] },
+  { folio: 4038, agoH: 26, cat: 3, tech: 0, status: 'cancelled', title: 'Revisión de minisplit (cliente canceló en sitio)', admin: true, transfer: true,
+    base: 45000, baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'cancelled'] },
   { folio: 4035, agoH: 0.1, cat: 0, tech: null, status: 'requested', title: 'Calentador gotea', admin: true, transfer: true, base: 35000,
     baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested'] },
 ];

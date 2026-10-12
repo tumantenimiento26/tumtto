@@ -41,8 +41,10 @@ import {
   baseMethodOf,
   depositArgs,
   filterTransfers,
+  isAdvanceOwed,
   isTransferRefundPending,
   listArgs,
+  owedAdvances,
   paginate,
   parseDepositAccount,
   parseTransferDetail,
@@ -50,6 +52,8 @@ import {
   validateDepositForm,
   type DepositAccount,
   type DepositForm,
+  type LatestProof,
+  type OwedAdvance,
   type PaymentTransfer,
   type TransferDetail,
   type TransferFilters,
@@ -622,6 +626,8 @@ export const getCashReviewOrders = () => w().orders.filter(o => o.cash_review_op
 export const getFailedBaseRefunds = () => failedBaseRefunds(w().orders);
 /** TUM-03: órdenes con un comprobante de transferencia por revisar (badge y avisos). */
 export const getTransferReviewOrders = () => w().orders.filter(o => o.base_fee_status === 'in_review');
+/** Decisión 7: servicios terminados con el adelanto aún adeudado (para el contador de la pestaña). */
+export const getOwedAdvanceOrders = () => w().orders.filter(isAdvanceOwed);
 /** TUM-03: transferencias aceptadas sobre solicitudes muertas que esperan el reembolso manual (finanzas). */
 export const getTransferRefundOrders = () =>
   w()
@@ -1984,6 +1990,35 @@ export async function fetchPaymentTransfer(id: string): Promise<TransferDetail |
     return parseTransferDetail(data);
   } catch (e) {
     console.warn('[data] admin_get_payment_transfer', e);
+    return null;
+  }
+}
+
+/**
+ * «Adelantos pendientes»: órdenes del snapshot ya terminadas con el adelanto
+ * sin pagar + su último comprobante (payment_transfers; RLS deja leer a
+ * soporte/finanzas). null = no disponible.
+ */
+export async function fetchOwedAdvances(): Promise<OwedAdvance[] | null> {
+  await loadWorld();
+  const orders = getOwedAdvanceOrders();
+  if (MOCK) return owedAdvances(orders, mockTransferList());
+  if (!orders.length) return [];
+  try {
+    const ids = orders.map(o => o.id);
+    const proofs: LatestProof[] = [];
+    // .in() viaja en la URL: en lotes para no exceder su largo.
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await supabase
+        .from('payment_transfers')
+        .select('id, service_order_id, status, reject_reason, created_at')
+        .in('service_order_id', ids.slice(i, i + 100));
+      if (error) throw error;
+      proofs.push(...(data ?? []));
+    }
+    return owedAdvances(orders, proofs);
+  } catch (e) {
+    console.warn('[data] adelantos pendientes', e);
     return null;
   }
 }

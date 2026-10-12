@@ -61,7 +61,7 @@ function Proof({ path, reference }: { path: string; reference: string }) {
         <img src={url} alt={`Comprobante de transferencia, referencia ${reference}`} className="mx-auto max-h-[420px] w-auto object-contain" />
       </a>
     );
-  return (
+  const link = (
     <a
       href={url}
       target="_blank"
@@ -71,12 +71,24 @@ function Proof({ path, reference }: { path: string; reference: string }) {
       <FileText size={22} className="text-primary" aria-hidden />
       <span className="min-w-0 flex-1">
         <span className="block font-sans text-[13.5px] font-semibold text-navy">
-          {kind === 'pdf' ? 'Abrir comprobante (PDF)' : 'Abrir comprobante'}
+          {kind === 'pdf' ? 'Abrir en pestaña nueva' : 'Abrir comprobante'}
         </span>
         <span className="block truncate font-mono text-[11.5px] text-muted">{path.split('/').pop()}</span>
       </span>
       <ExternalLink size={15} className="text-muted" aria-hidden />
     </a>
+  );
+  if (kind !== 'pdf') return link;
+  // Visor nativo del navegador (CSP: frame-src permite Storage y blob:).
+  return (
+    <div className="flex flex-col gap-2">
+      <iframe
+        src={url}
+        title={`Comprobante PDF, referencia ${reference}`}
+        className="h-[460px] w-full rounded-xl border border-line bg-panel"
+      />
+      {link}
+    </div>
   );
 }
 

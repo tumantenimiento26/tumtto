@@ -26,7 +26,9 @@ export type BaseFeeStatus =
   | 'refund_failed'
   | 'refunded'
   | 'waived'
-  | 'void';
+  | 'void'
+  | 'awaiting_transfer'
+  | 'in_review';
 export type CashStatus =
   | 'pending_technician'
   | 'technician_confirmed'
@@ -45,6 +47,9 @@ export const BASE_STATUS: Record<string, { label: string; tone: Tone }> = {
   refunded: { label: 'Reembolsada', tone: 'danger' },
   waived: { label: 'Exonerada', tone: 'info' },
   void: { label: 'Anulada', tone: 'neutral' },
+  // TUM-02: adelanto por transferencia (no bloquea el servicio).
+  awaiting_transfer: { label: 'Pendiente de transferencia', tone: 'warning' },
+  in_review: { label: 'En revisión', tone: 'info' },
 };
 
 export const CASH_STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -141,11 +146,23 @@ export const kindLabel = (k: string | null | undefined) => KIND_LABEL[k ?? 'lega
 
 // ── Resumen por orden (espejo de get_order_payment_summary) ──────────────────
 
+/** Último comprobante de transferencia del adelanto (get_order_payment_summary.base.transfer). */
+export interface BaseTransfer {
+  id: string;
+  status: string;
+  amountCents: number;
+  reference: string | null;
+  rejectReason: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+}
 export interface BaseSummary {
   feeCents: number;
   surchargeCents: number;
   totalCents: number;
-  method: 'card';
+  /** TUM-02: método elegido por el cliente (y luego el que pagó). */
+  method: 'card' | 'transfer';
+  transfer: BaseTransfer | null;
   status: string;
   paidAt: string | null;
   refundedCents: number;
@@ -304,7 +321,8 @@ export function buildPaymentSummary(
           feeCents: order.base_fee_cents,
           surchargeCents: order.base_surcharge_cents,
           totalCents: order.base_total_cents ?? 0,
-          method: 'card',
+          method: order.base_fee_method === 'transfer' ? 'transfer' : 'card',
+          transfer: null,
           status: order.base_fee_status,
           paidAt: order.base_fee_paid_at,
           refundedCents: base?.refunded_cents ?? 0,
@@ -329,6 +347,23 @@ export function buildPaymentSummary(
     cashReviewOpen: order.cash_review_open,
     totalCents: (isBaseCash ? (order.base_total_cents ?? 0) : 0) + quoted,
   };
+}
+
+function parseBaseTransfer(v: Json | undefined): BaseTransfer | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const t = v as Record<string, Json>;
+  const id = str(t.id);
+  return id
+    ? {
+        id,
+        status: str(t.status) ?? 'submitted',
+        amountCents: num0(t.amount_cents),
+        reference: str(t.reference),
+        rejectReason: str(t.reject_reason),
+        submittedAt: str(t.submitted_at),
+        reviewedAt: str(t.reviewed_at),
+      }
+    : null;
 }
 
 /** jsonb de get_order_payment_summary → PaymentSummary (tolerante a faltantes). */
@@ -369,7 +404,8 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
           feeCents: num0(b.fee_cents),
           surchargeCents: num0(b.surcharge_cents),
           totalCents: num0(b.total_cents),
-          method: 'card',
+          method: b.method === 'transfer' ? 'transfer' : 'card',
+          transfer: parseBaseTransfer(b.transfer),
           status: str(b.status) ?? 'not_required',
           paidAt: str(b.paid_at),
           refundedCents: num0(b.refunded_cents),
@@ -429,7 +465,7 @@ export const refundablePayments = (payments: PayRow[]) =>
 
 /** «Tarifa base · Tarjeta», «Presupuesto · Efectivo»… */
 export function paymentLabel(p: Pick<PayRow, 'kind' | 'method'>): string {
-  const method = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago' }[p.method] ?? p.method;
+  const method = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago', transfer: 'Transferencia' }[p.method] ?? p.method;
   return `${kindLabel(p.kind)} · ${method}`;
 }
 
@@ -863,7 +899,13 @@ export function paymentsReport(
   });
 }
 
-const METHOD_NAME: Record<string, string> = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago' };
+const METHOD_NAME: Record<string, string> = {
+  card: 'Tarjeta',
+  cash: 'Efectivo',
+  oxxo: 'OXXO',
+  wallet: 'Mercado Pago',
+  transfer: 'Transferencia',
+};
 export const methodName = (m: string | null | undefined) => (m ? (METHOD_NAME[m] ?? m) : '—');
 
 export function paymentsReportCsvRows(rows: PaymentsReportRow[]): Record<string, string | number>[] {

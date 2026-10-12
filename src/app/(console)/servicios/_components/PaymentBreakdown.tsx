@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, Building2, CreditCard, Gavel, HandCoins, Receipt, RotateCcw, XCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Banknote, Building2, ChevronRight, CreditCard, Gavel, HandCoins, Landmark, Receipt, RotateCcw, XCircle } from 'lucide-react';
 import { Badge, Button, Card, Input, Kicker, Modal, Textarea } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
 import { useAction } from '@/components/use-action';
@@ -32,6 +33,7 @@ import {
 } from '@/lib/payments';
 import { surchargeBadge } from '@/lib/scheduleRules';
 import { commissionRateLabel, isAdminOwned } from '@/lib/commission';
+import { BASE_METHOD_LABEL, transferStatus } from '@/lib/transfers';
 import { money } from './shared';
 
 const when = (iso: string | null) =>
@@ -164,7 +166,12 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         <section aria-label="Tarifa base" className="mb-4 border-t border-divider pt-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
-              <CreditCard size={15} className="text-primary" aria-hidden /> Tarifa base · Tarjeta
+              {b.method === 'transfer' ? (
+                <Landmark size={15} className="text-primary" aria-hidden />
+              ) : (
+                <CreditCard size={15} className="text-primary" aria-hidden />
+              )}{' '}
+              Tarifa base · {BASE_METHOD_LABEL[b.method]}
             </h3>
             <Badge tone={base.tone}>{base.label}</Badge>
           </div>
@@ -179,9 +186,60 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
               />
             )}
           </dl>
+          {b.transfer && (
+            <div className="mt-2.5 rounded-btn bg-panel px-3 py-2.5 text-[12.5px]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-sans font-semibold text-navy">Último comprobante</span>
+                <Badge tone={transferStatus(b.transfer.status).tone}>{transferStatus(b.transfer.status).label}</Badge>
+              </div>
+              <p className="mt-0.5 text-body">
+                {money(b.transfer.amountCents, true)}
+                {b.transfer.reference && (
+                  <>
+                    {' '}
+                    · ref. <span className="font-mono">{b.transfer.reference}</span>
+                  </>
+                )}
+                {b.transfer.submittedAt && ` · enviado ${when(b.transfer.submittedAt)}`}
+              </p>
+              {b.transfer.status === 'rejected' && b.transfer.rejectReason && (
+                <p className="mt-0.5 italic text-muted">“{b.transfer.rejectReason}”</p>
+              )}
+              {canResolve && (
+                <Link
+                  href={`/revision-pagos?transfer=${b.transfer.id}`}
+                  className="mt-1.5 inline-flex items-center gap-1 font-sans text-[12.5px] font-semibold text-primary hover:underline"
+                >
+                  {b.transfer.status === 'submitted' ? 'Revisar en Revisión de pagos' : 'Ver en Revisión de pagos'}
+                  <ChevronRight size={13} aria-hidden />
+                </Link>
+              )}
+            </div>
+          )}
+          {(b.status === 'awaiting_transfer' || b.status === 'in_review') && (
+            <p className="mt-2 rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+              {b.status === 'in_review'
+                ? 'El cliente subió su comprobante y espera la revisión.'
+                : b.transfer?.status === 'rejected'
+                  ? 'Se rechazó el comprobante: el cliente puede subir otro o pagar con tarjeta.'
+                  : 'El cliente eligió pagar por transferencia y aún no sube su comprobante.'}{' '}
+              No detiene el servicio.
+            </p>
+          )}
           {b.status === 'refund_pending' && (
             <p className="mt-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">
-              No hubo visita: el reembolso a la tarjeta del cliente está en proceso.
+              {b.method === 'transfer' ? (
+                <>
+                  No hubo visita: hay que devolver la transferencia al cliente a mano.{' '}
+                  {canResolve && (
+                    <Link href="/revision-pagos" className="font-semibold text-primary hover:underline">
+                      Registrar el reembolso en Revisión de pagos
+                    </Link>
+                  )}
+                </>
+              ) : (
+                'No hubo visita: el reembolso a la tarjeta del cliente está en proceso.'
+              )}
             </p>
           )}
           {b.status === 'refund_failed' && (

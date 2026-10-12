@@ -14,6 +14,7 @@ import {
   Minus,
   Siren,
   Moon,
+  Landmark,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -57,6 +58,7 @@ import { ScheduleSurchargeSection } from './_components/ScheduleSurchargeSection
 import { CompaniesSection } from './_components/CompaniesSection';
 import { ToolCatalogSection } from './_components/ToolCatalogSection';
 import { TechnicianCommissionSection } from './_components/TechnicianCommissionSection';
+import { TransferAccountSection } from './_components/TransferAccountSection';
 import { ADMIN_OWNED_FLAG_KEY } from '@/lib/commission';
 import {
   changedSettings,
@@ -65,10 +67,20 @@ import {
   type Settings as SettingsMap,
 } from '@/lib/settingsRules';
 
-type SectionId = 'commission' | 'ops' | 'schedule' | 'emergency' | 'security' | 'team' | 'companies' | 'tools';
+type SectionId =
+  | 'commission'
+  | 'transfers'
+  | 'ops'
+  | 'schedule'
+  | 'emergency'
+  | 'security'
+  | 'team'
+  | 'companies'
+  | 'tools';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
+  { id: 'transfers', label: 'Cuenta para transferencias', icon: Landmark },
   { id: 'ops', label: 'Operación', icon: Clock },
   { id: 'schedule', label: 'Recargos por horario', icon: Moon },
   { id: 'emergency', label: 'Emergencias', icon: Siren },
@@ -154,6 +166,7 @@ export default function ConfigPage() {
       horario: 'schedule',
       empresas: 'companies',
       herramientas: 'tools',
+      transferencias: 'transfers',
     };
     const t = alias[raw] ?? raw;
     if (SECTIONS.some(x => x.id === t)) setActive(t as SectionId);
@@ -401,6 +414,8 @@ export default function ConfigPage() {
               </Section>
             </>
           )}
+
+          {active === 'transfers' && <TransferAccountSection />}
 
           {active === 'schedule' && <ScheduleSurchargeSection />}
 

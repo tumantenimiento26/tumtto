@@ -451,7 +451,7 @@ export default function FinanzasPage() {
 
       {getCashReviewOrders().length > 0 && (
         <Link
-          href="/revision-efectivo"
+          href="/revision-pagos?tab=efectivo"
           className="flex items-center gap-3 rounded-xl border border-line bg-error-soft px-4 py-3 hover:border-error"
         >
           <Gavel size={16} className="text-error" aria-hidden />

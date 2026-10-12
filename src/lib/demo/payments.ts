@@ -56,6 +56,8 @@ interface Spec {
   dispatch?: string;
   /** TUM-01: el dinero es de Tu Mantenimiento (revenue_model admin_owned). */
   admin?: boolean;
+  /** TUM-02: el cliente eligió pagar la visita por transferencia (base_fee_method). */
+  transfer?: boolean;
   path: Status[];
 }
 
@@ -145,6 +147,22 @@ const SPECS: Spec[] = [
     cash: { status: 'resolved', received: 0, response: 'disputed', reason: 'client_not_paid', outcome: 'not_collected',
       notes: 'El cliente no pagó la reparación; se cobró solo la visita.', payStatus: 'failed' },
     path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  // TUM-02/03 · adelanto por transferencia (comprobantes en demo/transfers.ts). No bloquea el servicio.
+  { folio: 4029, agoH: 1.2, cat: 0, tech: 0, status: 'accepted', title: 'Fuga bajo el fregadero', admin: true, transfer: true, base: 35000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested', 'accepted'] },
+  { folio: 4030, agoH: 4, cat: 1, tech: 1, status: 'enroute', title: 'Apagador quemado', admin: true, transfer: true, base: 30000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute'] },
+  { folio: 4031, agoH: 30, cat: 3, tech: 0, status: 'paid', title: 'Limpieza de minisplit', admin: true, transfer: true, base: 45000,
+    baseStatus: 'paid', basePay: 'paid', quote: 60000, cash: { status: 'client_confirmed', received: 60000, response: 'confirmed' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  { folio: 4032, agoH: 0.4, cat: 4, tech: null, status: 'requested', title: 'Refrigerador hace ruido', admin: true, transfer: true, base: 30000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested'] },
+  { folio: 4033, agoH: 9, cat: 2, tech: null, status: 'cancelled', title: 'Revisión de boiler', admin: true, transfer: true, base: 40000,
+    baseStatus: 'refund_pending', basePay: 'paid', path: ['requested', 'cancelled'] },
+  { folio: 4034, agoH: 3, cat: 5, tech: 1, status: 'working', title: 'Cambio de chapa', admin: true, base: 25000,
+    baseStatus: 'paid', basePay: 'paid', path: ['requested', 'accepted', 'enroute', 'onsite', 'working'] },
+  { folio: 4035, agoH: 0.1, cat: 0, tech: null, status: 'requested', title: 'Calentador gotea', admin: true, transfer: true, base: 35000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested'] },
 ];
 
 /** Última ocurrencia (hora de México) de `time` —en `weekday` si se indica— antes de `before`. */
@@ -229,6 +247,7 @@ export function paymentModelDemo(
       schedule_surcharge_bps: rule?.surcharge_type === 'percent' ? rule.value : 0,
       base_total_cents: baseTotal,
       base_fee_status: s.baseStatus,
+      base_fee_method: s.transfer ? 'transfer' : 'card',
       base_fee_paid_at: ['paid', 'refund_pending', 'refund_failed', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
       // admin_owned también marca la tarifa como «conservada» (sin acreditar al técnico).
       base_fee_credited_at: s.path.includes('enroute') && s.baseStatus === 'paid' ? iso(created + 50 * MIN) : null,
@@ -258,7 +277,9 @@ export function paymentModelDemo(
 
     if (s.basePay) {
       const paid = ['paid', 'refunded'].includes(s.basePay);
-      const fee = Math.round(baseTotal * 0.029) + 300;
+      // Transferencia aceptada: method 'transfer', sin comisión de Stripe.
+      const byTransfer = !!s.transfer && paid;
+      const fee = byTransfer ? 0 : Math.round(baseTotal * 0.029) + 300;
       payments.push({
         ...payT,
         id: `pay-b-${s.folio}`,
@@ -266,13 +287,13 @@ export function paymentModelDemo(
         client_id: clientId,
         technician_id: s.admin ? null : techId,
         kind: 'base_fee',
-        method: 'card',
+        method: byTransfer ? 'transfer' : 'card',
         status: s.basePay,
         amount_cents: baseTotal,
         commission_cents: s.admin ? 0 : commissionOf(baseTotal, 1500),
         platform_fee_cents: s.admin ? 0 : commissionOf(baseTotal, 1500),
         stripe_fee_cents: paid ? fee : 0,
-        stripe_payment_intent_id: paid ? `pi_mock_b${s.folio}` : null,
+        stripe_payment_intent_id: paid && !byTransfer ? `pi_mock_b${s.folio}` : null,
         refunded_cents: s.refunded ? baseTotal : 0,
         refund_requested_at: ['refund_pending', 'refund_failed'].includes(s.baseStatus) ? iso(created + 10 * MIN) : null,
         tech_credit_cents:

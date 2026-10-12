@@ -1071,6 +1071,54 @@ export type Database = {
           },
         ]
       }
+      payment_transfers: {
+        Row: {
+          amount_cents: number
+          client_id: string
+          created_at: string
+          id: string
+          payment_id: string | null
+          proof_path: string
+          reference: string
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          service_order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          client_id: string
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          proof_path: string
+          reference: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_order_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          proof_path?: string
+          reference?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -1731,6 +1779,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -1794,6 +1843,7 @@ export type Database = {
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
+          base_fee_method?: string
           base_fee_paid_at?: string | null
           base_fee_refunded_at?: string | null
           base_fee_status?: string
@@ -1857,6 +1907,7 @@ export type Database = {
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
+          base_fee_method?: string
           base_fee_paid_at?: string | null
           base_fee_refunded_at?: string | null
           base_fee_status?: string
@@ -3228,6 +3279,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3300,6 +3352,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3423,6 +3476,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3657,6 +3711,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3787,6 +3842,80 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_accept_payment_transfer: {
+        Args: { p_transfer_id: string }
+        Returns: Database["public"]["Tables"]["payment_transfers"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payment_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_confirm_transfer_refund: {
+        Args: { p_order_id: string; p_reference: string }
+        Returns: Database["public"]["Tables"]["payments"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_get_payment_transfer: {
+        Args: { p_transfer_id: string }
+        Returns: Json
+      }
+      admin_list_payment_transfers: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+          p_to?: string
+        }
+        Returns: {
+          amount_cents: number
+          base_fee_status: string
+          client_id: string
+          client_name: string
+          client_phone: string
+          created_at: string
+          folio: number
+          id: string
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          proof_path: string
+          reference: string
+          reject_reason: string
+          reviewed_at: string
+          reviewed_by: string
+          reviewer_name: string
+          service_order_id: string
+          status: string
+          total_count: number
+        }[]
+      }
+      admin_reject_payment_transfer: {
+        Args: { p_reason: string; p_transfer_id: string }
+        Returns: Database["public"]["Tables"]["payment_transfers"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payment_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_transfer_deposit_account: {
+        Args: {
+          p_bank: string
+          p_card_number?: string
+          p_clabe: string
+          p_holder: string
+        }
+        Returns: Json
+      }
+      get_transfer_deposit_account: { Args: never; Returns: Json }
       admin_reject_request: {
         Args: { p_order_id: string; p_reason: string }
         Returns: {
@@ -3795,6 +3924,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4163,6 +4293,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4540,6 +4671,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4808,6 +4940,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4959,6 +5092,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5051,6 +5185,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5140,6 +5275,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5543,6 +5679,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5615,6 +5752,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5822,6 +5960,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -6089,6 +6228,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -6309,7 +6449,7 @@ export type Database = {
         | "transfer_reversal"
         | "dispute_hold"
         | "dispute_release"
-      payment_method: "card" | "oxxo" | "wallet" | "cash"
+      payment_method: "card" | "oxxo" | "wallet" | "cash" | "transfer"
       payment_status:
         | "pending"
         | "authorized"
@@ -6531,7 +6671,7 @@ export const Constants = {
         "dispute_hold",
         "dispute_release",
       ],
-      payment_method: ["card", "oxxo", "wallet", "cash"],
+      payment_method: ["card", "oxxo", "wallet", "cash", "transfer"],
       payment_status: [
         "pending",
         "authorized",

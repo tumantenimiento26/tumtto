@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_ENV: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
+  // TUM-03: «Revisión de efectivo» ahora es la pestaña Efectivo de «Revisión de pagos».
+  async redirects() {
+    return [{ source: '/revision-efectivo', destination: '/revision-pagos?tab=efectivo', permanent: false }];
+  },
   async headers() {
     return [
       {

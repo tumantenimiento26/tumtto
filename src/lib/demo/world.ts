@@ -445,6 +445,7 @@ function build(): World {
       base_surcharge_cents: 0,
       base_total_cents: 0,
       base_fee_status: 'not_required',
+      base_fee_method: 'card',
       base_fee_paid_at: null,
       base_fee_credited_at: null,
       base_fee_refunded_at: null,

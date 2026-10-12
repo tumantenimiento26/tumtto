@@ -1,6 +1,7 @@
 // ponytail: historial sintético SOLO para el modo maqueta (lib/mock.ts) — ~90 días
 // de servicios, pagos, eventos y calificaciones para que la analítica tenga forma.
 // Determinista (semilla fija) para que cada recarga muestre lo mismo.
+import type { ClientDocumentRow } from '@/lib/clientDocs';
 import type { Database } from '@/types/supabase';
 import { demoInventory } from './inventory';
 import { paymentModelDemo } from './payments';
@@ -87,7 +88,7 @@ export function withHistory(w: World): {
     geojson: { type: 'Polygon'; coordinates: number[][][] };
   })[];
   locations: Row<'technician_locations'>[];
-  clientDocuments: Row<'client_documents'>[];
+  clientDocuments: ClientDocumentRow[];
   companies: Row<'technician_companies'>[];
   vehicles: Row<'technician_vehicles'>[];
   toolCatalog: Row<'tool_catalog'>[];
@@ -774,33 +775,51 @@ export function withHistory(w: World): {
     });
   }
 
-  // Comprobantes de domicilio de los primeros clientes: varios estados.
+  // Comprobantes de domicilio de los primeros clientes: varios estados, tipos
+  // y direcciones vinculadas (forma de la vista client_documents_review).
   const ymd = (ms: number) => iso(ms).slice(0, 10);
-  const docStates: [Row<'client_documents'>['review_status'], number, string | null][] = [
-    ['pending', 1, null],
-    ['pending', 2, null],
-    ['approved', 6, null],
-    ['rejected', 4, 'La foto está borrosa y no se lee la dirección.'],
-    ['pending', 0, null],
+  type DocAddr = [line: string, colonia: string, municipio: string, cp: string, lng: number, lat: number];
+  const docStates: [
+    Row<'client_documents'>['review_status'],
+    number,
+    string | null,
+    Row<'client_documents'>['proof_type'],
+    DocAddr | null,
+  ][] = [
+    ['pending', 1, null, 'ine', ['Av. Pablo Neruda 2825', 'Providencia', 'Zapopan', '44630', -103.3773, 20.7062]],
+    ['pending', 2, null, 'electricity', ['Calle Independencia 140', 'Centro', 'San Pedro Tlaquepaque', '45500', -103.3123, 20.6405]],
+    ['approved', 6, null, 'phone', ['Av. Américas 1500', 'Country Club', 'Guadalajara', '44610', -103.3695, 20.7096]],
+    ['rejected', 4, 'La dirección no coincide', 'bank_statement', ['Av. López Mateos Sur 2077', 'Jardines Plaza del Sol', 'Guadalajara', '44510', -103.4021, 20.6487]],
+    ['pending', 0, null, null, null],
   ];
-  const clientDocuments: Row<'client_documents'>[] = docStates.map(([status, ago, notes], i) => {
+  const OCR: Record<string, Record<string, string>> = {
+    ine: { tipo_documento: 'Credencial para votar (INE)', emisor: 'Instituto Nacional Electoral', vigencia: '2031' },
+    electricity: { tipo_documento: 'Recibo de luz', emisor: 'CFE Suministrador de Servicios Básicos' },
+    phone: { tipo_documento: 'Recibo de teléfono', emisor: 'Telmex' },
+    bank_statement: { tipo_documento: 'Estado de cuenta', emisor: 'BBVA México' },
+  };
+  const clientDocuments: ClientDocumentRow[] = docStates.map(([status, ago, notes, type, addr], i) => {
     const clientId = clientIds[i];
     const at = iso(now - ago * DAY - (i + 1) * 37 * MIN);
     const reviewed = status !== 'pending';
+    const issued = type === 'ine' ? null : ymd(now - (10 + i * 15) * DAY);
+    const domicilio = addr ? `${addr[0]}, ${addr[1]}, ${addr[2]}` : 'Calle 12 #845, Centro, Guadalajara';
     return {
       id: `mock-cdoc-${i + 1}`,
       client_id: clientId,
       kind: 'proof_of_address',
       bucket_id: 'comprobante-domicilio',
-      storage_path: `${clientId}/proof_of_address-${i + 1}.pdf`,
-      issued_on: ymd(now - (10 + i * 15) * DAY),
+      storage_path: `${clientId}/proof_of_address-${i + 1}.${type === 'ine' ? 'jpg' : 'pdf'}`,
+      proof_type: type,
+      issued_on: issued,
+      address_id: addr ? `mock-caddr-${i + 1}` : null,
       ocr_data: {
         simulated: true,
         confidence: 0.93,
         fields: {
-          tipo_documento: 'Comprobante de domicilio',
-          emisor: 'CFE Suministrador de Servicios Básicos',
-          fecha_emision: ymd(now - (10 + i * 15) * DAY),
+          ...(OCR[type ?? 'electricity'] ?? {}),
+          domicilio,
+          ...(issued ? { fecha_emision: issued } : {}),
         },
       },
       review_status: status,
@@ -809,6 +828,15 @@ export function withHistory(w: World): {
       reviewed_at: reviewed ? at : null,
       created_at: at,
       updated_at: at,
+      address_label: addr ? (i % 2 ? 'Oficina' : 'Casa') : null,
+      address_line: addr?.[0] ?? null,
+      address_place_name: addr ? `${addr[0]}, ${addr[1]}, ${addr[2]}` : null,
+      address_neighborhood: addr?.[1] ?? null,
+      address_municipality: addr?.[2] ?? null,
+      address_state: addr ? 'Jalisco' : null,
+      address_postal_code: addr?.[3] ?? null,
+      address_lng: addr?.[4] ?? null,
+      address_lat: addr?.[5] ?? null,
     };
   });
 

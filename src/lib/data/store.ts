@@ -34,7 +34,7 @@ import {
   type ReviewOutcome,
 } from '@/lib/payments';
 import { canRejectPayout } from '@/lib/finance';
-import { rejectionNotes } from '@/lib/clientDocs';
+import { rejectionNotes, type ClientDocumentRow } from '@/lib/clientDocs';
 import {
   evaluateSurcharge,
   mxParts,
@@ -2227,7 +2227,18 @@ export async function getQuoteAttachmentUrl(a: QuoteAttachment): Promise<string 
 // y el resto de la consola sigue funcionando.
 
 export type TechDocument = Row<'technician_documents'>;
-export type ClientDocument = Row<'client_documents'>;
+export type ClientDocument = ClientDocumentRow;
+const LINKED_ADDRESS_NULL = {
+  address_label: null,
+  address_line: null,
+  address_place_name: null,
+  address_neighborhood: null,
+  address_municipality: null,
+  address_state: null,
+  address_postal_code: null,
+  address_lat: null,
+  address_lng: null,
+} satisfies Omit<ClientDocumentRow, keyof Row<'client_documents'>>;
 export type TechnicianCompany = Row<'technician_companies'>;
 export type PayoutRequest = Row<'payout_requests'>;
 export type OrderRating = Row<'order_ratings'>;
@@ -2297,14 +2308,30 @@ const EXTRA_QUERIES: { [K in ExtraKey]: () => Promise<ExtrasState[K]> } = {
         .order('created_at', { ascending: false })
         .range(a, b),
     ),
-  clientDocs: () =>
-    fetchAllRows((a, b) =>
-      supabase
-        .from('client_documents')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(a, b),
-    ),
+  // La vista trae tipo + dirección vinculada para comparar; si aún no existe
+  // (migración pendiente) se cae a la tabla sin dirección.
+  clientDocs: async () => {
+    try {
+      const rows = await fetchAllRows((a, b) =>
+        supabase
+          .from('client_documents_review')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(a, b),
+      );
+      return rows as ClientDocument[];
+    } catch (e) {
+      console.warn('[data] client_documents_review no disponible; uso client_documents', e);
+      const rows = await fetchAllRows((a, b) =>
+        supabase
+          .from('client_documents')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(a, b),
+      );
+      return rows.map(r => ({ ...LINKED_ADDRESS_NULL, ...r }));
+    }
+  },
   companies: () =>
     fetchAllRows((a, b) =>
       supabase.from('technician_companies').select('*').order('name').range(a, b),

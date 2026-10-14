@@ -186,10 +186,12 @@ export type Database = {
           bucket_id: string
           client_id: string
           created_at: string
+          address_id: string | null
           id: string
-          issued_on: string
+          issued_on: string | null
           ocr_data: Json | null
           kind: Database["public"]["Enums"]["client_document_kind"]
+          proof_type: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes: string | null
           review_status: Database["public"]["Enums"]["document_review_status"]
           reviewed_at: string | null
@@ -201,10 +203,12 @@ export type Database = {
           bucket_id?: string
           client_id: string
           created_at?: string
+          address_id?: string | null
           id?: string
-          issued_on: string
+          issued_on?: string | null
           ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
+          proof_type?: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
           reviewed_at?: string | null
@@ -216,10 +220,12 @@ export type Database = {
           bucket_id?: string
           client_id?: string
           created_at?: string
+          address_id?: string | null
           id?: string
-          issued_on?: string
+          issued_on?: string | null
           ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
+          proof_type?: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
           reviewed_at?: string | null
@@ -228,6 +234,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_documents_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "client_addresses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_documents_client_id_fkey"
             columns: ["client_id"]
@@ -3191,6 +3204,37 @@ export type Database = {
       }
     }
     Views: {
+      client_documents_review: {
+        Row: {
+          address_id: string | null
+          address_label: string | null
+          address_lat: number | null
+          address_line: string | null
+          address_lng: number | null
+          address_municipality: string | null
+          address_neighborhood: string | null
+          address_place_name: string | null
+          address_postal_code: string | null
+          address_state: string | null
+          bucket_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          issued_on: string | null
+          kind: Database["public"]["Enums"]["client_document_kind"] | null
+          ocr_data: Json | null
+          proof_type: Database["public"]["Enums"]["address_proof_type"] | null
+          review_notes: string | null
+          review_status:
+            | Database["public"]["Enums"]["document_review_status"]
+            | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          storage_path: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       technician_public_profiles: {
         Row: {
           accepts_card: boolean | null
@@ -6407,6 +6451,7 @@ export type Database = {
       }
     }
     Enums: {
+      address_proof_type: "ine" | "electricity" | "phone" | "bank_statement"
       client_document_kind: "proof_of_address"
       contact_status: "new" | "handled" | "archived"
       contact_type: "client" | "company" | "technician" | "other"
@@ -6625,6 +6670,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      address_proof_type: ["ine", "electricity", "phone", "bank_statement"],
       client_document_kind: ["proof_of_address"],
       contact_status: ["new", "handled", "archived"],
       contact_type: ["client", "company", "technician", "other"],

@@ -3673,14 +3673,14 @@ export const saveZone = (z: {
     e =>
       pgCode(e) === '23505'
         ? 'Ya existe una zona con ese slug.'
-        : pgMessage(e, 'No se pudo guardar la zona (¿GeoJSON válido?).'),
+        : pgMessage(e, 'No se pudo guardar la zona.'),
   );
 
 /** Activa/pausa una zona: mismo upsert con su geometría actual. */
 export const setZoneActive = (id: string, active: boolean) => {
   const z = useExtras.getState().zones.find(x => x.id === id);
   if (!z?.geojson) {
-    notifyError('La zona no tiene geometría; edítala e importa su GeoJSON.');
+    notifyError('La zona no tiene geometría; edítala y dibuja su forma.');
     return Promise.resolve(null);
   }
   return saveZone({ id, slug: z.slug, name: z.name, geojson: z.geojson, is_active: active });

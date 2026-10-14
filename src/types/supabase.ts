@@ -5602,6 +5602,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      list_service_tickets: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       list_due_account_deletions: {
         Args: never
         Returns: {

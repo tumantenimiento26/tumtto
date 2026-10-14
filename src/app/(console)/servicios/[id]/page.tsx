@@ -100,6 +100,9 @@ import {
   timeAgo,
 } from '../_components/shared';
 import { QuoteAttachments } from '../_components/QuoteAttachments';
+import { ServiceTickets } from '../_components/ServiceTickets';
+import { listServiceTickets } from '@/lib/data/serviceTickets';
+import type { ServiceTicket } from '@/lib/ticket';
 import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { PaymentBreakdown } from '../_components/PaymentBreakdown';
@@ -160,7 +163,7 @@ export default function ServicioDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const { can } = useAuth();
+  const { can, canView } = useAuth();
   const canFinance = can('finanzas');
   const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
@@ -176,6 +179,23 @@ export default function ServicioDetailPage() {
   const [evidenceError, setEvidenceError] = useState(false);
   const [attachments, setAttachments] = useState<QuoteAttachment[] | null>(null);
   const [attachmentsError, setAttachmentsError] = useState(false);
+  const [tickets, setTickets] = useState<ServiceTicket[] | null>(null);
+  const [ticketsError, setTicketsError] = useState(false);
+  const [ticketsTry, setTicketsTry] = useState(0);
+  const canTickets = canView('servicios');
+
+  useEffect(() => {
+    if (!ready || !id || !canTickets) return;
+    let alive = true;
+    setTicketsError(false);
+    listServiceTickets(id).then(
+      t => alive && setTickets(t),
+      () => alive && setTicketsError(true),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [ready, id, canTickets, ticketsTry]);
 
   useEffect(() => {
     if (!ready || !id) return;
@@ -592,6 +612,10 @@ export default function ServicioDetailPage() {
           </Card>
 
           {quote && <QuoteAttachments orderId={req.id} items={attachments} error={attachmentsError} />}
+
+          {canTickets && (
+            <ServiceTickets items={tickets} error={ticketsError} onRetry={() => setTicketsTry(n => n + 1)} />
+          )}
 
           <Card padded>
             <div className="mb-3 flex items-center justify-between">

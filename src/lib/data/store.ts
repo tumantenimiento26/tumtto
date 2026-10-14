@@ -3687,8 +3687,27 @@ export const saveZone = (z: {
   name: string;
   geojson: ZoneGeometry;
   is_active: boolean;
-}) =>
-  mutateExtras(
+}) => {
+  if (MOCK) {
+    // Maqueta: en memoria (el backend repara la geometría; aquí se guarda tal cual).
+    const zones = useExtras.getState().zones;
+    if (zones.some(x => x.slug === z.slug && x.id !== z.id)) {
+      notifyError('Ya existe una zona con ese slug.');
+      return Promise.resolve(null);
+    }
+    const prev = zones.find(x => x.id === z.id);
+    const row: CoverageZone = {
+      ...(prev ?? { technician_count: 0 }),
+      id: prev?.id ?? `zone-${z.slug}`,
+      slug: z.slug,
+      name: z.name,
+      is_active: z.is_active,
+      geojson: z.geojson,
+    } as CoverageZone;
+    useExtras.setState({ zones: prev ? zones.map(x => (x.id === row.id ? row : x)) : [...zones, row] });
+    return Promise.resolve(true);
+  }
+  return mutateExtras(
     async () => {
       const { error } = await supabase.rpc('upsert_coverage_zone', {
         p_slug: z.slug,
@@ -3706,6 +3725,7 @@ export const saveZone = (z: {
         ? 'Ya existe una zona con ese slug.'
         : pgMessage(e, 'No se pudo guardar la zona.'),
   );
+};
 
 /** Activa/pausa una zona: mismo upsert con su geometría actual. */
 export const setZoneActive = (id: string, active: boolean) => {
@@ -3718,8 +3738,19 @@ export const setZoneActive = (id: string, active: boolean) => {
 };
 
 /** Asigna la zona base de un técnico (RPC assign_technician_zone). */
-export const assignTechZone = (techId: string, zoneId: string) =>
-  mutateExtras(
+export const assignTechZone = (techId: string, zoneId: string) => {
+  if (MOCK) {
+    const t = getTechnician(techId);
+    if (!t) return Promise.resolve(null);
+    (t as { zone_id: string | null }).zone_id = zoneId;
+    useExtras.setState({
+      zones: useExtras.getState().zones.map(z =>
+        z.id === zoneId ? { ...z, technician_count: z.technician_count + 1 } : z,
+      ),
+    });
+    return Promise.resolve(true);
+  }
+  return mutateExtras(
     async () => {
       const { error } = await supabase.rpc('assign_technician_zone', {
         p_technician_id: techId,
@@ -3730,6 +3761,7 @@ export const assignTechZone = (techId: string, zoneId: string) =>
     },
     e => pgMessage(e, 'No se pudo asignar la zona al técnico.'),
   );
+};
 
 export type DemandCell = Fn['admin_report_demand_heatmap']['Returns'][number];
 /** Demanda por día de la semana × hora (RPC admin_report_demand_heatmap, hora ZMG). */

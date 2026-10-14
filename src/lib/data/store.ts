@@ -34,6 +34,46 @@ import {
   type ReviewOutcome,
 } from '@/lib/payments';
 import { canRejectPayout } from '@/lib/finance';
+import {
+  REFUND_REFERENCE_MAX,
+  REJECT_REASON_MAX,
+  TRANSFER_PAGE_SIZE,
+  baseMethodOf,
+  depositArgs,
+  filterTransfers,
+  isAdvanceOwed,
+  isTransferRefundPending,
+  listArgs,
+  owedAdvances,
+  paginate,
+  parseDepositAccount,
+  parseTransferDetail,
+  proofKind,
+  validateDepositForm,
+  type DepositAccount,
+  type DepositForm,
+  type LatestProof,
+  type OwedAdvance,
+  type PaymentTransfer,
+  type TransferDetail,
+  type TransferFilters,
+  type TransferRow,
+} from '@/lib/transfers';
+import { demoTransfers, mockProofImage, mockProofPdf } from '@/lib/demo/transfers';
+import {
+  ADMIN_OWNED_FLAG_KEY,
+  COMMISSION_SETTING_KEY,
+  commissionFromSetting,
+  commissionReport,
+  parseCommissionConfig,
+  revenueModelOf,
+  snapshotCommission,
+  snapshotDue,
+  type TechCommissionReportRow,
+  type TechnicianCommission,
+  type TechnicianCommissionConfig,
+  type TechnicianCommissionType,
+} from '@/lib/commission';
 import { rejectionNotes } from '@/lib/clientDocs';
 import {
   evaluateSurcharge,
@@ -136,6 +176,8 @@ let settings: PlatformSetting[] = [];
 let tickets: Ticket[] = [];
 let ticketMessages: TicketMessage[] = [];
 let adminEvents: AdminEvent[] = [];
+/** TUM-01: snapshots de technician_commissions (RLS: solo finanzas; otros ven []). */
+let commissions: TechnicianCommission[] = [];
 let lastFetched = 0;
 
 // ── Soporte y bitácora ───────────────────────────────────────────────────────
@@ -169,6 +211,7 @@ const EVENT_LABEL: Record<string, string> = {
   request_rejected: 'Solicitud rechazada',
   order_refunded: 'Reembolso emitido',
   setting_updated: 'Ajuste actualizado',
+  technician_commission_updated: 'Comisión del técnico actualizada',
   zone_upserted: 'Zona guardada',
   technician_type_changed: 'Tipo de técnico cambiado',
   vehicle_added: 'Vehículo agregado',
@@ -302,6 +345,7 @@ export function loadWorld(force = false): Promise<void> {
         ticketRows,
         ticketMessageRows,
         adminEventRows,
+        commissionRows,
       ] = await Promise.all([
         fetchAll('profiles'),
         fetchAll('service_categories'),
@@ -341,6 +385,7 @@ export function loadWorld(force = false): Promise<void> {
           ),
           'admin_events',
         ),
+        optional(fetchAll('technician_commissions', ['service_order_id']), 'technician_commissions'),
       ]);
       world = {
         profiles,
@@ -362,6 +407,7 @@ export function loadWorld(force = false): Promise<void> {
       tickets = ticketRows;
       ticketMessages = ticketMessageRows;
       adminEvents = adminEventRows;
+      commissions = commissionRows;
       // service_orders.folio alimenta orderCode() → SVC-<folio>.
       registerFolios(orders);
       lastFetched = Date.now();
@@ -578,6 +624,15 @@ export const quotePaymentOf = (orderId: string) => quotePayment(getOrderPayments
 export const getCashReviewOrders = () => w().orders.filter(o => o.cash_review_open);
 /** Reembolsos de tarifa base abandonados tras 10 intentos (cola de finanzas). */
 export const getFailedBaseRefunds = () => failedBaseRefunds(w().orders);
+/** TUM-03: órdenes con un comprobante de transferencia por revisar (badge y avisos). */
+export const getTransferReviewOrders = () => w().orders.filter(o => o.base_fee_status === 'in_review');
+/** Decisión 7: servicios terminados con el adelanto aún adeudado (para el contador de la pestaña). */
+export const getOwedAdvanceOrders = () => w().orders.filter(isAdvanceOwed);
+/** TUM-03: transferencias aceptadas sobre solicitudes muertas que esperan el reembolso manual (finanzas). */
+export const getTransferRefundOrders = () =>
+  w()
+    .orders.filter(isTransferRefundPending)
+    .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
 
 export const getPendingKyc = () =>
   w().technicians.filter(
@@ -1790,11 +1845,28 @@ export async function fetchOrderPaymentSummary(orderId: string): Promise<Payment
     const o = getRequest(orderId);
     return o ? buildPaymentSummary(o, getOrderPayments(orderId), w().quotes.filter(q => q.service_order_id === orderId)) : null;
   };
-  if (MOCK) return local();
+  if (MOCK) {
+    const s = local();
+    // El RPC trae el último comprobante en base.transfer; en maqueta sale de la lista local.
+    const t = mockTransferList().filter(x => x.service_order_id === orderId).sort(byNewest)[0];
+    if (s?.base && t)
+      s.base.transfer = {
+        id: t.id,
+        status: t.status,
+        amountCents: t.amount_cents,
+        reference: t.reference,
+        rejectReason: t.reject_reason,
+        submittedAt: t.created_at,
+        reviewedAt: t.reviewed_at,
+      };
+    return s;
+  }
   try {
     const { data, error } = await supabase.rpc('get_order_payment_summary', { p_order_id: orderId });
     if (error) throw error;
-    return parsePaymentSummary(data) ?? local();
+    const parsed = parsePaymentSummary(data);
+    // El RPC no trae revenue_model: se toma de la orden del snapshot.
+    return parsed ? { ...parsed, revenueModel: revenueModelOf(getRequest(orderId)) } : local();
   } catch (e) {
     console.warn('[data] get_order_payment_summary', e);
     return local();
@@ -1815,6 +1887,325 @@ export async function fetchCashReviews(): Promise<CashReviewRow[] | null> {
     console.warn('[data] admin_list_cash_reviews', e);
     return null;
   }
+}
+
+// ── TUM-02/03: adelanto por transferencia («Revisión de pagos») ─────────────
+
+/** Maqueta: comprobantes en memoria (se crean con el mundo demo). */
+let mockTransfers: PaymentTransfer[] | null = null;
+function mockTransferList(): PaymentTransfer[] {
+  mockTransfers ??= demoTransfers(w().orders, Date.now());
+  return mockTransfers;
+}
+function mockTransferRow(t: PaymentTransfer): TransferRow {
+  const o = getRequest(t.service_order_id);
+  const c = getProfile(t.client_id);
+  return {
+    id: t.id,
+    service_order_id: t.service_order_id,
+    folio: o?.folio ?? 0,
+    order_status: o?.status ?? 'requested',
+    base_fee_status: o?.base_fee_status ?? '',
+    client_id: t.client_id,
+    client_name: c?.full_name ?? null,
+    client_phone: c?.phone ?? null,
+    amount_cents: t.amount_cents,
+    reference: t.reference,
+    proof_path: t.proof_path,
+    status: t.status,
+    reject_reason: t.reject_reason,
+    reviewed_by: t.reviewed_by,
+    reviewer_name: t.reviewed_by ? (personOrNull(t.reviewed_by) ?? 'Admin') : null,
+    reviewed_at: t.reviewed_at,
+    created_at: t.created_at,
+    total_count: 0,
+  };
+}
+
+/** «Transferencias» (admin_list_payment_transfers), paginada con total_count. null = no disponible. */
+export async function fetchPaymentTransfers(
+  f: TransferFilters,
+  page: number,
+  pageSize = TRANSFER_PAGE_SIZE,
+): Promise<{ rows: TransferRow[]; total: number } | null> {
+  if (MOCK) {
+    await loadWorld();
+    const rows = paginate(filterTransfers(mockTransferList().map(mockTransferRow), f), page, pageSize);
+    return { rows, total: rows[0]?.total_count ?? 0 };
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_list_payment_transfers', listArgs(f, page, pageSize));
+    if (error) throw error;
+    const rows = (data ?? []) as TransferRow[];
+    return { rows, total: Number(rows[0]?.total_count ?? 0) };
+  } catch (e) {
+    console.warn('[data] admin_list_payment_transfers', e);
+    return null;
+  }
+}
+
+/** Detalle de un comprobante (admin_get_payment_transfer). null = no disponible / no existe. */
+export async function fetchPaymentTransfer(id: string): Promise<TransferDetail | null> {
+  if (MOCK) {
+    await loadWorld();
+    const t = mockTransferList().find(x => x.id === id);
+    const o = t ? getRequest(t.service_order_id) : null;
+    if (!t || !o) return null;
+    const c = getProfile(t.client_id);
+    return {
+      transfer: { ...t, reviewer_name: mockTransferRow(t).reviewer_name },
+      proofPath: t.proof_path,
+      order: {
+        id: o.id,
+        folio: o.folio,
+        title: o.title,
+        status: o.status,
+        category_name: w().categories.find(x => x.id === o.category_id)?.name ?? null,
+        revenue_model: o.revenue_model,
+        base_fee_method: baseMethodOf(o.base_fee_method),
+        base_fee_status: o.base_fee_status,
+        base_total_cents: o.base_total_cents ?? 0,
+        technician_name: o.technician_id ? personOrNull(o.technician_id) : null,
+        created_at: o.created_at,
+      },
+      client: { id: t.client_id, full_name: c?.full_name ?? null, phone: c?.phone ?? null },
+      history: mockTransferList()
+        .filter(x => x.service_order_id === o.id)
+        .sort(byNewest)
+        .map(x => ({
+          id: x.id,
+          status: x.status,
+          amount_cents: x.amount_cents,
+          reference: x.reference,
+          proof_path: x.proof_path,
+          reject_reason: x.reject_reason,
+          reviewed_at: x.reviewed_at,
+          created_at: x.created_at,
+        })),
+    };
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_get_payment_transfer', { p_transfer_id: id });
+    if (error) throw error;
+    return parseTransferDetail(data);
+  } catch (e) {
+    console.warn('[data] admin_get_payment_transfer', e);
+    return null;
+  }
+}
+
+/**
+ * «Adelantos pendientes»: órdenes del snapshot ya terminadas con el adelanto
+ * sin pagar + su último comprobante (payment_transfers; RLS deja leer a
+ * soporte/finanzas). null = no disponible.
+ */
+export async function fetchOwedAdvances(): Promise<OwedAdvance[] | null> {
+  await loadWorld();
+  const orders = getOwedAdvanceOrders();
+  if (MOCK) return owedAdvances(orders, mockTransferList());
+  if (!orders.length) return [];
+  try {
+    const ids = orders.map(o => o.id);
+    const proofs: LatestProof[] = [];
+    // .in() viaja en la URL: en lotes para no exceder su largo.
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await supabase
+        .from('payment_transfers')
+        .select('id, service_order_id, status, reject_reason, created_at')
+        .in('service_order_id', ids.slice(i, i + 100));
+      if (error) throw error;
+      proofs.push(...(data ?? []));
+    }
+    return owedAdvances(orders, proofs);
+  } catch (e) {
+    console.warn('[data] adelantos pendientes', e);
+    return null;
+  }
+}
+
+/** URL firmada (10 min) del comprobante en el bucket privado payment-proofs. */
+export async function transferProofUrl(path: string): Promise<string | null> {
+  if (MOCK) {
+    const t = mockTransferList().find(x => x.proof_path === path);
+    if (!t) return null;
+    return proofKind(path) === 'pdf' ? mockProofPdf() : mockProofImage(t);
+  }
+  const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 600);
+  if (error) {
+    console.warn('[data] payment-proofs signed url', error);
+    return null;
+  }
+  return data.signedUrl;
+}
+
+/** Maqueta: marca el comprobante revisado y mueve la orden como lo haría el backend. */
+function mockReview(id: string, next: 'accepted' | 'rejected', reason: string | null): PaymentTransfer | null {
+  const list = mockTransferList();
+  const i = list.findIndex(x => x.id === id);
+  const t = list[i];
+  if (!t || t.status !== 'submitted') {
+    notifyError('La transferencia ya fue revisada.');
+    return null;
+  }
+  const k = w().orders.findIndex(o => o.id === t.service_order_id);
+  const o = w().orders[k];
+  if (next === 'accepted' && o && !['awaiting_transfer', 'in_review', 'pending', 'failed'].includes(o.base_fee_status)) {
+    notifyError('La visita de esta orden ya no tiene un pago pendiente; rechaza el comprobante.');
+    return null;
+  }
+  const now = new Date().toISOString();
+  const payId = w().payments.find(p => p.service_order_id === t.service_order_id && p.kind === 'base_fee')?.id ?? null;
+  list[i] = {
+    ...t,
+    status: next,
+    reject_reason: reason,
+    reviewed_by: MOCK_ADMIN_ID,
+    reviewed_at: now,
+    payment_id: next === 'accepted' ? payId : null,
+    updated_at: now,
+  };
+  if (o) {
+    // Solicitud muerta antes de la visita → el dinero se devuelve a mano (refund_pending).
+    const dead = ['cancelled', 'expired'].includes(o.status) && !o.accepted_at;
+    w().orders[k] =
+      next === 'accepted'
+        ? {
+            ...o,
+            base_fee_method: 'transfer',
+            base_fee_status: dead ? 'refund_pending' : 'paid',
+            base_fee_paid_at: now,
+            updated_at: now,
+          }
+        : { ...o, base_fee_status: 'awaiting_transfer', updated_at: now };
+    if (next === 'accepted')
+      w().payments.forEach((p, j) => {
+        if (p.service_order_id === o.id && p.kind === 'base_fee')
+          w().payments[j] = { ...p, method: 'transfer', status: 'paid', paid_at: now, stripe_fee_cents: 0, updated_at: now };
+      });
+  }
+  bump();
+  return list[i];
+}
+
+/** Acepta el comprobante (soporte o finanzas): el adelanto queda pagado y se avisa al cliente. */
+export async function acceptPaymentTransfer(id: string) {
+  if (MOCK) return mockReview(id, 'accepted', null);
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_accept_payment_transfer', { p_transfer_id: id });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo aceptar la transferencia.'),
+  );
+}
+
+/** Rechaza el comprobante con motivo (obligatorio); el cliente puede subir otro o pagar con tarjeta. */
+export async function rejectPaymentTransfer(id: string, reason: string) {
+  const text = reason.trim();
+  if (!text || text.length > REJECT_REASON_MAX) {
+    notifyError(`Escribe el motivo del rechazo (máximo ${REJECT_REASON_MAX} caracteres).`);
+    return null;
+  }
+  if (MOCK) return mockReview(id, 'rejected', text);
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_reject_payment_transfer', { p_transfer_id: id, p_reason: text });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo rechazar la transferencia.'),
+  );
+}
+
+/** Registra que finanzas devolvió por transferencia el adelanto de una solicitud muerta. */
+export async function confirmTransferRefund(orderId: string, reference: string) {
+  const ref = reference.trim();
+  if (!ref || ref.length > REFUND_REFERENCE_MAX) {
+    notifyError('La referencia del reembolso es obligatoria.');
+    return null;
+  }
+  if (MOCK) {
+    const k = w().orders.findIndex(o => o.id === orderId);
+    const o = w().orders[k];
+    if (!o || !isTransferRefundPending(o)) {
+      notifyError('Esta orden no tiene un reembolso de transferencia pendiente.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    w().orders[k] = { ...o, base_fee_status: 'refunded', base_fee_refunded_at: now, updated_at: now };
+    let pay: Row<'payments'> | null = null;
+    w().payments.forEach((p, j) => {
+      if (p.service_order_id === orderId && p.kind === 'base_fee' && p.status === 'paid') {
+        pay = { ...p, status: 'refunded', refunded_cents: p.amount_cents, updated_at: now };
+        w().payments[j] = pay;
+      }
+    });
+    bump();
+    return pay ?? true;
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_confirm_transfer_refund', { p_order_id: orderId, p_reference: ref });
+      if (error) throw error;
+      return data;
+    },
+    e => pgMessage(e, 'No se pudo registrar el reembolso.'),
+  );
+}
+
+/** Maqueta: cuenta de depósito (platform_settings.transfer_deposit_account). */
+let mockDeposit: DepositAccount = {
+  configured: true,
+  bank: 'BBVA México',
+  clabe: '012180001234567899',
+  card_number: null,
+  holder: 'Tu Mantenimiento S.A. de C.V.',
+  updated_at: new Date(Date.now() - 6 * DAY_MS).toISOString(),
+};
+
+/** Cuenta a la que el cliente transfiere (get_transfer_deposit_account). null = no disponible. */
+export async function fetchDepositAccount(): Promise<DepositAccount | null> {
+  if (MOCK) return { ...mockDeposit };
+  try {
+    const { data, error } = await supabase.rpc('get_transfer_deposit_account');
+    if (error) throw error;
+    return parseDepositAccount(data);
+  } catch (e) {
+    console.warn('[data] get_transfer_deposit_account', e);
+    return null;
+  }
+}
+
+/** Guarda la cuenta de depósito (admin_set_transfer_deposit_account, finanzas; auditado). */
+export async function setDepositAccount(f: DepositForm): Promise<DepositAccount | null> {
+  const errs = validateDepositForm(f);
+  const first = Object.values(errs)[0];
+  if (first) {
+    notifyError(first);
+    return null;
+  }
+  const args = depositArgs(f);
+  if (MOCK) {
+    mockDeposit = {
+      configured: true,
+      bank: args.p_bank,
+      clabe: args.p_clabe,
+      card_number: args.p_card_number ?? null,
+      holder: args.p_holder,
+      updated_at: new Date().toISOString(),
+    };
+    bump();
+    return { ...mockDeposit };
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_set_transfer_deposit_account', args);
+      if (error) throw error;
+      return parseDepositAccount(data);
+    },
+    e => pgMessage(e, 'No se pudo guardar la cuenta para transferencias.'),
+  );
 }
 
 /** Reporte «Efectivo por técnico» (finanzas). null = no disponible. */
@@ -1880,6 +2271,123 @@ export async function fetchPaymentsReport(
     return { rows, total: Number(rows[0]?.total_count ?? 0) };
   } catch (e) {
     console.warn('[data] admin_report_payments', e);
+    return null;
+  }
+}
+
+// ── TUM-01: dinero de Tu Mantenimiento + comisión del técnico ───────────────
+
+/** Maqueta: tarifa congelada por orden al primer snapshot (como el backend). */
+const mockSnapshots = new Map<string, TechnicianCommission>();
+function mockCommissionRate() {
+  return commissionFromSetting(settings.find(x => x.key === COMMISSION_SETTING_KEY)?.value);
+}
+/** Maqueta: snapshots derivados de las órdenes admin_owned en estado terminal. */
+function mockCommissions(): TechnicianCommission[] {
+  const rate = mockCommissionRate();
+  for (const o of w().orders) {
+    if (!snapshotDue(o)) continue;
+    const prev = mockSnapshots.get(o.id) ?? null;
+    const at = prev ? o.updated_at : (o.completed_at ?? o.paid_at ?? o.cancelled_at ?? o.updated_at);
+    const next = snapshotCommission(o, getOrderPayments(o.id), rate, prev, at);
+    if (next) mockSnapshots.set(o.id, next);
+  }
+  return [...mockSnapshots.values()];
+}
+
+/** Snapshots de comisión (technician_commissions) del snapshot cargado. */
+export const getTechnicianCommissions = () => (MOCK ? mockCommissions() : commissions);
+export const getOrderCommission = (orderId: string) =>
+  getTechnicianCommissions().find(c => c.service_order_id === orderId) ?? null;
+
+/** Config vigente (get_technician_commission_config). null = no disponible. */
+export async function fetchTechnicianCommissionConfig(): Promise<TechnicianCommissionConfig | null> {
+  if (MOCK) {
+    const rate = mockCommissionRate();
+    return {
+      ...rate,
+      updatedAt: settings.find(x => x.key === COMMISSION_SETTING_KEY)?.updated_at ?? null,
+      adminOwnedEnabled: getSettingBool(ADMIN_OWNED_FLAG_KEY, true),
+    };
+  }
+  try {
+    const { data, error } = await supabase.rpc('get_technician_commission_config');
+    if (error) throw error;
+    return parseCommissionConfig(data);
+  } catch (e) {
+    console.warn('[data] get_technician_commission_config', e);
+    return null;
+  }
+}
+
+/** Guarda la comisión del técnico (admin_set_technician_commission, finanzas). */
+export async function setTechnicianCommission(
+  type: TechnicianCommissionType,
+  value: number,
+): Promise<TechnicianCommissionConfig | null> {
+  if (!Number.isInteger(value) || value < 0 || (type === 'percent' && value > 10_000)) {
+    notifyError('Valor de comisión inválido: monto fijo de 0 o más, o porcentaje entre 0 y 100.');
+    return null;
+  }
+  if (MOCK) {
+    const now = new Date().toISOString();
+    const i = settings.findIndex(x => x.key === COMMISSION_SETTING_KEY);
+    const old = i >= 0 ? settings[i].value : null;
+    const val = { type, value };
+    if (i >= 0) settings[i] = { ...settings[i], value: val, updated_at: now };
+    else
+      settings = [
+        ...settings,
+        { id: `mock-set-${COMMISSION_SETTING_KEY}`, key: COMMISSION_SETTING_KEY, value: val, description: null, created_at: now, updated_at: now },
+      ];
+    adminEvents = [
+      ...adminEvents,
+      {
+        id: `mock-ae-tc-${Date.now()}`,
+        actor_id: MOCK_ADMIN_ID,
+        entity_type: 'platform_settings',
+        entity_id: `mock-set-${COMMISSION_SETTING_KEY}`,
+        event_type: 'technician_commission_updated',
+        payload: { key: COMMISSION_SETTING_KEY, old, new: val },
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+    bump();
+    return fetchTechnicianCommissionConfig();
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_set_technician_commission', { p_type: type, p_value: value });
+      if (error) throw error;
+      const cfg = parseCommissionConfig(data);
+      if (!cfg) throw new Error('respuesta inválida de admin_set_technician_commission');
+      return cfg;
+    },
+    e => pgMessage(e, 'No se pudo guardar la comisión del técnico.'),
+  );
+}
+
+/** Reporte «Comisiones de técnicos» (admin_report_technician_commissions, finanzas). null = no disponible. */
+export async function fetchTechnicianCommissionReport(
+  from: Date,
+  to: Date,
+  technicianId: string | null = null,
+): Promise<TechCommissionReportRow[] | null> {
+  if (MOCK) {
+    await loadWorld();
+    return commissionReport(getTechnicianCommissions(), from.getTime(), to.getTime(), personOrNull, technicianId);
+  }
+  try {
+    const { data, error } = await supabase.rpc('admin_report_technician_commissions', {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+      ...(technicianId ? { p_technician_id: technicianId } : {}),
+    });
+    if (error) throw error;
+    return data ?? [];
+  } catch (e) {
+    console.warn('[data] admin_report_technician_commissions', e);
     return null;
   }
 }

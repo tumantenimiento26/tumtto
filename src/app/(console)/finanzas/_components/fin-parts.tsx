@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CreditCard, Store, Wallet, Banknote } from 'lucide-react';
+import { CreditCard, Store, Wallet, Banknote, Landmark } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ds';
 import type { BucketTotals } from '@/lib/finance';
@@ -19,6 +19,7 @@ export const METHOD: Record<string, { label: string; icon: LucideIcon; color: st
   wallet: { label: 'Mercado Pago', icon: Wallet, color: 'var(--color-cyan)' },
   oxxo: { label: 'OXXO', icon: Store, color: 'var(--color-warning)' },
   cash: { label: 'Efectivo', icon: Banknote, color: 'var(--color-success)' },
+  transfer: { label: 'Transferencia', icon: Landmark, color: 'var(--color-navy)' },
 };
 export const methodMeta = (m: string) =>
   METHOD[m] ?? { label: m, icon: CreditCard, color: 'var(--color-muted)' };

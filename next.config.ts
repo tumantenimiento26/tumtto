@@ -20,6 +20,8 @@ const CSP = [
   `connect-src 'self' https://*.supabase.co wss://*.supabase.co${SB_HTTP}${SB_WS} https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com`,
   "worker-src 'self' blob:",
   "child-src blob:",
+  // TUM-03: vista previa del comprobante PDF (URL firmada de Storage; blob: en maqueta).
+  `frame-src 'self' blob: https://*.supabase.co${SB_HTTP}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -32,6 +34,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7),
     NEXT_PUBLIC_BUILD_ENV: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+  },
+  // TUM-03: «Revisión de efectivo» ahora es la pestaña Efectivo de «Revisión de pagos».
+  async redirects() {
+    return [{ source: '/revision-efectivo', destination: '/revision-pagos?tab=efectivo', permanent: false }];
   },
   async headers() {
     return [

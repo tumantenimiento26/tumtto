@@ -20,6 +20,8 @@ import {
 } from './store';
 import { getContactMessages, loadContactMessages, useContact } from './contactStore';
 import { CONTACT_TYPE_LABEL } from '@/lib/contactAdmin';
+import { assignmentNotifHref } from '@/lib/assignments';
+import { getServerNotifs, useAssignments } from './assignmentsStore';
 import { useEffect } from 'react';
 
 /**
@@ -38,6 +40,7 @@ export type NotifType =
   | 'retiros'
   | 'emergencias'
   | 'servicios'
+  | 'asignaciones'
   | 'pagos'
   | 'sistema';
 
@@ -49,6 +52,7 @@ export const NOTIF_TYPES: { type: NotifType; label: string }[] = [
   { type: 'retiros', label: 'Retiros' },
   { type: 'emergencias', label: 'Emergencias' },
   { type: 'servicios', label: 'Servicios' },
+  { type: 'asignaciones', label: 'Asignaciones' },
   { type: 'pagos', label: 'Pagos' },
   { type: 'sistema', label: 'Sistema' },
 ];
@@ -62,6 +66,8 @@ export interface AdminNotification {
   ts: string;
   /** Ruta a la que lleva al hacer clic. */
   href: string;
+  /** Ya leída en el backend (notificaciones de la tabla `notifications`). */
+  readAt?: boolean;
 }
 
 const name = (id: string | null | undefined) =>
@@ -190,6 +196,18 @@ export function derive(now = Date.now()): AdminNotification[] {
         ts: o.created_at,
         href: `/servicios/${o.id}`,
       });
+  // Notificaciones reales del backend (tabla `notifications`, del propio admin):
+  // `admin_request_created` y `assignment_acknowledged`.
+  for (const n of getServerNotifs())
+    out.push({
+      id: `srv-${n.id}`,
+      type: 'asignaciones',
+      title: n.title,
+      body: n.body ?? '',
+      ts: n.created_at,
+      href: assignmentNotifHref(n.kind, n.entity_id),
+      readAt: !!n.read_at,
+    });
   return out.sort((a, b) => b.ts.localeCompare(a.ts));
 }
 
@@ -235,13 +253,14 @@ export function useNotifications(): {
 } {
   useTick();
   useContact(s => s.messages);
+  useAssignments(s => s.notifs);
   useEffect(() => {
     void loadContactMessages();
   }, []);
   const { read, deleted, muted } = useNotifState();
   const items = derive()
     .filter(n => !deleted.includes(n.id) && !muted.includes(n.type))
-    .map(n => ({ ...n, read: read.includes(n.id) }));
+    .map(n => ({ ...n, read: !!n.readAt || read.includes(n.id) }));
   return { items, unread: items.filter(n => !n.read).length };
 }
 

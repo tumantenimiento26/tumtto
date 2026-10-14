@@ -26,6 +26,7 @@ import {
   Settings,
   Siren,
   Sun,
+  UserCheck,
   User,
   Users,
   Wallet,
@@ -70,6 +71,8 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useTheme, applyTheme } from '@/lib/theme';
 import { orderCode } from '@/lib/orderCode';
+import { usePendingAssignments } from '@/lib/data/assignmentsStore';
+import { useAssignmentsLive } from '@/lib/data/assignmentsLive';
 
 /**
  * Shell de la consola (handoff web · C. Consola admin):
@@ -140,6 +143,7 @@ interface NavGroup {
 function useNavGroups(): NavGroup[] {
   useTick();
   const { unread } = useNotifications();
+  const pendingAssignments = usePendingAssignments();
   const { permissions } = useAuth();
   const groups: NavGroup[] = [
     {
@@ -170,6 +174,12 @@ function useNavGroups(): NavGroup[] {
       label: 'Operación',
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
+        {
+          href: '/asignaciones',
+          icon: UserCheck,
+          label: 'Asignaciones',
+          badge: () => pendingAssignments,
+        },
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
         { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
@@ -217,6 +227,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/clientes': ['Usuarios', 'Clientes'],
   '/tecnicos': ['Usuarios', 'Técnicos'],
   '/servicios': ['Operación', 'Servicios'],
+  '/asignaciones': ['Operación', 'Asignaciones'],
   '/inventario': ['Operación', 'Inventario'],
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
@@ -595,6 +606,7 @@ const NOTIF_ICON: Record<NotifType, { icon: LucideIcon; tile: string }> = {
   retiros: { icon: Banknote, tile: 'bg-success-soft text-success' },
   emergencias: { icon: Siren, tile: 'bg-error-soft text-error' },
   servicios: { icon: Wrench, tile: 'bg-warning-soft text-warning-ink' },
+  asignaciones: { icon: UserCheck, tile: 'bg-info-soft text-primary' },
   pagos: { icon: CreditCard, tile: 'bg-error-soft text-error' },
   sistema: { icon: Info, tile: 'bg-chip text-muted' },
 };
@@ -823,6 +835,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const hydrateTheme = useTheme(s => s.hydrate);
   const [navigating, setNavigating] = useState(false);
   const first = useRef(true);
+  useAssignmentsLive();
 
   // Tema solo dentro de la consola; al salir (login) se quita.
   useEffect(() => {

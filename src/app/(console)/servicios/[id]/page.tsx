@@ -51,6 +51,7 @@ import {
   scheduleLabel,
   scheduleSurchargeLabel,
 } from '@/lib/unassigned';
+import { agoLabel, confirmationLabel } from '@/lib/assignments';
 import { AssignModal, RejectModal } from '../_components/AssignModal';
 import {
   addNote,
@@ -754,6 +755,21 @@ export default function ServicioDetailPage() {
                   ? `Sin técnico · espera ${ageLabel(req.created_at)}`
                   : 'Sin técnico asignado todavía.'}
               </p>
+            )}
+            {req.assigned_by_admin_at && (
+              <div className="mt-3 flex flex-col items-start gap-1.5 border-t border-divider pt-3">
+                <Badge tone="info" mono>
+                  Asignado por Tumtto
+                </Badge>
+                <span className="text-[12.5px] text-muted">
+                  {agoLabel(req.assigned_by_admin_at)}
+                </span>
+                {req.technician_id && (
+                  <Badge tone={req.assignment_ack_at ? 'success' : 'warning'} dot>
+                    {confirmationLabel({ technician: techProfile ? { id: techProfile.id, name: techProfile.full_name ?? '' } : null, assignment_ack_at: req.assignment_ack_at })}
+                  </Badge>
+                )}
+              </div>
             )}
             {techRec && (
               <Link

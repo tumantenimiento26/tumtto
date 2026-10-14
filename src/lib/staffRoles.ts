@@ -129,6 +129,7 @@ type RouteRule = {
 const ROUTES: RouteRule[] = [
   { prefix: '/dashboard', section: 'dashboard', action: 'view' },
   { prefix: '/servicios', section: 'servicios', action: 'view' },
+  { prefix: '/asignaciones', section: 'servicios', action: 'view' },
   { prefix: '/tecnicos', section: 'tecnicos', action: 'view' },
   { prefix: '/clientes', section: 'clientes', action: 'view' },
   { prefix: '/inventario', section: 'inventario', action: 'view' },

@@ -1080,6 +1080,9 @@ export async function assignOrder(
       accepted_at: wasRequested ? now : (prev.accepted_at ?? now),
       needs_manual_assignment: false,
       dispatch_status: prev.priority === 'emergency' ? 'assigned' : prev.dispatch_status,
+      ...(prev.assignment_mode === 'admin'
+        ? { assigned_by_admin_at: now, assigned_by_admin_id: MOCK_ADMIN_ID, assignment_ack_at: null }
+        : {}),
       updated_at: now,
     };
     const by = getProfile(MOCK_ADMIN_ID)?.full_name ?? 'admin';

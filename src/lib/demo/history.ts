@@ -727,6 +727,61 @@ export function withHistory(w: World): {
     });
   });
 
+  // Ya asignadas por Tumtto: una esperando el «Enterado» del técnico y dos confirmadas.
+  const assigned: [number, number, number, string, number, number | null][] = [
+    // [categoría idx, minutos desde la solicitud, lugar, técnico, minutos desde la asignación, minutos desde el «Enterado»]
+    [1, 95, 2, 'u-jose', 38, null],
+    [0, 4 * 60, 5, 'u-ag', 3 * 60, 2 * 60 + 40],
+    [4, 26 * 60, 8, 'u-lupita', 25 * 60, 24 * 60 + 30],
+  ];
+  assigned.forEach(([catIdx, minsAgo, place, techId, asgAgo, ackAgo], k) => {
+    const n = 9201 + k;
+    const [catId, , , , titles] = CATS[catIdx];
+    const [neighborhood, municipality, postal_code, lng, lat] = PLACES[place];
+    const at = now - minsAgo * MIN;
+    const asgAt = iso(now - asgAgo * MIN);
+    orders.push({
+      ...w.orders[0],
+      id: `SVC-${n}`,
+      folio: n,
+      client_id: clientIds[(n + 5) % clientIds.length],
+      technician_id: techId,
+      category_id: catId,
+      client_address_id: null,
+      status: 'accepted',
+      title: titles[0],
+      description: DESC[(k + 3) % DESC.length],
+      is_urgent: false,
+      priority: 'normal',
+      assignment_mode: 'admin',
+      assigned_by_admin_at: asgAt,
+      assigned_by_admin_id: 'mock-admin',
+      assignment_ack_at: ackAgo == null ? null : iso(now - ackAgo * MIN),
+      needs_manual_assignment: false,
+      schedule_surcharge_bps: 0,
+      scheduled_for: iso(now + (k + 2) * 60 * MIN),
+      scheduled_until: iso(now + (k + 4) * 60 * MIN),
+      location: ewkb(lng, lat),
+      address_line: `Calle ${between(1, 99)} #${between(100, 3000)}`,
+      neighborhood,
+      municipality,
+      postal_code,
+      quoted_subtotal_cents: null,
+      quoted_total_cents: null,
+      commission_cents: null,
+      is_disputed: false,
+      accepted_at: asgAt,
+      completed_at: null,
+      paid_at: null,
+      cancelled_at: null,
+      cancellation_reason: null,
+      expires_at: null,
+      dispatch_status: null,
+      created_at: iso(at),
+      updated_at: asgAt,
+    });
+  });
+
   // Retiros semanales por técnico activo: pagados salvo la última semana.
   const payouts: Row<'payout_requests'>[] = [];
   for (const t of ['u-ag', 'u-sc', 'u-jose', 'u-lupita', 'u-do', TECH_USER_ID])

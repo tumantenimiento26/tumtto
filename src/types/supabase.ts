@@ -1789,6 +1789,9 @@ export type Database = {
         Row: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -1853,6 +1856,9 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           address_line?: string | null
+          assigned_by_admin_at?: string | null
+          assigned_by_admin_id?: string | null
+          assignment_ack_at?: string | null
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
@@ -1917,6 +1923,9 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           address_line?: string | null
+          assigned_by_admin_at?: string | null
+          assigned_by_admin_id?: string | null
+          assignment_ack_at?: string | null
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
@@ -3320,6 +3329,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -3393,6 +3405,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -3517,6 +3532,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -3714,6 +3732,7 @@ export type Database = {
         Returns: boolean
       }
       my_permissions: { Args: never; Returns: Json }
+      admin_list_assignments: { Args: { p_status?: string }; Returns: Json }
       admin_list_cash_reviews: {
         Args: never
         Returns: {
@@ -3771,6 +3790,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -4002,6 +4024,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -4371,6 +4396,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -4749,6 +4777,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5018,6 +5049,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5170,6 +5204,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5263,6 +5300,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5353,6 +5393,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5757,6 +5800,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -5830,6 +5876,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -6038,6 +6087,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
@@ -6306,6 +6358,9 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string | null
+          assigned_by_admin_at: string | null
+          assigned_by_admin_id: string | null
+          assignment_ack_at: string | null
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null

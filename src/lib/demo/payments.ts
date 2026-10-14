@@ -54,6 +54,10 @@ interface Spec {
     payStatus?: Pay['status'];
   };
   dispatch?: string;
+  /** TUM-01: el dinero es de Tu Mantenimiento (revenue_model admin_owned). */
+  admin?: boolean;
+  /** TUM-02: el cliente eligió pagar la visita por transferencia (base_fee_method). */
+  transfer?: boolean;
   path: Status[];
 }
 
@@ -119,6 +123,53 @@ const SPECS: Spec[] = [
   // Reembolso de la visita que Stripe rechazó 10 veces: espera «Reintentar» en Finanzas.
   { folio: 4021, agoH: 50, cat: 1, tech: null, status: 'cancelled', title: 'Corto en cocina', base: 30000, baseStatus: 'refund_failed', basePay: 'paid',
     path: ['requested', 'cancelled'] },
+  // TUM-01 · dinero de Tu Mantenimiento: sin crédito al técnico ni comisión de plataforma;
+  // el técnico gana su comisión (technician_commissions).
+  { folio: 4022, agoH: 30, cat: 0, tech: 0, status: 'paid', title: 'Cambio de llave de paso', admin: true, base: 35000, baseStatus: 'paid', basePay: 'paid', quote: 160000,
+    cash: { status: 'client_confirmed', received: 160000, response: 'confirmed' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  { folio: 4023, agoH: 10, cat: 1, tech: 1, status: 'completed', title: 'Instalación de lámparas', admin: true, base: 30000, baseStatus: 'paid', basePay: 'paid', quote: 110000,
+    cash: { status: 'technician_confirmed', received: 110000 },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed'] },
+  { folio: 4024, agoH: 22, cat: 3, tech: 1, status: 'completed', title: 'Carga de gas a minisplit', admin: true, base: 45000, baseStatus: 'paid', basePay: 'paid', quote: 120000,
+    cash: { status: 'disputed', received: 90000, response: 'disputed', clientReported: 120000, reason: 'amount_mismatch',
+      disputeReason: 'Pagué los 1,200 completos; el técnico reportó menos.' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed'] },
+  { folio: 4025, agoH: 34, cat: 4, tech: 0, status: 'closed', title: 'Secadora no calienta', admin: true, base: 30000, baseStatus: 'paid', basePay: 'paid', quote: 260000, qs: 'rejected',
+    rejectReason: 'Me sale más barato reemplazarla.',
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'closed'] },
+  { folio: 4026, agoH: 16, cat: 2, tech: 0, status: 'cancelled', title: 'Revisión de fuga (cliente ausente)', admin: true, base: 40000, baseStatus: 'paid', basePay: 'paid',
+    path: ['requested', 'accepted', 'enroute', 'cancelled'] },
+  { folio: 4027, agoH: 1.5, cat: 0, tech: 1, status: 'working', title: 'Calentador sin flama', admin: true, base: 35000, baseStatus: 'paid', basePay: 'paid', quote: 85000,
+    cash: { status: 'pending_technician' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working'] },
+  { folio: 4028, agoH: 70, cat: 1, tech: 0, status: 'paid', title: 'Corto en recámara', admin: true, base: 30000, baseStatus: 'paid', basePay: 'paid', quote: 70000,
+    cash: { status: 'resolved', received: 0, response: 'disputed', reason: 'client_not_paid', outcome: 'not_collected',
+      notes: 'El cliente no pagó la reparación; se cobró solo la visita.', payStatus: 'failed' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  // TUM-02/03 · adelanto por transferencia (comprobantes en demo/transfers.ts). No bloquea el servicio.
+  { folio: 4029, agoH: 1.2, cat: 0, tech: 0, status: 'accepted', title: 'Fuga bajo el fregadero', admin: true, transfer: true, base: 35000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested', 'accepted'] },
+  { folio: 4030, agoH: 4, cat: 1, tech: 1, status: 'enroute', title: 'Apagador quemado', admin: true, transfer: true, base: 30000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute'] },
+  { folio: 4031, agoH: 30, cat: 3, tech: 0, status: 'paid', title: 'Limpieza de minisplit', admin: true, transfer: true, base: 45000,
+    baseStatus: 'paid', basePay: 'paid', quote: 60000, cash: { status: 'client_confirmed', received: 60000, response: 'confirmed' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed', 'paid'] },
+  { folio: 4032, agoH: 0.4, cat: 4, tech: null, status: 'requested', title: 'Refrigerador hace ruido', admin: true, transfer: true, base: 30000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested'] },
+  { folio: 4033, agoH: 9, cat: 2, tech: null, status: 'cancelled', title: 'Revisión de boiler', admin: true, transfer: true, base: 40000,
+    baseStatus: 'refund_pending', basePay: 'paid', path: ['requested', 'cancelled'] },
+  { folio: 4034, agoH: 3, cat: 5, tech: 1, status: 'working', title: 'Cambio de chapa', admin: true, base: 25000,
+    baseStatus: 'paid', basePay: 'paid', path: ['requested', 'accepted', 'enroute', 'onsite', 'working'] },
+  // Decisión 7: servicio terminado con el adelanto aún sin pagar (queda adeudado por el cliente).
+  { folio: 4036, agoH: 48, cat: 1, tech: 0, status: 'completed', title: 'Cambio de contactos', admin: true, transfer: true, base: 30000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'working', 'completed'] },
+  { folio: 4037, agoH: 75, cat: 0, tech: 1, status: 'paid', title: 'Destape de coladera', admin: true, transfer: true, base: 35000,
+    baseStatus: 'in_review', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'working', 'completed', 'paid'] },
+  { folio: 4038, agoH: 26, cat: 3, tech: 0, status: 'cancelled', title: 'Revisión de minisplit (cliente canceló en sitio)', admin: true, transfer: true,
+    base: 45000, baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'cancelled'] },
+  { folio: 4035, agoH: 0.1, cat: 0, tech: null, status: 'requested', title: 'Calentador gotea', admin: true, transfer: true, base: 35000,
+    baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested'] },
 ];
 
 /** Última ocurrencia (hora de México) de `time` —en `weekday` si se indica— antes de `before`. */
@@ -186,13 +237,14 @@ export function paymentModelDemo(
       quoted_subtotal_cents: quoted,
       quoted_total_cents: quoted,
       commission_bps: 1500,
-      commission_cents: s.cash?.received != null ? commissionOf(s.cash.received, 1500) : null,
+      commission_cents: !s.admin && s.cash?.received != null ? commissionOf(s.cash.received, 1500) : null,
       accepted_at: at('accepted'),
       completed_at: at('completed'),
       paid_at: at('paid') ?? (rejected ? at('closed') : null),
       cancelled_at: at('cancelled'),
       cancellation_reason: s.status === 'cancelled' ? 'Cancelada por el cliente antes de la visita' : null,
       payment_model: 'base_cash',
+      revenue_model: s.admin ? 'admin_owned' : 'technician_owned',
       base_fee_cents: s.base,
       base_surcharge_cents: (s.surcharge ?? 0) + schedCents,
       scheduled_for: s.when ? iso(created + 2 * HOUR) : null,
@@ -202,7 +254,9 @@ export function paymentModelDemo(
       schedule_surcharge_bps: rule?.surcharge_type === 'percent' ? rule.value : 0,
       base_total_cents: baseTotal,
       base_fee_status: s.baseStatus,
+      base_fee_method: s.transfer ? 'transfer' : 'card',
       base_fee_paid_at: ['paid', 'refund_pending', 'refund_failed', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
+      // admin_owned también marca la tarifa como «conservada» (sin acreditar al técnico).
       base_fee_credited_at: s.path.includes('enroute') && s.baseStatus === 'paid' ? iso(created + 50 * MIN) : null,
       base_fee_refunded_at: s.baseStatus === 'refunded' ? iso(created + 40 * MIN) : null,
       cash_review_open: s.cash?.status === 'disputed',
@@ -230,25 +284,27 @@ export function paymentModelDemo(
 
     if (s.basePay) {
       const paid = ['paid', 'refunded'].includes(s.basePay);
-      const fee = Math.round(baseTotal * 0.029) + 300;
+      // Transferencia aceptada: method 'transfer', sin comisión de Stripe.
+      const byTransfer = !!s.transfer && paid;
+      const fee = byTransfer ? 0 : Math.round(baseTotal * 0.029) + 300;
       payments.push({
         ...payT,
         id: `pay-b-${s.folio}`,
         service_order_id: id,
         client_id: clientId,
-        technician_id: techId,
+        technician_id: s.admin ? null : techId,
         kind: 'base_fee',
-        method: 'card',
+        method: byTransfer ? 'transfer' : 'card',
         status: s.basePay,
         amount_cents: baseTotal,
-        commission_cents: commissionOf(baseTotal, 1500),
-        platform_fee_cents: commissionOf(baseTotal, 1500),
+        commission_cents: s.admin ? 0 : commissionOf(baseTotal, 1500),
+        platform_fee_cents: s.admin ? 0 : commissionOf(baseTotal, 1500),
         stripe_fee_cents: paid ? fee : 0,
-        stripe_payment_intent_id: paid ? `pi_mock_b${s.folio}` : null,
+        stripe_payment_intent_id: paid && !byTransfer ? `pi_mock_b${s.folio}` : null,
         refunded_cents: s.refunded ? baseTotal : 0,
         refund_requested_at: ['refund_pending', 'refund_failed'].includes(s.baseStatus) ? iso(created + 10 * MIN) : null,
         tech_credit_cents:
-          s.path.includes('enroute') && s.baseStatus === 'paid'
+          !s.admin && s.path.includes('enroute') && s.baseStatus === 'paid'
             ? baseTotal - commissionOf(baseTotal, 1500) - fee
             : 0,
         paid_at: paid ? iso(created + 4 * MIN) : null,
@@ -286,7 +342,8 @@ export function paymentModelDemo(
       const got = c.received ?? null;
       const settled = c.status === 'client_confirmed' || (c.status === 'resolved' && c.payStatus !== 'failed');
       const qStatus = c.payStatus ?? (settled ? 'paid' : 'pending');
-      const commission = got != null ? commissionOf(got, 1500) : 0;
+      // admin_owned: payments.commission_cents = 0 y sin deuda en el ledger.
+      const commission = !s.admin && got != null ? commissionOf(got, 1500) : 0;
       const reviewOpen = c.status === 'disputed';
       payments.push({
         ...payT,

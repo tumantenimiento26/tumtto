@@ -49,6 +49,7 @@ import {
   getClients,
   getOpenSupportCount,
   getCashReviewOrders,
+  getTransferReviewOrders,
   getPendingKyc,
   getProfile,
   getTechniciansWithProfile,
@@ -139,8 +140,8 @@ function useNavGroups(): NavGroup[] {
   const { unread } = useNotifications();
   const { can } = useAuth();
   const finanzas = can('finanzas');
-  // Soporte o finanzas resuelven revisiones de efectivo (página propia).
-  const efectivo = finanzas || can('soporte');
+  // Soporte o finanzas revisan pagos: transferencias y efectivo (página propia).
+  const pagos = finanzas || can('soporte');
   return [
     {
       label: 'General',
@@ -173,7 +174,16 @@ function useNavGroups(): NavGroup[] {
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
         ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
-        ...(efectivo ? [{ href: '/revision-efectivo', icon: Banknote, label: 'Revisión de efectivo', badge: () => getCashReviewOrders().length }] : []),
+        ...(pagos
+          ? [
+              {
+                href: '/revision-pagos',
+                icon: Banknote,
+                label: 'Revisión de pagos',
+                badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
+              },
+            ]
+          : []),
         {
           href: '/soporte',
           icon: Scale,
@@ -211,7 +221,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
   '/soporte': ['Operación', 'Soporte'],
-  '/revision-efectivo': ['Operación', 'Revisión de efectivo'],
+  '/revision-pagos': ['Operación', 'Revisión de pagos'],
   '/reportes': ['Analítica', 'Reportes'],
   '/catalogo': ['Sistema', 'Catálogo'],
   '/config': ['Sistema', 'Configuración'],

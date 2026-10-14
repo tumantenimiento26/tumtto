@@ -5,6 +5,7 @@
 
 import type { Database, Json } from '@/types/supabase';
 import type { NullableCols } from '@/types/rpc';
+import { isAdminOwned, revenueModelOf, type RevenueModel } from '@/lib/commission';
 
 type T = Database['public']['Tables'];
 type Fn = Database['public']['Functions'];
@@ -25,7 +26,9 @@ export type BaseFeeStatus =
   | 'refund_failed'
   | 'refunded'
   | 'waived'
-  | 'void';
+  | 'void'
+  | 'awaiting_transfer'
+  | 'in_review';
 export type CashStatus =
   | 'pending_technician'
   | 'technician_confirmed'
@@ -44,6 +47,9 @@ export const BASE_STATUS: Record<string, { label: string; tone: Tone }> = {
   refunded: { label: 'Reembolsada', tone: 'danger' },
   waived: { label: 'Exonerada', tone: 'info' },
   void: { label: 'Anulada', tone: 'neutral' },
+  // TUM-02: adelanto por transferencia (no bloquea el servicio).
+  awaiting_transfer: { label: 'Pendiente de transferencia', tone: 'warning' },
+  in_review: { label: 'En revisión', tone: 'info' },
 };
 
 export const CASH_STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -82,6 +88,17 @@ export const OUTCOMES: { value: ReviewOutcome; label: string; hint: string }[] =
     hint: 'El técnico asume el faltante: se revierte la comisión de ese efectivo y no se cobra al cliente.',
   },
 ];
+/**
+ * Pistas de cada resultado en órdenes admin_owned (TUM-01): el efectivo es de
+ * Tu Mantenimiento y no hay comisión que recalcular; el resultado solo fija
+ * cuánto efectivo debe entregar el técnico.
+ */
+export const OUTCOMES_ADMIN_OWNED: typeof OUTCOMES = [
+  { ...OUTCOMES[0], hint: 'Se acepta el monto que reportó el técnico: es lo que debe entregar a Tu Mantenimiento.' },
+  { ...OUTCOMES[1], hint: 'Se fija el monto realmente cobrado: es lo que el técnico debe entregar a Tu Mantenimiento.' },
+  { ...OUTCOMES[2], hint: 'No hubo cobro: el técnico no entrega efectivo de este servicio y no se cobra al cliente.' },
+];
+export const outcomesFor = (model: RevenueModel) => (model === 'admin_owned' ? OUTCOMES_ADMIN_OWNED : OUTCOMES);
 export const OUTCOME_LABEL: Record<string, string> = Object.fromEntries(
   OUTCOMES.map(o => [o.value, o.label]),
 );
@@ -129,11 +146,23 @@ export const kindLabel = (k: string | null | undefined) => KIND_LABEL[k ?? 'lega
 
 // ── Resumen por orden (espejo de get_order_payment_summary) ──────────────────
 
+/** Último comprobante de transferencia del adelanto (get_order_payment_summary.base.transfer). */
+export interface BaseTransfer {
+  id: string;
+  status: string;
+  amountCents: number;
+  reference: string | null;
+  rejectReason: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+}
 export interface BaseSummary {
   feeCents: number;
   surchargeCents: number;
   totalCents: number;
-  method: 'card';
+  /** TUM-02: método elegido por el cliente (y luego el que pagó). */
+  method: 'card' | 'transfer';
+  transfer: BaseTransfer | null;
   status: string;
   paidAt: string | null;
   refundedCents: number;
@@ -221,6 +250,8 @@ export interface Concepts {
 export interface PaymentSummary {
   orderId: string;
   paymentModel: 'legacy' | 'base_cash';
+  /** TUM-01: admin_owned = todo el dinero es de Tu Mantenimiento; el técnico gana su comisión. */
+  revenueModel: RevenueModel;
   base: BaseSummary | null;
   quote: QuoteSummary;
   /** null en órdenes del modelo anterior (no hay conceptos separados). */
@@ -281,6 +312,7 @@ export function buildPaymentSummary(
   return {
     orderId: order.id,
     paymentModel: isBaseCash ? 'base_cash' : 'legacy',
+    revenueModel: revenueModelOf(order),
     concepts: isBaseCash ? conceptsOf(order, closedByRejection) : null,
     quoteState: quoteStateOf(quotes, attachmentsCount),
     closedByQuoteRejection: closedByRejection,
@@ -289,7 +321,8 @@ export function buildPaymentSummary(
           feeCents: order.base_fee_cents,
           surchargeCents: order.base_surcharge_cents,
           totalCents: order.base_total_cents ?? 0,
-          method: 'card',
+          method: order.base_fee_method === 'transfer' ? 'transfer' : 'card',
+          transfer: null,
           status: order.base_fee_status,
           paidAt: order.base_fee_paid_at,
           refundedCents: base?.refunded_cents ?? 0,
@@ -316,6 +349,23 @@ export function buildPaymentSummary(
   };
 }
 
+function parseBaseTransfer(v: Json | undefined): BaseTransfer | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const t = v as Record<string, Json>;
+  const id = str(t.id);
+  return id
+    ? {
+        id,
+        status: str(t.status) ?? 'submitted',
+        amountCents: num0(t.amount_cents),
+        reference: str(t.reference),
+        rejectReason: str(t.reject_reason),
+        submittedAt: str(t.submitted_at),
+        reviewedAt: str(t.reviewed_at),
+      }
+    : null;
+}
+
 /** jsonb de get_order_payment_summary → PaymentSummary (tolerante a faltantes). */
 export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
@@ -327,6 +377,8 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
   return {
     orderId: str(j.order_id) ?? '',
     paymentModel: j.payment_model === 'base_cash' ? 'base_cash' : 'legacy',
+    // get_order_payment_summary no trae revenue_model: quien llama lo toma de la orden.
+    revenueModel: j.revenue_model === 'admin_owned' ? 'admin_owned' : 'technician_owned',
     concepts: c
       ? {
           visitCents: num0(c.visit_cents),
@@ -352,7 +404,8 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
           feeCents: num0(b.fee_cents),
           surchargeCents: num0(b.surcharge_cents),
           totalCents: num0(b.total_cents),
-          method: 'card',
+          method: b.method === 'transfer' ? 'transfer' : 'card',
+          transfer: parseBaseTransfer(b.transfer),
           status: str(b.status) ?? 'not_required',
           paidAt: str(b.paid_at),
           refundedCents: num0(b.refunded_cents),
@@ -412,7 +465,7 @@ export const refundablePayments = (payments: PayRow[]) =>
 
 /** «Tarifa base · Tarjeta», «Presupuesto · Efectivo»… */
 export function paymentLabel(p: Pick<PayRow, 'kind' | 'method'>): string {
-  const method = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago' }[p.method] ?? p.method;
+  const method = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago', transfer: 'Transferencia' }[p.method] ?? p.method;
   return `${kindLabel(p.kind)} · ${method}`;
 }
 
@@ -456,8 +509,10 @@ export function applyCashResolution(
       : outcome === 'not_collected'
         ? 0
         : (pay.cash_received_cents ?? pay.amount_cents);
-  const commission =
-    outcome === 'confirm_technician'
+  // admin_owned: el efectivo es de Tu Mantenimiento, no hay comisión de plataforma.
+  const commission = isAdminOwned(order)
+    ? 0
+    : outcome === 'confirm_technician'
       ? pay.commission_cents
       : commissionOf(received, order.commission_bps ?? 1500);
   const payment: PayRow = {
@@ -649,8 +704,11 @@ export function cashByTechnician(
     const t = o.base_fee_credited_at ? Date.parse(o.base_fee_credited_at) : NaN;
     if (!(t >= from && t < to)) continue;
     const r = acc.get(o.technician_id) ?? emptyCashRow(o.technician_id, nameOf(o.technician_id));
-    r.base_fee_credited_cents += o.base_fee_cents ?? 0;
-    r.schedule_surcharge_credited_cents += o.schedule_surcharge_cents ?? 0;
+    // admin_owned: la tarifa base no se acredita al técnico (es de Tu Mantenimiento).
+    if (!isAdminOwned(o)) {
+      r.base_fee_credited_cents += o.base_fee_cents ?? 0;
+      r.schedule_surcharge_credited_cents += o.schedule_surcharge_cents ?? 0;
+    }
     if (credits!.rejected.has(o.id)) r.quotes_rejected += 1;
     acc.set(o.technician_id, r);
   }
@@ -841,7 +899,13 @@ export function paymentsReport(
   });
 }
 
-const METHOD_NAME: Record<string, string> = { card: 'Tarjeta', cash: 'Efectivo', oxxo: 'OXXO', wallet: 'Mercado Pago' };
+const METHOD_NAME: Record<string, string> = {
+  card: 'Tarjeta',
+  cash: 'Efectivo',
+  oxxo: 'OXXO',
+  wallet: 'Mercado Pago',
+  transfer: 'Transferencia',
+};
 export const methodName = (m: string | null | undefined) => (m ? (METHOD_NAME[m] ?? m) : '—');
 
 export function paymentsReportCsvRows(rows: PaymentsReportRow[]): Record<string, string | number>[] {

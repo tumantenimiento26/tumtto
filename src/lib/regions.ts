@@ -179,3 +179,33 @@ export function arrivalMinutes(
   }
   return out;
 }
+
+export type ZoneAssignCandidate = {
+  id: string;
+  name: string;
+  type: 'tumtto' | 'third_party' | 'independent';
+  kycApproved: boolean;
+  zoneId: string | null;
+  municipality: string | null;
+};
+
+const TYPE_ORDER = { tumtto: 0, third_party: 1, independent: 2 } as const;
+const TYPE_LABEL = { tumtto: 'Tumtto', third_party: 'Tercero', independent: 'Independiente' } as const;
+
+/**
+ * Opciones del selector «Asignar técnico a esta zona»: primero los técnicos de
+ * Tumtto (aunque su KYC siga en revisión: el tipo lo asigna el admin), luego
+ * terceros e independientes aprobados. Fuera solo los que ya están en la zona.
+ */
+export function zoneAssignOptions(techs: ZoneAssignCandidate[], zoneId: string) {
+  return techs
+    .filter(t => t.zoneId !== zoneId && (t.type === 'tumtto' || t.kycApproved))
+    .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.name.localeCompare(b.name, 'es'))
+    .map(t => ({
+      value: t.id,
+      label: t.name,
+      hint: [TYPE_LABEL[t.type], t.type === 'tumtto' && !t.kycApproved ? 'KYC en revisión' : null, t.municipality ?? 'sin base']
+        .filter(Boolean)
+        .join(' · '),
+    }));
+}

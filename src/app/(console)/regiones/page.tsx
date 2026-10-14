@@ -17,7 +17,6 @@ import {
   ScreenSkeleton,
   Select,
   Sheet,
-  Textarea,
   Toggle,
   snackbar,
   toast,
@@ -49,7 +48,8 @@ import {
   type CoverageZone,
   type DemandCell,
 } from '@/lib/data/store';
-import { parseZoneGeoJson, wkbPoint, type LngLat } from '@/lib/geo';
+import { parseZoneGeoJson, wkbPoint, type LngLat, type ZoneShape } from '@/lib/geo';
+import { ZoneDrawMap } from '@/components/zone-draw-map';
 import {
   arrivalMinutes,
   canonMunicipality,
@@ -470,6 +470,7 @@ export default function RegionesPage() {
         open={editor.open}
         zone={editor.zone}
         defaultName={!editor.zone && sel ? sel.name : ''}
+        others={extras.zones.filter(z => z.geojson && z.id !== editor.zone?.id).map(z => z.geojson!)}
         onClose={() => setEditor({ open: false, zone: null })}
       />
     </div>
@@ -503,47 +504,56 @@ function AssignTech({ zone, techs }: { zone: CoverageZone; techs: TechBase[] }) 
 }
 
 /**
- * Alta/edición de zona: nombre, slug y GeoJSON (pegado o importado de un
- * archivo .geojson/.json, p. ej. el polígono municipal de INEGI). El backend
- * valida la geometría (Polygon/MultiPolygon válido).
+ * Alta/edición de zona: nombre, slug y la forma dibujada en el mapa (o
+ * importada de un .geojson, p. ej. el polígono municipal de INEGI). El
+ * backend repara contornos que se cruzan (ST_MakeValid).
  */
 function ZoneEditor({
   open,
   zone,
   defaultName,
+  others,
   onClose,
 }: {
   open: boolean;
   zone: CoverageZone | null;
   defaultName: string;
+  others: ZoneShape[];
   onClose: () => void;
 }) {
   const [name, setName] = useState(zone?.name ?? defaultName);
   const [slug, setSlug] = useState(zone?.slug ?? slugify(defaultName));
   const [slugTouched, setSlugTouched] = useState(!!zone);
-  const [geo, setGeo] = useState(zone?.geojson ? JSON.stringify(zone.geojson) : '');
+  const [shape, setShape] = useState<ZoneShape | null>(zone?.geojson ?? null);
+  // Al importar un archivo se remonta el mapa con la forma nueva.
+  const [mapKey, setMapKey] = useState(0);
+  const [importErr, setImportErr] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(zone?.is_active ?? true);
   const [tried, setTried] = useState(false);
   const { busy, run } = useAction();
 
-  const parsed = geo.trim() ? parseZoneGeoJson(geo) : { geometry: null, error: 'Pega o importa el GeoJSON de la zona.' };
   const nameErr = tried && name.trim().length < 2 ? 'Escribe el nombre de la zona.' : null;
   const slugErr = tried && !/^[a-z0-9-]{2,}$/.test(slug) ? 'Slug en minúsculas, números y guiones.' : null;
-  const geoErr = tried && parsed.error ? parsed.error : null;
+  const geoErr = importErr ?? (tried && !shape ? 'Dibuja la zona en el mapa (mínimo 3 puntos).' : null);
 
   async function importFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setGeo(await f.text());
+    const parsed = parseZoneGeoJson(await f.text());
     e.target.value = '';
+    setImportErr(parsed.error);
+    if (parsed.geometry) {
+      setShape(parsed.geometry);
+      setMapKey(k => k + 1);
+    }
   }
 
   async function save() {
     setTried(true);
-    if (nameErr || slugErr || !parsed.geometry || name.trim().length < 2 || !/^[a-z0-9-]{2,}$/.test(slug)) return;
+    if (nameErr || slugErr || !shape || name.trim().length < 2 || !/^[a-z0-9-]{2,}$/.test(slug)) return;
     const ok = await run(
       'save',
-      () => saveZone({ id: zone?.id ?? null, slug, name: name.trim(), geojson: parsed.geometry, is_active: isActive }),
+      () => saveZone({ id: zone?.id ?? null, slug, name: name.trim(), geojson: shape, is_active: isActive }),
       zone ? 'Zona actualizada' : 'Zona creada',
     );
     if (ok) onClose();
@@ -555,7 +565,7 @@ function ZoneEditor({
       onClose={() => !busy && onClose()}
       title={zone ? `Editar ${zone.name}` : 'Nueva zona de cobertura'}
       kicker="Regiones"
-      width={520}
+      width={620}
       footer={
         <div className="flex w-full gap-2">
           <Button variant="secondary" full disabled={!!busy} onClick={onClose}>
@@ -590,13 +600,15 @@ function ZoneEditor({
           hint="Identificador estable (zapopan, tlajomulco-norte)."
           className="font-mono"
         />
-        <Field label="GeoJSON (Polygon o MultiPolygon)" hint={parsed.geometry ? `${parsed.geometry.type} válido` : undefined}>
-          <Textarea
-            rows={8}
-            value={geo}
-            onChange={e => setGeo(e.target.value)}
-            placeholder='{"type":"Polygon","coordinates":[[[-103.52,20.79],…]]}'
-            className="font-mono text-[12px]"
+        <Field label="Forma de la zona" required>
+          <ZoneDrawMap
+            key={mapKey}
+            value={shape}
+            others={others}
+            onChange={g => {
+              setShape(g);
+              setImportErr(null);
+            }}
           />
           {geoErr && (
             <p role="alert" className="mt-1 font-sans text-[12px] text-error">
@@ -605,7 +617,7 @@ function ZoneEditor({
           )}
           <label className="mt-2 inline-flex cursor-pointer items-center gap-2 font-sans text-[13px] font-semibold text-primary hover:underline">
             <input type="file" accept=".geojson,.json,application/geo+json,application/json" className="sr-only" onChange={e => void importFile(e)} />
-            Importar archivo .geojson
+            O importar archivo .geojson
           </label>
         </Field>
         <div className="flex items-center justify-between rounded-box border border-line bg-panel px-4 py-3">

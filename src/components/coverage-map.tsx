@@ -11,7 +11,7 @@ import { useTheme } from '@/lib/theme';
  * `coverage_zones` (GeoJSON de la RPC admin_list_coverage_zones), capa de
  * calor con las solicitudes recientes y anillos de cobertura de los técnicos
  * con base registrada. Hover/selección por feature-state, sincronizada con la
- * lista. La geometría se edita importando GeoJSON (ver Regiones), no a mano.
+ * lista. La geometría se dibuja en el mapa del editor de zonas (ver Regiones).
  *
  * Token: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (.env.local, compartido con la app
  * móvil). Sin token renderiza un placeholder utilizable.

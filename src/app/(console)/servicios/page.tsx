@@ -275,21 +275,26 @@ export default function ServiciosPage() {
       ),
     },
     {
+      key: 'tipo',
+      header: 'Tipo de servicio',
+      sortValue: r => r.categoryName,
+      render: r => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <CategoryTile slug={slugOf(r.categoryId)} size={30} />
+          <span className="truncate text-[13.5px] font-semibold text-navy">
+            {r.categoryName}
+          </span>
+        </div>
+      ),
+    },
+    {
       key: 'cliente',
       header: 'Cliente',
       sortValue: r => r.clientName,
       render: r => (
-        <div className="flex min-w-0 items-center gap-2.5">
-          <CategoryTile slug={slugOf(r.categoryId)} size={30} />
-          <div className="min-w-0">
-            <div className="truncate font-display text-[13.5px] font-bold text-navy">
-              {r.clientName}
-            </div>
-            <div className="truncate text-[12px] text-muted">
-              {r.categoryName}
-            </div>
-          </div>
-        </div>
+        <span className="block truncate font-display text-[13.5px] font-bold text-navy">
+          {r.clientName}
+        </span>
       ),
     },
     {
@@ -324,9 +329,21 @@ export default function ServiciosPage() {
           <Badge tone={STATUS[r.status].tone} dot>
             {STATUS[r.status].label}
           </Badge>
-          {r.is_disputed && <Badge tone="danger">Disputa</Badge>}
         </span>
       ),
+    },
+    {
+      key: 'disputa',
+      header: 'Disputa',
+      sortValue: r => (r.is_disputed ? 1 : 0),
+      render: r =>
+        r.is_disputed ? (
+          <Badge tone="danger" dot>
+            Sí
+          </Badge>
+        ) : (
+          <span className="text-[12.5px] text-faint">No</span>
+        ),
     },
     {
       key: 'total',
@@ -390,7 +407,7 @@ export default function ServiciosPage() {
   ];
   const shownColumns = inbox
     ? [
-        ...columns.filter(c => ['servicio', 'cliente', 'zona'].includes(c.key)),
+        ...columns.filter(c => ['servicio', 'tipo', 'cliente', 'zona'].includes(c.key)),
         ...inboxColumns,
         columns.find(c => c.key === 'tecnico')!,
       ]

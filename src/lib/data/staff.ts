@@ -240,7 +240,9 @@ export async function fetchMyPermissions(): Promise<MyPermissions | null> {
 /** Carga secciones, roles y miembros. Sin permiso de equipo deja las listas vacías. */
 export async function loadStaff(): Promise<void> {
   if (MOCK) return publishMock();
-  patch({ status: 'loading', error: null });
+  // Solo la primera carga muestra el esqueleto; las recargas tras guardar van en
+  // segundo plano para no desmontar hojas abiertas (resumen del alta, matriz).
+  if (useStaff.getState().status !== 'ready') patch({ status: 'loading', error: null });
   const [sec, rol, adm] = await Promise.all([
     supabase.rpc('admin_list_sections'),
     supabase.rpc('admin_list_roles'),

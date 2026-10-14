@@ -4,21 +4,20 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Gavel, SlidersHorizontal } from 'lucide-react';
 import {
+  Badge,
   Button,
   Card,
   Chip,
   EmptyState,
-  ErrorPage,
   Kicker,
-  PageHeader,
-  ScreenSkeleton,
   Segmented,
+  Skeleton,
   Select,
   Sheet,
 } from '@/components/ds';
 import { CashReviewModal } from '@/components/cash-review-modal';
-import { useAuth } from '@/lib/auth';
-import { fetchCashReviews, loadWorld, useTick, useWorldFailed, useWorldReady } from '@/lib/data/store';
+import { fetchCashReviews, getRequest, useTick } from '@/lib/data/store';
+import { isAdminOwned } from '@/lib/commission';
 import { orderCode } from '@/lib/orderCode';
 import {
   EMPTY_CASH_REVIEW_FILTERS,
@@ -52,26 +51,25 @@ const AGES: { value: string; label: string }[] = [
   { value: '7', label: '+7 días' },
 ];
 
-export default function RevisionEfectivoPage() {
+/**
+ * «Revisión de pagos» › Efectivo: la cola de antes (efectivo que no cuadra
+ * entre técnico y cliente). RPC admin_list_cash_reviews / resolve; la página
+ * ya validó soporte o finanzas.
+ */
+export function CashReviewPanel() {
   const tick = useTick();
-  const ready = useWorldReady();
-  const failed = useWorldFailed();
-  const { can } = useAuth();
-  // Backend: admin_list_cash_reviews / resolve aceptan soporte o finanzas.
-  const allowed = can('soporte') || can('finanzas');
   const [rows, setRows] = useState<CashReviewRow[] | null | undefined>(undefined);
   const [target, setTarget] = useState<string | null>(null);
   const [f, setF] = useState<CashReviewFilters>(EMPTY_CASH_REVIEW_FILTERS);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!allowed) return;
     let live = true;
     void fetchCashReviews().then(r => live && setRows(r));
     return () => {
       live = false;
     };
-  }, [tick, allowed]);
+  }, [tick]);
 
   const techs = useMemo(() => {
     const m = new Map<string, string>();
@@ -81,32 +79,27 @@ export default function RevisionEfectivoPage() {
   const visible = useMemo(() => filterCashReviews(rows ?? [], f), [rows, f]);
   const nFilters = activeCashReviewFilters(f);
 
-  if (!allowed) return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
-  if (failed) return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
-  if (!ready || rows === undefined) return <ScreenSkeleton kind="list" />;
+  if (rows === undefined) return <Skeleton className="h-40 w-full" />;
 
   const total = rows?.length ?? 0;
 
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Revisión de efectivo"
-        description={
-          rows === null
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-sans text-[13px] text-muted">
+          {rows === null
             ? 'Efectivo que no cuadra entre el técnico y el cliente.'
-            : `${visible.length} de ${total} ${total === 1 ? 'revisión abierta' : 'revisiones abiertas'} · el efectivo no cuadra entre técnico y cliente`
-        }
-        actions={
-          <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setOpen(true)}>
-            Filtros
-            {nFilters > 0 && (
-              <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
-                {nFilters}
-              </span>
-            )}
-          </Button>
-        }
-      />
+            : `${visible.length} de ${total} ${total === 1 ? 'revisión abierta' : 'revisiones abiertas'} · el efectivo no cuadra entre técnico y cliente`}
+        </p>
+        <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setOpen(true)}>
+          Filtros
+          {nFilters > 0 && (
+            <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+              {nFilters}
+            </span>
+          )}
+        </Button>
+      </div>
 
       {nFilters > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -157,7 +150,10 @@ export default function RevisionEfectivoPage() {
                     >
                       {orderCode(r.order_id)} <ExternalLink size={11} aria-hidden />
                     </Link>
-                    <div className="font-sans text-[13.5px] font-semibold text-navy">{reviewReason(r.review_reason)}</div>
+                    <div className="flex flex-wrap items-center gap-2 font-sans text-[13.5px] font-semibold text-navy">
+                      {reviewReason(r.review_reason)}
+                      {isAdminOwned(getRequest(r.order_id)) && <Badge tone="info">Efectivo de Tu Mantenimiento</Badge>}
+                    </div>
                     <div className="font-sans text-[12.5px] text-muted">
                       {r.technician_name ?? 'Técnico'} · {r.client_name ?? 'Cliente'} · {ago(r.review_opened_at)}
                     </div>
@@ -195,7 +191,7 @@ export default function RevisionEfectivoPage() {
         open={open}
         onClose={() => setOpen(false)}
         width={400}
-        kicker="Revisión de efectivo"
+        kicker="Revisión de pagos · Efectivo"
         title="Filtros"
         footer={
           <div className="flex w-full gap-2.5">

@@ -96,27 +96,28 @@ function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
       />
 
       <div className="relative flex h-full flex-col">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex flex-col items-center gap-3 self-center">
           <BrandMark
-            size={34}
-            className="rounded-[9px] shadow-[0_0_24px_rgba(24,193,255,0.35)]"
+            size={110}
+            animated
+            className="rounded-[26px] shadow-[0_0_56px_rgba(24,193,255,0.5)]"
           />
-          <span className="font-display text-[17px] font-bold">
+          <span className="font-display text-[36px] font-extrabold tracking-[-0.8px]">
             Tumantenimiento
           </span>
         </Link>
 
-        <div className="mt-10 min-[760px]:mt-14">
+        <div className="mt-10 text-center min-[760px]:mt-14">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-cyan">
             {kicker}
           </p>
           <h2 className="mt-3 font-display text-[clamp(28px,3.4vw,40px)] font-extrabold leading-[1.08] tracking-[-1px]">
             {title}
           </h2>
-          <p className="mt-4 max-w-[440px] text-[15px] leading-[1.65] text-lp-body">
+          <p className="mx-auto mt-4 max-w-[440px] text-[15px] leading-[1.65] text-lp-body">
             {lead}
           </p>
-          <ul className="mt-6 hidden flex-col gap-3 min-[760px]:flex">
+          <ul className="mx-auto mt-6 hidden w-fit flex-col gap-3 text-left min-[760px]:flex">
             {bullets.map(b => (
               <li key={b} className="flex items-center gap-3 text-[14.5px]">
                 <span className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-primary/25 text-cyan">
@@ -162,22 +163,7 @@ export function AsideConsole() {
 
   return (
     <div className="rounded-box border border-lp-line bg-lp-card p-5 backdrop-blur-md">
-      <div className="flex items-center gap-5">
-        <div className="relative grid h-[84px] w-[84px] flex-shrink-0 place-items-center">
-          <span
-            aria-hidden
-            className="absolute inset-0 animate-pulse-ring rounded-[22px] border-2 border-cyan/60"
-          />
-          <span
-            aria-hidden
-            className="absolute inset-0 animate-pulse-ring rounded-[22px] border border-cyan/40 [animation-delay:1.2s]"
-          />
-          <BrandMark
-            size={72}
-            animated
-            className="logo-in rounded-[18px] shadow-[0_0_40px_rgba(24,193,255,0.45)]"
-          />
-        </div>
+      <div>
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-cyan">
             {now
@@ -242,18 +228,6 @@ export function AsideConsole() {
           <dd className="mt-1 font-semibold">{built}</dd>
         </div>
       </dl>
-
-      <style>{`
-        @keyframes logo-in {
-          0% { opacity: 0; transform: scale(.6) rotate(-12deg); }
-          60% { opacity: 1; transform: scale(1.06) rotate(2deg); }
-          100% { transform: none; }
-        }
-        .logo-in { animation: logo-in .9s cubic-bezier(.2,.8,.2,1) both; }
-        @media (prefers-reduced-motion: reduce) {
-          .logo-in, .animate-pulse-ring { animation: none; }
-        }
-      `}</style>
     </div>
   );
 }

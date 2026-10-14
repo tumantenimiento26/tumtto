@@ -16,6 +16,8 @@ import {
   Briefcase,
   TrendingUp,
   MapPin,
+  HandCoins,
+  Building2,
 } from 'lucide-react';
 import {
   Badge,
@@ -42,6 +44,7 @@ import {
   getTechRates,
   getTechRatings,
   getTechnician,
+  getTechnicianCommissions,
   getWallet,
   loadExtras,
   loadWorld,
@@ -54,6 +57,7 @@ import {
   useWorldFailed,
   useWorldReady,
 } from '@/lib/data/store';
+import { techAdminOwnedSummary, techIncome } from '@/lib/commission';
 import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
@@ -122,12 +126,8 @@ export default function TecnicoDetailPage() {
     const orders = getAllRequests().filter(o => o.technician_id === tech.id);
     const done = orders.filter(o => DONE.has(o.status));
     const since30 = Date.now() - 30 * 864e5;
-    const pays = getAllPayments().filter(
-      p =>
-        p.status === 'paid' &&
-        orders.some(o => o.id === p.service_order_id) &&
-        new Date(p.paid_at ?? p.created_at).getTime() >= since30,
-    );
+    const allPays = getAllPayments();
+    const commissions = getTechnicianCommissions();
     const wallet = getWallet(tech.id);
     return {
       catNames: getTechCategories(tech.id)
@@ -142,7 +142,9 @@ export default function TecnicoDetailPage() {
       })),
       recent: orders.slice(0, 5),
       jobs: done.length,
-      income30: pays.reduce((s, p) => s + p.amount_cents - p.commission_cents, 0),
+      // Modelo anterior: cobrado − comisión de plataforma; dinero de TM: su comisión.
+      income30: techIncome(tech.id, orders, allPays, commissions, since30),
+      adminOwned: techAdminOwnedSummary(tech.id, orders, allPays, commissions),
       balance:
         wallet?.available_cents ??
         getLedger(tech.id).reduce((s, e) => s + e.amount_cents, 0),
@@ -407,6 +409,22 @@ export default function TecnicoDetailPage() {
               },
               { l: 'Ingresos netos · 30 d', v: money(data.income30), i: TrendingUp },
               { l: 'Saldo en cartera', v: money(data.balance), i: Wallet },
+              ...(data.adminOwned.servicesCount > 0 || data.adminOwned.cashHeldForAdminCents > 0
+                ? [
+                    {
+                      l: 'Comisiones ganadas',
+                      v: money(data.adminOwned.commissionEarnedCents),
+                      sub: `${data.adminOwned.servicesCount} servicios · dinero de Tu Mantenimiento`,
+                      i: HandCoins,
+                    },
+                    {
+                      l: 'Efectivo de Tu Mantenimiento',
+                      v: money(data.adminOwned.cashHeldForAdminCents),
+                      sub: 'Reportado por el técnico; debe entregarlo',
+                      i: Building2,
+                    },
+                  ]
+                : []),
             ].map(k => (
               <Card key={k.l} padded hover className="animate-up">
                 <div className="flex items-start justify-between">

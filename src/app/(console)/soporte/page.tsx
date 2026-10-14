@@ -75,7 +75,7 @@ import { loadContactMessages, useContact } from '@/lib/data/contactStore';
 import { newContactCount } from '@/lib/contactAdmin';
 import { ContactView } from './_components/ContactView';
 import { exportSupportTab } from './_components/exportSupport';
-import { ClientDocActions, issuedOn } from '../clientes/_components/ClientDocCard';
+import { ClientDocActions, ClientDocDetails } from '../clientes/_components/ClientDocCard';
 import { OcrSummary } from '../tecnicos/_components/detail-parts';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
@@ -843,9 +843,7 @@ function ClientDocKycCard({ doc }: { doc: ReturnType<typeof getPendingClientDocu
           </span>
           <span className="font-sans text-[11px] text-faint">{timeAgo(doc.created_at)}</span>
         </div>
-        <span className="font-sans text-[12.5px] text-muted">
-          Emitido el {issuedOn(doc.issued_on)}
-        </span>
+        <ClientDocDetails doc={doc} />
         <OcrSummary data={doc.ocr_data} />
         <Link
           href={`/clientes/${doc.client_id}`}

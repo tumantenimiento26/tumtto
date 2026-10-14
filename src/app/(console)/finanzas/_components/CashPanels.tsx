@@ -16,7 +16,19 @@ import {
   type DataColumn,
 } from '@/components/ds';
 import { exportCsv } from '@/components/admin';
-import { fetchCashByTechnician, fetchPaymentsReport, useTick } from '@/lib/data/store';
+import {
+  fetchCashByTechnician,
+  fetchPaymentsReport,
+  fetchTechnicianCommissionReport,
+  getRequest,
+  useTick,
+} from '@/lib/data/store';
+import {
+  commissionReportCsvRows,
+  commissionTotals,
+  isAdminOwned,
+  type TechCommissionReportRow,
+} from '@/lib/commission';
 import { fmtDate } from '@/lib/dates';
 import { orderCode } from '@/lib/orderCode';
 import {
@@ -103,8 +115,10 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
     <div className="p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-[640px] font-sans text-[13px] text-muted">
-          Efectivo cobrado por técnico en {label} (por fecha de reporte). La comisión del efectivo es deuda del técnico:
-          se descuenta sola de su saldo con los fondos que la plataforma retiene.
+          Efectivo cobrado por técnico en {label} (por fecha de reporte). En servicios del modelo anterior, la comisión
+          del efectivo es deuda del técnico y se descuenta sola de su saldo. En servicios con dinero de Tu Mantenimiento
+          el efectivo es de Tu Mantenimiento: ahí la comisión generada y la tarifa base acreditada valen 0 (la ganancia
+          del técnico está en «Comisiones de técnicos»).
         </p>
         <Button
           variant="secondary"
@@ -265,7 +279,19 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
           <span className="text-faint">—</span>
         ),
     },
-    { key: 'comm', header: 'Comisión', align: 'right', sortValue: r => Number(r.commission_cents), render: r => <span className="font-mono text-[12.5px] text-muted tabular">{money(Number(r.commission_cents))}</span> },
+    {
+      key: 'comm',
+      header: 'Comisión plataforma',
+      align: 'right',
+      sortValue: r => Number(r.commission_cents),
+      // admin_owned: commission_cents = 0 (no hay comisión de plataforma; todo es ingreso de TM).
+      render: r =>
+        isAdminOwned(getRequest(r.order_id)) ? (
+          <Badge tone="info">Ingreso TM</Badge>
+        ) : (
+          <span className="font-mono text-[12.5px] text-muted tabular">{money(Number(r.commission_cents))}</span>
+        ),
+    },
     { key: 'tot', header: 'Total', align: 'right', sortValue: r => Number(r.total_cents), render: r => <span className="font-mono text-[13px] font-semibold text-navy tabular">{money(Number(r.total_cents))}</span> },
     {
       key: 'rev',
@@ -339,6 +365,87 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
             </Button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Comisiones de técnicos (TUM-01) ──────────────────────────────────── */
+
+export function TechnicianCommissions({ from, to, label }: { from: Date; to: Date; label: string }) {
+  const tick = useTick();
+  const router = useRouter();
+  const [rows, setRows] = useState<TechCommissionReportRow[] | null | undefined>(undefined);
+
+  useEffect(() => {
+    let live = true;
+    setRows(undefined);
+    void fetchTechnicianCommissionReport(from, to).then(r => live && setRows(r));
+    return () => {
+      live = false;
+    };
+  }, [from, to, tick]);
+
+  const totals = useMemo(() => commissionTotals(rows ?? []), [rows]);
+  const num = (c: number | string) => money(Number(c));
+  const cols: DataColumn<TechCommissionReportRow>[] = [
+    {
+      key: 'tech',
+      header: 'Técnico',
+      sortValue: r => r.technician_name ?? '',
+      render: r => <span className="font-sans text-[13.5px] font-semibold text-navy">{r.technician_name ?? 'Técnico'}</span>,
+    },
+    { key: 'n', header: 'Servicios', align: 'right', sortValue: r => Number(r.services_count), render: r => <span className="font-mono text-[12.5px] tabular">{Number(r.services_count)}</span> },
+    { key: 'base', header: 'Tarifa base', align: 'right', sortValue: r => Number(r.base_collected_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.base_collected_cents)}</span> },
+    { key: 'cash', header: 'Efectivo', align: 'right', sortValue: r => Number(r.quote_collected_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.quote_collected_cents)}</span> },
+    { key: 'gross', header: 'Ingreso bruto', align: 'right', sortValue: r => Number(r.gross_collected_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-navy tabular">{num(r.gross_collected_cents)}</span> },
+    { key: 'comm', header: 'Comisión técnico', align: 'right', sortValue: r => Number(r.commission_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-warning-ink tabular">{num(r.commission_cents)}</span> },
+    { key: 'net', header: 'Neto Tu Mantenimiento', align: 'right', sortValue: r => Number(r.admin_net_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-success tabular">{num(r.admin_net_cents)}</span> },
+  ];
+
+  return (
+    <div className="p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[640px] font-sans text-[13px] text-muted">
+          Servicios con dinero de Tu Mantenimiento terminados en {label}: todo lo cobrado es ingreso de Tu Mantenimiento
+          y el técnico gana su comisión (tarifa congelada en cada servicio). El pago de comisiones llega con nómina; no
+          pasa por la cartera.
+        </p>
+        <Button
+          variant="secondary"
+          icon={Download}
+          disabled={!rows?.length}
+          onClick={() => {
+            exportCsv(`comisiones-tecnicos-${label.replace(/\W+/g, '-')}.csv`, commissionReportCsvRows(rows ?? []));
+            toast.success('CSV exportado', `${rows?.length ?? 0} técnicos`);
+          }}
+        >
+          Exportar CSV
+        </Button>
+      </div>
+      {rows === null ? (
+        <EmptyState kind="no-results" compact title="Reporte no disponible" description="Requiere permiso de finanzas o el servidor no respondió." />
+      ) : (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-5">
+            <Stat label="Servicios" value={String(totals.services)} />
+            <Stat label="Ingreso bruto" value={num(totals.gross)} />
+            <Stat label="Comisión técnicos" value={num(totals.commission)} tone={totals.commission ? 'warning' : undefined} />
+            <Stat label="Neto Tu Mantenimiento" value={num(totals.net)} />
+            <Stat label="Efectivo cobrado" value={num(totals.quote)} />
+          </div>
+          <DataTable
+            rows={rows ?? []}
+            rowKey={r => r.technician_id}
+            columns={cols}
+            loading={rows === undefined}
+            onRowClick={r => router.push(`/tecnicos/${r.technician_id}`)}
+            initialSort={{ key: 'comm', dir: 'desc' }}
+            pageSize={8}
+            minWidth={980}
+            empty={<EmptyState kind="no-results" compact title="Sin comisiones en el periodo" description="Ningún servicio con dinero de Tu Mantenimiento terminó en estas fechas." />}
+          />
+        </>
       )}
     </div>
   );

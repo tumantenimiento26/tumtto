@@ -6,7 +6,8 @@ import { Button, Input, Modal, Textarea } from '@/components/ds';
 import { useAction } from '@/components/use-action';
 import { getOrderPayments, getRequest, resolveCashReview } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
-import { OUTCOMES, buildPaymentSummary, reviewReason, validateResolution, type ReviewOutcome } from '@/lib/payments';
+import { buildPaymentSummary, outcomesFor, reviewReason, validateResolution, type ReviewOutcome } from '@/lib/payments';
+import { revenueModelOf } from '@/lib/commission';
 
 const money = (c: number | null | undefined) =>
   c == null ? '—' : (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
@@ -42,6 +43,7 @@ export function CashReviewModal({
 
   const order = orderId ? getRequest(orderId) : null;
   const q = order ? buildPaymentSummary(order, getOrderPayments(order.id)).quote : null;
+  const model = revenueModelOf(order);
   const pesos = Number(amount.replace(/[^\d.]/g, ''));
   const cents = amount && Number.isFinite(pesos) ? Math.round(pesos * 100) : null;
   const problem = validateResolution({ outcome, notes, amountCents: cents });
@@ -99,8 +101,15 @@ export function CashReviewModal({
             ))}
           </dl>
 
+          {model === 'admin_owned' && (
+            <p className="rounded-btn bg-info-soft px-3 py-2 font-sans text-[12.5px] text-body">
+              Efectivo de Tu Mantenimiento: el resultado solo fija cuánto efectivo debe entregar el técnico. No hay
+              comisión de plataforma que recalcular; su comisión se ajusta con lo cobrado.
+            </p>
+          )}
+
           <div role="radiogroup" aria-label="Resultado" className="flex flex-col gap-2">
-            {OUTCOMES.map(o => {
+            {outcomesFor(model).map(o => {
               const on = outcome === o.value;
               return (
                 <button

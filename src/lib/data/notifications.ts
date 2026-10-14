@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { needsManualAssignment } from '@/lib/emergency';
 import { awaitingBasePayment, isFailedCharge, reviewReason } from '@/lib/payments';
 import { ageLabel, inUnassignedInbox, isAdminRequest } from '@/lib/unassigned';
+import { orderCode } from '@/lib/orderCode';
 import {
   getAllPayments,
   getAllRequests,
@@ -133,9 +134,20 @@ export function derive(now = Date.now()): AdminNotification[] {
         title: 'Revisión de efectivo abierta',
         body: reviewReason(p.review_reason),
         ts: p.review_opened_at ?? p.updated_at ?? p.created_at,
-        href: '/revision-efectivo',
+        href: '/revision-pagos?tab=efectivo',
       });
   }
+  // Backend: notificación a admins `payment_transfer_submitted` (TUM-03).
+  for (const o of getAllRequests())
+    if (o.base_fee_status === 'in_review')
+      out.push({
+        id: `ptr-${o.id}`,
+        type: 'pagos',
+        title: 'Transferencia por revisar',
+        body: `${orderCode(o.id)}: comprobante de ${((o.base_total_cents ?? 0) / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} por la visita.`,
+        ts: o.updated_at ?? o.created_at,
+        href: '/revision-pagos',
+      });
   for (const o of getAllRequests())
     if (needsManualAssignment(o))
       out.push({

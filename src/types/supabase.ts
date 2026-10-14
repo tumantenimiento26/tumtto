@@ -186,10 +186,12 @@ export type Database = {
           bucket_id: string
           client_id: string
           created_at: string
+          address_id: string | null
           id: string
-          issued_on: string
+          issued_on: string | null
           ocr_data: Json | null
           kind: Database["public"]["Enums"]["client_document_kind"]
+          proof_type: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes: string | null
           review_status: Database["public"]["Enums"]["document_review_status"]
           reviewed_at: string | null
@@ -201,10 +203,12 @@ export type Database = {
           bucket_id?: string
           client_id: string
           created_at?: string
+          address_id?: string | null
           id?: string
-          issued_on: string
+          issued_on?: string | null
           ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
+          proof_type?: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
           reviewed_at?: string | null
@@ -216,10 +220,12 @@ export type Database = {
           bucket_id?: string
           client_id?: string
           created_at?: string
+          address_id?: string | null
           id?: string
-          issued_on?: string
+          issued_on?: string | null
           ocr_data?: Json | null
           kind?: Database["public"]["Enums"]["client_document_kind"]
+          proof_type?: Database["public"]["Enums"]["address_proof_type"] | null
           review_notes?: string | null
           review_status?: Database["public"]["Enums"]["document_review_status"]
           reviewed_at?: string | null
@@ -228,6 +234,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_documents_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "client_addresses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_documents_client_id_fkey"
             columns: ["client_id"]
@@ -1071,6 +1084,54 @@ export type Database = {
           },
         ]
       }
+      payment_transfers: {
+        Row: {
+          amount_cents: number
+          client_id: string
+          created_at: string
+          id: string
+          payment_id: string | null
+          proof_path: string
+          reference: string
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          service_order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          client_id: string
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          proof_path: string
+          reference: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_order_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          payment_id?: string | null
+          proof_path?: string
+          reference?: string
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service_order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -1731,6 +1792,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -1773,6 +1835,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -1793,6 +1856,7 @@ export type Database = {
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
+          base_fee_method?: string
           base_fee_paid_at?: string | null
           base_fee_refunded_at?: string | null
           base_fee_status?: string
@@ -1835,6 +1899,7 @@ export type Database = {
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          revenue_model?: string
           schedule_surcharge_bps?: number
           schedule_surcharge_cents?: number | null
           schedule_surcharge_name?: string | null
@@ -1855,6 +1920,7 @@ export type Database = {
           assignment_mode?: string
           base_fee_cents?: number
           base_fee_credited_at?: string | null
+          base_fee_method?: string
           base_fee_paid_at?: string | null
           base_fee_refunded_at?: string | null
           base_fee_status?: string
@@ -1897,6 +1963,7 @@ export type Database = {
           quoted_total_cents?: number | null
           raw_mapbox_feature?: Json | null
           requested_technician_id?: string | null
+          revenue_model?: string
           schedule_surcharge_bps?: number
           schedule_surcharge_cents?: number | null
           schedule_surcharge_name?: string | null
@@ -2368,6 +2435,69 @@ export type Database = {
           },
           {
             foreignKeyName: "technician_categories_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_commissions: {
+        Row: {
+          base_collected_cents: number
+          commission_cents: number
+          commission_type: string
+          commission_value: number
+          computed_at: string
+          created_at: string
+          gross_collected_cents: number
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents: number
+          service_order_id: string
+          snapshot_at: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          base_collected_cents?: number
+          commission_cents: number
+          commission_type: string
+          commission_value: number
+          computed_at?: string
+          created_at?: string
+          gross_collected_cents?: number
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents?: number
+          service_order_id: string
+          snapshot_at?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          base_collected_cents?: number
+          commission_cents?: number
+          commission_type?: string
+          commission_value?: number
+          computed_at?: string
+          created_at?: string
+          gross_collected_cents?: number
+          order_status?: Database["public"]["Enums"]["service_order_status"]
+          quote_collected_cents?: number
+          service_order_id?: string
+          snapshot_at?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_commissions_service_order_id_fkey"
+            columns: ["service_order_id"]
+            isOneToOne: true
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_commissions_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "technicians"
@@ -3074,6 +3204,37 @@ export type Database = {
       }
     }
     Views: {
+      client_documents_review: {
+        Row: {
+          address_id: string | null
+          address_label: string | null
+          address_lat: number | null
+          address_line: string | null
+          address_lng: number | null
+          address_municipality: string | null
+          address_neighborhood: string | null
+          address_place_name: string | null
+          address_postal_code: string | null
+          address_state: string | null
+          bucket_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          issued_on: string | null
+          kind: Database["public"]["Enums"]["client_document_kind"] | null
+          ocr_data: Json | null
+          proof_type: Database["public"]["Enums"]["address_proof_type"] | null
+          review_notes: string | null
+          review_status:
+            | Database["public"]["Enums"]["document_review_status"]
+            | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          storage_path: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       technician_public_profiles: {
         Row: {
           accepts_card: boolean | null
@@ -3162,6 +3323,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3204,6 +3366,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3233,6 +3396,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3275,6 +3439,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3355,6 +3520,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3397,6 +3563,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3588,6 +3755,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3630,6 +3798,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3717,6 +3886,80 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_accept_payment_transfer: {
+        Args: { p_transfer_id: string }
+        Returns: Database["public"]["Tables"]["payment_transfers"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payment_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_confirm_transfer_refund: {
+        Args: { p_order_id: string; p_reference: string }
+        Returns: Database["public"]["Tables"]["payments"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_get_payment_transfer: {
+        Args: { p_transfer_id: string }
+        Returns: Json
+      }
+      admin_list_payment_transfers: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+          p_to?: string
+        }
+        Returns: {
+          amount_cents: number
+          base_fee_status: string
+          client_id: string
+          client_name: string
+          client_phone: string
+          created_at: string
+          folio: number
+          id: string
+          order_status: Database["public"]["Enums"]["service_order_status"]
+          proof_path: string
+          reference: string
+          reject_reason: string
+          reviewed_at: string
+          reviewed_by: string
+          reviewer_name: string
+          service_order_id: string
+          status: string
+          total_count: number
+        }[]
+      }
+      admin_reject_payment_transfer: {
+        Args: { p_reason: string; p_transfer_id: string }
+        Returns: Database["public"]["Tables"]["payment_transfers"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "payment_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_transfer_deposit_account: {
+        Args: {
+          p_bank: string
+          p_card_number?: string
+          p_clabe: string
+          p_holder: string
+        }
+        Returns: Json
+      }
+      get_transfer_deposit_account: { Args: never; Returns: Json }
       admin_reject_request: {
         Args: { p_order_id: string; p_reason: string }
         Returns: {
@@ -3725,6 +3968,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -3767,6 +4011,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -3888,6 +4133,19 @@ export type Database = {
           category_id: string
           category_name: string
           paid_orders: number
+        }[]
+      }
+      admin_report_technician_commissions: {
+        Args: { p_from: string; p_technician_id?: string; p_to: string }
+        Returns: {
+          admin_net_cents: number
+          base_collected_cents: number
+          commission_cents: number
+          gross_collected_cents: number
+          quote_collected_cents: number
+          services_count: number
+          technician_id: string
+          technician_name: string
         }[]
       }
       admin_resolve_cash_review: {
@@ -4079,6 +4337,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4121,6 +4380,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4248,6 +4508,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_set_technician_commission: {
+        Args: { p_type: string; p_value: number }
+        Returns: Json
       }
       admin_set_technician_type: {
         Args: {
@@ -4451,6 +4715,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4493,6 +4758,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4718,6 +4984,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4760,6 +5027,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4868,6 +5136,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -4910,6 +5179,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -4959,6 +5229,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5001,6 +5272,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5047,6 +5319,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5089,6 +5362,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5231,6 +5505,7 @@ export type Database = {
         Args: { p_technician_id?: string }
         Returns: Json
       }
+      get_technician_commission_config: { Args: never; Returns: Json }
       get_technician_wallet: {
         Args: { p_technician_id?: string }
         Returns: {
@@ -5448,6 +5723,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5490,6 +5766,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5519,6 +5796,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5561,6 +5839,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5725,6 +6004,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -5767,6 +6047,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -5991,6 +6272,7 @@ export type Database = {
           assignment_mode: string
           base_fee_cents: number
           base_fee_credited_at: string | null
+          base_fee_method: string
           base_fee_paid_at: string | null
           base_fee_refunded_at: string | null
           base_fee_status: string
@@ -6033,6 +6315,7 @@ export type Database = {
           quoted_total_cents: number | null
           raw_mapbox_feature: Json | null
           requested_technician_id: string | null
+          revenue_model: string
           schedule_surcharge_bps: number
           schedule_surcharge_cents: number | null
           schedule_surcharge_name: string | null
@@ -6168,6 +6451,7 @@ export type Database = {
       }
     }
     Enums: {
+      address_proof_type: "ine" | "electricity" | "phone" | "bank_statement"
       client_document_kind: "proof_of_address"
       contact_status: "new" | "handled" | "archived"
       contact_type: "client" | "company" | "technician" | "other"
@@ -6210,7 +6494,7 @@ export type Database = {
         | "transfer_reversal"
         | "dispute_hold"
         | "dispute_release"
-      payment_method: "card" | "oxxo" | "wallet" | "cash"
+      payment_method: "card" | "oxxo" | "wallet" | "cash" | "transfer"
       payment_status:
         | "pending"
         | "authorized"
@@ -6386,6 +6670,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      address_proof_type: ["ine", "electricity", "phone", "bank_statement"],
       client_document_kind: ["proof_of_address"],
       contact_status: ["new", "handled", "archived"],
       contact_type: ["client", "company", "technician", "other"],
@@ -6432,7 +6717,7 @@ export const Constants = {
         "dispute_hold",
         "dispute_release",
       ],
-      payment_method: ["card", "oxxo", "wallet", "cash"],
+      payment_method: ["card", "oxxo", "wallet", "cash", "transfer"],
       payment_status: [
         "pending",
         "authorized",

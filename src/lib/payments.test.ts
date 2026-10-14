@@ -230,9 +230,9 @@ describe('efectivo por técnico', () => {
     const t = cashTotals(rows);
     expect(t.expected).toBeGreaterThan(0);
     expect(t.confirmed).toBeGreaterThan(0); // 4001 y 4008
-    expect(t.awaiting).toBe(150000); // 4005
-    expect(t.disputed).toBe(240000 + 95000); // 4006 + 4007
-    expect(t.reviews).toBe(2);
+    expect(t.awaiting).toBe(150000 + 110000); // 4005 + 4023 (dinero de TM)
+    expect(t.disputed).toBe(240000 + 95000 + 90000); // 4006 + 4007 + 4024 (dinero de TM)
+    expect(t.reviews).toBe(3);
     expect(t.pending).toBe(t.generated - t.recovered);
   });
 
@@ -263,8 +263,8 @@ describe('reporte de pagos por servicio', () => {
   });
 
   it('filtra por método, estado del efectivo y solo revisión', () => {
-    expect(run({ onlyReview: true }).map(r => r.folio).sort()).toEqual([4006, 4007]);
-    expect(run({ cashStatus: 'disputed' }).map(r => r.folio).sort()).toEqual([4006, 4007]);
+    expect(run({ onlyReview: true }).map(r => r.folio).sort()).toEqual([4006, 4007, 4024]);
+    expect(run({ cashStatus: 'disputed' }).map(r => r.folio).sort()).toEqual([4006, 4007, 4024]);
     const cash = run({ method: 'cash' });
     expect(cash.every(r => r.quote_method === 'cash')).toBe(true);
     expect(run({ method: 'card' }).some(r => r.folio === 4001)).toBe(true);
@@ -291,7 +291,7 @@ describe('reporte de pagos por servicio', () => {
 describe('cola de revisiones', () => {
   it('lista las órdenes con revisión abierta, la más antigua primero', () => {
     const q = cashReviews(demo.orders, byOrder, names.person);
-    expect(q.map(r => r.folio).sort()).toEqual([4006, 4007]);
+    expect(q.map(r => r.folio).sort()).toEqual([4006, 4007, 4024]);
     expect(q[0].review_opened_at! <= q[1].review_opened_at!).toBe(true);
     expect(q.find(r => r.folio === 4007)).toMatchObject({ expected_cents: 95000, received_cents: 95000, client_reported_cents: 0 });
   });
@@ -343,7 +343,7 @@ describe('modelo de cobro v2: conceptos separados', () => {
   });
 
   it('cierre por cotización rechazada: solo se cobra la base y el total no suma la cotización', () => {
-    expect([...rej].sort()).toEqual(['SVC-4016', 'SVC-4019']);
+    expect([...rej].sort()).toEqual(['SVC-4016', 'SVC-4019', 'SVC-4025']);
     const s = buildPaymentSummary(ord(4016), pays(4016), quotesOf(4016));
     expect(s.closedByQuoteRejection).toBe(true);
     expect(s.quoteState).toMatchObject({ status: 'rejected', rejectReason: expect.stringContaining('Muy caro') });
@@ -391,7 +391,7 @@ describe('modelo de cobro v2: conceptos separados', () => {
 
   it('KPIs: conceptos y cotizaciones rechazadas del periodo', () => {
     const k = kpiWindow(demo.orders, byOrder, ...WIDE, 'all', rej);
-    expect(k.quotes_rejected).toBe(2);
+    expect(k.quotes_rejected).toBe(3);
     expect(k.schedule_surcharge_cents).toBeGreaterThanOrEqual(5250 + 3000 + 6750);
     expect(k.base_fee_cents).toBeGreaterThan(0);
     // rechazada: no suma cotización
@@ -407,7 +407,7 @@ describe('modelo de cobro v2: conceptos separados', () => {
     expect(t.quotes_rejected).toBeGreaterThanOrEqual(1);
     expect(t.base_fee_credited_cents).toBeGreaterThan(0);
     expect(rows.some(r => r.schedule_surcharge_credited_cents > 0)).toBe(true);
-    expect(cashTotals(rows).rejected).toBe(2);
+    expect(cashTotals(rows).rejected).toBe(3);
     expect(cashByTechCsvRows(rows)[0]).toHaveProperty('Cotizaciones rechazadas');
   });
 });

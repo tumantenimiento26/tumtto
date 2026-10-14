@@ -38,6 +38,7 @@ export const METHOD_LABEL: Record<string, string> = {
   cash: 'Efectivo',
   oxxo: 'OXXO',
   wallet: 'Cartera',
+  transfer: 'Transferencia',
 };
 
 export const ZONES = [

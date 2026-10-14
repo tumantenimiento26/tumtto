@@ -59,6 +59,7 @@ import {
   zoneStats,
   type TechBase,
   type ZoneRow,
+  zoneAssignOptions,
 } from '@/lib/regions';
 import { pctDelta, deltaLabel } from '@/lib/finance';
 
@@ -458,7 +459,7 @@ export default function RegionesPage() {
                     ))}
                   </div>
                 )}
-                {selZone && <AssignTech zone={selZone} techs={data.techs} />}
+                {selZone && <AssignTech zone={selZone} />}
               </div>
             </div>
           )}
@@ -477,12 +478,20 @@ export default function RegionesPage() {
   );
 }
 
-/** Asigna la zona a un técnico aprobado (technicians.zone_id vía RPC). */
-function AssignTech({ zone, techs }: { zone: CoverageZone; techs: TechBase[] }) {
+/** Asigna la zona a un técnico (technicians.zone_id vía RPC); los de Tumtto primero. */
+function AssignTech({ zone }: { zone: CoverageZone }) {
   const { busy, run } = useAction();
-  const opts = techs
-    .filter(t => canonMunicipality(t.municipality) !== canonMunicipality(zone.name))
-    .map(t => ({ value: t.id, label: t.name, hint: t.municipality ?? 'sin base' }));
+  const opts = zoneAssignOptions(
+    getTechniciansWithProfile().map(({ tech, profile }) => ({
+      id: tech.id,
+      name: profile?.full_name ?? tech.display_name ?? 'Técnico',
+      type: tech.technician_type ?? 'independent',
+      kycApproved: tech.kyc_status === 'approved',
+      zoneId: tech.zone_id ?? null,
+      municipality: getTechMunicipality(tech.id),
+    })),
+    zone.id,
+  );
   if (!opts.length) return null;
   return (
     <div className="mt-3 flex items-center gap-2">

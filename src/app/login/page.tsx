@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button, Field, Input, Kicker } from '@/components/ds';
 import { AsideConsole, AuthShell } from '@/components/auth-shell';
+import { ForcePasswordChange } from '@/components/force-password-change';
 import { BrandMark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -34,7 +35,15 @@ import {
 // TOTP real de Supabase) → consola. Clientes y técnicos → "continúa en la
 // app" (la web solo opera la consola).
 
-type Step = 'login' | 'mfa' | 'enroll' | 'app' | 'forgot' | 'sent' | 'redirect';
+type Step =
+  | 'login'
+  | 'newpass'
+  | 'mfa'
+  | 'enroll'
+  | 'app'
+  | 'forgot'
+  | 'sent'
+  | 'redirect';
 
 /** Traduce el error de Supabase Auth; el genérico sólo cubre lo que no reconocemos. */
 function authMessage(raw: string): string {
@@ -172,6 +181,16 @@ export default function LoginPage() {
       await signOut();
       setLoading(false);
       setStep('app');
+      return;
+    }
+
+    // Contraseña temporal (alta directa de equipo): se cambia antes del 2FA.
+    if (
+      (user.app_metadata as { must_change_password?: unknown } | undefined)
+        ?.must_change_password === true
+    ) {
+      setLoading(false);
+      setStep('newpass');
       return;
     }
 
@@ -432,6 +451,17 @@ export default function LoginPage() {
             Regístrate como técnico
           </Button>
         </div>
+      )}
+
+      {step === 'newpass' && (
+        <ForcePasswordChange
+          onDone={() => {
+            setPass('');
+            setLoading(true);
+            void routeAfterSignIn();
+          }}
+          onCancel={() => void switchAccount()}
+        />
       )}
 
       {step === 'mfa' && (

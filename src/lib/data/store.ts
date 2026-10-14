@@ -7,7 +7,6 @@ import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import { distanceM, wkbPoint } from '@/lib/geo';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
-import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
 import type { CompanyToolRowValue, ImportContext, ImportEntity, ImportValue, TechRowValue, ToolRowValue } from '@/lib/bulkImport';
 import { isImageMime, type QuoteAttachment } from '@/lib/quoteAttachments';
@@ -1324,42 +1323,7 @@ export async function updateTechnicianBank(
 // ── Equipo (admins) ──────────────────────────────────────────────────────────
 export const getAdmins = () => w().profiles.filter(p => p.role === 'admin');
 
-/** Invita a un admin por correo vía la Edge Function admin-users (service role). */
-export async function inviteAdmin(email: string, fullName: string, adminRole?: AdminRole) {
-  return mutate(async () => {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: {
-        action: 'invite',
-        email,
-        full_name: fullName || undefined,
-        admin_role: adminRole,
-      },
-    });
-    if (error) throw error;
-    return data ?? true;
-  }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
-}
-
-/** Roles de consola de todos los admins (RPC admin_list_admin_roles; solo super_admin). */
-export async function fetchAdminRoles(): Promise<Record<string, string>> {
-  const { data, error } = await supabase.rpc('admin_list_admin_roles');
-  if (error) {
-    console.warn('[data] admin_list_admin_roles', error);
-    return {};
-  }
-  return Object.fromEntries((data ?? []).map(r => [r.user_id, r.admin_role]));
-}
-
-/** Cambia el rol de consola de otro admin (admin-users set_admin_role; solo super_admin). */
-export async function setAdminRole(userId: string, adminRole: AdminRole) {
-  return mutate(async () => {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'set_admin_role', user_id: userId, admin_role: adminRole },
-    });
-    if (error) throw error;
-    return data ?? true;
-  }, 'No se pudo cambiar el rol.');
-}
+// Altas, roles y matriz de permisos del equipo: lib/data/staff.ts.
 
 /** Invita a un cliente (admin-users invite_client): recibe correo para crear su cuenta. */
 export async function inviteClient(email: string, fullName: string, phone: string | null) {

@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui';
 import { MOCK, SKIP_MFA } from '@/lib/mock';
+import { AsideConsole, AuthShell } from '@/components/auth-shell';
+import { ForcePasswordChange } from '@/components/force-password-change';
 
 /**
  * Console gate: Supabase session + profiles.role === 'admin'.
@@ -20,6 +22,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     usuario,
     usuarioError,
     isAdmin,
+    mustChangePassword,
+    permissionsStatus,
+    loadPermissions,
     resolving,
     signOut,
     retryUsuario,
@@ -37,7 +42,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   // admin_require_aal2 (Config › Seguridad). Middleware SSR: pendiente (README).
   const [mfaOk, setMfaOk] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!session || !isAdmin || MOCK || SKIP_MFA) return;
+    if (!session || !isAdmin || mustChangePassword || MOCK || SKIP_MFA) return;
     let live = true;
     (async () => {
       try {
@@ -59,7 +64,14 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     return () => {
       live = false;
     };
-  }, [session, isAdmin, router]);
+  }, [session, isAdmin, mustChangePassword, router]);
+
+  // Permisos por sección: se cargan cuando la sesión ya cumple el 2FA (el RPC
+  // puede exigir aal2) y el usuario ya no tiene contraseña temporal.
+  const ready = isAdmin && !mustChangePassword && (MOCK || SKIP_MFA || mfaOk === true);
+  useEffect(() => {
+    if (ready && permissionsStatus === 'idle') void loadPermissions();
+  }, [ready, permissionsStatus, loadPermissions]);
 
   // Sesión o perfil resolviéndose: spinner, nunca pantalla en blanco (la
   // consulta del perfil tiene timeout y cae al panel de error).
@@ -97,7 +109,32 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Contraseña temporal pendiente: nada de consola hasta crear la propia.
+  if (mustChangePassword && !MOCK)
+    return (
+      <AuthShell
+        aside={{
+          kicker: 'Consola de operación · ZMG',
+          title: 'Un último paso.',
+          lead: 'Crea tu contraseña personal para entrar a la consola.',
+          bullets: [
+            'La contraseña temporal deja de servir',
+            'Después activas la verificación en dos pasos',
+          ],
+          children: <AsideConsole />,
+        }}
+      >
+        <ForcePasswordChange
+          onDone={() => {
+            // El token ya se renovó: el efecto del 2FA retoma el flujo.
+          }}
+          onCancel={() => void signOut().then(() => router.replace('/login'))}
+        />
+      </AuthShell>
+    );
+
   if (!mfaOk && !MOCK && !SKIP_MFA) return <Resolving />;
+  if (permissionsStatus !== 'ready') return <Resolving />;
 
   return <>{children}</>;
 }

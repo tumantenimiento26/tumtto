@@ -22,7 +22,8 @@ import { Badge, Button, Card, EmptyState } from '@/components/ds';
 import { orderCode } from '@/lib/orderCode';
 import { timeAgo } from '@/lib/data/notifications';
 import type { ActivityItem } from '@/lib/dashboard';
-import { CardHead, STATUS_BADGE, catIcon, money } from './shared';
+import { CategoryIcon } from '@/components/category-icon';
+import { CardHead, STATUS_BADGE, money } from './shared';
 
 /* ── Requiere atención ─────────────────────────────────────────────────── */
 
@@ -200,7 +201,6 @@ export function CategoryBars({
           onMouseLeave={() => setHover(null)}
         >
           {rows.map((b, i) => {
-            const Icon = catIcon(b.slug);
             const on = hover === b.id;
             return (
               <button
@@ -213,10 +213,9 @@ export function CategoryBars({
                 }`}
               >
                 <div className="mb-1.5 flex items-center gap-2 text-[13px] text-navy">
-                  <Icon
-                    size={15}
-                    className={on ? 'text-primary' : 'text-muted'}
-                  />
+                  <span className={on ? 'text-primary' : 'text-muted'}>
+                    <CategoryIcon cat={b.slug} size={16} decorative />
+                  </span>
                   <span className="flex-1 font-medium">{b.label}</span>
                   <b className="font-mono font-semibold">{b.value}</b>
                   <span className="w-10 text-right font-mono text-[11.5px] text-faint">
@@ -285,7 +284,6 @@ export function RecentServices({
         <div className="overflow-x-auto">
           <div className="min-w-[820px]">
             {rows.map(r => {
-              const Icon = catIcon(r.slug);
               const s = STATUS_BADGE[r.status] ?? {
                 label: r.status,
                 tone: 'neutral' as const,
@@ -301,9 +299,12 @@ export function RecentServices({
                     {orderCode(r.id)}
                   </span>
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg bg-tint text-primary">
-                      <Icon size={15} />
-                    </span>
+                    <CategoryIcon
+                      cat={r.slug}
+                      variant="tile"
+                      size={16}
+                      decorative
+                    />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-navy">
                         {r.cliente}

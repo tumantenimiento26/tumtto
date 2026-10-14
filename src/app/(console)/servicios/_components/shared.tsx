@@ -2,16 +2,7 @@
 
 import { UserIcon } from '@/components/profile-icon';
 import { useCallback, useEffect, useRef } from 'react';
-import {
-  Droplet,
-  Flame,
-  Key,
-  Snowflake,
-  WashingMachine,
-  Wrench,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react';
+import { CategoryIcon } from '@/components/category-icon';
 import { snackbar, type Tone } from '@/components/ds';
 import type { OrderStatus } from '@/lib/serviciosFilter';
 import { MX_TZ } from '@/lib/dates';
@@ -164,22 +155,7 @@ export function useDeferredCommit() {
   );
 }
 
-const CAT_ICON: Record<string, LucideIcon> = {
-  plumbing: Droplet,
-  electrical: Zap,
-  gas: Flame,
-  ac: Snowflake,
-  appliances: WashingMachine,
-  locks: Key,
-};
-
-/** Ícono de la categoría por slug (o por id `cat-<slug>` del demo). */
-export function categoryIconFor(slugOrId: string | null | undefined): LucideIcon {
-  const slug = (slugOrId ?? '').replace(/^cat-/, '');
-  return CAT_ICON[slug] ?? Wrench;
-}
-
-/** Tile de ícono de categoría (8px de radio, tint azul). */
+/** Tile de ícono de categoría (slug o id `cat-<slug>`); lado ≈ `size`, ícono animado. */
 export function CategoryTile({
   slug,
   size = 34,
@@ -187,14 +163,12 @@ export function CategoryTile({
   slug: string | null | undefined;
   size?: number;
 }) {
-  const Icon = categoryIconFor(slug);
   return (
-    <span
-      className="grid shrink-0 place-items-center rounded-[9px] bg-info-soft text-primary"
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      <Icon size={Math.round(size * 0.5)} />
-    </span>
+    <CategoryIcon
+      cat={slug}
+      variant="tile"
+      size={Math.round(size / 1.9)}
+      decorative
+    />
   );
 }

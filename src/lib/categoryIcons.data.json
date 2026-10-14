@@ -1,0 +1,231 @@
+{
+ "tokens": {
+  "light": {
+   "inactive": {
+    "bg": "#E0F0FF",
+    "fg": "#0A6BCF"
+   },
+   "active": {
+    "bg": "#0A6BCF",
+    "fg": "#FFFFFF"
+   },
+   "disabled": {
+    "fg": "#9CA3AF"
+   }
+  },
+  "dark": {
+   "inactive": {
+    "bg": "rgba(24,193,255,0.12)",
+    "fg": "#18C1FF"
+   },
+   "active": {
+    "bg": "#0A6BCF",
+    "fg": "#FFFFFF"
+   },
+   "disabled": {
+    "fg": "#6F819B"
+   }
+  },
+  "hoverGlow": {
+   "light": "rgba(10,107,207,0.45)",
+   "dark": "rgba(24,193,255,0.5)"
+  }
+ },
+ "categories": [
+  {
+   "id": "plomeria",
+   "name": "Plomería",
+   "aliases": [
+    "fugas",
+    "agua",
+    "calentadores",
+    "wc",
+    "i-drop",
+    "plumbing",
+    "cat-plumbing"
+   ],
+   "durationSec": 1.9,
+   "svgInner": "<path d=\"M4 6v8\"/><g class=\"a hnd\"><path d=\"M9 8V5\"/><path d=\"M6.5 5h5\"/></g><path d=\"M4 8h8a5 5 0 0 1 5 5v1h-4a2 2 0 0 0-2-2H4\"/><path class=\"a drop\" d=\"M15 16.2c-.95 1.25-1.55 2.15-1.55 3a1.55 1.55 0 0 0 3.1 0c0-.85-.6-1.75-1.55-3z\"/><path class=\"a spl\" d=\"M12.6 21.4l-.9.8M17.4 21.4l.9.8M13.6 23h2.8\"/>",
+   "css": ".drop{animation-name:tm-drip;transform-box:fill-box;transform-origin:50% 0%}.spl{animation-name:tm-splash;transform-box:fill-box;transform-origin:50% 100%;opacity:0}.hnd{animation-name:tm-valve;transform-box:view-box;transform-origin:9px 8px}@keyframes tm-drip{0%{transform:translateY(0) scale(1);opacity:1}28%{transform:translateY(0) scale(.94,1.14)}52%{transform:translateY(3.2px) scale(.9,1.12);opacity:1;animation-timing-function:cubic-bezier(.55,0,1,.45)}56%{transform:translateY(3.6px) scale(1.3,.6);opacity:0}57%{transform:translateY(-1px) scale(.15);opacity:0}64%{opacity:1}82%,100%{transform:translateY(0) scale(1);opacity:1}}@keyframes tm-splash{0%,53%{opacity:0;transform:scale(.5)}60%{opacity:1;transform:scale(1)}78%,100%{opacity:0;transform:scale(1.25)}}@keyframes tm-valve{0%,100%{transform:rotate(0)}10%,40%{transform:rotate(-14deg)}}"
+  },
+  {
+   "id": "electricidad",
+   "name": "Electricidad",
+   "aliases": [
+    "electrico",
+    "contactos",
+    "apagadores",
+    "i-zap",
+    "electrical",
+    "zap",
+    "plug",
+    "cat-electrical"
+   ],
+   "durationSec": 1.2,
+   "svgInner": "<path class=\"a bolt\" d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/><path class=\"a sp\" d=\"M20.5 3.5 22 2M2 22l1.5-1.5M21 7h1.5M1.5 17H3\"/>",
+   "css": ".bolt{animation-name:tm-zap;transform-box:fill-box;transform-origin:50% 50%}.sp{animation-name:tm-spark;opacity:0}@keyframes tm-zap{0%,100%{transform:scale(1);opacity:1}18%{transform:scale(1.1)}28%{opacity:.35}36%{opacity:1}46%{opacity:.6}54%{opacity:1;transform:scale(1)}}@keyframes tm-spark{0%,100%{opacity:0}22%,44%{opacity:1}}"
+  },
+  {
+   "id": "gas",
+   "name": "Gas",
+   "aliases": [
+    "gas-lp",
+    "regulador",
+    "i-flame",
+    "flame",
+    "cat-gas"
+   ],
+   "durationSec": 1.1,
+   "svgInner": "<path class=\"a fl\" d=\"M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z\"/>",
+   "css": ".fl{animation-name:tm-flame;transform-box:fill-box;transform-origin:50% 100%}@keyframes tm-flame{0%,100%{transform:scale(1,1) skewX(0)}25%{transform:scale(.95,1.07) skewX(-3deg)}50%{transform:scale(1.04,.94) skewX(2deg)}75%{transform:scale(.97,1.05) skewX(-1deg)}}"
+  },
+  {
+   "id": "aire",
+   "name": "Aire acondicionado",
+   "aliases": [
+    "aire-acondicionado",
+    "a-c",
+    "ac",
+    "minisplit",
+    "clima",
+    "i-snow",
+    "wind",
+    "snowflake",
+    "cat-ac"
+   ],
+   "durationSec": 1.1,
+   "svgInner": "<g class=\"a fan\"><path d=\"M10.83 16.38a6.08 6.08 0 0 1-8.62-7l5.41 1.45a6.08 6.08 0 0 1 7-8.62l-1.45 5.41a6.08 6.08 0 0 1 8.62 7l-5.41-1.45a6.08 6.08 0 0 1-7 8.62l1.45-5.41Z\"/></g><path d=\"M12 12v.01\"/>",
+   "css": ".fan{animation-name:tm-spin;animation-timing-function:linear;transform-box:view-box;transform-origin:12px 12px}@keyframes tm-spin{to{transform:rotate(360deg)}}"
+  },
+  {
+   "id": "linea-blanca",
+   "name": "Línea blanca",
+   "aliases": [
+    "electrodomesticos",
+    "lavadoras",
+    "refrigeradores",
+    "i-washer",
+    "appliances",
+    "cat-appliances"
+   ],
+   "durationSec": 1,
+   "svgInner": "<g class=\"a body\"><path d=\"M3 6h3\"/><path d=\"M17 6h.01\"/><rect width=\"18\" height=\"20\" x=\"3\" y=\"2\" rx=\"2\"/><circle cx=\"12\" cy=\"13\" r=\"5\"/><path class=\"a swirl\" d=\"M12 18a2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5\"/></g>",
+   "css": ".swirl{animation-name:tm-spin;animation-timing-function:linear;transform-box:view-box;transform-origin:12px 13px}.body{animation-name:tm-shake}@keyframes tm-spin{to{transform:rotate(360deg)}}@keyframes tm-shake{0%,50%,100%{transform:translateX(0)}25%{transform:translateX(-.35px)}75%{transform:translateX(.35px)}}"
+  },
+  {
+   "id": "cerrajeria",
+   "name": "Cerrajería",
+   "aliases": [
+    "chapas",
+    "llaves",
+    "apertura",
+    "i-key",
+    "locks",
+    "key",
+    "cat-locks"
+   ],
+   "durationSec": 1.3,
+   "svgInner": "<g class=\"a key\"><path d=\"M2.59 17.41A2 2 0 0 0 2 18.83V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.17a2 2 0 0 0 1.42-.59l.81-.81a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/></g>",
+   "css": ".key{animation-name:tm-turn;transform-box:view-box;transform-origin:15px 9px}@keyframes tm-turn{0%,100%{transform:rotate(0)}30%{transform:rotate(-20deg)}55%{transform:rotate(8deg)}75%{transform:rotate(-3deg)}}"
+  },
+  {
+   "id": "herreria",
+   "name": "Herrería",
+   "aliases": [
+    "portones",
+    "soldadura",
+    "estructuras",
+    "hammer"
+   ],
+   "durationSec": 1.2,
+   "svgInner": "<g class=\"a ham\"><path d=\"m15 12-9.37 9.37a1 1 0 0 1-3-3L12 9\"/><path d=\"m18 15 4-4\"/><path d=\"m21.5 11.5-1.91-1.91A2 2 0 0 1 19 8.17v-.34a2 2 0 0 0-.59-1.41l-1.65-1.66A6 6 0 0 0 12.52 3H9l1.24 1.24A6 6 0 0 1 12 8.49V10l2 2h1.17a4 4 0 0 1 2.83 1.17l1.5 1.33\"/></g><path class=\"a imp\" d=\"M21 19.5h2M19.5 21.5l1.2 1.2\"/>",
+   "css": ".ham{animation-name:tm-strike;transform-box:view-box;transform-origin:4px 20px}.imp{animation-name:tm-impact;opacity:0}@keyframes tm-strike{0%,100%{transform:rotate(0)}30%{transform:rotate(-24deg)}45%{transform:rotate(3deg)}55%{transform:rotate(0)}}@keyframes tm-impact{0%,40%,100%{opacity:0}46%,60%{opacity:1}}"
+  },
+  {
+   "id": "pintura",
+   "name": "Pintura",
+   "aliases": [
+    "pintura-interior",
+    "paredes",
+    "paintbrush"
+   ],
+   "durationSec": 1.4,
+   "svgInner": "<g class=\"a roll\"><rect width=\"16\" height=\"6\" x=\"2\" y=\"2\" rx=\"2\"/><path d=\"M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2\"/><rect width=\"4\" height=\"6\" x=\"8\" y=\"16\" rx=\"1\"/></g>",
+   "css": ".roll{animation-name:tm-roll;transform-box:view-box;transform-origin:10px 19px}@keyframes tm-roll{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(-1.2px,-1px) rotate(-5deg)}75%{transform:translate(1.2px,.6px) rotate(4deg)}}"
+  },
+  {
+   "id": "cristales",
+   "name": "Cristales",
+   "aliases": [
+    "ventanas",
+    "vidrios",
+    "cancel",
+    "square"
+   ],
+   "durationSec": 1.8,
+   "svgInner": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M12 3v18\"/><path d=\"M3 12h18\"/><path class=\"a sh\" d=\"M5.5 9.5 9.5 5.5\"/>",
+   "css": ".sh{animation-name:tm-shine}@keyframes tm-shine{0%{transform:translate(0,0);opacity:1}45%{transform:translate(9px,9px);opacity:0}46%{transform:translate(0,0);opacity:0}100%{transform:translate(0,0);opacity:1}}"
+  },
+  {
+   "id": "drenaje",
+   "name": "Drenaje",
+   "aliases": [
+    "destape",
+    "coladera",
+    "tuberias",
+    "droplets"
+   ],
+   "durationSec": 1.4,
+   "svgInner": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path class=\"a sw\" d=\"M12 7.5a4.5 4.5 0 1 1-4.5 4.5A2.5 2.5 0 0 1 12 9.5a1.5 1.5 0 0 1 0 3\"/>",
+   "css": ".sw{animation-name:tm-spin;animation-timing-function:linear;transform-box:view-box;transform-origin:12px 12px}@keyframes tm-spin{to{transform:rotate(360deg)}}"
+  },
+  {
+   "id": "limpieza",
+   "name": "Limpieza",
+   "aliases": [
+    "aseo",
+    "desinfeccion"
+   ],
+   "durationSec": 1.2,
+   "svgInner": "<path class=\"a d1\" d=\"M3 3h.01\"/><path class=\"a d2\" d=\"M7 5h.01\"/><path class=\"a d3\" d=\"M11 7h.01\"/><path class=\"a d1\" d=\"M3 7h.01\"/><path class=\"a d2\" d=\"M7 9h.01\"/><path class=\"a d1\" d=\"M3 11h.01\"/><rect class=\"a cap\" width=\"4\" height=\"4\" x=\"15\" y=\"5\"/><path d=\"m19 9 2 2v10c0 .6-.4 1-1 1h-6c-.6 0-1-.4-1-1V11l2-2\"/><path d=\"m13 14 8-2\"/><path d=\"m13 19 8-2\"/>",
+   "css": ".d3{animation-name:tm-p3}.d2{animation-name:tm-p2}.d1{animation-name:tm-p1}.cap{animation-name:tm-press}@keyframes tm-p3{0%,100%{opacity:1}10%{opacity:.1}30%{opacity:1}}@keyframes tm-p2{0%,100%{opacity:1}22%{opacity:.1}42%{opacity:1}}@keyframes tm-p1{0%,100%{opacity:1}34%{opacity:.1}54%{opacity:1}}@keyframes tm-press{0%,100%{transform:translateY(0)}8%,20%{transform:translateY(.8px)}}"
+  },
+  {
+   "id": "jardineria",
+   "name": "Jardinería",
+   "aliases": [
+    "jardin",
+    "poda",
+    "pasto"
+   ],
+   "durationSec": 1.8,
+   "svgInner": "<path d=\"M7 20h10\"/><g class=\"a sway\"><path d=\"M10 20c5.5-2.5.8-6.4 3-10\"/><path d=\"M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z\"/><path d=\"M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z\"/></g>",
+   "css": ".sway{animation-name:tm-sway;transform-box:view-box;transform-origin:11px 20px}@keyframes tm-sway{0%,100%{transform:rotate(0)}30%{transform:rotate(-7deg)}70%{transform:rotate(5deg)}}"
+  },
+  {
+   "id": "impermeabilizacion",
+   "name": "Impermeabilización",
+   "aliases": [
+    "impermeabilizar",
+    "techos",
+    "goteras"
+   ],
+   "durationSec": 1.4,
+   "svgInner": "<g class=\"a umb\"><path d=\"M22 12a10.06 10.06 1 0 0-20 0Z\"/><path d=\"M12 12v8a2 2 0 0 0 4 0\"/><path d=\"M12 2v1\"/></g><path class=\"a r1\" d=\"M3 15v2\"/><path class=\"a r2\" d=\"M21 15v2\"/>",
+   "css": ".umb{animation-name:tm-bob}.r1{animation-name:tm-rain}.r2{animation-name:tm-rain2}@keyframes tm-bob{0%,100%{transform:translateY(0)}20%{transform:translateY(.6px)}}@keyframes tm-rain{0%{transform:translateY(0);opacity:1}50%{transform:translateY(4px);opacity:0}51%{transform:translateY(-2px);opacity:0}100%{transform:translateY(0);opacity:1}}@keyframes tm-rain2{0%,20%{transform:translateY(0);opacity:1}70%{transform:translateY(4px);opacity:0}71%{transform:translateY(-2px);opacity:0}100%{transform:translateY(0);opacity:1}}"
+  },
+  {
+   "id": "general",
+   "name": "Mantenimiento general",
+   "aliases": [
+    "mantenimiento",
+    "otros",
+    "i-wrench",
+    "wrench"
+   ],
+   "durationSec": 1.2,
+   "svgInner": "<path class=\"a wr\" d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/>",
+   "css": ".wr{animation-name:tm-wiggle;transform-box:view-box;transform-origin:12px 12px}@keyframes tm-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}60%{transform:rotate(9deg)}80%{transform:rotate(-3deg)}}"
+  }
+ ]
+}

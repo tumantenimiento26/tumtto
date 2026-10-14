@@ -28,6 +28,7 @@ import {
   ScreenSkeleton,
   toast,
 } from '@/components/ds';
+import { CategoryIcon } from '@/components/category-icon';
 import { useAction } from '@/components/use-action';
 import {
   getAllPayments,
@@ -376,6 +377,7 @@ export default function TecnicoDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   {data.catNames.map(c => (
                     <Badge key={c} tone="info">
+                      <CategoryIcon cat={c} size={14} decorative />
                       {c}
                     </Badge>
                   ))}

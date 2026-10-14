@@ -163,6 +163,7 @@ export default function ConfigPage() {
   const [form, setForm] = useState<SettingsMap>({});
   const [baseline, setBaseline] = useState<SettingsMap>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [radiusUnit, setRadiusUnit] = useState<'m' | 'km'>('km');
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -272,6 +273,35 @@ export default function ConfigPage() {
       />
     </Row>
   );
+  // Radios: se guardan en metros; el admin elige verlos en m o km.
+  const radiusField = (key: string, label: string, desc?: string) => {
+    const m = num(key);
+    const km = radiusUnit === 'km';
+    return (
+      <Row label={label} desc={desc} error={errs[key]}>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            step={km ? '0.1' : '1'}
+            value={Number.isNaN(m) ? '' : km ? m / 1000 : m}
+            onChange={e => {
+              const raw = e.target.value.trim();
+              set(key, raw === '' ? NaN : Math.round(Number(raw) * (km ? 1000 : 1)));
+            }}
+            error={!!errs[key]}
+            aria-label={`${label} (${radiusUnit})`}
+          />
+          <Segmented
+            size="sm"
+            options={['m', 'km'] as const}
+            value={radiusUnit}
+            onChange={setRadiusUnit}
+            aria-label="Unidad del radio"
+          />
+        </div>
+      </Row>
+    );
+  };
   const toggleField = (key: string, label: string, desc?: string) => (
     <Row label={label} desc={desc}>
       <div className="flex justify-end">
@@ -357,10 +387,9 @@ export default function ConfigPage() {
                   'min',
                   'Tiempo que una solicitud espera técnico antes de expirar.',
                 )}
-                {intField(
+                {radiusField(
                   'default_match_radius_m',
                   'Radio de búsqueda',
-                  'm',
                   'Radio por defecto para encontrar técnicos cercanos (si el técnico no define el suyo).',
                 )}
                 {intField(
@@ -411,22 +440,19 @@ export default function ConfigPage() {
           {active === 'emergency' && (
             <>
               <Section title="Búsqueda de técnico">
-                {intField(
+                {radiusField(
                   'emergency_initial_radius_m',
                   'Radio inicial',
-                  'm',
                   'Primera ronda: se avisa a los técnicos elegibles dentro de este radio.',
                 )}
-                {intField(
+                {radiusField(
                   'emergency_radius_step_m',
                   'Incremento por ronda',
-                  'm',
                   'Cuánto se amplía el radio en cada ronda sin respuesta.',
                 )}
-                {intField(
+                {radiusField(
                   'emergency_max_radius_m',
                   'Radio máximo',
-                  'm',
                   'La búsqueda no se amplía más allá de este radio.',
                 )}
                 {intField(

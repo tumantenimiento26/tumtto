@@ -80,7 +80,7 @@ type SectionId =
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
-  { id: 'transfers', label: 'Cuenta para transferencias', icon: Landmark },
+  { id: 'transfers', label: 'Cuentas para transferencias', icon: Landmark },
   { id: 'ops', label: 'Operación', icon: Clock },
   { id: 'schedule', label: 'Recargos por horario', icon: Moon },
   { id: 'emergency', label: 'Emergencias', icon: Siren },

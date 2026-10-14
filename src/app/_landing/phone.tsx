@@ -3,19 +3,14 @@
 import type { ReactNode } from 'react';
 import {
   CreditCard,
-  Droplet,
-  Flame,
-  KeyRound,
   MapPin,
   MessageSquare,
   Phone as PhoneIcon,
   Search,
   ShieldCheck,
-  Snowflake,
   Star,
-  WashingMachine,
-  Zap,
 } from 'lucide-react';
+import { CategoryIcon } from '@/components/category-icon';
 
 // Mockups de la app (tema claro de la app, como en el handoff). Todo es
 // ilustrativo: datos de ejemplo, sin llamadas.
@@ -74,12 +69,12 @@ function Header({ kicker, title }: { kicker: string; title: string }) {
 }
 
 const APP_CATS = [
-  [Droplet, 'Plomería'],
-  [Zap, 'Electricidad'],
-  [Flame, 'Gas'],
-  [Snowflake, 'Aire'],
-  [WashingMachine, 'Línea blanca'],
-  [KeyRound, 'Cerrajería'],
+  ['plomeria', 'Plomería'],
+  ['electricidad', 'Electricidad'],
+  ['gas', 'Gas'],
+  ['aire', 'Aire'],
+  ['linea-blanca', 'Línea blanca'],
+  ['cerrajeria', 'Cerrajería'],
 ] as const;
 
 function Progress({ done, total }: { done: number; total: number }) {
@@ -105,14 +100,18 @@ export function HomeScreen() {
           <span className="text-[14.5px]">¿Qué necesitas reparar?</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {APP_CATS.map(([Icon, name]) => (
+          {APP_CATS.map(([id, name]) => (
             <div
               key={name}
               className="flex flex-col items-center gap-2 rounded-box border border-line bg-white px-1.5 py-3.5"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-info-soft text-primary">
-                <Icon size={21} />
-              </span>
+              <CategoryIcon
+                cat={id}
+                variant="tile"
+                size={21}
+                theme="light"
+                decorative
+              />
               <span className="text-[12.5px] font-semibold">{name}</span>
             </div>
           ))}

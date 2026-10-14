@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { Button, DateRangePicker, Kicker, Sheet, rangeLabel } from '@/components/ds';
-import { rangePreset } from '@/lib/calendar';
+import { rangePreset, sameDay, type DateRange } from '@/lib/calendar';
 import type { DashRange } from '@/lib/dashboard';
 import { clockLabel, greeting, sparkPaths } from '@/lib/dashboard';
 import { BAND, useCountUp } from './shared';
@@ -26,6 +26,15 @@ const RANGES: { value: Exclude<DashRange, object>; label: string }[] = [
   { value: '7d', label: '7 días' },
   { value: '30d', label: '30 días' },
 ];
+
+/** Rango del calendario → el filtro rápido equivalente (si coincide), para marcarlo. */
+function fromCalendar(r: NonNullable<DateRange>): DashRange {
+  const hit = RANGES.find(q => {
+    const p = rangePreset(q.value === 'hoy' ? 'today' : q.value)!;
+    return sameDay(r.from, p.from) && sameDay(r.to, p.to);
+  });
+  return hit ? hit.value : r;
+}
 
 function Kpi({ k, index }: { k: BandKpi; index: number }) {
   const n = useCountUp(k.value);
@@ -225,7 +234,7 @@ export function DashBand({
             label="Periodo"
             value={asDates}
             allowAll={false}
-            onChange={r => r && onRange(r)}
+            onChange={r => r && onRange(fromCalendar(r))}
           />
         </section>
       </Sheet>

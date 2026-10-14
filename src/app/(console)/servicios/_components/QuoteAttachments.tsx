@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ExternalLink, FileText, Paperclip } from 'lucide-react';
 import { Card, EmptyState, Modal, toast } from '@/components/ds';
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { getOrderQuotes, getProfile, getQuoteAttachmentUrl } from '@/lib/data/store';
 import { fmtDateTime } from '@/lib/dates';
 import {

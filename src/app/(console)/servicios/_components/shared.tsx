@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useCallback, useEffect, useRef } from 'react';
 import { CategoryIcon } from '@/components/category-icon';
 import { snackbar, type Tone } from '@/components/ds';

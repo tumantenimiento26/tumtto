@@ -45,6 +45,7 @@ import {
 import { canAccessPath } from '@/lib/staffRoles';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
+import { Avatar } from './avatar';
 import { toast } from './toast';
 import { IconButton, Kicker, Portal, ScreenSkeleton, useEscape } from './ds';
 import {
@@ -259,13 +260,11 @@ export function screenKind(pathname: string): 'dashboard' | 'list' | 'detail' {
 function useAdminUser() {
   const { usuario, session } = useAuth();
   const name = usuario?.full_name ?? 'Admin';
-  const initials =
-    name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map(p => p[0]?.toUpperCase() ?? '')
-      .join('') || 'A';
-  return { name, email: session?.user.email ?? '', initials };
+  return {
+    name,
+    email: session?.user.email ?? '',
+    avatarId: usuario?.avatar_icon,
+  };
 }
 
 /* ── Sidebar ── */
@@ -381,9 +380,7 @@ function Sidebar({
         <div
           className={`flex items-center gap-2.5 rounded-btn bg-white/[0.04] ${compact ? 'p-2' : 'p-2.5'}`}
         >
-          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0a6bcf] font-display text-[12.5px] font-bold">
-            {user.initials}
-          </span>
+          <Avatar avatarId={user.avatarId} size={36} bg="bold" decorative />
           {!compact && (
             <>
               <div className="min-w-0 flex-1">

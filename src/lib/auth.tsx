@@ -241,6 +241,7 @@ function mockAuth(signOut: () => Promise<void>): AuthContextValue {
       phone: null,
       role: 'admin',
       avatar_path: null,
+      avatar_icon: 'casco',
       status: 'active',
       stripe_customer_id: null,
       created_at: now,

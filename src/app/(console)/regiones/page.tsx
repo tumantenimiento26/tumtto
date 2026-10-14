@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useEffect, useMemo, useState } from 'react';
 import { Download, MapPin, Pencil, Plus, Star, UserPlus } from 'lucide-react';
 import {

@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { BrandMark } from '@/components/ui';
 import { easeOutCubic } from '@/lib/landing';
-import { Container, Initials, StoreButtons, Stars } from './bits';
+import { Avatar } from '@/components/avatar';
+import { Container, StoreButtons, Stars } from './bits';
 import { HomeScreen, Phone } from './phone';
 import { scrollToId, useInViewOnce } from './hooks';
 
@@ -234,12 +235,7 @@ const WORDS: [string, boolean][] = [
   ['en camino.', true],
 ];
 const WORD_DELAYS = [0.05, 0.12, 0.19, 0.3, 0.37, 0.44];
-const AVATARS: [string, string][] = [
-  ['MC', '#0A6BCF'],
-  ['RV', '#1E6B4B'],
-  ['LM', '#F5B94A'],
-  ['JS', '#18C1FF'],
-];
+const AVATARS = ['casco', 'trenzas', 'gorra', 'canas'];
 
 export function Hero({ reduced }: { reduced: boolean }) {
   const [live, setLive] = useState(89);
@@ -306,9 +302,12 @@ export function Hero({ reduced }: { reduced: boolean }) {
           <StoreButtons className="mb-9 animate-[lp-wordin_.8s_ease_.65s_both]" />
           <div className="flex animate-[lp-wordin_.8s_ease_.75s_both] flex-wrap items-center gap-[22px]">
             <div className="flex items-center">
-              {AVATARS.map(([ini, c], i) => (
-                <span key={ini} className={i ? '-ml-2.5' : ''}>
-                  <Initials text={ini} color={c} ring />
+              {AVATARS.map((id, i) => (
+                <span
+                  key={id}
+                  className={`rounded-full ring-2 ring-deep ${i ? '-ml-2.5' : ''}`}
+                >
+                  <Avatar avatarId={id} size={36} bg="bold" decorative />
                 </span>
               ))}
             </div>

@@ -8,7 +8,15 @@ import {
   activeTransferFilters,
   baseMethodOf,
   canReviewTransfer,
+  applyOrder,
   depositArgs,
+  depositFormDirty,
+  depositFormOf,
+  depositTitle,
+  hasActiveDeposit,
+  movedIds,
+  parseDepositAccounts,
+  type DepositAccount,
   filterTransfers,
   folioOf,
   groupDigits,
@@ -18,7 +26,6 @@ import {
   listArgs,
   pageCount,
   paginate,
-  parseDepositAccount,
   parseTransferDetail,
   proofKind,
   rangeBounds,
@@ -33,6 +40,7 @@ const form = (p: Partial<DepositForm> = {}): DepositForm => ({
   clabe: VALID_CLABE,
   card: '',
   holder: 'Tu Mantenimiento S.A. de C.V.',
+  alias: '',
   ...p,
 });
 
@@ -62,22 +70,68 @@ describe('cuenta de depósito', () => {
     expect(validateDepositForm(form({ holder: 'x'.repeat(121) })).holder).toBeDefined();
   });
 
-  it('normaliza los args del RPC (tarjeta vacía → sin p_card_number)', () => {
-    expect(depositArgs(form({ bank: ' BBVA ', clabe: '0321-8000-0118-3597-19' }))).toEqual({
+  it('normaliza los args del RPC (vacíos → null, p_id null = crear)', () => {
+    expect(depositArgs(form({ bank: ' BBVA ', clabe: '0321-8000-0118-3597-19', alias: ' Principal ' }))).toEqual({
+      p_id: null,
       p_bank: 'BBVA',
       p_clabe: VALID_CLABE,
       p_holder: 'Tu Mantenimiento S.A. de C.V.',
-      p_card_number: undefined,
+      p_card_number: null,
+      p_alias: 'Principal',
     });
-    expect(depositArgs(form({ card: '4152 3138 0000 0001' })).p_card_number).toBe('4152313800000001');
+    expect(depositArgs(form({ card: '4152 3138 0000 0001' }), 'x1')).toMatchObject({ p_id: 'x1', p_card_number: '4152313800000001', p_alias: null });
   });
 
-  it('lee get_transfer_deposit_account (configurada o no)', () => {
-    expect(parseDepositAccount({ configured: false, bank: null, clabe: null, card_number: null, holder: null, updated_at: null }).configured).toBe(false);
-    const a = parseDepositAccount({ configured: true, bank: 'BBVA', clabe: VALID_CLABE, card_number: null, holder: 'TM', updated_at: '2026-10-01T00:00:00Z' });
-    expect(a).toMatchObject({ configured: true, bank: 'BBVA', clabe: VALID_CLABE });
-    expect(parseDepositAccount(null).configured).toBe(false);
+  it('valida el alias (máx. 60)', () => {
+    expect(validateDepositForm(form({ alias: 'x'.repeat(60) })).alias).toBeUndefined();
+    expect(validateDepositForm(form({ alias: 'x'.repeat(61) })).alias).toMatch(/60/);
+  });
+
+  const acct = (p: Partial<DepositAccount> = {}): DepositAccount => ({
+    id: 'a', bank: 'BBVA', clabe: VALID_CLABE, card_number: null, holder: 'TM', alias: null,
+    is_active: true, sort_order: 0, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', ...p,
+  });
+
+  it('lee admin_list_deposit_accounts ordenado y descarta filas inválidas', () => {
+    const list = parseDepositAccounts([
+      { id: 'b', bank: 'HSBC', clabe: VALID_CLABE, holder: 'TM', is_active: false, sort_order: 1, card_number: null, alias: 'Respaldo' },
+      { id: 'a', bank: 'BBVA', clabe: VALID_CLABE, holder: 'TM', is_active: true, sort_order: 0, card_number: '4152313800000001', alias: null },
+      { bank: 'sin id' },
+    ]);
+    expect(list.map(a => a.id)).toEqual(['a', 'b']);
+    expect(list[1]).toMatchObject({ is_active: false, alias: 'Respaldo' });
+    expect(parseDepositAccounts(null)).toEqual([]);
+    expect(parseDepositAccounts({})).toEqual([]);
+  });
+
+  it('título, formulario y cambios', () => {
+    expect(depositTitle(acct({ alias: ' Principal ' }))).toBe('Principal');
+    expect(depositTitle(acct())).toBe('BBVA');
+    const a = acct({ card_number: '4152313800000001' });
+    expect(depositFormDirty(depositFormOf(a), a)).toBe(false);
+    expect(depositFormDirty({ ...depositFormOf(a), clabe: '0321 8000 0118 3597 19' }, a)).toBe(false);
+    expect(depositFormDirty({ ...depositFormOf(a), holder: 'Otro' }, a)).toBe(true);
+  });
+
+  it('avisa si no hay cuentas activas', () => {
+    expect(hasActiveDeposit([])).toBe(false);
+    expect(hasActiveDeposit([acct({ is_active: false })])).toBe(false);
+    expect(hasActiveDeposit([acct({ is_active: false }), acct({ id: 'b' })])).toBe(true);
+  });
+
+  it('reordena: movedIds en los bordes y applyOrder renumera', () => {
+    expect(movedIds(['a', 'b', 'c'], 'b', -1)).toEqual(['b', 'a', 'c']);
+    expect(movedIds(['a', 'b', 'c'], 'b', 1)).toEqual(['a', 'c', 'b']);
+    expect(movedIds(['a', 'b'], 'a', -1)).toBeNull();
+    expect(movedIds(['a', 'b'], 'b', 1)).toBeNull();
+    expect(movedIds(['a', 'b'], 'z', 1)).toBeNull();
+    const out = applyOrder([acct({ id: 'a' }), acct({ id: 'b' }), acct({ id: 'c' })], ['c', 'a']);
+    expect(out.map(x => [x.id, x.sort_order])).toEqual([['c', 0], ['a', 1], ['b', 2]]);
+  });
+
+  it('agrupa dígitos', () => {
     expect(groupDigits(VALID_CLABE)).toBe('0321 8000 0118 3597 19');
+    expect(groupDigits(null)).toBe('—');
   });
 });
 

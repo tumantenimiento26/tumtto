@@ -3619,6 +3619,7 @@ export type Database = {
           technicians_count: number
         }[]
       }
+      admin_delete_deposit_account: { Args: { p_id: string }; Returns: Json }
       admin_delete_holiday: { Args: { p_date: string }; Returns: undefined }
       admin_delete_schedule_rule: { Args: { p_id: string }; Returns: undefined }
       admin_emergency_history: { Args: { p_order_id: string }; Returns: Json }
@@ -3950,6 +3951,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_list_deposit_accounts: { Args: never; Returns: Json }
+      admin_reorder_deposit_accounts: { Args: { p_ids: string[] }; Returns: Json }
+      admin_set_deposit_account_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: Json
+      }
+      admin_upsert_deposit_account: {
+        Args: {
+          p_alias?: string
+          p_bank: string
+          p_card_number: string
+          p_clabe: string
+          p_holder: string
+          p_id: string
+        }
+        Returns: Json
+      }
+      get_deposit_accounts: { Args: never; Returns: Json }
       admin_set_transfer_deposit_account: {
         Args: {
           p_bank: string

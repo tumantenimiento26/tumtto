@@ -38,6 +38,7 @@ import {
   REFUND_REFERENCE_MAX,
   REJECT_REASON_MAX,
   TRANSFER_PAGE_SIZE,
+  applyOrder,
   baseMethodOf,
   depositArgs,
   filterTransfers,
@@ -46,7 +47,7 @@ import {
   listArgs,
   owedAdvances,
   paginate,
-  parseDepositAccount,
+  parseDepositAccounts,
   parseTransferDetail,
   proofKind,
   validateDepositForm,
@@ -2154,58 +2155,121 @@ export async function confirmTransferRefund(orderId: string, reference: string) 
   );
 }
 
-/** Maqueta: cuenta de depósito (platform_settings.transfer_deposit_account). */
-let mockDeposit: DepositAccount = {
-  configured: true,
-  bank: 'BBVA México',
-  clabe: '012180001234567899',
+/** Maqueta: cuentas de depósito (tabla deposit_accounts). */
+const mockAcct = (p: Partial<DepositAccount> & Pick<DepositAccount, 'id' | 'bank' | 'clabe' | 'holder'>): DepositAccount => ({
   card_number: null,
-  holder: 'Tu Mantenimiento S.A. de C.V.',
+  alias: null,
+  is_active: true,
+  sort_order: 0,
+  created_at: new Date(Date.now() - 6 * DAY_MS).toISOString(),
   updated_at: new Date(Date.now() - 6 * DAY_MS).toISOString(),
-};
+  ...p,
+});
+let mockDeposits: DepositAccount[] = [
+  mockAcct({ id: 'dep-1', bank: 'BBVA México', clabe: '012180001234567899', holder: 'Tu Mantenimiento S.A. de C.V.', alias: 'Principal', card_number: '4152313800000001' }),
+  mockAcct({ id: 'dep-2', bank: 'Banorte', clabe: '072180001234567890', holder: 'Tu Mantenimiento S.A. de C.V.', alias: 'Respaldo', is_active: false, sort_order: 1 }),
+];
+const depositsCopy = () => mockDeposits.map(a => ({ ...a }));
 
-/** Cuenta a la que el cliente transfiere (get_transfer_deposit_account). null = no disponible. */
-export async function fetchDepositAccount(): Promise<DepositAccount | null> {
-  if (MOCK) return { ...mockDeposit };
+/** Todas las cuentas de depósito, activas o no (admin_list_deposit_accounts). null = no disponible. */
+export async function fetchDepositAccounts(): Promise<DepositAccount[] | null> {
+  if (MOCK) return depositsCopy();
   try {
-    const { data, error } = await supabase.rpc('get_transfer_deposit_account');
+    const { data, error } = await supabase.rpc('admin_list_deposit_accounts');
     if (error) throw error;
-    return parseDepositAccount(data);
+    return parseDepositAccounts(data);
   } catch (e) {
-    console.warn('[data] get_transfer_deposit_account', e);
+    console.warn('[data] admin_list_deposit_accounts', e);
     return null;
   }
 }
 
-/** Guarda la cuenta de depósito (admin_set_transfer_deposit_account, finanzas; auditado). */
-export async function setDepositAccount(f: DepositForm): Promise<DepositAccount | null> {
-  const errs = validateDepositForm(f);
-  const first = Object.values(errs)[0];
+/** Crea (id null) o edita una cuenta (admin_upsert_deposit_account, finanzas; auditado). Devuelve la lista actualizada. */
+export async function saveDepositAccount(id: string | null, f: DepositForm): Promise<DepositAccount[] | null> {
+  const first = Object.values(validateDepositForm(f))[0];
   if (first) {
     notifyError(first);
     return null;
   }
-  const args = depositArgs(f);
+  const args = depositArgs(f, id);
   if (MOCK) {
-    mockDeposit = {
-      configured: true,
-      bank: args.p_bank,
-      clabe: args.p_clabe,
-      card_number: args.p_card_number ?? null,
-      holder: args.p_holder,
-      updated_at: new Date().toISOString(),
-    };
+    if (mockDeposits.some(a => a.clabe === args.p_clabe && a.id !== id)) {
+      notifyError('Ya existe una cuenta con esa CLABE.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const base = { bank: args.p_bank, clabe: args.p_clabe, holder: args.p_holder, card_number: args.p_card_number, alias: args.p_alias, updated_at: now };
+    mockDeposits = id
+      ? mockDeposits.map(a => (a.id === id ? { ...a, ...base } : a))
+      : [...mockDeposits, mockAcct({ ...base, id: `dep-${Date.now()}`, sort_order: mockDeposits.length, created_at: now })];
     bump();
-    return { ...mockDeposit };
+    return depositsCopy();
   }
   return mutate(
     async () => {
-      const { data, error } = await supabase.rpc('admin_set_transfer_deposit_account', args);
+      const { error } = await supabase.rpc('admin_upsert_deposit_account', args as Fn['admin_upsert_deposit_account']['Args']);
       if (error) throw error;
-      return parseDepositAccount(data);
+      return await listDepositsOrThrow();
     },
-    e => pgMessage(e, 'No se pudo guardar la cuenta para transferencias.'),
+    e => pgMessage(e, 'No se pudo guardar la cuenta.'),
   );
+}
+
+/** Activa o desactiva una cuenta (admin_set_deposit_account_active). */
+export async function setDepositAccountActive(id: string, active: boolean): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = mockDeposits.map(a => (a.id === id ? { ...a, is_active: active, updated_at: new Date().toISOString() } : a));
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_deposit_account_active', { p_id: id, p_active: active });
+      if (error) throw error;
+      return await listDepositsOrThrow();
+    },
+    e => pgMessage(e, 'No se pudo cambiar el estado de la cuenta.'),
+  );
+}
+
+/** Guarda el orden de las cuentas (admin_reorder_deposit_accounts; el primero se muestra primero). */
+export async function reorderDepositAccounts(ids: string[]): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = applyOrder(mockDeposits, ids);
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_reorder_deposit_accounts', { p_ids: ids });
+      if (error) throw error;
+      return parseDepositAccounts(data);
+    },
+    e => pgMessage(e, 'No se pudo cambiar el orden.'),
+  );
+}
+
+/** Elimina una cuenta (admin_delete_deposit_account; el historial de pagos no depende de ella). */
+export async function deleteDepositAccount(id: string): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = applyOrder(mockDeposits.filter(a => a.id !== id), mockDeposits.filter(a => a.id !== id).map(a => a.id));
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_delete_deposit_account', { p_id: id });
+      if (error) throw error;
+      return await listDepositsOrThrow();
+    },
+    e => pgMessage(e, 'No se pudo eliminar la cuenta.'),
+  );
+}
+
+async function listDepositsOrThrow(): Promise<DepositAccount[]> {
+  const { data, error } = await supabase.rpc('admin_list_deposit_accounts');
+  if (error) throw error;
+  return parseDepositAccounts(data);
 }
 
 /** Reporte «Efectivo por técnico» (finanzas). null = no disponible. */

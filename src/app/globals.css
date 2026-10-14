@@ -340,3 +340,37 @@ html, body {
   opacity: 1;
 }
 }
+
+/* ── Avatares ilustrados (<Avatar>, handoff tumtto_avatars) ───────────────── */
+.tmav { position: relative; display: inline-block; flex-shrink: 0; line-height: 0; vertical-align: middle; }
+.tmav-wrap { position: relative; display: block; width: 100%; height: 100%; }
+.tmav[data-in] .tmav-wrap { animation: tmav-in 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+@keyframes tmav-in { 0% { opacity: 0; transform: scale(0.5) rotate(-10deg); } 100% { opacity: 1; transform: none; } }
+.tmav-clip { display: block; width: 100%; height: 100%; border-radius: var(--av-r); overflow: hidden; transform: translateZ(0); }
+.tmav-clip > svg, .tmav-photo { display: block; width: 100%; height: 100%; }
+.tmav-photo { object-fit: cover; }
+.tmav .char { transform-box: view-box; transform-origin: 40px 78px; transition: transform 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.tmav .halo { transform-box: view-box; transform-origin: 40px 36px; transition: transform 0.5s cubic-bezier(0.3, 1.4, 0.5, 1), opacity 0.3s; }
+.tmav .acc { transform-box: view-box; transform-origin: 40px 30px; }
+.tmav[data-blink] .eyes { transform-box: fill-box; transform-origin: 50% 50%; animation: tmav-blink var(--blink-dur, 5s) var(--blink-delay, 0s) infinite; }
+@keyframes tmav-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+/* Hover / foco del control más cercano que contiene al avatar (botón, enlace, fila, tarjeta). */
+:is(button, a, label, [role='button'], [role='option'], [data-av-hover], tr):is(:hover, :focus-within) .tmav .char { transform: translateY(-2px) rotate(-5deg); }
+:is(button, a, label, [role='button'], [role='option'], [data-av-hover], tr):is(:hover, :focus-within) .tmav .halo { transform: scale(1.12); }
+:is(button, a, label, [role='button'], [role='option'], [data-av-hover], tr):is(:hover, :focus-within) .tmav .acc { animation: tmav-bob 0.6s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes tmav-bob { 0%, 100% { transform: none; } 40% { transform: translateY(-1.6px) rotate(3deg); } }
+.tmav-st, .tmav-vf { position: absolute; box-sizing: border-box; width: var(--av-b); height: var(--av-b); border-radius: 50%; border: var(--av-bw) solid var(--av-edge); }
+.tmav-st { right: var(--av-inset); bottom: var(--av-inset); background: var(--av-st); }
+.tmav-st::after { content: ''; position: absolute; inset: calc(var(--av-bw) * -1); border-radius: 50%; border: 2px solid var(--av-st); opacity: 0; }
+.tmav[data-status='online'] .tmav-st::after { animation: tmav-ping 2s ease-out infinite; }
+@keyframes tmav-ping { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2.2); opacity: 0; } }
+.tmav-vf { right: var(--av-inset); top: var(--av-inset); background: #0a6bcf; display: flex; align-items: center; justify-content: center; }
+.tmav-vf svg { width: 62%; height: 62%; }
+.tmav[data-still] .eyes, .tmav[data-still] .tmav-st::after, .tmav[data-still] .tmav-wrap { animation: none !important; }
+.tmav[data-still] .char, .tmav[data-still] .halo { transition: none; }
+.tmav[data-still] .char, .tmav[data-still] .halo { transform: none !important; }
+.tmav[data-still] .acc { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tmav .eyes, .tmav .tmav-st::after, .tmav .tmav-wrap, .tmav .acc { animation: none !important; }
+  .tmav .char, .tmav .halo { transition: none; transform: none !important; }
+}

@@ -20,7 +20,8 @@ import {
   money,
   monthlyIncome,
 } from '@/lib/landing';
-import { Container, H2, Initials, Kicker, Lead, Stars, StoreButtons } from './bits';
+import { Avatar } from '@/components/avatar';
+import { Container, H2, Kicker, Lead, Stars, StoreButtons } from './bits';
 import { scrollToId } from './hooks';
 import { CONTACT, displayPhone, mailLink, telLink, waLink } from '@/lib/contact';
 import { SocialLinks } from './socials';
@@ -36,21 +37,21 @@ const REVIEWS: [string, string, string][] = [
   ['Fernando Ruiz', 'Gas · Zapopan', 'Revisó toda la instalación y me dejó tranquilo.'],
   ['Sofía Aguilar', 'Aire acondicionado · Tlajomulco', 'Mantenimiento completo y muy amable.'],
 ];
-const AV_COLORS = ['#0A6BCF', '#1E6B4B', '#B45309', '#18C1FF', '#0E2C56', '#6B7280'];
+const REVIEW_AVATARS = ['rizos', 'clasico', 'chongo', 'audifonos', 'clasica', 'canas', 'trenzas', 'clasico'];
 
 function ReviewCard({ r, i }: { r: [string, string, string]; i: number }) {
   const [n, s, t] = r;
-  const ini = n
-    .split(' ')
-    .map(w => w[0])
-    .join('')
-    .slice(0, 2);
   return (
     <div className="flex w-[340px] flex-shrink-0 flex-col gap-3 rounded-[14px] border border-white/[0.09] bg-white/[0.05] p-5 transition-colors hover:border-[rgba(24,193,255,0.4)] hover:bg-white/[0.09] max-sm:w-[280px]">
       <Stars />
       <p className="text-[15px] leading-[1.55] text-lp-text">“{t}”</p>
       <div className="mt-auto flex items-center gap-2.5">
-        <Initials text={ini} color={AV_COLORS[i % AV_COLORS.length]} />
+        <Avatar
+          avatarId={REVIEW_AVATARS[i % REVIEW_AVATARS.length]}
+          size={36}
+          bg="bold"
+          decorative
+        />
         <div>
           <div className="text-[13.5px] font-semibold">{n}</div>
           <div className="text-[12px] text-lp-muted">{s}</div>

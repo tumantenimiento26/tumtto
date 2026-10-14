@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useState } from 'react';
 import Link from 'next/link';
 import { EyeOff, Eye, Star } from 'lucide-react';

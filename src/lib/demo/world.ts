@@ -1,5 +1,4 @@
 import type { Database } from '@/types/supabase';
-import { defaultAvatarFor } from '@/lib/avatarArt';
 
 /**
  * In-memory demo world — one coherent dataset shared across the Cliente,
@@ -56,18 +55,20 @@ export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 
 const MOCK_ICONS: Record<string, string> = {
-  [CLIENT_ID]: 'casa',
-  [TECH_USER_ID]: 'llave',
-  'u-ag': 'foco',
-  'u-sc': 'casco',
-  'u-do': 'gota',
-  'u-carla': 'martillo',
-  'u-carlos': 'casco',
-  'u-miguel': 'martillo',
-  'u-jose': 'llave',
-  'u-lupita': 'gota',
-  'u-fer': 'foco',
-  // u-luis, u-ivan, u-roberto: sin entrada -> default por hash
+  [CLIENT_ID]: 'casita',
+  [TECH_USER_ID]: 'casco',
+  'u-ag': 'gorra',
+  'u-sc': 'goggles',
+  'u-do': 'soldador',
+  'u-carla': 'pintor',
+  'u-carlos': 'gorro',
+  'u-miguel': 'bandana',
+  'u-jose': 'casco',
+  'u-lupita': 'trenzas',
+  'u-fer': 'chongo',
+  'u-luis': 'clasico',
+  'u-ivan': 'audifonos',
+  'u-roberto': 'canas',
 };
 
 function profile(
@@ -82,7 +83,7 @@ function profile(
     phone,
     role,
     avatar_path: null,
-    avatar_icon: MOCK_ICONS[id] ?? defaultAvatarFor(id),
+    avatar_icon: MOCK_ICONS[id] ?? 'silueta',
     status: 'active',
     stripe_customer_id: null,
     ...ts(),

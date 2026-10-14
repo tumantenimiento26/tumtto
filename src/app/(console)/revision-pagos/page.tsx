@@ -29,8 +29,8 @@ export default function RevisionPagosPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const { can } = useAuth();
-  const allowed = can('soporte') || can('finanzas');
+  const { can, canView } = useAuth();
+  const allowed = canView('revision_pagos') || can('soporte') || can('finanzas');
   const [tab, setTab] = useState<Tab>('transferencias');
   const [initialTransfer, setInitialTransfer] = useState<string | null>(null);
 

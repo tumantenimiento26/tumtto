@@ -36,10 +36,12 @@ import {
   CreditCard,
   Info,
   Package,
+  ShieldCheck,
   type LucideIcon,
   Menu as MenuIcon,
 } from 'lucide-react';
 
+import { canAccessPath } from '@/lib/staffRoles';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
 import { toast } from './toast';
@@ -138,11 +140,8 @@ interface NavGroup {
 function useNavGroups(): NavGroup[] {
   useTick();
   const { unread } = useNotifications();
-  const { can } = useAuth();
-  const finanzas = can('finanzas');
-  // Soporte o finanzas revisan pagos: transferencias y efectivo (página propia).
-  const pagos = finanzas || can('soporte');
-  return [
+  const { permissions } = useAuth();
+  const groups: NavGroup[] = [
     {
       label: 'General',
       items: [
@@ -173,17 +172,13 @@ function useNavGroups(): NavGroup[] {
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
-        ...(pagos
-          ? [
-              {
-                href: '/revision-pagos',
-                icon: Banknote,
-                label: 'Revisión de pagos',
-                badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
-              },
-            ]
-          : []),
+        { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        {
+          href: '/revision-pagos',
+          icon: Banknote,
+          label: 'Revisión de pagos',
+          badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
+        },
         {
           href: '/soporte',
           icon: Scale,
@@ -200,7 +195,8 @@ function useNavGroups(): NavGroup[] {
       label: 'Sistema',
       items: [
         { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
-        ...(finanzas ? [{ href: '/config', icon: Settings, label: 'Configuración' }] : []),
+        { href: '/config', icon: Settings, label: 'Configuración' },
+        { href: '/equipo', icon: ShieldCheck, label: 'Equipo y roles' },
         // Galería de estados/errores: solo en desarrollo.
         ...(process.env.NODE_ENV === 'production'
           ? []
@@ -208,6 +204,10 @@ function useNavGroups(): NavGroup[] {
       ],
     },
   ];
+  // Sólo lo que el rol puede abrir (matriz de permisos); sin grupos vacíos.
+  return groups
+    .map(g => ({ ...g, items: g.items.filter(i => canAccessPath(permissions, i.href)) }))
+    .filter(g => g.items.length > 0);
 }
 
 /** Ruta → [grupo, título] para las migas del header. */
@@ -225,6 +225,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/reportes': ['Analítica', 'Reportes'],
   '/catalogo': ['Sistema', 'Catálogo'],
   '/config': ['Sistema', 'Configuración'],
+  '/equipo': ['Sistema', 'Equipo y roles'],
   '/estados': ['Sistema', 'Estados y errores'],
 };
 const DETAIL_TITLE: Record<string, string> = {

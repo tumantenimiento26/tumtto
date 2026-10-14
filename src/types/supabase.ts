@@ -3693,9 +3693,27 @@ export type Database = {
         Returns: {
           admin_role: string
           email: string
+          full_name: string
+          must_change_password: boolean
           user_id: string
         }[]
       }
+      admin_delete_role: { Args: { p_slug: string }; Returns: Json }
+      admin_list_roles: { Args: never; Returns: Json }
+      admin_list_sections: { Args: never; Returns: Json }
+      admin_set_role_permissions: {
+        Args: { p_matrix: Json; p_slug: string }
+        Returns: Json
+      }
+      admin_upsert_role: {
+        Args: { p_description?: string; p_name: string; p_slug: string }
+        Returns: Json
+      }
+      current_admin_can: {
+        Args: { p_action: string; p_section: string }
+        Returns: boolean
+      }
+      my_permissions: { Args: never; Returns: Json }
       admin_list_cash_reviews: {
         Args: never
         Returns: {

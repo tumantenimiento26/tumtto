@@ -24,6 +24,7 @@ import {
   Sheet,
   Textarea,
 } from '@/components/ds';
+import { CategoryIcon } from '@/components/category-icon';
 import { useAction } from '@/components/use-action';
 import { useAuth } from '@/lib/auth';
 import { isValidClabe } from '@/lib/clabe';
@@ -500,7 +501,14 @@ export function RatesCard({ techId, rates }: { techId: string; rates: RateRow[] 
               <tbody>
                 {rates.map(r => (
                   <tr key={r.category_id} className="border-t border-divider">
-                    <td className="py-2.5 font-sans text-[13.5px] font-semibold text-navy">{r.cat}</td>
+                    <td className="py-2.5 font-sans text-[13.5px] font-semibold text-navy">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="text-primary">
+                          <CategoryIcon cat={r.cat} size={16} decorative />
+                        </span>
+                        {r.cat}
+                      </span>
+                    </td>
                     {(['visita', 'hora', 'minimo'] as const).map(k => (
                       <td key={k} className="py-2 text-right">
                         {editing ? (

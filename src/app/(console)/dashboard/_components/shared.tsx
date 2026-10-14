@@ -2,16 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import {
-  Droplet,
-  Flame,
-  KeyRound,
-  Snowflake,
-  WashingMachine,
-  Wrench,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react';
 import type { Tone } from '@/components/ds';
 
 /** Estado de la orden → etiqueta + tono de Badge (misma semántica que la consola). */
@@ -29,18 +19,6 @@ export const STATUS_BADGE: Record<string, { label: string; tone: Tone }> = {
   expired: { label: 'Expirado', tone: 'danger' },
   cancelled: { label: 'Cancelado', tone: 'danger' },
 };
-
-/** Ícono por slug de categoría (catálogo del seed). */
-const CAT_ICON: Record<string, LucideIcon> = {
-  plumbing: Droplet,
-  electrical: Zap,
-  gas: Flame,
-  ac: Snowflake,
-  appliances: WashingMachine,
-  locks: KeyRound,
-};
-export const catIcon = (slug?: string | null): LucideIcon =>
-  (slug && CAT_ICON[slug]) || Wrench;
 
 /** Colores de la banda del dashboard: siempre oscura (como el sidebar). */
 export const BAND = {

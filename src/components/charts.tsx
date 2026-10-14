@@ -2,6 +2,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useInView, useReducedMotion } from 'framer-motion';
 import { motion, EASE } from './motion';
+import { CategoryIcon } from './category-icon';
 
 /**
  * Gráficas interactivas del admin (SVG puro, sin dependencias de chart libs).
@@ -772,7 +773,7 @@ export function HBars({
   controls = false,
   showPct = false,
 }: {
-  rows: { label: string; value: number; meta?: string }[];
+  rows: { label: string; value: number; meta?: string; catIcon?: string }[];
   format?: (v: number) => string;
   /** Fila de controles: ordenar por valor / alfabético. */
   controls?: boolean;
@@ -829,6 +830,7 @@ export function HBars({
               layout={!reduced}
               transition={{ duration: 0.35, ease: EASE }}
               tabIndex={0}
+              data-cat-hover
               className="group -mx-2 grid grid-cols-[18px_minmax(84px,auto)_1fr_auto] items-center gap-x-3 rounded-lg px-2 py-1.5 outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
               onMouseMove={e => moveTip(e, body)}
               onMouseLeave={hide}
@@ -839,8 +841,13 @@ export function HBars({
               <span className="font-mono text-[10px] tabular-nums text-faint">
                 {i + 1}
               </span>
-              <span className="truncate text-right text-[12.5px] text-navy group-hover:font-semibold">
-                {r.label}
+              <span className="flex min-w-0 items-center justify-end gap-1.5 text-[12.5px] text-navy group-hover:font-semibold">
+                {r.catIcon && (
+                  <span className="text-primary">
+                    <CategoryIcon cat={r.catIcon} fallback={[r.label]} size={14} decorative />
+                  </span>
+                )}
+                <span className="truncate">{r.label}</span>
               </span>
               <div className="h-3.5 rounded-full bg-surface-2">
                 <motion.div

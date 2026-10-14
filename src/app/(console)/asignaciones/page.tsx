@@ -109,17 +109,22 @@ export default function AsignacionesPage() {
     },
     {
       key: 'cliente',
-      header: 'Cliente · zona',
+      header: 'Cliente',
       sortValue: r => r.client?.name ?? '',
       render: r => (
-        <div className="min-w-0">
-          <span className="block truncate font-display text-[13.5px] font-bold text-navy">
-            {r.client?.name ?? 'Cliente'}
-          </span>
-          <span className="block truncate text-[12px] text-muted">
-            {r.zone?.name || 'Sin zona'}
-          </span>
-        </div>
+        <span className="block truncate font-display text-[13.5px] font-bold text-navy">
+          {r.client?.name ?? 'Cliente'}
+        </span>
+      ),
+    },
+    {
+      key: 'zona',
+      header: 'Zona',
+      sortValue: r => r.zone?.name ?? '',
+      render: r => (
+        <span className="block truncate text-[13.5px] text-muted">
+          {r.zone?.name || 'Sin zona'}
+        </span>
       ),
     },
     {

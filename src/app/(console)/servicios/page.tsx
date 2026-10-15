@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -49,6 +49,7 @@ import {
   getUnassignedAlertMinutes,
   setStatus,
 } from '@/lib/data/store';
+import { listTicketedOrderIds } from '@/lib/data/serviceTickets';
 import { orderCode } from '@/lib/orderCode';
 import { emergencyPinRank, isEmergency } from '@/lib/emergency';
 import {
@@ -106,6 +107,14 @@ export default function ServiciosPage() {
   // Servicios con cancelación pendiente (en espera de "Deshacer").
   const [pendingCancel, setPendingCancel] = useState<Set<string>>(new Set());
   const deferred = useDeferredCommit();
+  // Órdenes con ticket de cierre: se cargan una vez para toda la lista.
+  const [ticketed, setTicketed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!ready) return;
+    listTicketedOrderIds().then(setTicketed, e =>
+      console.warn('[data] service_tickets', e),
+    );
+  }, [ready]);
 
   const cats = useMemo(
     () => getCategories(),
@@ -269,6 +278,11 @@ export default function ServiciosPage() {
           {r.is_admin_request && (
             <Badge tone="info" mono>
               Tumtto asigna
+            </Badge>
+          )}
+          {ticketed.has(r.id) && (
+            <Badge tone="neutral" mono>
+              Ticket
             </Badge>
           )}
         </div>

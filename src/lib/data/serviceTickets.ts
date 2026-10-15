@@ -1,7 +1,7 @@
 // Tickets de cierre guardados por servicio (RPC list_service_tickets + bucket privado service-tickets).
 import { supabase } from '@/lib/supabase';
 import { MOCK } from '@/lib/mock';
-import { getProfile, getRequest, getTechByUser } from '@/lib/data/store';
+import { getAllRequests, getProfile, getRequest, getTechByUser } from '@/lib/data/store';
 import {
   parseSnapshot,
   parseTickets,
@@ -98,6 +98,14 @@ export async function listServiceTickets(orderId: string): Promise<ServiceTicket
   const { data, error } = await supabase.rpc('list_service_tickets', { p_order_id: orderId });
   if (error) throw error;
   return parseTickets(data);
+}
+
+/** Ids de las órdenes con al menos un ticket de cierre (una sola consulta para la lista). */
+export async function listTicketedOrderIds(): Promise<Set<string>> {
+  if (MOCK) return new Set(getAllRequests().filter(o => DONE.has(o.status)).map(o => o.id));
+  const { data, error } = await supabase.from('service_tickets').select('service_order_id');
+  if (error) throw error;
+  return new Set((data ?? []).map(r => r.service_order_id));
 }
 
 /** URL firmada (5 min) del PDF; `download` fuerza la descarga con ese nombre. null = no disponible. */

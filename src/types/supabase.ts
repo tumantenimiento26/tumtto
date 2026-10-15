@@ -3324,6 +3324,53 @@ export type Database = {
       }
     }
     Functions: {
+      // Liquidaciones con el técnico (migración 20261019100000, editado a mano).
+      admin_list_technician_balances: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          technician_id: string
+          technician_name: string
+          avatar_icon: string | null
+          technician_type: Database["public"]["Enums"]["technician_type"]
+          owed_to_technician_cents: number
+          owed_to_admin_cents: number
+          net_cents: number
+          last_payout_at: string | null
+          last_delivery_at: string | null
+          pending_commissions_count: number
+          pending_cash_count: number
+        }[]
+      }
+      technician_settlement_summary: {
+        Args: { p_technician_id?: string }
+        Returns: Json
+      }
+      admin_record_technician_payout: {
+        Args: {
+          p_technician_id: string
+          p_commission_order_ids?: string[] | null
+          p_method?: string
+          p_reference?: string | null
+          p_note?: string | null
+          p_paid_at?: string
+        }
+        Returns: Json
+      }
+      admin_record_cash_delivery: {
+        Args: {
+          p_technician_id: string
+          p_payment_ids?: string[] | null
+          p_method?: string
+          p_reference?: string | null
+          p_note?: string | null
+          p_received_at?: string
+        }
+        Returns: Json
+      }
+      admin_void_settlement: {
+        Args: { p_kind: string; p_id: string; p_reason?: string | null }
+        Returns: Json
+      }
       accept_quote: {
         Args: { p_quote_id: string }
         Returns: {

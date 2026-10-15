@@ -34,6 +34,7 @@ import {
   WifiOff,
   X,
   Banknote,
+  HandCoins,
   CreditCard,
   Info,
   Package,
@@ -184,6 +185,7 @@ function useNavGroups(): NavGroup[] {
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
         { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        { href: '/liquidaciones', icon: HandCoins, label: 'Liquidaciones' },
         {
           href: '/revision-pagos',
           icon: Banknote,
@@ -232,6 +234,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/inventario': ['Operación', 'Inventario'],
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
+  '/liquidaciones': ['Operación', 'Liquidaciones'],
   '/soporte': ['Operación', 'Soporte'],
   '/revision-pagos': ['Operación', 'Revisión de pagos'],
   '/reportes': ['Analítica', 'Reportes'],
@@ -245,6 +248,7 @@ const DETAIL_TITLE: Record<string, string> = {
   '/inventario': 'Detalle de herramienta',
   '/clientes': 'Detalle de cliente',
   '/tecnicos': 'Detalle de técnico',
+  '/liquidaciones': 'Liquidación del técnico',
 };
 
 function isActive(href: string, pathname: string) {

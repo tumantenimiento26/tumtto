@@ -222,7 +222,7 @@ describe('reporte de comisiones (espejo de admin_report_technician_commissions)'
     const t1 = r.find(x => x.technician_id === 't1')!;
     const t1Rows = rows.filter(x => x.technician_id === 't1');
     expect(t1.services_count).toBe(t1Rows.length);
-    expect(t1.gross_collected_cents).toBe(t1Rows.reduce((s, x) => s + x.gross_collected_cents, 0));
+    expect(t1.gross_collected_cents).toBe(t1Rows.reduce((s, x) => s + (x.gross_collected_cents ?? 0), 0));
     expect(t1.admin_net_cents).toBe(t1.gross_collected_cents - t1.commission_cents);
     expect(t1.technician_name).toBe('T-t1');
     for (let i = 1; i < r.length; i++) expect(r[i - 1].commission_cents).toBeGreaterThanOrEqual(r[i].commission_cents);

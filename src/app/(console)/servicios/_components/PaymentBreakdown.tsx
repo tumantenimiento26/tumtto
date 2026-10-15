@@ -412,7 +412,7 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
                 />
                 <Line
                   label="Neto Tu Mantenimiento"
-                  value={money(snap.gross_collected_cents - snap.commission_cents, true)}
+                  value={money((snap.gross_collected_cents ?? 0) - snap.commission_cents, true)}
                   tone="success"
                 />
               </dl>

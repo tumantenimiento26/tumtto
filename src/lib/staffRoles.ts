@@ -135,6 +135,7 @@ const ROUTES: RouteRule[] = [
   { prefix: '/inventario', section: 'inventario', action: 'view' },
   { prefix: '/regiones', section: 'regiones', action: 'view' },
   { prefix: '/finanzas', section: 'finanzas', action: 'view' },
+  { prefix: '/liquidaciones', section: 'finanzas', action: 'view' },
   // Los RPC de ambas colas siguen aceptando soporte o finanzas.
   {
     prefix: '/revision-pagos',

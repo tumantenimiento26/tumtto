@@ -91,6 +91,7 @@ import { VehiclesCard } from '../_components/VehiclesCard';
 import { ToolsCard } from '../_components/ToolsCard';
 import { CompanyToolsCard } from '../_components/CompanyToolsCard';
 import { RatingsCard } from '../_components/RatingsCard';
+import { SettlementCard } from '../../liquidaciones/_components/SettlementCard';
 import { ratingSummary } from '@/lib/ratingModeration';
 
 const DONE = new Set(['completed', 'paid', 'closed']);
@@ -105,7 +106,8 @@ export default function TecnicoDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const { can } = useAuth();
+  const { can, canView } = useAuth();
+  const canViewFinance = canView('finanzas');
   const canKyc = can('kyc');
   const canSupport = can('soporte');
   // CURP/RFC/CLABE: solo quien revisa KYC o finanzas.
@@ -445,6 +447,7 @@ export default function TecnicoDetailPage() {
 
           <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
             <div className="flex flex-col gap-4">
+              {canViewFinance && <SettlementCard techId={tech.id} />}
               <RatesCard techId={tech.id} rates={data.rates} />
               <Card padded>
                 <CardHead title="Servicios recientes" />

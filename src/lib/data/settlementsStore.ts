@@ -79,6 +79,7 @@ export async function fetchTechnicianBalances(): Promise<BalanceRow[] | null> {
     if (error) throw error;
     return (data ?? []).map(r => ({
       ...r,
+      technician_type: r.technician_type as BalanceRow['technician_type'],
       owed_to_technician_cents: Number(r.owed_to_technician_cents),
       owed_to_admin_cents: Number(r.owed_to_admin_cents),
       net_cents: Number(r.net_cents),
@@ -122,10 +123,10 @@ export const recordTechnicianPayout = (techId: string, f: SettlementForm) =>
     if (MOCK) return mockRecordPayout(mockState(), techId, { ...f });
     const { data, error } = await supabase.rpc('admin_record_technician_payout', {
       p_technician_id: techId,
-      p_commission_order_ids: f.ids,
+      p_commission_order_ids: f.ids ?? undefined,
       p_method: f.method,
-      p_reference: opt(f.reference),
-      p_note: opt(f.note),
+      p_reference: opt(f.reference) ?? undefined,
+      p_note: opt(f.note) ?? undefined,
       p_paid_at: f.at,
     });
     if (error) throw error;
@@ -138,10 +139,10 @@ export const recordCashDelivery = (techId: string, f: SettlementForm) =>
     if (MOCK) return mockRecordDelivery(mockState(), techId, { ...f });
     const { data, error } = await supabase.rpc('admin_record_cash_delivery', {
       p_technician_id: techId,
-      p_payment_ids: f.ids,
+      p_payment_ids: f.ids ?? undefined,
       p_method: f.method,
-      p_reference: opt(f.reference),
-      p_note: opt(f.note),
+      p_reference: opt(f.reference) ?? undefined,
+      p_note: opt(f.note) ?? undefined,
       p_received_at: f.at,
     });
     if (error) throw error;
@@ -155,7 +156,7 @@ export const voidSettlement = (kind: SettlementKind, id: string, reason: string)
     const { data, error } = await supabase.rpc('admin_void_settlement', {
       p_kind: kind,
       p_id: id,
-      p_reason: opt(reason),
+      p_reason: opt(reason) ?? undefined,
     });
     if (error) throw error;
     return data;

@@ -86,6 +86,7 @@ function profile(
     avatar_icon: MOCK_ICONS[id] ?? 'silueta',
     status: 'active',
     stripe_customer_id: null,
+    birth_date: null,
     ...ts(),
   };
 }
@@ -634,6 +635,8 @@ function build(): World {
       cash_confirmed_at: null,
       cash_confirmed_by: null,
       cash_debt_recovered_cents: 0,
+      cash_delivered_cents: null,
+      cash_delivery_id: null,
       kind: 'legacy',
       refund_attempts: 0,
       cash_status: null,

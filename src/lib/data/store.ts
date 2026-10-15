@@ -3958,7 +3958,7 @@ function mockInvEvent(
       entity_type: entity,
       entity_id: entityId,
       event_type: type,
-      payload: payload as Json,
+      payload: payload as NonNullable<Json>,
       created_at: now,
       updated_at: now,
     },

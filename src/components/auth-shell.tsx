@@ -27,7 +27,7 @@ export function AuthShell({
 }: {
   aside: AuthAsideProps;
   children: React.ReactNode;
-  /** Pie mono "Conexión cifrada · MFA para administradores · Ayuda". */
+  /** Pie mono "Conexión cifrada · Ayuda". */
   footer?: boolean;
 }) {
   // Estas páginas son siempre claras: si se llega desde la consola en modo
@@ -59,7 +59,7 @@ export function AuthShell({
         </div>
         {footer && (
           <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
-            Conexión cifrada · MFA para administradores ·{' '}
+            Conexión cifrada ·{' '}
             <a
               href="mailto:soporte@tumantenimiento.mx"
               className="hover:text-navy"

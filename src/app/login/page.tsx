@@ -20,6 +20,7 @@ import { ForcePasswordChange } from '@/components/force-password-change';
 import { BrandMark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { fetchRequireAal2 } from '@/lib/data/store';
 import { MOCK, SKIP_MFA } from '@/lib/mock';
 import { APP_STORE_URL, PLAY_STORE_URL, schemeUrl } from '@/lib/appLinks';
 import {
@@ -64,7 +65,7 @@ const ASIDE = {
   title: 'Opera Tumantenimiento.',
   lead: 'Acceso exclusivo para el equipo: solicitudes, técnicos, pagos y regiones en un solo lugar.',
   bullets: [
-    'Verificación en dos pasos para cada administrador',
+    'Acceso seguro para cada administrador',
     'Permisos por rol: super admin, finanzas y soporte',
     'Acciones sensibles registradas en la bitácora',
   ],
@@ -184,7 +185,7 @@ export default function LoginPage() {
       return;
     }
 
-    // Contraseña temporal (alta directa de equipo): se cambia antes del 2FA.
+    // Contraseña temporal (alta directa de equipo): se cambia antes del 2FA (si aplica).
     if (
       (user.app_metadata as { must_change_password?: unknown } | undefined)
         ?.must_change_password === true
@@ -194,7 +195,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (SKIP_MFA) return enterConsole();
+    if (SKIP_MFA || !(await fetchRequireAal2())) return enterConsole();
     const { data: aal } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.currentLevel === 'aal2') return enterConsole();

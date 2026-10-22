@@ -13,6 +13,7 @@ import {
   getOrderQuotes,
   quotePaymentOf,
   retryBaseFeeRefund,
+  onlinePaymentsEnabled,
   useTick,
   waiveBaseFee,
 } from '@/lib/data/store';
@@ -103,6 +104,9 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
   const adminOwned = isAdminOwned(order);
   const snap = adminOwned ? getOrderCommission(order.id) : null;
   const c = s.concepts;
+  const baseCash = b?.method === 'cash';
+  const online = onlinePaymentsEnabled();
+  const baseInCash = q.includesBaseCents;
   const qs = s.quoteState;
   const qStatus = QUOTE_STATUS[qs.status];
   const ruleBadge =
@@ -153,9 +157,10 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
             <div className="mt-2.5 flex items-start gap-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">
               <XCircle size={15} className="mt-0.5 shrink-0 text-warning-ink" aria-hidden />
               <p>
-                <b className="font-semibold text-navy">Cerrado por cotización rechazada.</b> El cliente rechazó la
-                cotización: el servicio se cerró y solo se cobró la visita
-                {c.scheduleCents > 0 ? ' con su recargo' : ''}. No hay efectivo pendiente.
+                <b className="font-semibold text-navy">Cotización rechazada.</b> El cliente rechazó la
+                cotización: solo se cobra la visita
+                {c.scheduleCents > 0 ? ' con su recargo' : ''}
+                {baseCash ? ' en efectivo (un solo cobro).' : '. No hay efectivo pendiente.'}
               </p>
             </div>
           )}
@@ -166,7 +171,9 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         <section aria-label="Tarifa base" className="mb-4 border-t border-divider pt-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
-              {b.method === 'transfer' ? (
+              {b.method === 'cash' ? (
+                <Banknote size={15} className="text-success" aria-hidden />
+              ) : b.method === 'transfer' ? (
                 <Landmark size={15} className="text-primary" aria-hidden />
               ) : (
                 <CreditCard size={15} className="text-primary" aria-hidden />
@@ -186,6 +193,12 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
               />
             )}
           </dl>
+          {baseCash && b.status !== 'void' && (
+            <p className="mt-2 rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
+              Pago en persona: la visita no tiene cobro aparte, viaja en el efectivo único
+              {baseInCash > 0 ? ` (${money(baseInCash, true)} de visita)` : ''} que confirma el técnico y el cliente.
+            </p>
+          )}
           {b.transfer && (
             <div className="mt-2.5 rounded-btn bg-panel px-3 py-2.5 text-[12.5px]">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -242,7 +255,7 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
               )}
             </p>
           )}
-          {b.status === 'refund_failed' && (
+          {online && b.status === 'refund_failed' && (
             <div className="mt-2 rounded-btn bg-error-soft px-3 py-2 text-[12.5px] text-body">
               <p>El reembolso a la tarjeta falló 10 veces y ya no se reintenta solo. Revisa el pago en Stripe y reinténtalo.</p>
               <Button
@@ -287,7 +300,7 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
             <Banknote size={15} className="text-success" aria-hidden />
-            {s.paymentModel === 'base_cash' ? 'Cotización · Efectivo' : 'Servicio'}
+            {s.paymentModel === 'base_cash' ? (baseCash ? 'Efectivo · visita + cotización' : 'Cotización · Efectivo') : 'Servicio'}
           </h3>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             {s.paymentModel === 'base_cash' && qs.status !== 'none' && (
@@ -320,11 +333,21 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
             Enviada{qs.sentAt ? ` · ${when(qs.sentAt)}` : ''}: el cliente decide si la acepta o la rechaza.
           </p>
         )}
-        {s.closedByQuoteRejection ? (
+        {s.closedByQuoteRejection && !baseCash ? (
           <p className="text-[13px] text-muted">Sin cobro en efectivo: el servicio se cerró al rechazarse la cotización.</p>
         ) : q.totalCents > 0 || q.expectedCents != null ? (
           <dl className="flex flex-col gap-1.5 text-[13.5px]">
-            <Line label="Total cotización" value={money(q.totalCents, true)} strong />
+            {baseInCash > 0 ? (
+              <>
+                <Line label="Visita" value={money(baseInCash, true)} />
+                {!s.closedByQuoteRejection && (
+                  <Line label="Cotización" value={money((q.expectedCents ?? 0) - baseInCash, true)} />
+                )}
+                <Line label="Total en efectivo" value={money(q.expectedCents ?? 0, true)} strong />
+              </>
+            ) : (
+              <Line label="Total cotización" value={money(q.totalCents, true)} strong />
+            )}
             {s.paymentModel !== 'base_cash' && (
               <Line label="Método" value={q.method === 'card' ? 'Tarjeta' : q.method === 'cash' ? 'Efectivo' : (q.method ?? '—')} />
             )}

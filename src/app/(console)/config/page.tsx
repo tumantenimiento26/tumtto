@@ -34,6 +34,8 @@ import {
   loadWorld,
   getSettingInt,
   getSettingBool,
+  ONLINE_PAYMENTS_KEY,
+  onlinePaymentsEnabled,
   getSettingList,
   getEmergencyConfig,
   saveSettings,
@@ -97,6 +99,7 @@ function readForm(): SettingsMap {
     account_deletion_grace_days: getSettingInt('account_deletion_grace_days', 30),
     enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
     admin_require_aal2: getSettingBool('admin_require_aal2', false),
+    [ONLINE_PAYMENTS_KEY]: onlinePaymentsEnabled(),
     // TUM-01: seed del backend = true (los servicios nuevos son de Tu Mantenimiento).
     [ADMIN_OWNED_FLAG_KEY]: getSettingBool(ADMIN_OWNED_FLAG_KEY, true),
     [ALERT_MINUTES_KEY]: getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT),
@@ -113,6 +116,7 @@ function readForm(): SettingsMap {
 
 const LABELS: Record<string, string> = {
   commission_bps: 'Comisión global',
+  [ONLINE_PAYMENTS_KEY]: 'Pagos en línea (Stripe)',
   payment_model_admin_owned_enabled: 'Dinero de Tu Mantenimiento',
   emergency_initial_radius_m: 'Radio inicial de emergencia',
   emergency_radius_step_m: 'Incremento de radio',
@@ -349,6 +353,11 @@ export default function ConfigPage() {
             <>
               <Section title="Modelo de ingresos">
                 {toggleField(
+                  ONLINE_PAYMENTS_KEY,
+                  'Pagos en línea (Stripe)',
+                  'Apagado: todo se cobra en efectivo, en persona (el técnico lo registra y el cliente confirma) y no hay retiros por Stripe. Encendido: tarjeta/transferencia como antes. Solo afecta solicitudes nuevas.',
+                )}
+                {toggleField(
                   ADMIN_OWNED_FLAG_KEY,
                   'Dinero de Tu Mantenimiento',
                   'Activo: en los servicios nuevos todo lo cobrado (visita y efectivo) es de Tu Mantenimiento y el técnico gana su comisión. Apagado: el técnico conserva el dinero y adeuda la comisión de plataforma (modelo anterior). Los servicios existentes no cambian.',
@@ -362,6 +371,7 @@ export default function ConfigPage() {
                   'Solo para servicios del modelo anterior (el técnico conserva el dinero). Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
                 )}
               </Section>
+              {bool(ONLINE_PAYMENTS_KEY) && (
               <Section title="Costo estimado de Stripe">
                 {pctField(
                   'stripe_fee_estimate_bps',
@@ -375,6 +385,7 @@ export default function ConfigPage() {
                   'Parte fija por transacción (p. ej. 300 = $3.00).',
                 )}
               </Section>
+              )}
             </>
           )}
 

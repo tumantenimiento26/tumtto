@@ -522,6 +522,9 @@ export function getSettingList(key: string, fallback: string[]): string[] {
   const v = settings.find(s => s.key === key)?.value;
   return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
 }
+/** Pagos en línea (Stripe). Apagado = todo se cobra en efectivo (flag del backend, seed false). */
+export const ONLINE_PAYMENTS_KEY = 'online_payments_enabled';
+export const onlinePaymentsEnabled = () => getSettingBool(ONLINE_PAYMENTS_KEY, false);
 /** Minutos tras los que una solicitud sin técnico dispara alerta. */
 export const getUnassignedAlertMinutes = () =>
   getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT);

@@ -210,17 +210,45 @@ export const ORDER_STATUS: Record<
   cancelled: { label: 'Cancelado', tone: 'danger' },
 };
 
+type Obj = Record<string, unknown>;
+
+/**
+ * Decisión Didit normalizada. V3 guarda arrays plurales
+ * (`decision.id_verifications[]`, `liveness_checks[]`, `face_matches[]`);
+ * filas anteriores tienen el objeto singular en la raíz del raw_decision.
+ */
+export function diditDecision(raw: unknown): {
+  id: Obj | null;
+  liveness: Obj | null;
+  face: Obj | null;
+  rest: Obj;
+} {
+  const r: Obj = raw && typeof raw === 'object' ? (raw as Obj) : {};
+  const d: Obj =
+    r.decision && typeof r.decision === 'object' ? (r.decision as Obj) : r;
+  const first = (plural: string, singular: string): Obj | null => {
+    const arr = d[plural] ?? r[plural];
+    const v = Array.isArray(arr) ? arr[0] : (d[singular] ?? r[singular]);
+    return v && typeof v === 'object' ? (v as Obj) : null;
+  };
+  return {
+    id: first('id_verifications', 'id_verification'),
+    liveness: first('liveness_checks', 'liveness'),
+    face: first('face_matches', 'face_match'),
+    rest: { ...r, ...d },
+  };
+}
+
 /** Revisiones automáticas de Didit a partir de raw_decision (tolerante). */
 export function diditChecks(
   raw: unknown,
-): { label: string; ok: boolean | null }[] {
+): { label: string; ok: boolean | null; score?: number }[] {
   if (!raw || typeof raw !== 'object') return [];
-  const r = raw as Record<string, unknown>;
-  const pick = (key: string) => {
-    const v = r[key];
+  const { id, liveness, face, rest } = diditDecision(raw);
+  const verdict = (v: unknown) => {
     const s =
       v && typeof v === 'object'
-        ? String((v as Record<string, unknown>).status ?? '')
+        ? String((v as Obj).status ?? '')
         : String(v ?? '');
     if (!s) return null;
     return /approved|verified|success|passed|true/i.test(s)
@@ -229,15 +257,56 @@ export function diditChecks(
         ? false
         : null;
   };
-  const MAP: [string, string][] = [
-    ['id_verification', 'Identificación (INE)'],
-    ['liveness', 'Prueba de vida'],
-    ['face_match', 'Coincidencia facial'],
-    ['aml', 'Listas de riesgo'],
-    ['ip_analysis', 'Análisis de IP'],
+  const score = (v: Obj | null) =>
+    typeof v?.score === 'number' ? v.score : undefined;
+  const rows: [string, unknown, number?][] = [
+    ['Identificación (INE)', id ?? rest.id_verification],
+    ['Prueba de vida', liveness ?? rest.liveness, score(liveness)],
+    ['Coincidencia facial', face ?? rest.face_match, score(face)],
+    ['Listas de riesgo', rest.aml ?? (Array.isArray(rest.aml_screenings) ? rest.aml_screenings[0] : undefined)],
+    ['Análisis de IP', rest.ip_analysis ?? (Array.isArray(rest.ip_analyses) ? rest.ip_analyses[0] : undefined)],
   ];
-  return MAP.filter(([k]) => k in r).map(([k, label]) => ({ label, ok: pick(k) }));
+  return rows
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([label, v, sc]) => ({ label, ok: verdict(v), ...(sc != null && { score: sc }) }));
 }
+
+/** Advertencias de Didit (documento + rostro) como texto legible. */
+export function diditWarnings(raw: unknown): string[] {
+  const { id, face } = diditDecision(raw);
+  const out: string[] = [];
+  for (const o of [id, face]) {
+    if (!Array.isArray(o?.warnings)) continue;
+    for (const w of o.warnings as unknown[]) {
+      const t =
+        typeof w === 'string'
+          ? w
+          : String((w as Obj)?.message ?? (w as Obj)?.code ?? '');
+      if (t) out.push(t);
+    }
+  }
+  return out;
+}
+
+/** Estado de la sesión Didit (kyc_sessions.status, incluye V3). */
+export const DIDIT_SESSION_META: Record<
+  string,
+  { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }
+> = {
+  not_started: { label: 'Sin iniciar', tone: 'neutral' },
+  in_progress: { label: 'En curso', tone: 'neutral' },
+  awaiting_user: { label: 'Esperando al técnico', tone: 'neutral' },
+  in_review: { label: 'En revisión', tone: 'warning' },
+  resubmitted: { label: 'Reenvío solicitado', tone: 'warning' },
+  approved: { label: 'Aprobada', tone: 'success' },
+  declined: { label: 'Rechazada', tone: 'danger' },
+  abandoned: { label: 'Abandonada', tone: 'danger' },
+  expired: { label: 'Expirada', tone: 'danger' },
+  kyc_expired: { label: 'KYC vencido', tone: 'danger' },
+};
+
+export const diditSessionMeta = (status: string) =>
+  DIDIT_SESSION_META[status] ?? { label: status, tone: 'neutral' as const };
 
 const OCR_LABEL: Record<string, string> = {
   tipo_documento: 'Documento',
@@ -257,6 +326,12 @@ const OCR_LABEL: Record<string, string> = {
   date_of_birth: 'Nacimiento',
   expiration_date: 'Vigencia',
   address: 'Domicilio',
+  first_name: 'Nombre',
+  last_name: 'Apellidos',
+  gender: 'Sexo',
+  nationality: 'Nacionalidad',
+  date_of_issue: 'Emisión',
+  issuing_state: 'Estado emisor',
 };
 
 /**
@@ -271,7 +346,7 @@ export function extractedData(raw: unknown): {
 } | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  const src = (r.fields ?? r.id_verification) as Record<string, unknown> | undefined;
+  const src = (r.fields ?? diditDecision(raw).id) as Record<string, unknown> | undefined;
   if (!src || typeof src !== 'object') return null;
   const fields: { label: string; value: string }[] = [];
   for (const [k, label] of Object.entries(OCR_LABEL)) {

@@ -79,6 +79,7 @@ import { exportSupportTab } from './_components/exportSupport';
 import { ClientDocActions, ClientDocDetails } from '../clientes/_components/ClientDocCard';
 import { OcrSummary } from '../tecnicos/_components/detail-parts';
 import { orderCode } from '@/lib/orderCode';
+import { diditSessionMeta } from '@/lib/techConsole';
 import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/data/notifications';
 import {
@@ -894,7 +895,7 @@ function KycCard({ techId }: { techId: string }) {
             >
               <FileText size={14} className="text-primary" />
               <span className="flex-1 truncate font-sans text-[12.5px] text-navy">
-                Verificación Didit · {s.status}
+                Verificación Didit · {diditSessionMeta(s.status).label}
               </span>
               <span className="font-sans text-[11px] text-faint">
                 {timeAgo(s.created_at)}

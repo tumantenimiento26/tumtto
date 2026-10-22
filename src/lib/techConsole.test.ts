@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   activeFilterCount,
   diditChecks,
+  diditSessionMeta,
+  diditWarnings,
+  extractedData,
   filterTechs,
   kycGroup,
   rateError,
@@ -104,5 +107,39 @@ describe('filterTechs · herramientas', () => {
     expect(filterTechs(rows, { ...base, tools: ['t1', 't2'] }).map(r => r.name)).toEqual(['A']);
     expect(filterTechs(rows, { ...base, tools: [] })).toHaveLength(3);
     expect(activeFilterCount({ ...base, tools: ['t1', 't2'] })).toBe(1);
+  });
+});
+
+describe('Didit V3', () => {
+  const v3 = {
+    decision: {
+      id_verifications: [
+        { status: 'Approved', first_name: 'Ana', document_number: 'X1', warnings: [{ code: 'A', message: 'Brillo' }] },
+      ],
+      liveness_checks: [{ status: 'Declined', score: 41.6 }],
+      face_matches: [{ status: 'Approved', score: 92, warnings: ['Poca luz'] }],
+    },
+  };
+  it('lee arrays plurales con score', () => {
+    expect(diditChecks(v3)).toEqual([
+      { label: 'Identificación (INE)', ok: true },
+      { label: 'Prueba de vida', ok: false, score: 41.6 },
+      { label: 'Coincidencia facial', ok: true, score: 92 },
+    ]);
+  });
+  it('advertencias y OCR del primer elemento', () => {
+    expect(diditWarnings(v3)).toEqual(['Brillo', 'Poca luz']);
+    expect(extractedData(v3)?.fields).toEqual([
+      { label: 'Número', value: 'X1' },
+      { label: 'Nombre', value: 'Ana' },
+    ]);
+  });
+  it('mantiene el formato singular antiguo', () => {
+    expect(extractedData({ id_verification: { full_name: 'Bo' } })?.fields[0].value).toBe('Bo');
+  });
+  it('etiqueta estados V3', () => {
+    expect(diditSessionMeta('awaiting_user').label).toBe('Esperando al técnico');
+    expect(diditSessionMeta('kyc_expired').tone).toBe('danger');
+    expect(diditSessionMeta('zzz').label).toBe('zzz');
   });
 });

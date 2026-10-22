@@ -58,6 +58,8 @@ interface Spec {
   admin?: boolean;
   /** TUM-02: el cliente eligió pagar la visita por transferencia (base_fee_method). */
   transfer?: boolean;
+  /** Pagos en persona: la visita viaja en el efectivo único (cotización + base), sin pago base_fee. */
+  cashBase?: boolean;
   path: Status[];
 }
 
@@ -168,6 +170,16 @@ const SPECS: Spec[] = [
     baseStatus: 'in_review', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'working', 'completed', 'paid'] },
   { folio: 4038, agoH: 26, cat: 3, tech: 0, status: 'cancelled', title: 'Revisión de minisplit (cliente canceló en sitio)', admin: true, transfer: true,
     base: 45000, baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested', 'accepted', 'enroute', 'onsite', 'cancelled'] },
+  // Pagos en persona (online_payments_enabled = false): un solo efectivo = cotización + visita.
+  { folio: 4039, agoH: 1.5, cat: 0, tech: 0, status: 'working', title: 'Fuga en lavabo', admin: true, cashBase: true, base: 35000, baseStatus: 'cash_pending',
+    quote: 90000, cash: { status: 'pending_technician' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working'] },
+  { folio: 4040, agoH: 12, cat: 1, tech: 1, status: 'completed', title: 'Cambio de interruptor', admin: true, cashBase: true, base: 30000, baseStatus: 'cash_pending',
+    quote: 70000, cash: { status: 'technician_confirmed', received: 100000 },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working', 'completed'] },
+  { folio: 4041, agoH: 3, cat: 3, tech: 0, status: 'closing', title: 'Minisplit gotea (cotización rechazada)', admin: true, cashBase: true, base: 45000, baseStatus: 'cash_pending',
+    quote: 300000, qs: 'rejected', rejectReason: 'Prefiero otra opinión.', cash: { status: 'pending_technician' },
+    path: ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'closing'] },
   { folio: 4035, agoH: 0.1, cat: 0, tech: null, status: 'requested', title: 'Calentador gotea', admin: true, transfer: true, base: 35000,
     baseStatus: 'awaiting_transfer', basePay: 'pending', path: ['requested'] },
 ];
@@ -254,7 +266,7 @@ export function paymentModelDemo(
       schedule_surcharge_bps: rule?.surcharge_type === 'percent' ? rule.value : 0,
       base_total_cents: baseTotal,
       base_fee_status: s.baseStatus,
-      base_fee_method: s.transfer ? 'transfer' : 'card',
+      base_fee_method: s.cashBase ? 'cash' : s.transfer ? 'transfer' : 'card',
       base_fee_paid_at: ['paid', 'refund_pending', 'refund_failed', 'refunded'].includes(s.baseStatus) ? iso(created + 4 * MIN) : null,
       // admin_owned también marca la tarifa como «conservada» (sin acreditar al técnico).
       base_fee_credited_at: s.path.includes('enroute') && s.baseStatus === 'paid' ? iso(created + 50 * MIN) : null,
@@ -282,7 +294,7 @@ export function paymentModelDemo(
       });
     });
 
-    if (s.basePay) {
+    if (s.basePay && !s.cashBase) {
       const paid = ['paid', 'refunded'].includes(s.basePay);
       // Transferencia aceptada: method 'transfer', sin comisión de Stripe.
       const byTransfer = !!s.transfer && paid;
@@ -354,7 +366,8 @@ export function paymentModelDemo(
         kind: 'quote',
         method: 'cash',
         status: qStatus,
-        amount_cents: quoted,
+        amount_cents: (quoted ?? 0) + (s.cashBase ? baseTotal : 0),
+        base_included_cents: s.cashBase ? baseTotal : 0,
         commission_cents: commission,
         platform_fee_cents: commission,
         stripe_payment_intent_id: null,

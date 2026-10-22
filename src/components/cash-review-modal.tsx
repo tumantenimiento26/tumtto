@@ -88,7 +88,7 @@ export function CashReviewModal({
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-3 gap-2 text-center">
             {[
-              ['Presupuesto', q.expectedCents],
+              ['Efectivo esperado', q.expectedCents],
               ['Reportó el técnico', q.receivedCents],
               ['Reportó el cliente', q.clientReportedCents],
             ].map(([label, v]) => (
@@ -136,7 +136,7 @@ export function CashReviewModal({
               inputMode="decimal"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              hint={`Presupuesto ${money(q.expectedCents)}`}
+              hint={`Esperado ${money(q.expectedCents)}${q.includesBaseCents > 0 ? ` (visita ${money(q.includesBaseCents)} incl.)` : ''}`}
               error={touched && !(cents != null && cents > 0) ? 'Indica un monto mayor a cero' : null}
             />
           )}

@@ -13,7 +13,7 @@ import type { Tone } from '@/lib/payments';
 type Fn = Database['public']['Functions'];
 export type PaymentTransfer = Database['public']['Tables']['payment_transfers']['Row'];
 export type PaymentTransferStatus = 'submitted' | 'accepted' | 'rejected' | 'cancelled';
-export type BaseFeeMethod = 'card' | 'transfer';
+export type BaseFeeMethod = 'card' | 'transfer' | 'cash';
 /** Fila de admin_list_payment_transfers (los LEFT JOIN y la revisión pueden venir null). */
 export type TransferRow = NullableCols<
   Fn['admin_list_payment_transfers']['Returns'][number],
@@ -31,8 +31,9 @@ export const TRANSFER_STATUS: Record<PaymentTransferStatus, { label: string; ton
 export const transferStatus = (s: string | null | undefined) =>
   TRANSFER_STATUS[s as PaymentTransferStatus] ?? { label: s ?? '—', tone: 'neutral' as Tone };
 
-export const BASE_METHOD_LABEL: Record<BaseFeeMethod, string> = { card: 'Tarjeta', transfer: 'Transferencia' };
-export const baseMethodOf = (m: string | null | undefined): BaseFeeMethod => (m === 'transfer' ? 'transfer' : 'card');
+export const BASE_METHOD_LABEL: Record<BaseFeeMethod, string> = { card: 'Tarjeta', transfer: 'Transferencia', cash: 'Efectivo' };
+export const baseMethodOf = (m: string | null | undefined): BaseFeeMethod =>
+  m === 'transfer' ? 'transfer' : m === 'cash' ? 'cash' : 'card';
 
 /** Motivos rápidos de rechazo (el admin puede escribir otro). */
 export const QUICK_REJECT_REASONS = [

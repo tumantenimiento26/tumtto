@@ -5,6 +5,7 @@
 
 import type { Database, Json } from '@/types/supabase';
 import type { NullableCols } from '@/types/rpc';
+import { baseMethodOf } from '@/lib/transfers';
 import { isAdminOwned, revenueModelOf, type RevenueModel } from '@/lib/commission';
 
 type T = Database['public']['Tables'];
@@ -27,6 +28,7 @@ export type BaseFeeStatus =
   | 'refunded'
   | 'waived'
   | 'void'
+  | 'cash_pending'
   | 'awaiting_transfer'
   | 'in_review';
 export type CashStatus =
@@ -47,6 +49,8 @@ export const BASE_STATUS: Record<string, { label: string; tone: Tone }> = {
   refunded: { label: 'Reembolsada', tone: 'danger' },
   waived: { label: 'Exonerada', tone: 'info' },
   void: { label: 'Anulada', tone: 'neutral' },
+  // Pagos en persona: la visita viaja en el efectivo único (cotización + visita).
+  cash_pending: { label: 'Efectivo por confirmar', tone: 'warning' },
   // TUM-02: adelanto por transferencia (no bloquea el servicio).
   awaiting_transfer: { label: 'Pendiente de transferencia', tone: 'warning' },
   in_review: { label: 'En revisión', tone: 'info' },
@@ -161,7 +165,7 @@ export interface BaseSummary {
   surchargeCents: number;
   totalCents: number;
   /** TUM-02: método elegido por el cliente (y luego el que pagó). */
-  method: 'card' | 'transfer';
+  method: 'card' | 'transfer' | 'cash';
   transfer: BaseTransfer | null;
   status: string;
   paidAt: string | null;
@@ -175,6 +179,8 @@ export interface QuoteSummary {
   paymentStatus: string | null;
   cashStatus: string | null;
   expectedCents: number | null;
+  /** Parte de expectedCents que es la visita (efectivo único cotización + base). */
+  includesBaseCents: number;
   receivedCents: number | null;
   reportedAt: string | null;
   clientResponse: string | null;
@@ -234,7 +240,7 @@ export function rejectedCloseIds(orders: Pick<PayOrder, 'id' | 'status'>[], quot
     const cur = latest.get(q.service_order_id);
     if (!cur || q.created_at > cur.created_at) latest.set(q.service_order_id, q);
   }
-  return new Set(orders.filter(o => o.status === 'closed' && latest.get(o.id)?.rejected_at).map(o => o.id));
+  return new Set(orders.filter(o => ['closed', 'completed', 'paid'].includes(o.status) && latest.get(o.id)?.rejected_at).map(o => o.id));
 }
 
 /** Conceptos separados del cobro (visita, recargo de horario, emergencia, cotización). */
@@ -321,7 +327,7 @@ export function buildPaymentSummary(
           feeCents: order.base_fee_cents,
           surchargeCents: order.base_surcharge_cents,
           totalCents: order.base_total_cents ?? 0,
-          method: order.base_fee_method === 'transfer' ? 'transfer' : 'card',
+          method: baseMethodOf(order.base_fee_method),
           transfer: null,
           status: order.base_fee_status,
           paidAt: order.base_fee_paid_at,
@@ -336,6 +342,7 @@ export function buildPaymentSummary(
       paymentStatus: quote?.status ?? null,
       cashStatus: quote?.cash_status ?? null,
       expectedCents: quote?.amount_cents ?? null,
+      includesBaseCents: quote?.base_included_cents ?? 0,
       receivedCents: quote?.cash_received_cents ?? null,
       reportedAt: quote?.cash_reported_at ?? null,
       clientResponse: quote?.client_cash_response ?? null,
@@ -404,7 +411,7 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
           feeCents: num0(b.fee_cents),
           surchargeCents: num0(b.surcharge_cents),
           totalCents: num0(b.total_cents),
-          method: b.method === 'transfer' ? 'transfer' : 'card',
+          method: baseMethodOf(str(b.method)),
           transfer: parseBaseTransfer(b.transfer),
           status: str(b.status) ?? 'not_required',
           paidAt: str(b.paid_at),
@@ -419,6 +426,7 @@ export function parsePaymentSummary(json: Json | null): PaymentSummary | null {
       paymentStatus: str(q.payment_status),
       cashStatus: str(q.cash_status),
       expectedCents: num(q.expected_cents),
+      includesBaseCents: num0(q.includes_base_cents),
       receivedCents: num(q.received_cents),
       reportedAt: str(q.reported_at),
       clientResponse: str(q.client_response),
@@ -882,10 +890,10 @@ export function paymentsReport(
       closed_by_quote_rejection: rej.has(o.id),
       base_total_cents: o.base_total_cents,
       base_fee_status: o.base_fee_status,
-      base_method: isBC && (o.base_total_cents ?? 0) > 0 ? 'card' : null,
+      base_method: isBC && (o.base_total_cents ?? 0) > 0 ? baseMethodOf(o.base_fee_method) : null,
       base_refunded_cents: s.base?.refundedCents ?? 0,
       quote_total_cents: o.quoted_total_cents,
-      quote_method: isBC ? ((o.quoted_total_cents ?? 0) > 0 ? 'cash' : null) : s.quote.method,
+      quote_method: isBC ? ((o.quoted_total_cents ?? 0) > 0 || s.quote.includesBaseCents > 0 ? 'cash' : null) : s.quote.method,
       cash_status: s.quote.cashStatus,
       cash_expected_cents: s.quote.expectedCents,
       cash_received_cents: s.quote.receivedCents,

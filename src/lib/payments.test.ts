@@ -230,7 +230,7 @@ describe('efectivo por técnico', () => {
     const t = cashTotals(rows);
     expect(t.expected).toBeGreaterThan(0);
     expect(t.confirmed).toBeGreaterThan(0); // 4001 y 4008
-    expect(t.awaiting).toBe(150000 + 110000); // 4005 + 4023 (dinero de TM)
+    expect(t.awaiting).toBe(150000 + 110000 + 100000); // 4005 + 4023 + 4040 (efectivo único visita+cotización) (dinero de TM)
     expect(t.disputed).toBe(240000 + 95000 + 90000); // 4006 + 4007 + 4024 (dinero de TM)
     expect(t.reviews).toBe(3);
     expect(t.pending).toBe(t.generated - t.recovered);
@@ -432,5 +432,44 @@ describe('reembolsos de tarifa base fallidos', () => {
     expect(f).toHaveLength(1);
     expect(f[0].base_fee_paid_at).not.toBeNull();
     expect(orderGmv(f[0], [], 'all')).toBe(f[0].base_total_cents);
+  });
+});
+
+describe('pagos en persona: efectivo único (visita + cotización)', () => {
+  const quotesOf = (folio: number) => demo.quotes.filter(q => q.service_order_id === `SVC-${folio}`);
+  const sum = (folio: number) => buildPaymentSummary(ord(folio), pays(folio), quotesOf(folio));
+
+  it('el pago en efectivo trae cotización + base y no hay pago base_fee', () => {
+    expect(ord(4039).base_fee_method).toBe('cash');
+    expect(ord(4039).base_fee_status).toBe('cash_pending');
+    expect(pays(4039).map(p => p.kind)).toEqual(['quote']);
+    const s = sum(4039);
+    expect(s.base?.method).toBe('cash');
+    expect(s.quote.expectedCents).toBe(90000 + 35000);
+    expect(s.quote.includesBaseCents).toBe(35000);
+    expect(BASE_STATUS.cash_pending.label).toBeTruthy();
+  });
+
+  it('cotización rechazada en closing: solo se cobra la visita en efectivo', () => {
+    const s = sum(4041);
+    expect(ord(4041).status).toBe('closing');
+    expect(s.quote.expectedCents).toBe(45000);
+    expect(s.quote.includesBaseCents).toBe(45000);
+    expect(s.concepts?.quoteCents).toBe(0);
+    // closing aún no cuenta como «cerrada por rechazo»; completed/paid sí
+    expect(rejectedCloseIds([ord(4041)], quotesOf(4041)).size).toBe(0);
+    expect(rejectedCloseIds([{ id: ord(4041).id, status: 'completed' }], quotesOf(4041)).size).toBe(1);
+  });
+
+  it('parsePaymentSummary lee includes_base_cents y el método cash', () => {
+    const s = parsePaymentSummary({
+      order_id: 'x',
+      payment_model: 'base_cash',
+      base: { method: 'cash', status: 'cash_pending', total_cents: 30000 },
+      quote: { expected_cents: 130000, includes_base_cents: 30000, quote_total_cents: 100000 },
+    });
+    expect(s?.base?.method).toBe('cash');
+    expect(s?.quote.includesBaseCents).toBe(30000);
+    expect(s?.quote.expectedCents).toBe(130000);
   });
 });

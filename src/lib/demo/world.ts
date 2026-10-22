@@ -613,6 +613,7 @@ function build(): World {
       method: 'card',
       status: 'paid',
       amount_cents: 164000,
+      base_included_cents: 0,
       commission_cents: 24600,
       currency: 'MXN',
       mp_preference_id: 'pref_demo_2835',

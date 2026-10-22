@@ -1,25 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Wrench,
-  Zap,
-  Flame,
-  Hammer,
-  Paintbrush,
-  Square,
-  Droplets,
-  Wind,
-  Plug,
-  KeyRound,
-  Snowflake,
-  Download,
-  Plus,
-  Trash2,
-  Search,
-  Settings,
-  type LucideIcon,
-} from 'lucide-react';
+import { Download, Plus, Trash2, Search } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -59,20 +41,8 @@ import { parseRuleValue } from '@/lib/scheduleRules';
 import { money } from '../servicios/_components/shared';
 import { addIncluded, categoryStats, rangeLabel } from '@/lib/catalogStats';
 import { exportCsv } from '@/components/admin';
-
-const ICONS: Record<string, LucideIcon> = {
-  wrench: Wrench,
-  zap: Zap,
-  flame: Flame,
-  hammer: Hammer,
-  paintbrush: Paintbrush,
-  square: Square,
-  droplets: Droplets,
-  wind: Wind,
-  snowflake: Snowflake,
-  plug: Plug,
-  key: KeyRound,
-};
+import { CategoryIcon } from '@/components/category-icon';
+import { CATEGORY_ICONS } from '@/lib/categoryIcons';
 
 type Cat = ReturnType<typeof getCategoriesWithCounts>[number];
 
@@ -209,7 +179,6 @@ export default function CatalogoPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c, i) => {
-            const Icon = ICONS[c.icon ?? ''] ?? Settings;
             const s = categoryStats(c.id, data);
             const inc = included[c.id]?.length ?? 0;
             return (
@@ -225,9 +194,13 @@ export default function CatalogoPage() {
                   className="flex items-start justify-between"
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
-                  <span className="grid h-11 w-11 place-items-center rounded-btn bg-info-soft">
-                    <Icon size={20} className="text-primary" />
-                  </span>
+                  <CategoryIcon
+                    cat={c.slug}
+                    fallback={[c.name, c.icon]}
+                    variant="tile"
+                    size={22}
+                    label={c.name}
+                  />
                   {/* El toggle no abre el editor */}
                   <span onClick={e => e.stopPropagation()}>
                     <Toggle
@@ -636,7 +609,7 @@ function NewCategoryModal({
   onCreated: (id: string) => void;
 }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('wrench');
+  const [icon, setIcon] = useState('general');
   const [saving, setSaving] = useState(false);
 
   async function submit() {
@@ -648,7 +621,7 @@ function NewCategoryModal({
     if (!cat) return;
     toast.success(`Categoría creada · ${cat.name}`);
     setName('');
-    setIcon('wrench');
+    setIcon('general');
     onClose();
     onCreated(cat.id);
   }
@@ -689,20 +662,21 @@ function NewCategoryModal({
         />
         <Field label="Ícono">
           <div className="flex flex-wrap gap-2">
-            {Object.entries(ICONS).map(([key, Icon]) => (
+            {CATEGORY_ICONS.map(ci => (
               <button
-                key={key}
+                key={ci.id}
                 type="button"
-                onClick={() => setIcon(key)}
-                aria-label={key}
-                aria-pressed={icon === key}
+                onClick={() => setIcon(ci.id)}
+                aria-label={ci.name}
+                title={ci.name}
+                aria-pressed={icon === ci.id}
                 className={`grid h-11 w-11 place-items-center rounded-btn border transition-colors ${
-                  icon === key
+                  icon === ci.id
                     ? 'border-primary bg-info-soft text-primary'
                     : 'border-line bg-card text-muted hover:bg-panel'
                 }`}
               >
-                <Icon size={18} />
+                <CategoryIcon cat={ci.id} size={18} decorative />
               </button>
             ))}
           </div>

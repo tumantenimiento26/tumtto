@@ -1,39 +1,32 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Banknote,
   Building2,
   Wrench,
   Clock,
-  Users,
-  Mail,
   ShieldCheck,
   ShieldAlert,
-  Check,
-  Minus,
   Siren,
   Moon,
   Landmark,
   type LucideIcon,
 } from 'lucide-react';
 import {
-  Badge,
   Button,
   Card,
   ErrorPage,
   Input,
-  Kicker,
   Modal,
   PageHeader,
   ScreenSkeleton,
   Segmented,
-  Select,
   Toggle,
   toast,
 } from '@/components/ds';
 import { useAuth } from '@/lib/auth';
-import { ADMIN_ROLES, PERMISSIONS, type AdminRole } from '@/lib/rbac';
 import {
   useTick,
   useWorldReady,
@@ -41,17 +34,12 @@ import {
   loadWorld,
   getSettingInt,
   getSettingBool,
+  ONLINE_PAYMENTS_KEY,
+  onlinePaymentsEnabled,
   getSettingList,
   getEmergencyConfig,
   saveSettings,
-  fetchAdminRoles,
-  getAdmins,
-  inviteAdmin,
-  setAdminRole,
-  getMyMfaVerified,
-  getSessionUserId,
 } from '@/lib/data/store';
-import { useAction } from '@/components/use-action';
 import { EMERGENCY_KEYS, type SurchargeMode } from '@/lib/emergency';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY } from '@/lib/unassigned';
 import { ScheduleSurchargeSection } from './_components/ScheduleSurchargeSection';
@@ -74,18 +62,16 @@ type SectionId =
   | 'schedule'
   | 'emergency'
   | 'security'
-  | 'team'
   | 'companies'
   | 'tools';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
-  { id: 'transfers', label: 'Cuenta para transferencias', icon: Landmark },
+  { id: 'transfers', label: 'Cuentas para transferencias', icon: Landmark },
   { id: 'ops', label: 'Operación', icon: Clock },
   { id: 'schedule', label: 'Recargos por horario', icon: Moon },
   { id: 'emergency', label: 'Emergencias', icon: Siren },
   { id: 'security', label: 'Seguridad', icon: ShieldCheck },
-  { id: 'team', label: 'Equipo y permisos', icon: Users },
   { id: 'companies', label: 'Empresas de técnicos', icon: Building2 },
   { id: 'tools', label: 'Catálogo de herramientas', icon: Wrench },
 ];
@@ -113,6 +99,7 @@ function readForm(): SettingsMap {
     account_deletion_grace_days: getSettingInt('account_deletion_grace_days', 30),
     enabled_payment_methods: getSettingList('enabled_payment_methods', ['card', 'oxxo', 'wallet', 'cash']),
     admin_require_aal2: getSettingBool('admin_require_aal2', false),
+    [ONLINE_PAYMENTS_KEY]: onlinePaymentsEnabled(),
     // TUM-01: seed del backend = true (los servicios nuevos son de Tu Mantenimiento).
     [ADMIN_OWNED_FLAG_KEY]: getSettingBool(ADMIN_OWNED_FLAG_KEY, true),
     [ALERT_MINUTES_KEY]: getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT),
@@ -129,6 +116,7 @@ function readForm(): SettingsMap {
 
 const LABELS: Record<string, string> = {
   commission_bps: 'Comisión global',
+  [ONLINE_PAYMENTS_KEY]: 'Pagos en línea (Stripe)',
   payment_model_admin_owned_enabled: 'Dinero de Tu Mantenimiento',
   emergency_initial_radius_m: 'Radio inicial de emergencia',
   emergency_radius_step_m: 'Incremento de radio',
@@ -152,13 +140,13 @@ export default function ConfigPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const canFinance = useAuth().can('finanzas');
+  const router = useRouter();
+  const canConfig = useAuth().canView('configuracion');
   const [active, setActive] = useState<SectionId>('commission');
   // /config?tab=equipo (p. ej. desde la invitación).
   useEffect(() => {
     const raw = new URLSearchParams(window.location.search).get('tab') ?? '';
     const alias: Record<string, SectionId> = {
-      equipo: 'team',
       comisiones: 'commission',
       seguridad: 'security',
       emergencias: 'emergency',
@@ -168,12 +156,18 @@ export default function ConfigPage() {
       herramientas: 'tools',
       transferencias: 'transfers',
     };
+    // El equipo vive en su propia página (/equipo).
+    if (raw === 'equipo') {
+      router.replace('/equipo');
+      return;
+    }
     const t = alias[raw] ?? raw;
     if (SECTIONS.some(x => x.id === t)) setActive(t as SectionId);
-  }, []);
+  }, [router]);
   const [form, setForm] = useState<SettingsMap>({});
   const [baseline, setBaseline] = useState<SettingsMap>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [radiusUnit, setRadiusUnit] = useState<'m' | 'km'>('km');
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -229,7 +223,7 @@ export default function ConfigPage() {
     setErrs({});
   }
 
-  if (!canFinance)
+  if (!canConfig)
     return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed)
     return (
@@ -283,6 +277,35 @@ export default function ConfigPage() {
       />
     </Row>
   );
+  // Radios: se guardan en metros; el admin elige verlos en m o km.
+  const radiusField = (key: string, label: string, desc?: string) => {
+    const m = num(key);
+    const km = radiusUnit === 'km';
+    return (
+      <Row label={label} desc={desc} error={errs[key]}>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            step={km ? '0.1' : '1'}
+            value={Number.isNaN(m) ? '' : km ? m / 1000 : m}
+            onChange={e => {
+              const raw = e.target.value.trim();
+              set(key, raw === '' ? NaN : Math.round(Number(raw) * (km ? 1000 : 1)));
+            }}
+            error={!!errs[key]}
+            aria-label={`${label} (${radiusUnit})`}
+          />
+          <Segmented
+            size="sm"
+            options={['m', 'km'] as const}
+            value={radiusUnit}
+            onChange={setRadiusUnit}
+            aria-label="Unidad del radio"
+          />
+        </div>
+      </Row>
+    );
+  };
   const toggleField = (key: string, label: string, desc?: string) => (
     <Row label={label} desc={desc}>
       <div className="flex justify-end">
@@ -330,6 +353,11 @@ export default function ConfigPage() {
             <>
               <Section title="Modelo de ingresos">
                 {toggleField(
+                  ONLINE_PAYMENTS_KEY,
+                  'Pagos en línea (Stripe)',
+                  'Apagado: todo se cobra en efectivo, en persona (el técnico lo registra y el cliente confirma) y no hay retiros por Stripe. Encendido: tarjeta/transferencia como antes. Solo afecta solicitudes nuevas.',
+                )}
+                {toggleField(
                   ADMIN_OWNED_FLAG_KEY,
                   'Dinero de Tu Mantenimiento',
                   'Activo: en los servicios nuevos todo lo cobrado (visita y efectivo) es de Tu Mantenimiento y el técnico gana su comisión. Apagado: el técnico conserva el dinero y adeuda la comisión de plataforma (modelo anterior). Los servicios existentes no cambian.',
@@ -343,6 +371,7 @@ export default function ConfigPage() {
                   'Solo para servicios del modelo anterior (el técnico conserva el dinero). Se congela en cada orden nueva; las categorías pueden tener la suya (Catálogo).',
                 )}
               </Section>
+              {bool(ONLINE_PAYMENTS_KEY) && (
               <Section title="Costo estimado de Stripe">
                 {pctField(
                   'stripe_fee_estimate_bps',
@@ -356,6 +385,7 @@ export default function ConfigPage() {
                   'Parte fija por transacción (p. ej. 300 = $3.00).',
                 )}
               </Section>
+              )}
             </>
           )}
 
@@ -368,10 +398,9 @@ export default function ConfigPage() {
                   'min',
                   'Tiempo que una solicitud espera técnico antes de expirar.',
                 )}
-                {intField(
+                {radiusField(
                   'default_match_radius_m',
                   'Radio de búsqueda',
-                  'm',
                   'Radio por defecto para encontrar técnicos cercanos (si el técnico no define el suyo).',
                 )}
                 {intField(
@@ -422,22 +451,19 @@ export default function ConfigPage() {
           {active === 'emergency' && (
             <>
               <Section title="Búsqueda de técnico">
-                {intField(
+                {radiusField(
                   'emergency_initial_radius_m',
                   'Radio inicial',
-                  'm',
                   'Primera ronda: se avisa a los técnicos elegibles dentro de este radio.',
                 )}
-                {intField(
+                {radiusField(
                   'emergency_radius_step_m',
                   'Incremento por ronda',
-                  'm',
                   'Cuánto se amplía el radio en cada ronda sin respuesta.',
                 )}
-                {intField(
+                {radiusField(
                   'emergency_max_radius_m',
                   'Radio máximo',
-                  'm',
                   'La búsqueda no se amplía más allá de este radio.',
                 )}
                 {intField(
@@ -525,7 +551,6 @@ export default function ConfigPage() {
             </Section>
           )}
 
-          {active === 'team' && <TeamSection />}
           {active === 'companies' && <CompaniesSection />}
           {active === 'tools' && <ToolCatalogSection />}
         </div>
@@ -654,245 +679,5 @@ function Row({
         )}
       </div>
     </div>
-  );
-}
-
-// ── Equipo y permisos ────────────────────────────────────────────────────────
-const ROLE_OPTS = ADMIN_ROLES.map(r => ({ value: r.value, label: r.label, hint: r.desc }));
-const roleLabel = (r: AdminRole) => ADMIN_ROLES.find(x => x.value === r)?.label ?? r;
-
-function TeamSection() {
-  useTick();
-  const admins = getAdmins();
-  const { adminRole, can } = useAuth();
-  const canUsers = can('usuarios');
-  const { busy, run } = useAction();
-  const [me, setMe] = useState<string | null>(null);
-  const [myMfa, setMyMfa] = useState<boolean | null>(null);
-  const [inviteOpen, setInviteOpen] = useState(false);
-  // Rol actual de cada admin (app_metadata) vía admin_list_admin_roles.
-  const [roles, setRoles] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    void getSessionUserId().then(setMe);
-    void getMyMfaVerified().then(setMyMfa);
-    if (canUsers) void fetchAdminRoles().then(setRoles);
-  }, [canUsers]);
-
-  return (
-    <>
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-divider px-5 py-4">
-          <div>
-            <div className="font-display text-[16px] font-bold text-navy">
-              Administradores
-            </div>
-            <p className="mt-0.5 font-sans text-[12.5px] text-muted">
-              {admins.length} con acceso a la consola.
-            </p>
-          </div>
-          {canUsers && (
-            <Button icon={Mail} onClick={() => setInviteOpen(true)}>
-              Invitar
-            </Button>
-          )}
-        </div>
-        <ul className="divide-y divide-divider">
-          {admins.map(a => {
-            const mine = a.id === me;
-            return (
-              <li key={a.id} className="flex items-center gap-3 px-5 py-3.5">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-action font-display text-[12px] font-bold text-white">
-                  {(a.full_name ?? 'A')
-                    .split(' ')
-                    .slice(0, 2)
-                    .map(w => w[0])
-                    .join('')
-                    .toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-sans text-[14px] font-semibold text-navy">
-                    {a.full_name ?? 'Admin'}
-                    {mine && <span className="ml-1.5 text-muted">(tú)</span>}
-                  </div>
-                  <div className="font-sans text-[12px] text-muted">
-                    {a.status === 'active' ? 'Activo' : 'Suspendido'}
-                  </div>
-                </div>
-                {mine ? (
-                  <Badge tone="navy">{roleLabel(adminRole)}</Badge>
-                ) : canUsers ? (
-                  <div className="w-44">
-                    <Select
-                      options={ROLE_OPTS}
-                      value={(roles[a.id] as AdminRole | undefined) ?? null}
-                      placeholder="Asignar rol…"
-                      disabled={busy === a.id}
-                      aria-label={`Rol de ${a.full_name ?? 'admin'}`}
-                      onChange={r =>
-                        void run(a.id, async () => {
-                          const ok = await setAdminRole(a.id, r);
-                          if (ok) setRoles(s => ({ ...s, [a.id]: r }));
-                          return ok;
-                        }, `Rol actualizado · ${roleLabel(r)}`)
-                      }
-                    />
-                  </div>
-                ) : (
-                  <Badge tone="navy">Admin</Badge>
-                )}
-                <span className="w-24 text-right font-sans text-[12px]">
-                  {mine && myMfa != null ? (
-                    myMfa ? (
-                      <span className="font-semibold text-success">
-                        MFA activo
-                      </span>
-                    ) : (
-                      <span className="font-semibold text-warning-ink">
-                        Sin MFA
-                      </span>
-                    )
-                  ) : (
-                    <span
-                      className="text-faint"
-                      title="Supabase solo expone el MFA de tu propia sesión"
-                    >
-                      MFA —
-                    </span>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-
-      <Card className="overflow-hidden">
-        <div className="border-b border-divider px-5 py-4">
-          <div className="font-display text-[16px] font-bold text-navy">
-            Matriz de permisos
-          </div>
-          <p className="mt-0.5 font-sans text-[12.5px] text-muted">
-            Solo lectura: es el mismo mapa que aplica el backend
-            (app.has_permission). Todo admin puede leer la consola.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse">
-            <thead>
-              <tr className="bg-panel">
-                <th className="px-5 py-2.5 text-left font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
-                  Permiso
-                </th>
-                {ADMIN_ROLES.map(r => (
-                  <th
-                    key={r.value}
-                    className="px-3 py-2.5 text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted"
-                  >
-                    {r.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(PERMISSIONS) as (keyof typeof PERMISSIONS)[]).map(k => (
-                <tr key={k} className="border-t border-divider">
-                  <td className="px-5 py-3">
-                    <div className="font-sans text-[13.5px] font-semibold text-navy">
-                      {PERMISSIONS[k].label}
-                    </div>
-                    <div className="font-sans text-[12px] text-muted">{PERMISSIONS[k].desc}</div>
-                  </td>
-                  {ADMIN_ROLES.map(r => (
-                    <td key={r.value} className="px-3 py-3 text-center">
-                      {PERMISSIONS[k].roles.includes(r.value) ? (
-                        <Check size={16} className="inline text-success" aria-label="Permitido" />
-                      ) : (
-                        <Minus size={16} className="inline text-faint" aria-label="Sin permiso" />
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-    </>
-  );
-}
-
-function InviteModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<AdminRole>('soporte');
-  const [sending, setSending] = useState(false);
-  const invalid = !/^\S+@\S+\.\S+$/.test(email.trim());
-
-  async function send() {
-    if (invalid || sending) return;
-    setSending(true);
-    const ok = await inviteAdmin(email.trim(), name.trim(), role);
-    setSending(false);
-    if (ok === null) return; // el store ya mostró el error; el modal sigue
-    toast.success('Invitación enviada', email.trim());
-    setEmail('');
-    setName('');
-    onClose();
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      dismissible={!sending}
-      title="Invitar administrador"
-      description="Recibirá un correo para crear su contraseña y entrar a la consola."
-      icon={Mail}
-      width={460}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={sending}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => void send()}
-            loading={sending}
-            disabled={invalid}
-          >
-            Enviar invitación
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Correo"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder="nombre@tumantenimiento.mx"
-          error={email && invalid ? 'Correo no válido.' : null}
-        />
-        <Input
-          label="Nombre (opcional)"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Nombre y apellido"
-        />
-        <div>
-          <Kicker className="mb-1.5">Rol en la consola</Kicker>
-          <Select options={ROLE_OPTS} value={role} onChange={setRole} aria-label="Rol" />
-        </div>
-      </div>
-    </Modal>
   );
 }

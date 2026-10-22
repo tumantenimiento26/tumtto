@@ -26,6 +26,7 @@ import {
   Settings,
   Siren,
   Sun,
+  UserCheck,
   User,
   Users,
   Wallet,
@@ -33,15 +34,19 @@ import {
   WifiOff,
   X,
   Banknote,
+  HandCoins,
   CreditCard,
   Info,
   Package,
+  ShieldCheck,
   type LucideIcon,
   Menu as MenuIcon,
 } from 'lucide-react';
 
+import { canAccessPath } from '@/lib/staffRoles';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
+import { Avatar } from './avatar';
 import { toast } from './toast';
 import { IconButton, Kicker, Portal, ScreenSkeleton, useEscape } from './ds';
 import {
@@ -68,6 +73,8 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useTheme, applyTheme } from '@/lib/theme';
 import { orderCode } from '@/lib/orderCode';
+import { usePendingAssignments } from '@/lib/data/assignmentsStore';
+import { useAssignmentsLive } from '@/lib/data/assignmentsLive';
 
 /**
  * Shell de la consola (handoff web · C. Consola admin):
@@ -138,11 +145,9 @@ interface NavGroup {
 function useNavGroups(): NavGroup[] {
   useTick();
   const { unread } = useNotifications();
-  const { can } = useAuth();
-  const finanzas = can('finanzas');
-  // Soporte o finanzas revisan pagos: transferencias y efectivo (página propia).
-  const pagos = finanzas || can('soporte');
-  return [
+  const pendingAssignments = usePendingAssignments();
+  const { permissions } = useAuth();
+  const groups: NavGroup[] = [
     {
       label: 'General',
       items: [
@@ -171,19 +176,22 @@ function useNavGroups(): NavGroup[] {
       label: 'Operación',
       items: [
         { href: '/servicios', icon: Wrench, label: 'Servicios' },
+        {
+          href: '/asignaciones',
+          icon: UserCheck,
+          label: 'Asignaciones',
+          badge: () => pendingAssignments,
+        },
         { href: '/inventario', icon: Package, label: 'Inventario' },
         { href: '/regiones', icon: Map, label: 'Regiones' },
-        ...(finanzas ? [{ href: '/finanzas', icon: Wallet, label: 'Finanzas' }] : []),
-        ...(pagos
-          ? [
-              {
-                href: '/revision-pagos',
-                icon: Banknote,
-                label: 'Revisión de pagos',
-                badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
-              },
-            ]
-          : []),
+        { href: '/finanzas', icon: Wallet, label: 'Finanzas' },
+        { href: '/liquidaciones', icon: HandCoins, label: 'Liquidaciones' },
+        {
+          href: '/revision-pagos',
+          icon: Banknote,
+          label: 'Revisión de pagos',
+          badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
+        },
         {
           href: '/soporte',
           icon: Scale,
@@ -200,7 +208,8 @@ function useNavGroups(): NavGroup[] {
       label: 'Sistema',
       items: [
         { href: '/catalogo', icon: FolderTree, label: 'Catálogo' },
-        ...(finanzas ? [{ href: '/config', icon: Settings, label: 'Configuración' }] : []),
+        { href: '/config', icon: Settings, label: 'Configuración' },
+        { href: '/equipo', icon: ShieldCheck, label: 'Equipo y roles' },
         // Galería de estados/errores: solo en desarrollo.
         ...(process.env.NODE_ENV === 'production'
           ? []
@@ -208,6 +217,10 @@ function useNavGroups(): NavGroup[] {
       ],
     },
   ];
+  // Sólo lo que el rol puede abrir (matriz de permisos); sin grupos vacíos.
+  return groups
+    .map(g => ({ ...g, items: g.items.filter(i => canAccessPath(permissions, i.href)) }))
+    .filter(g => g.items.length > 0);
 }
 
 /** Ruta → [grupo, título] para las migas del header. */
@@ -217,14 +230,17 @@ const CRUMB: Record<string, [string, string]> = {
   '/clientes': ['Usuarios', 'Clientes'],
   '/tecnicos': ['Usuarios', 'Técnicos'],
   '/servicios': ['Operación', 'Servicios'],
+  '/asignaciones': ['Operación', 'Asignaciones'],
   '/inventario': ['Operación', 'Inventario'],
   '/regiones': ['Operación', 'Regiones y cobertura'],
   '/finanzas': ['Operación', 'Finanzas'],
+  '/liquidaciones': ['Operación', 'Liquidaciones'],
   '/soporte': ['Operación', 'Soporte'],
   '/revision-pagos': ['Operación', 'Revisión de pagos'],
   '/reportes': ['Analítica', 'Reportes'],
   '/catalogo': ['Sistema', 'Catálogo'],
   '/config': ['Sistema', 'Configuración'],
+  '/equipo': ['Sistema', 'Equipo y roles'],
   '/estados': ['Sistema', 'Estados y errores'],
 };
 const DETAIL_TITLE: Record<string, string> = {
@@ -232,6 +248,7 @@ const DETAIL_TITLE: Record<string, string> = {
   '/inventario': 'Detalle de herramienta',
   '/clientes': 'Detalle de cliente',
   '/tecnicos': 'Detalle de técnico',
+  '/liquidaciones': 'Liquidación del técnico',
 };
 
 function isActive(href: string, pathname: string) {
@@ -247,13 +264,11 @@ export function screenKind(pathname: string): 'dashboard' | 'list' | 'detail' {
 function useAdminUser() {
   const { usuario, session } = useAuth();
   const name = usuario?.full_name ?? 'Admin';
-  const initials =
-    name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map(p => p[0]?.toUpperCase() ?? '')
-      .join('') || 'A';
-  return { name, email: session?.user.email ?? '', initials };
+  return {
+    name,
+    email: session?.user.email ?? '',
+    avatarId: usuario?.avatar_icon,
+  };
 }
 
 /* ── Sidebar ── */
@@ -369,9 +384,7 @@ function Sidebar({
         <div
           className={`flex items-center gap-2.5 rounded-btn bg-white/[0.04] ${compact ? 'p-2' : 'p-2.5'}`}
         >
-          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0a6bcf] font-display text-[12.5px] font-bold">
-            {user.initials}
-          </span>
+          <Avatar avatarId={user.avatarId} size={36} bg="bold" decorative />
           {!compact && (
             <>
               <div className="min-w-0 flex-1">
@@ -594,6 +607,7 @@ const NOTIF_ICON: Record<NotifType, { icon: LucideIcon; tile: string }> = {
   retiros: { icon: Banknote, tile: 'bg-success-soft text-success' },
   emergencias: { icon: Siren, tile: 'bg-error-soft text-error' },
   servicios: { icon: Wrench, tile: 'bg-warning-soft text-warning-ink' },
+  asignaciones: { icon: UserCheck, tile: 'bg-info-soft text-primary' },
   pagos: { icon: CreditCard, tile: 'bg-error-soft text-error' },
   sistema: { icon: Info, tile: 'bg-chip text-muted' },
 };
@@ -822,6 +836,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const hydrateTheme = useTheme(s => s.hydrate);
   const [navigating, setNavigating] = useState(false);
   const first = useRef(true);
+  useAssignmentsLive();
 
   // Tema solo dentro de la consola; al salir (login) se quita.
   useEffect(() => {

@@ -106,6 +106,7 @@ export function snapshotCommission(
     quote_collected_cents: quoteCents,
     gross_collected_cents: gross,
     commission_cents: computeTechnicianCommission(type, value, gross),
+    payout_id: prev?.payout_id ?? null,
     order_status: order.status,
     snapshot_at: prev?.snapshot_at ?? now,
     computed_at: now,
@@ -186,7 +187,7 @@ export function commissionReport(
     a.services_count += 1;
     a.base_collected_cents += r.base_collected_cents;
     a.quote_collected_cents += r.quote_collected_cents;
-    a.gross_collected_cents += r.gross_collected_cents;
+    a.gross_collected_cents += r.gross_collected_cents ?? 0;
     a.commission_cents += r.commission_cents;
     a.admin_net_cents = a.gross_collected_cents - a.commission_cents;
     acc.set(r.technician_id, a);
@@ -246,7 +247,7 @@ export function techAdminOwnedSummary(
   return {
     commissionEarnedCents: mine.reduce((s, c) => s + c.commission_cents, 0),
     servicesCount: mine.length,
-    grossCollectedCents: mine.reduce((s, c) => s + c.gross_collected_cents, 0),
+    grossCollectedCents: mine.reduce((s, c) => s + (c.gross_collected_cents ?? 0), 0),
     cashHeldForAdminCents: payments
       .filter(
         p =>

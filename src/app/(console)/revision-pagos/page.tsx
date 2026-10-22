@@ -8,6 +8,7 @@ import {
   getOwedAdvanceOrders,
   getTransferReviewOrders,
   loadWorld,
+  onlinePaymentsEnabled,
   useTick,
   useWorldFailed,
   useWorldReady,
@@ -29,8 +30,10 @@ export default function RevisionPagosPage() {
   useTick();
   const ready = useWorldReady();
   const failed = useWorldFailed();
-  const { can } = useAuth();
-  const allowed = can('soporte') || can('finanzas');
+  const { can, canView } = useAuth();
+  const allowed = canView('revision_pagos') || can('soporte') || can('finanzas');
+  const online = onlinePaymentsEnabled();
+  // Sin pagos en línea no hay transferencias ni adelantos: solo la cola de efectivo.
   const [tab, setTab] = useState<Tab>('transferencias');
   const [initialTransfer, setInitialTransfer] = useState<string | null>(null);
 
@@ -49,6 +52,8 @@ export default function RevisionPagosPage() {
     window.history.replaceState(null, '', url);
   }
 
+  const shown: Tab = online ? tab : 'efectivo';
+
   if (!allowed) return <ErrorPage kind="403" primary={{ label: 'Ir al panel', href: '/dashboard' }} />;
   if (failed) return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
   if (!ready) return <ScreenSkeleton kind="list" />;
@@ -61,16 +66,20 @@ export default function RevisionPagosPage() {
       />
       <Tabs
         tabs={[
-          { value: 'transferencias', label: 'Transferencias', count: getTransferReviewOrders().length },
-          { value: 'adelantos', label: 'Adelantos pendientes', count: getOwedAdvanceOrders().length },
-          { value: 'efectivo', label: 'Efectivo', count: getCashReviewOrders().length },
+          ...(online
+            ? [
+                { value: 'transferencias' as const, label: 'Transferencias', count: getTransferReviewOrders().length },
+                { value: 'adelantos' as const, label: 'Adelantos pendientes', count: getOwedAdvanceOrders().length },
+              ]
+            : []),
+          { value: 'efectivo' as const, label: 'Efectivo', count: getCashReviewOrders().length },
         ]}
-        value={tab}
+        value={shown}
         onChange={changeTab}
       />
-      {tab === 'transferencias' && <TransfersPanel initialTransfer={initialTransfer} />}
-      {tab === 'adelantos' && <OwedAdvancesPanel />}
-      {tab === 'efectivo' && <CashReviewPanel />}
+      {shown === 'transferencias' && <TransfersPanel initialTransfer={initialTransfer} />}
+      {shown === 'adelantos' && <OwedAdvancesPanel />}
+      {shown === 'efectivo' && <CashReviewPanel />}
     </div>
   );
 }

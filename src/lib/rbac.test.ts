@@ -21,7 +21,10 @@ test('calificaciones: solo super_admin y soporte', () => {
 test('rol desde app_metadata con fallback super_admin', () => {
   expect(roleFromMetadata({ admin_role: 'legal' })).toBe('legal');
   expect(roleFromMetadata({ role: 'admin' })).toBe('super_admin');
-  expect(roleFromMetadata({ admin_role: 'otra-cosa' })).toBe('super_admin');
+  // Roles personalizados: el slug pasa tal cual (sin permisos en el mapa estático).
+  expect(roleFromMetadata({ admin_role: 'finanzas' })).toBe('finanzas');
+  expect(can('finanzas', 'finanzas')).toBe(false);
+  expect(roleFromMetadata({ admin_role: '  ' })).toBe('super_admin');
   expect(roleFromMetadata(undefined)).toBe('super_admin');
 });
 

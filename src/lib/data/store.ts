@@ -7,7 +7,6 @@ import { mxDay } from '@/lib/dates';
 import { registerFolios } from '@/lib/orderCode';
 import { distanceM, wkbPoint } from '@/lib/geo';
 import { ALERT_MINUTES_DEFAULT, ALERT_MINUTES_KEY, canReassignStatus, rejectNote } from '@/lib/unassigned';
-import type { AdminRole } from '@/lib/rbac';
 import { MOCK } from '@/lib/mock';
 import type { CompanyToolRowValue, ImportContext, ImportEntity, ImportValue, TechRowValue, ToolRowValue } from '@/lib/bulkImport';
 import { isImageMime, type QuoteAttachment } from '@/lib/quoteAttachments';
@@ -38,6 +37,7 @@ import {
   REFUND_REFERENCE_MAX,
   REJECT_REASON_MAX,
   TRANSFER_PAGE_SIZE,
+  applyOrder,
   baseMethodOf,
   depositArgs,
   filterTransfers,
@@ -46,7 +46,7 @@ import {
   listArgs,
   owedAdvances,
   paginate,
-  parseDepositAccount,
+  parseDepositAccounts,
   parseTransferDetail,
   proofKind,
   validateDepositForm,
@@ -522,6 +522,9 @@ export function getSettingList(key: string, fallback: string[]): string[] {
   const v = settings.find(s => s.key === key)?.value;
   return Array.isArray(v) ? (v as unknown[]).map(String) : fallback;
 }
+/** Pagos en línea (Stripe). Apagado = todo se cobra en efectivo (flag del backend, seed false). */
+export const ONLINE_PAYMENTS_KEY = 'online_payments_enabled';
+export const onlinePaymentsEnabled = () => getSettingBool(ONLINE_PAYMENTS_KEY, false);
 /** Minutos tras los que una solicitud sin técnico dispara alerta. */
 export const getUnassignedAlertMinutes = () =>
   getSettingInt(ALERT_MINUTES_KEY, ALERT_MINUTES_DEFAULT);
@@ -1080,6 +1083,9 @@ export async function assignOrder(
       accepted_at: wasRequested ? now : (prev.accepted_at ?? now),
       needs_manual_assignment: false,
       dispatch_status: prev.priority === 'emergency' ? 'assigned' : prev.dispatch_status,
+      ...(prev.assignment_mode === 'admin'
+        ? { assigned_by_admin_at: now, assigned_by_admin_id: MOCK_ADMIN_ID, assignment_ack_at: null }
+        : {}),
       updated_at: now,
     };
     const by = getProfile(MOCK_ADMIN_ID)?.full_name ?? 'admin';
@@ -1323,42 +1329,7 @@ export async function updateTechnicianBank(
 // ── Equipo (admins) ──────────────────────────────────────────────────────────
 export const getAdmins = () => w().profiles.filter(p => p.role === 'admin');
 
-/** Invita a un admin por correo vía la Edge Function admin-users (service role). */
-export async function inviteAdmin(email: string, fullName: string, adminRole?: AdminRole) {
-  return mutate(async () => {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: {
-        action: 'invite',
-        email,
-        full_name: fullName || undefined,
-        admin_role: adminRole,
-      },
-    });
-    if (error) throw error;
-    return data ?? true;
-  }, 'No se pudo enviar la invitación. Revisa el correo o si ya tiene cuenta.');
-}
-
-/** Roles de consola de todos los admins (RPC admin_list_admin_roles; solo super_admin). */
-export async function fetchAdminRoles(): Promise<Record<string, string>> {
-  const { data, error } = await supabase.rpc('admin_list_admin_roles');
-  if (error) {
-    console.warn('[data] admin_list_admin_roles', error);
-    return {};
-  }
-  return Object.fromEntries((data ?? []).map(r => [r.user_id, r.admin_role]));
-}
-
-/** Cambia el rol de consola de otro admin (admin-users set_admin_role; solo super_admin). */
-export async function setAdminRole(userId: string, adminRole: AdminRole) {
-  return mutate(async () => {
-    const { data, error } = await supabase.functions.invoke('admin-users', {
-      body: { action: 'set_admin_role', user_id: userId, admin_role: adminRole },
-    });
-    if (error) throw error;
-    return data ?? true;
-  }, 'No se pudo cambiar el rol.');
-}
+// Altas, roles y matriz de permisos del equipo: lib/data/staff.ts.
 
 /** Invita a un cliente (admin-users invite_client): recibe correo para crear su cuenta. */
 export async function inviteClient(email: string, fullName: string, phone: string | null) {
@@ -2154,58 +2125,121 @@ export async function confirmTransferRefund(orderId: string, reference: string) 
   );
 }
 
-/** Maqueta: cuenta de depósito (platform_settings.transfer_deposit_account). */
-let mockDeposit: DepositAccount = {
-  configured: true,
-  bank: 'BBVA México',
-  clabe: '012180001234567899',
+/** Maqueta: cuentas de depósito (tabla deposit_accounts). */
+const mockAcct = (p: Partial<DepositAccount> & Pick<DepositAccount, 'id' | 'bank' | 'clabe' | 'holder'>): DepositAccount => ({
   card_number: null,
-  holder: 'Tu Mantenimiento S.A. de C.V.',
+  alias: null,
+  is_active: true,
+  sort_order: 0,
+  created_at: new Date(Date.now() - 6 * DAY_MS).toISOString(),
   updated_at: new Date(Date.now() - 6 * DAY_MS).toISOString(),
-};
+  ...p,
+});
+let mockDeposits: DepositAccount[] = [
+  mockAcct({ id: 'dep-1', bank: 'BBVA México', clabe: '012180001234567899', holder: 'Tu Mantenimiento S.A. de C.V.', alias: 'Principal', card_number: '4152313800000001' }),
+  mockAcct({ id: 'dep-2', bank: 'Banorte', clabe: '072180001234567890', holder: 'Tu Mantenimiento S.A. de C.V.', alias: 'Respaldo', is_active: false, sort_order: 1 }),
+];
+const depositsCopy = () => mockDeposits.map(a => ({ ...a }));
 
-/** Cuenta a la que el cliente transfiere (get_transfer_deposit_account). null = no disponible. */
-export async function fetchDepositAccount(): Promise<DepositAccount | null> {
-  if (MOCK) return { ...mockDeposit };
+/** Todas las cuentas de depósito, activas o no (admin_list_deposit_accounts). null = no disponible. */
+export async function fetchDepositAccounts(): Promise<DepositAccount[] | null> {
+  if (MOCK) return depositsCopy();
   try {
-    const { data, error } = await supabase.rpc('get_transfer_deposit_account');
+    const { data, error } = await supabase.rpc('admin_list_deposit_accounts');
     if (error) throw error;
-    return parseDepositAccount(data);
+    return parseDepositAccounts(data);
   } catch (e) {
-    console.warn('[data] get_transfer_deposit_account', e);
+    console.warn('[data] admin_list_deposit_accounts', e);
     return null;
   }
 }
 
-/** Guarda la cuenta de depósito (admin_set_transfer_deposit_account, finanzas; auditado). */
-export async function setDepositAccount(f: DepositForm): Promise<DepositAccount | null> {
-  const errs = validateDepositForm(f);
-  const first = Object.values(errs)[0];
+/** Crea (id null) o edita una cuenta (admin_upsert_deposit_account, finanzas; auditado). Devuelve la lista actualizada. */
+export async function saveDepositAccount(id: string | null, f: DepositForm): Promise<DepositAccount[] | null> {
+  const first = Object.values(validateDepositForm(f))[0];
   if (first) {
     notifyError(first);
     return null;
   }
-  const args = depositArgs(f);
+  const args = depositArgs(f, id);
   if (MOCK) {
-    mockDeposit = {
-      configured: true,
-      bank: args.p_bank,
-      clabe: args.p_clabe,
-      card_number: args.p_card_number ?? null,
-      holder: args.p_holder,
-      updated_at: new Date().toISOString(),
-    };
+    if (mockDeposits.some(a => a.clabe === args.p_clabe && a.id !== id)) {
+      notifyError('Ya existe una cuenta con esa CLABE.');
+      return null;
+    }
+    const now = new Date().toISOString();
+    const base = { bank: args.p_bank, clabe: args.p_clabe, holder: args.p_holder, card_number: args.p_card_number, alias: args.p_alias, updated_at: now };
+    mockDeposits = id
+      ? mockDeposits.map(a => (a.id === id ? { ...a, ...base } : a))
+      : [...mockDeposits, mockAcct({ ...base, id: `dep-${Date.now()}`, sort_order: mockDeposits.length, created_at: now })];
     bump();
-    return { ...mockDeposit };
+    return depositsCopy();
   }
   return mutate(
     async () => {
-      const { data, error } = await supabase.rpc('admin_set_transfer_deposit_account', args);
+      const { error } = await supabase.rpc('admin_upsert_deposit_account', args as Fn['admin_upsert_deposit_account']['Args']);
       if (error) throw error;
-      return parseDepositAccount(data);
+      return await listDepositsOrThrow();
     },
-    e => pgMessage(e, 'No se pudo guardar la cuenta para transferencias.'),
+    e => pgMessage(e, 'No se pudo guardar la cuenta.'),
   );
+}
+
+/** Activa o desactiva una cuenta (admin_set_deposit_account_active). */
+export async function setDepositAccountActive(id: string, active: boolean): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = mockDeposits.map(a => (a.id === id ? { ...a, is_active: active, updated_at: new Date().toISOString() } : a));
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_set_deposit_account_active', { p_id: id, p_active: active });
+      if (error) throw error;
+      return await listDepositsOrThrow();
+    },
+    e => pgMessage(e, 'No se pudo cambiar el estado de la cuenta.'),
+  );
+}
+
+/** Guarda el orden de las cuentas (admin_reorder_deposit_accounts; el primero se muestra primero). */
+export async function reorderDepositAccounts(ids: string[]): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = applyOrder(mockDeposits, ids);
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { data, error } = await supabase.rpc('admin_reorder_deposit_accounts', { p_ids: ids });
+      if (error) throw error;
+      return parseDepositAccounts(data);
+    },
+    e => pgMessage(e, 'No se pudo cambiar el orden.'),
+  );
+}
+
+/** Elimina una cuenta (admin_delete_deposit_account; el historial de pagos no depende de ella). */
+export async function deleteDepositAccount(id: string): Promise<DepositAccount[] | null> {
+  if (MOCK) {
+    mockDeposits = applyOrder(mockDeposits.filter(a => a.id !== id), mockDeposits.filter(a => a.id !== id).map(a => a.id));
+    bump();
+    return depositsCopy();
+  }
+  return mutate(
+    async () => {
+      const { error } = await supabase.rpc('admin_delete_deposit_account', { p_id: id });
+      if (error) throw error;
+      return await listDepositsOrThrow();
+    },
+    e => pgMessage(e, 'No se pudo eliminar la cuenta.'),
+  );
+}
+
+async function listDepositsOrThrow(): Promise<DepositAccount[]> {
+  const { data, error } = await supabase.rpc('admin_list_deposit_accounts');
+  if (error) throw error;
+  return parseDepositAccounts(data);
 }
 
 /** Reporte «Efectivo por técnico» (finanzas). null = no disponible. */
@@ -2521,6 +2555,25 @@ export async function getMyMfaVerified(): Promise<boolean | null> {
     return (data?.totp ?? []).some(f => f.status === 'verified');
   } catch {
     return null;
+  }
+}
+/**
+ * ¿Hay que exigir 2 pasos? Sigue platform_settings.admin_require_aal2 (default
+ * false; lectura permitida a cualquier sesión). Si no se puede leer, se exige
+ * (lo seguro: el backend igual lo aplicaría).
+ */
+export async function fetchRequireAal2(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'admin_require_aal2')
+      .maybeSingle();
+    if (error) throw error;
+    return String(data?.value ?? false).toLowerCase() === 'true';
+  } catch (e) {
+    console.warn('[data] admin_require_aal2', e);
+    return true;
   }
 }
 /** Id del usuario con sesión (para marcar "Tú" en Equipo). */
@@ -3656,8 +3709,27 @@ export const saveZone = (z: {
   name: string;
   geojson: ZoneGeometry;
   is_active: boolean;
-}) =>
-  mutateExtras(
+}) => {
+  if (MOCK) {
+    // Maqueta: en memoria (el backend repara la geometría; aquí se guarda tal cual).
+    const zones = useExtras.getState().zones;
+    if (zones.some(x => x.slug === z.slug && x.id !== z.id)) {
+      notifyError('Ya existe una zona con ese slug.');
+      return Promise.resolve(null);
+    }
+    const prev = zones.find(x => x.id === z.id);
+    const row: CoverageZone = {
+      ...(prev ?? { technician_count: 0 }),
+      id: prev?.id ?? `zone-${z.slug}`,
+      slug: z.slug,
+      name: z.name,
+      is_active: z.is_active,
+      geojson: z.geojson,
+    } as CoverageZone;
+    useExtras.setState({ zones: prev ? zones.map(x => (x.id === row.id ? row : x)) : [...zones, row] });
+    return Promise.resolve(true);
+  }
+  return mutateExtras(
     async () => {
       const { error } = await supabase.rpc('upsert_coverage_zone', {
         p_slug: z.slug,
@@ -3673,22 +3745,34 @@ export const saveZone = (z: {
     e =>
       pgCode(e) === '23505'
         ? 'Ya existe una zona con ese slug.'
-        : pgMessage(e, 'No se pudo guardar la zona (¿GeoJSON válido?).'),
+        : pgMessage(e, 'No se pudo guardar la zona.'),
   );
+};
 
 /** Activa/pausa una zona: mismo upsert con su geometría actual. */
 export const setZoneActive = (id: string, active: boolean) => {
   const z = useExtras.getState().zones.find(x => x.id === id);
   if (!z?.geojson) {
-    notifyError('La zona no tiene geometría; edítala e importa su GeoJSON.');
+    notifyError('La zona no tiene geometría; edítala y dibuja su forma.');
     return Promise.resolve(null);
   }
   return saveZone({ id, slug: z.slug, name: z.name, geojson: z.geojson, is_active: active });
 };
 
 /** Asigna la zona base de un técnico (RPC assign_technician_zone). */
-export const assignTechZone = (techId: string, zoneId: string) =>
-  mutateExtras(
+export const assignTechZone = (techId: string, zoneId: string) => {
+  if (MOCK) {
+    const t = getTechnician(techId);
+    if (!t) return Promise.resolve(null);
+    (t as { zone_id: string | null }).zone_id = zoneId;
+    useExtras.setState({
+      zones: useExtras.getState().zones.map(z =>
+        z.id === zoneId ? { ...z, technician_count: z.technician_count + 1 } : z,
+      ),
+    });
+    return Promise.resolve(true);
+  }
+  return mutateExtras(
     async () => {
       const { error } = await supabase.rpc('assign_technician_zone', {
         p_technician_id: techId,
@@ -3699,6 +3783,7 @@ export const assignTechZone = (techId: string, zoneId: string) =>
     },
     e => pgMessage(e, 'No se pudo asignar la zona al técnico.'),
   );
+};
 
 export type DemandCell = Fn['admin_report_demand_heatmap']['Returns'][number];
 /** Demanda por día de la semana × hora (RPC admin_report_demand_heatmap, hora ZMG). */
@@ -3895,7 +3980,7 @@ function mockInvEvent(
       entity_type: entity,
       entity_id: entityId,
       event_type: type,
-      payload: payload as Json,
+      payload: payload as NonNullable<Json>,
       created_at: now,
       updated_at: now,
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -51,6 +51,7 @@ import {
   scheduleLabel,
   scheduleSurchargeLabel,
 } from '@/lib/unassigned';
+import { agoLabel, confirmationLabel } from '@/lib/assignments';
 import { AssignModal, RejectModal } from '../_components/AssignModal';
 import {
   addNote,
@@ -99,6 +100,9 @@ import {
   timeAgo,
 } from '../_components/shared';
 import { QuoteAttachments } from '../_components/QuoteAttachments';
+import { ServiceTickets } from '../_components/ServiceTickets';
+import { listServiceTickets } from '@/lib/data/serviceTickets';
+import type { ServiceTicket } from '@/lib/ticket';
 import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { PaymentBreakdown } from '../_components/PaymentBreakdown';
@@ -159,7 +163,7 @@ export default function ServicioDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const { can } = useAuth();
+  const { can, canView } = useAuth();
   const canFinance = can('finanzas');
   const canSupport = can('soporte');
   const [editOpen, setEditOpen] = useState(false);
@@ -175,6 +179,23 @@ export default function ServicioDetailPage() {
   const [evidenceError, setEvidenceError] = useState(false);
   const [attachments, setAttachments] = useState<QuoteAttachment[] | null>(null);
   const [attachmentsError, setAttachmentsError] = useState(false);
+  const [tickets, setTickets] = useState<ServiceTicket[] | null>(null);
+  const [ticketsError, setTicketsError] = useState(false);
+  const [ticketsTry, setTicketsTry] = useState(0);
+  const canTickets = canView('servicios');
+
+  useEffect(() => {
+    if (!ready || !id || !canTickets) return;
+    let alive = true;
+    setTicketsError(false);
+    listServiceTickets(id).then(
+      t => alive && setTickets(t),
+      () => alive && setTicketsError(true),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [ready, id, canTickets, ticketsTry]);
 
   useEffect(() => {
     if (!ready || !id) return;
@@ -592,6 +613,10 @@ export default function ServicioDetailPage() {
 
           {quote && <QuoteAttachments orderId={req.id} items={attachments} error={attachmentsError} />}
 
+          {canTickets && (
+            <ServiceTickets items={tickets} error={ticketsError} onRetry={() => setTicketsTry(n => n + 1)} />
+          )}
+
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-display text-[16px] font-bold text-navy">Bitácora</h2>
@@ -754,6 +779,21 @@ export default function ServicioDetailPage() {
                   ? `Sin técnico · espera ${ageLabel(req.created_at)}`
                   : 'Sin técnico asignado todavía.'}
               </p>
+            )}
+            {req.assigned_by_admin_at && (
+              <div className="mt-3 flex flex-col items-start gap-1.5 border-t border-divider pt-3">
+                <Badge tone="info" mono>
+                  Asignado por Tumtto
+                </Badge>
+                <span className="text-[12.5px] text-muted">
+                  {agoLabel(req.assigned_by_admin_at)}
+                </span>
+                {req.technician_id && (
+                  <Badge tone={req.assignment_ack_at ? 'success' : 'warning'} dot>
+                    {confirmationLabel({ technician: techProfile ? { id: techProfile.id, name: techProfile.full_name ?? '' } : null, assignment_ack_at: req.assignment_ack_at })}
+                  </Badge>
+                )}
+              </div>
             )}
             {techRec && (
               <Link

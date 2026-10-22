@@ -164,7 +164,7 @@ export function CashReviewPanel() {
                   <dl className="grid grid-cols-3 gap-3 text-right">
                     {(
                       [
-                        ['Presupuesto', r.expected_cents],
+                        ['Efectivo esperado', r.expected_cents],
                         ['Técnico', r.received_cents],
                         ['Cliente', r.client_reported_cents],
                       ] as const

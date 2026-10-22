@@ -12,7 +12,15 @@ import React, {
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
-import { can as canRole, roleFromMetadata, type AdminRole, type Permission } from '@/lib/rbac';
+import { roleFromMetadata, type AdminRole, type Permission } from '@/lib/rbac';
+import {
+  canLegacy,
+  canSection,
+  fullAccess,
+  legacyPermissions,
+  type MyPermissions,
+} from '@/lib/staffRoles';
+import { fetchMyPermissions } from '@/lib/data/staff';
 import type { Database } from '@/types/supabase';
 import { MOCK } from '@/lib/mock';
 
@@ -33,12 +41,25 @@ export type AuthState = {
   resolving: boolean;
 };
 
+export type PermissionsStatus = 'idle' | 'loading' | 'ready';
+
 export type AuthContextValue = AuthState & {
+  /** Permisos por sección (my_permissions); null hasta cargarlos. */
+  permissions: MyPermissions | null;
+  permissionsStatus: PermissionsStatus;
+  /** Carga/recarga my_permissions (el gate la llama cuando ya hay 2FA). */
+  loadPermissions: () => Promise<void>;
+  /** app_metadata.must_change_password: contraseña temporal pendiente. */
+  mustChangePassword: boolean;
+  /** ¿Puede ver la sección? (admin_sections.slug) */
+  canView: (section: string) => boolean;
+  /** ¿Puede editar la sección? */
+  canEdit: (section: string) => boolean;
   /** Consola = solo staff: sesión válida + profiles.role admin. */
   isAdmin: boolean;
   /** app_metadata.admin_role (fallback super_admin). */
   adminRole: AdminRole;
-  /** ¿El rol de la sesión tiene el permiso? (mapa del contrato §3). */
+  /** API anterior: `can('finanzas')` = editar la sección equivalente. */
   can: (perm: Permission) => boolean;
   signIn: (
     email: string,
@@ -82,6 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Usuario cuyo perfil ya está cargado (o cargando): los eventos del mismo
   // usuario (TOKEN_REFRESHED, SIGNED_IN al volver a la pestaña) no lo tiran.
   const resolvedFor = useRef<string | null>(null);
+  const [permissions, setPermissions] = useState<MyPermissions | null>(null);
+  const [permissionsStatus, setPermissionsStatus] =
+    useState<PermissionsStatus>('idle');
 
   const refreshUsuario = useCallback(async (session: Session | null) => {
     if (!session?.user) {
@@ -126,6 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       resolvedFor.current = userId;
+      setPermissions(null);
+      setPermissionsStatus('idle');
       setState(s => ({
         ...s,
         session,
@@ -138,6 +164,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [refreshUsuario]);
 
+  const loadPermissions = useCallback(async () => {
+    setPermissionsStatus('loading');
+    const p = await fetchMyPermissions();
+    // Si el RPC no responde (migración pendiente) se cae al mapa estático
+    // de los roles del sistema en vez de dejar la consola en blanco.
+    let fallback: MyPermissions | null = null;
+    if (!p) {
+      const { data } = await supabase.auth.getSession();
+      fallback = legacyPermissions(roleFromMetadata(data.session?.user.app_metadata));
+    }
+    setPermissions(p ?? fallback);
+    setPermissionsStatus('ready');
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -149,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     resolvedFor.current = null;
+    setPermissions(null);
+    setPermissionsStatus('idle');
     setState({
       session: null,
       usuario: null,
@@ -165,17 +207,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => {
     if (MOCK) return mockAuth(signOut);
-    const adminRole = roleFromMetadata(state.session?.user.app_metadata);
+    const meta = state.session?.user.app_metadata;
+    const adminRole = roleFromMetadata(meta);
     return {
       ...state,
       isAdmin: !!state.session && state.usuario?.role === 'admin',
       adminRole,
-      can: perm => canRole(adminRole, perm),
+      permissions,
+      permissionsStatus,
+      loadPermissions,
+      mustChangePassword:
+        (meta as { must_change_password?: unknown } | undefined)?.must_change_password === true,
+      canView: section => canSection(permissions, section, 'view'),
+      canEdit: section => canSection(permissions, section, 'edit'),
+      can: perm => canLegacy(permissions, perm),
       signIn,
       signOut,
       retryUsuario,
     };
-  }, [state, signIn, signOut, retryUsuario]);
+  }, [state, permissions, permissionsStatus, loadPermissions, signIn, signOut, retryUsuario]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -191,6 +241,7 @@ function mockAuth(signOut: () => Promise<void>): AuthContextValue {
       phone: null,
       role: 'admin',
       avatar_path: null,
+      avatar_icon: 'casco',
       status: 'active',
       stripe_customer_id: null,
       created_at: now,
@@ -201,6 +252,12 @@ function mockAuth(signOut: () => Promise<void>): AuthContextValue {
     resolving: false,
     isAdmin: true,
     adminRole: 'super_admin',
+    permissions: fullAccess(),
+    permissionsStatus: 'ready',
+    loadPermissions: async () => {},
+    mustChangePassword: false,
+    canView: () => true,
+    canEdit: () => true,
     can: () => true,
     signIn: async () => ({ error: null }),
     signOut,

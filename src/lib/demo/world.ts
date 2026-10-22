@@ -1,5 +1,4 @@
 import type { Database } from '@/types/supabase';
-import { defaultAvatarFor } from '@/lib/avatarArt';
 
 /**
  * In-memory demo world — one coherent dataset shared across the Cliente,
@@ -56,18 +55,20 @@ export const CLIENT_ID = 'demo-cliente';
 export const TECH_USER_ID = 'demo-tecnico'; // Ramón — the técnico the cliente hires
 
 const MOCK_ICONS: Record<string, string> = {
-  [CLIENT_ID]: 'casa',
-  [TECH_USER_ID]: 'llave',
-  'u-ag': 'foco',
-  'u-sc': 'casco',
-  'u-do': 'gota',
-  'u-carla': 'martillo',
-  'u-carlos': 'casco',
-  'u-miguel': 'martillo',
-  'u-jose': 'llave',
-  'u-lupita': 'gota',
-  'u-fer': 'foco',
-  // u-luis, u-ivan, u-roberto: sin entrada -> default por hash
+  [CLIENT_ID]: 'casita',
+  [TECH_USER_ID]: 'casco',
+  'u-ag': 'gorra',
+  'u-sc': 'goggles',
+  'u-do': 'soldador',
+  'u-carla': 'pintor',
+  'u-carlos': 'gorro',
+  'u-miguel': 'bandana',
+  'u-jose': 'casco',
+  'u-lupita': 'trenzas',
+  'u-fer': 'chongo',
+  'u-luis': 'clasico',
+  'u-ivan': 'audifonos',
+  'u-roberto': 'canas',
 };
 
 function profile(
@@ -82,9 +83,10 @@ function profile(
     phone,
     role,
     avatar_path: null,
-    avatar_icon: MOCK_ICONS[id] ?? defaultAvatarFor(id),
+    avatar_icon: MOCK_ICONS[id] ?? 'silueta',
     status: 'active',
     stripe_customer_id: null,
+    birth_date: null,
     ...ts(),
   };
 }
@@ -401,6 +403,9 @@ function build(): World {
       urgent_surcharge_bps: 0,
       priority: 'normal',
       assignment_mode: 'client',
+      assigned_by_admin_at: null,
+      assigned_by_admin_id: null,
+      assignment_ack_at: null,
       schedule_surcharge_bps: 0,
       schedule_surcharge_cents: null,
       schedule_surcharge_name: null,
@@ -608,6 +613,7 @@ function build(): World {
       method: 'card',
       status: 'paid',
       amount_cents: 164000,
+      base_included_cents: 0,
       commission_cents: 24600,
       currency: 'MXN',
       mp_preference_id: 'pref_demo_2835',
@@ -630,6 +636,8 @@ function build(): World {
       cash_confirmed_at: null,
       cash_confirmed_by: null,
       cash_debt_recovered_cents: 0,
+      cash_delivered_cents: null,
+      cash_delivery_id: null,
       kind: 'legacy',
       refund_attempts: 0,
       cash_status: null,

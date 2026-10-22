@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -50,6 +50,7 @@ import {
   type PayoutRequest,
   type ReportKpis,
   slugify,
+  onlinePaymentsEnabled,
 } from '@/lib/data/store';
 import { orderCode } from '@/lib/orderCode';
 import { kindLabel } from '@/lib/payments';
@@ -254,7 +255,9 @@ export default function FinanzasPage() {
   const payouts = extras.payouts;
   const pendingPO = payouts.filter(p => p.status === 'pending');
   const heldPO = payouts.filter(p => p.status === 'held');
-  const failedRefunds = getFailedBaseRefunds();
+  // Sin pagos en línea (todo efectivo) no hay Stripe: ni retiros ni reembolsos de tarjeta.
+  const online = onlinePaymentsEnabled();
+  const failedRefunds = online ? getFailedBaseRefunds() : [];
   const gmv = kpis ? Number(kpis.current.gmv_cents) : m.cur.gross;
   const gmvPrev = kpis ? Number(kpis.previous.gmv_cents) : m.prev.gross;
   const payoutsReal = extras.loaded && !extras.unavailable.payouts;
@@ -359,7 +362,7 @@ export default function FinanzasPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Finanzas"
-        description="Tarifa base con tarjeta (Stripe), presupuestos en efectivo, comisión de plataforma y retiros a técnicos."
+        description={online ? 'Tarifa base con tarjeta (Stripe), presupuestos en efectivo, comisión de plataforma y retiros a técnicos.' : 'Cobros en efectivo en persona (visita + cotización), comisión de plataforma y liquidaciones.'}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <PeriodFilters value={range} onChange={setRange} kicker="Finanzas">
@@ -509,8 +512,8 @@ export default function FinanzasPage() {
         <div className="border-b border-line px-5 pt-3">
           <Tabs
             tabs={[
-              { value: 'tx', label: 'Transacciones', count: m.tx.length },
-              { value: 'po', label: 'Retiros', count: pendingPO.length + heldPO.length },
+              { value: 'tx' as const, label: 'Transacciones', count: m.tx.length },
+              ...(online ? [{ value: 'po' as const, label: 'Retiros', count: pendingPO.length + heldPO.length }] : []),
               { value: 'wal', label: 'Carteras' },
               { value: 'mes', label: 'Resumen mensual' },
               { value: 'cash', label: 'Efectivo por técnico' },
@@ -543,7 +546,7 @@ export default function FinanzasPage() {
           </>
         )}
 
-        {tab === 'po' && (
+        {online && tab === 'po' && (
           <div className="p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="font-sans text-[13px] text-muted">

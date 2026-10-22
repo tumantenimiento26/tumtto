@@ -166,32 +166,3 @@ export function StoreButtons({ className = '' }: { className?: string }) {
     </div>
   );
 }
-
-/** Avatar circular con iniciales (reseñas, técnicos). */
-export function Initials({
-  text,
-  color,
-  size = 34,
-  ring,
-}: {
-  text: string;
-  color: string;
-  size?: number;
-  ring?: boolean;
-}) {
-  return (
-    <span
-      className={`flex flex-shrink-0 items-center justify-center rounded-full font-display font-extrabold text-white ${
-        ring ? 'border-2 border-deep' : ''
-      }`}
-      style={{
-        width: size,
-        height: size,
-        background: color,
-        fontSize: size * 0.34,
-      }}
-    >
-      {text}
-    </span>
-  );
-}

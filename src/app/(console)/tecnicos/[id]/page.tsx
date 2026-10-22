@@ -1,6 +1,6 @@
 'use client';
 
-import { UserIcon } from '@/components/profile-icon';
+import { UserIcon } from '@/components/user-avatar';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -28,6 +28,7 @@ import {
   ScreenSkeleton,
   toast,
 } from '@/components/ds';
+import { CategoryIcon } from '@/components/category-icon';
 import { useAction } from '@/components/use-action';
 import {
   getAllPayments,
@@ -90,6 +91,7 @@ import { VehiclesCard } from '../_components/VehiclesCard';
 import { ToolsCard } from '../_components/ToolsCard';
 import { CompanyToolsCard } from '../_components/CompanyToolsCard';
 import { RatingsCard } from '../_components/RatingsCard';
+import { SettlementCard } from '../../liquidaciones/_components/SettlementCard';
 import { ratingSummary } from '@/lib/ratingModeration';
 
 const DONE = new Set(['completed', 'paid', 'closed']);
@@ -104,7 +106,8 @@ export default function TecnicoDetailPage() {
   const ready = useWorldReady();
   const failed = useWorldFailed();
   const { busy, run } = useAction();
-  const { can } = useAuth();
+  const { can, canView } = useAuth();
+  const canViewFinance = canView('finanzas');
   const canKyc = can('kyc');
   const canSupport = can('soporte');
   // CURP/RFC/CLABE: solo quien revisa KYC o finanzas.
@@ -376,6 +379,7 @@ export default function TecnicoDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   {data.catNames.map(c => (
                     <Badge key={c} tone="info">
+                      <CategoryIcon cat={c} size={14} decorative />
                       {c}
                     </Badge>
                   ))}
@@ -443,6 +447,7 @@ export default function TecnicoDetailPage() {
 
           <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
             <div className="flex flex-col gap-4">
+              {canViewFinance && <SettlementCard techId={tech.id} />}
               <RatesCard techId={tech.id} rates={data.rates} />
               <Card padded>
                 <CardHead title="Servicios recientes" />

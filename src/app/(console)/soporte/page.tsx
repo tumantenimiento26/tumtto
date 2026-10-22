@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { UserIcon } from '@/components/user-avatar';
 import {
   ArrowLeft,
   ArrowRight,
@@ -115,23 +116,8 @@ const ORDER_STATUS: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
-const initials = (name?: string | null) =>
-  (name ?? '?')
-    .split(' ')
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase();
-
-function Avatar({ name, size = 36 }: { name?: string | null; size?: number }) {
-  return (
-    <span
-      className="grid shrink-0 place-items-center rounded-full bg-action font-display text-[12px] font-bold text-white"
-      style={{ width: size, height: size }}
-    >
-      {initials(name)}
-    </span>
-  );
+function Avatar({ userId, size = 36 }: { userId?: string | null; size?: number }) {
+  return <UserIcon userId={userId ?? ''} size={size} />;
 }
 
 export default function SoportePage() {
@@ -355,8 +341,8 @@ function DisputeDetail({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Party name={opener?.full_name} role="Abrió la disputa" />
-        <Party name={tech?.full_name} role="Técnico del servicio" />
+        <Party id={opener?.id} name={opener?.full_name} role="Abrió la disputa" />
+        <Party id={tech?.id} name={tech?.full_name} role="Técnico del servicio" />
       </div>
 
       {req && (
@@ -455,10 +441,10 @@ function DisputeDetail({
   );
 }
 
-function Party({ name, role }: { name?: string | null; role: string }) {
+function Party({ id, name, role }: { id?: string | null; name?: string | null; role: string }) {
   return (
     <div className="flex items-center gap-3 rounded-box border border-line px-3.5 py-3">
-      <Avatar name={name} />
+      <Avatar userId={id} />
       <div className="min-w-0">
         <div className="truncate font-sans text-[13.5px] font-semibold text-navy">
           {name ?? '—'}
@@ -525,7 +511,7 @@ function TicketsView() {
                   active ? 'bg-tint' : 'hover:bg-panel'
                 }`}
               >
-                <Avatar name={requester?.full_name} size={32} />
+                <Avatar userId={requester?.id} size={32} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate font-sans text-[13px] font-semibold text-navy">
@@ -608,7 +594,7 @@ function TicketThread({
         >
           <ArrowLeft size={18} />
         </button>
-        <Avatar name={requester?.full_name} size={38} />
+        <Avatar userId={requester?.id} size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-display text-[15px] font-bold text-navy">
@@ -713,7 +699,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
       <div>
         <Kicker className="mb-2">Usuario</Kicker>
         <div className="flex items-center gap-3">
-          <Avatar name={requester?.full_name} size={38} />
+          <Avatar userId={requester?.id} size={38} />
           <div className="min-w-0">
             <div className="truncate font-sans text-[13.5px] font-semibold text-navy">
               {requester?.full_name ?? 'Usuario'}
@@ -826,7 +812,7 @@ function ClientDocKycCard({ doc }: { doc: ReturnType<typeof getPendingClientDocu
   return (
     <Card padded className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Avatar name={profile?.full_name} size={42} />
+        <Avatar userId={profile?.id} size={42} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-sans text-[14px] font-semibold text-navy">{who}</div>
           <div className="font-sans text-[12px] text-muted">
@@ -883,7 +869,7 @@ function KycCard({ techId }: { techId: string }) {
   return (
     <Card padded className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Avatar name={profile?.full_name} size={42} />
+        <Avatar userId={profile?.id} size={42} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-sans text-[14px] font-semibold text-navy">
             {who}

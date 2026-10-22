@@ -2,25 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  AppWindow,
   Check,
   CreditCard,
-  Droplet,
-  Droplets,
   FileText,
-  Flame,
   Home,
   IdCard,
   MessageSquare,
   Navigation,
-  Paintbrush,
   Phone as PhoneIcon,
   User,
-  Wrench,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { money } from '@/lib/landing';
+import { CategoryIcon } from '@/components/category-icon';
 import { Container, H2, Kicker, Lead } from './bits';
 import { Phone, STEP_SCREENS } from './phone';
 import { scrollToId, useInViewOnce } from './hooks';
@@ -28,7 +22,8 @@ import { scrollToId, useInViewOnce } from './hooks';
 /* ── Categorías: pestañas + panel que rota cada 5 s ── */
 type Cat = {
   name: string;
-  icon: LucideIcon;
+  /** id del registro de íconos de categoría. */
+  icon: string;
   desc: string;
   from: string;
   subs: [string, number, number][];
@@ -44,7 +39,7 @@ type Cat = {
 const CATS: Cat[] = [
   {
     name: 'Plomería',
-    icon: Droplet,
+    icon: 'plomeria',
     desc: 'Fugas, calentadores, drenaje y sanitarios. La especialidad con más técnicos en la red.',
     from: '$300',
     subs: [
@@ -61,7 +56,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Electricidad',
-    icon: Zap,
+    icon: 'electricidad',
     desc: 'Contactos, apagadores, lámparas y tableros, con técnicos que revisan la instalación completa.',
     from: '$200',
     subs: [
@@ -78,7 +73,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Gas',
-    icon: Flame,
+    icon: 'gas',
     desc: 'Regulador, revisión de instalación y fugas. Solo técnicos con certificación de gas LP vigente.',
     from: '$300',
     subs: [
@@ -94,7 +89,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Herrería',
-    icon: Wrench,
+    icon: 'herreria',
     desc: 'Puertas, portones, rejas y soldadura a domicilio.',
     from: '$600',
     subs: [
@@ -110,7 +105,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Pintura',
-    icon: Paintbrush,
+    icon: 'pintura',
     desc: 'Pintura interior por habitación o casa completa, con materiales cotizados antes de empezar.',
     from: '$500',
     subs: [
@@ -127,7 +122,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Cristales',
-    icon: AppWindow,
+    icon: 'cristales',
     desc: 'Ventanas residenciales, reposición de vidrios y canceles de baño.',
     from: '$350',
     subs: [
@@ -142,7 +137,7 @@ const CATS: Cat[] = [
   },
   {
     name: 'Drenaje',
-    icon: Droplets,
+    icon: 'drenaje',
     desc: 'Destape de drenaje en cocina, baños y registros.',
     from: '$350',
     subs: [
@@ -256,7 +251,7 @@ export function Categories({ reduced }: { reduced: boolean }) {
                         : 'bg-white/[0.05] text-lp-muted'
                     }`}
                   >
-                    <k.icon size={21} />
+                    <CategoryIcon cat={k.icon} size={21} theme="dark" decorative />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-display text-[15px] font-bold">
@@ -303,7 +298,7 @@ export function Categories({ reduced }: { reduced: boolean }) {
               <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-[18px]">
                 <div className="flex items-center gap-3.5">
                   <span className="relative flex h-16 w-16 items-center justify-center rounded-[16px] border border-[rgba(24,193,255,0.3)] bg-[rgba(24,193,255,0.12)] text-[var(--lp-cyan)]">
-                    <c.icon size={30} />
+                    <CategoryIcon cat={c.icon} size={30} theme="dark" decorative />
                     <span className="absolute -inset-1.5 animate-[lp-spin_24s_linear_infinite] rounded-[20px] border border-dashed border-[rgba(24,193,255,0.3)]" />
                   </span>
                   <div>

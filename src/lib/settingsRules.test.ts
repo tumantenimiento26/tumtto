@@ -12,6 +12,7 @@ describe('validateSettings', () => {
         account_deletion_grace_days: 30,
         enabled_payment_methods: ['card', 'cash'],
         admin_require_aal2: true,
+        online_payments_enabled: false,
       }),
     ).toEqual({});
   });

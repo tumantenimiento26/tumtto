@@ -206,7 +206,7 @@ const ERRORS: Record<
       'Tu rol no incluye este permiso. Pide acceso a un administrador.',
     steps: [
       'Confirma con qué cuenta entraste',
-      'Pide el permiso en Configuración › Equipo',
+      'Pide el permiso en Equipo y roles',
       'Vuelve al dashboard',
     ],
     icon: Lock,

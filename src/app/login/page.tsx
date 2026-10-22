@@ -16,9 +16,11 @@ import {
 } from 'lucide-react';
 import { Button, Field, Input, Kicker } from '@/components/ds';
 import { AsideConsole, AuthShell } from '@/components/auth-shell';
+import { ForcePasswordChange } from '@/components/force-password-change';
 import { BrandMark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { fetchRequireAal2 } from '@/lib/data/store';
 import { MOCK, SKIP_MFA } from '@/lib/mock';
 import { APP_STORE_URL, PLAY_STORE_URL, schemeUrl } from '@/lib/appLinks';
 import {
@@ -34,7 +36,15 @@ import {
 // TOTP real de Supabase) → consola. Clientes y técnicos → "continúa en la
 // app" (la web solo opera la consola).
 
-type Step = 'login' | 'mfa' | 'enroll' | 'app' | 'forgot' | 'sent' | 'redirect';
+type Step =
+  | 'login'
+  | 'newpass'
+  | 'mfa'
+  | 'enroll'
+  | 'app'
+  | 'forgot'
+  | 'sent'
+  | 'redirect';
 
 /** Traduce el error de Supabase Auth; el genérico sólo cubre lo que no reconocemos. */
 function authMessage(raw: string): string {
@@ -55,7 +65,7 @@ const ASIDE = {
   title: 'Opera Tumantenimiento.',
   lead: 'Acceso exclusivo para el equipo: solicitudes, técnicos, pagos y regiones en un solo lugar.',
   bullets: [
-    'Verificación en dos pasos para cada administrador',
+    'Acceso seguro para cada administrador',
     'Permisos por rol: super admin, finanzas y soporte',
     'Acciones sensibles registradas en la bitácora',
   ],
@@ -175,7 +185,17 @@ export default function LoginPage() {
       return;
     }
 
-    if (SKIP_MFA) return enterConsole();
+    // Contraseña temporal (alta directa de equipo): se cambia antes del 2FA (si aplica).
+    if (
+      (user.app_metadata as { must_change_password?: unknown } | undefined)
+        ?.must_change_password === true
+    ) {
+      setLoading(false);
+      setStep('newpass');
+      return;
+    }
+
+    if (SKIP_MFA || !(await fetchRequireAal2())) return enterConsole();
     const { data: aal } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.currentLevel === 'aal2') return enterConsole();
@@ -432,6 +452,17 @@ export default function LoginPage() {
             Regístrate como técnico
           </Button>
         </div>
+      )}
+
+      {step === 'newpass' && (
+        <ForcePasswordChange
+          onDone={() => {
+            setPass('');
+            setLoading(true);
+            void routeAfterSignIn();
+          }}
+          onCancel={() => void switchAccount()}
+        />
       )}
 
       {step === 'mfa' && (

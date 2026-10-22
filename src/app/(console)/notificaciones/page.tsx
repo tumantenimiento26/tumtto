@@ -53,6 +53,7 @@ const TYPE_TONE: Record<NotifType, Tone> = {
   retiros: 'success',
   emergencias: 'danger',
   servicios: 'warning',
+  asignaciones: 'info',
   pagos: 'danger',
   sistema: 'neutral',
 };

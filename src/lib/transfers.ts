@@ -13,7 +13,7 @@ import type { Tone } from '@/lib/payments';
 type Fn = Database['public']['Functions'];
 export type PaymentTransfer = Database['public']['Tables']['payment_transfers']['Row'];
 export type PaymentTransferStatus = 'submitted' | 'accepted' | 'rejected' | 'cancelled';
-export type BaseFeeMethod = 'card' | 'transfer';
+export type BaseFeeMethod = 'card' | 'transfer' | 'cash';
 /** Fila de admin_list_payment_transfers (los LEFT JOIN y la revisión pueden venir null). */
 export type TransferRow = NullableCols<
   Fn['admin_list_payment_transfers']['Returns'][number],
@@ -31,8 +31,9 @@ export const TRANSFER_STATUS: Record<PaymentTransferStatus, { label: string; ton
 export const transferStatus = (s: string | null | undefined) =>
   TRANSFER_STATUS[s as PaymentTransferStatus] ?? { label: s ?? '—', tone: 'neutral' as Tone };
 
-export const BASE_METHOD_LABEL: Record<BaseFeeMethod, string> = { card: 'Tarjeta', transfer: 'Transferencia' };
-export const baseMethodOf = (m: string | null | undefined): BaseFeeMethod => (m === 'transfer' ? 'transfer' : 'card');
+export const BASE_METHOD_LABEL: Record<BaseFeeMethod, string> = { card: 'Tarjeta', transfer: 'Transferencia', cash: 'Efectivo' };
+export const baseMethodOf = (m: string | null | undefined): BaseFeeMethod =>
+  m === 'transfer' ? 'transfer' : m === 'cash' ? 'cash' : 'card';
 
 /** Motivos rápidos de rechazo (el admin puede escribir otro). */
 export const QUICK_REJECT_REASONS = [
@@ -304,56 +305,74 @@ export function owedAdvances(orders: OwedOrder[], proofs: LatestProof[]): OwedAd
 /** Estado del adelanto en el detalle de la orden: hay algo que el admin debe mirar. */
 export const transferNeedsReview = (baseStatus: string | null | undefined) => baseStatus === 'in_review';
 
-// ── Cuenta de depósito (transfer_deposit_account) ───────────────────────────
+// ── Cuentas de depósito (deposit_accounts, N cuentas activables) ────────────
 
+export const ALIAS_MAX = 60;
+
+/** Cuenta tal como la devuelve admin_list_deposit_accounts. */
 export interface DepositAccount {
-  configured: boolean;
-  bank: string | null;
-  clabe: string | null;
+  id: string;
+  bank: string;
+  clabe: string;
   card_number: string | null;
-  holder: string | null;
-  updated_at: string | null;
+  holder: string;
+  alias: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 export interface DepositForm {
   bank: string;
   clabe: string;
   card: string;
   holder: string;
+  alias: string;
 }
-export const EMPTY_DEPOSIT_ACCOUNT: DepositAccount = {
-  configured: false,
-  bank: null,
-  clabe: null,
-  card_number: null,
-  holder: null,
-  updated_at: null,
-};
+export const EMPTY_DEPOSIT_FORM: DepositForm = { bank: '', clabe: '', card: '', holder: '', alias: '' };
 
-/** jsonb de get_transfer_deposit_account / admin_set_transfer_deposit_account. */
-export function parseDepositAccount(json: Json | null): DepositAccount {
-  const j = obj(json ?? undefined);
-  if (!j) return EMPTY_DEPOSIT_ACCOUNT;
-  const acc = {
-    bank: str(j.bank),
-    clabe: str(j.clabe),
-    card_number: str(j.card_number),
-    holder: str(j.holder),
-    updated_at: str(j.updated_at),
-  };
-  return { configured: j.configured === true || (j.configured == null && !!acc.clabe), ...acc };
+/** jsonb array de admin_list_deposit_accounts / admin_reorder_deposit_accounts → cuentas ordenadas. */
+export function parseDepositAccounts(json: Json | null): DepositAccount[] {
+  if (!Array.isArray(json)) return [];
+  return json
+    .flatMap((v, i) => {
+      const j = obj(v);
+      if (!j || !str(j.id) || !str(j.clabe)) return [];
+      const a: DepositAccount = {
+        id: str(j.id)!,
+        bank: str(j.bank) ?? '',
+        clabe: str(j.clabe)!,
+        card_number: str(j.card_number),
+        holder: str(j.holder) ?? '',
+        alias: str(j.alias),
+        is_active: j.is_active !== false,
+        sort_order: num(j.sort_order) ?? i,
+        created_at: str(j.created_at) ?? '',
+        updated_at: str(j.updated_at) ?? str(j.created_at) ?? '',
+      };
+      return [a];
+    })
+    .sort((a, b) => a.sort_order - b.sort_order);
 }
+
+/** jsonb de admin_upsert_deposit_account / admin_set_deposit_account_active (una cuenta). */
+export const parseDepositAccount = (json: Json | null): DepositAccount | null => parseDepositAccounts(json ? [json] : [])[0] ?? null;
 
 export const depositFormOf = (a: DepositAccount): DepositForm => ({
-  bank: a.bank ?? '',
-  clabe: a.clabe ?? '',
+  bank: a.bank,
+  clabe: a.clabe,
   card: a.card_number ?? '',
-  holder: a.holder ?? '',
+  holder: a.holder,
+  alias: a.alias ?? '',
 });
+
+/** Título de la fila: el alias si existe, si no el banco. */
+export const depositTitle = (a: Pick<DepositAccount, 'alias' | 'bank'>) => a.alias?.trim() || a.bank;
 
 /** Quita espacios y guiones (como el backend). */
 export const digitsOnly = (s: string) => s.replace(/[\s-]/g, '');
 
-/** Errores por campo con los mismos textos (y límites) que admin_set_transfer_deposit_account. */
+/** Errores por campo con los mismos textos (y límites) que admin_upsert_deposit_account. */
 export function validateDepositForm(f: DepositForm): Partial<Record<keyof DepositForm, string>> {
   const e: Partial<Record<keyof DepositForm, string>> = {};
   const bank = f.bank.trim();
@@ -365,16 +384,52 @@ export function validateDepositForm(f: DepositForm): Partial<Record<keyof Deposi
   else if (!isValidClabe(clabe)) e.clabe = 'La CLABE no es válida (dígito verificador incorrecto).';
   if (card && !/^\d{16}$/.test(card)) e.card = 'El número de tarjeta debe tener 16 dígitos.';
   if (!holder || holder.length > 120) e.holder = 'El titular es obligatorio (máximo 120 caracteres).';
+  if (f.alias.trim().length > ALIAS_MAX) e.alias = `El alias no puede superar ${ALIAS_MAX} caracteres.`;
   return e;
 }
 
-/** Args normalizados del RPC (tarjeta vacía → null). */
-export const depositArgs = (f: DepositForm) => ({
+/** Args normalizados de admin_upsert_deposit_account (`id` null = crear; vacíos → null). */
+export const depositArgs = (f: DepositForm, id: string | null = null) => ({
+  p_id: id,
   p_bank: f.bank.trim(),
   p_clabe: digitsOnly(f.clabe),
   p_holder: f.holder.trim(),
-  p_card_number: digitsOnly(f.card) || undefined,
+  p_card_number: digitsOnly(f.card) || null,
+  p_alias: f.alias.trim() || null,
 });
+
+/** ¿El formulario cambió respecto a la cuenta (comparando ya normalizado)? */
+export const depositFormDirty = (f: DepositForm, a: DepositAccount) => {
+  const b = depositFormOf(a);
+  return (
+    f.bank.trim() !== b.bank ||
+    digitsOnly(f.clabe) !== b.clabe ||
+    digitsOnly(f.card) !== b.card ||
+    f.holder.trim() !== b.holder ||
+    f.alias.trim() !== b.alias
+  );
+};
 
 /** «0321 8000 0118 3597 19» — agrupa de 4 en 4 para leerla. */
 export const groupDigits = (s: string | null | undefined) => (s ? digitsOnly(s).replace(/(\d{4})(?=\d)/g, '$1 ') : '—');
+
+/** Los clientes solo ven transferencia si hay al menos una cuenta activa. */
+export const hasActiveDeposit = (accts: Pick<DepositAccount, 'is_active'>[]) => accts.some(a => a.is_active);
+
+/** Orden de ids tras mover `id` una posición (-1 arriba, +1 abajo). null si no se puede mover. */
+export function movedIds(ids: string[], id: string, dir: -1 | 1): string[] | null {
+  const i = ids.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ids.length) return null;
+  const next = [...ids];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** Espejo de admin_reorder_deposit_accounts (modo maqueta): listadas primero, las demás después. */
+export function applyOrder(accts: DepositAccount[], ids: string[]): DepositAccount[] {
+  const byId = new Map(accts.map(a => [a.id, a]));
+  const listed = ids.flatMap(id => (byId.has(id) ? [byId.get(id)!] : []));
+  const rest = accts.filter(a => !ids.includes(a.id));
+  return [...listed, ...rest].map((a, i) => ({ ...a, sort_order: i }));
+}

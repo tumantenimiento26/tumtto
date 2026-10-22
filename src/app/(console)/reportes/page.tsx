@@ -131,6 +131,7 @@ export default function ReportesPage() {
       const t = ticketBy.get(c.id);
       return {
         label: c.name,
+        catIcon: c.slug,
         value: c.services,
         meta: t ? `ticket medio ${mxn(Number(t.avg_ticket_cents))}` : undefined,
       };

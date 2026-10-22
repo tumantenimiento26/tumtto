@@ -86,3 +86,21 @@ export function parseZoneGeoJson(
     return { geometry: null, error: 'El polígono no tiene coordenadas.' };
   return { geometry: { type: g.type, coordinates: g.coordinates }, error: null };
 }
+
+export type ZoneShape = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown };
+
+/** Puntos dibujados → Polygon cerrado (≥ 3 puntos). */
+export function pointsToPolygon(points: LngLat[]): ZoneShape | null {
+  if (points.length < 3) return null;
+  return { type: 'Polygon', coordinates: [[...points, points[0]]] };
+}
+
+/** Polygon de un solo anillo → sus vértices (sin el punto de cierre) para seguir editándolo. */
+export function polygonToPoints(g: ZoneShape | null): LngLat[] {
+  if (g?.type !== 'Polygon') return [];
+  const rings = g.coordinates as LngLat[][];
+  if (rings.length !== 1) return [];
+  const ring = rings[0].map(([lng, lat]) => [lng, lat] as LngLat);
+  const [a, b] = [ring[0], ring[ring.length - 1]];
+  return a && b && a[0] === b[0] && a[1] === b[1] ? ring.slice(0, -1) : ring;
+}

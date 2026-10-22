@@ -2554,6 +2554,25 @@ export async function getMyMfaVerified(): Promise<boolean | null> {
     return null;
   }
 }
+/**
+ * ¿Hay que exigir 2 pasos? Sigue platform_settings.admin_require_aal2 (default
+ * false; lectura permitida a cualquier sesión). Si no se puede leer, se exige
+ * (lo seguro: el backend igual lo aplicaría).
+ */
+export async function fetchRequireAal2(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'admin_require_aal2')
+      .maybeSingle();
+    if (error) throw error;
+    return String(data?.value ?? false).toLowerCase() === 'true';
+  } catch (e) {
+    console.warn('[data] admin_require_aal2', e);
+    return true;
+  }
+}
 /** Id del usuario con sesión (para marcar "Tú" en Equipo). */
 export async function getSessionUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();

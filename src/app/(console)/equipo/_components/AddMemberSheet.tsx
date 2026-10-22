@@ -122,8 +122,7 @@ export function AddMemberSheet({
           </span>
           <p className="text-[14px] text-body">
             Comparte estos datos por un canal seguro. Al entrar por primera vez
-            tendrá que crear su propia contraseña y activar la verificación en
-            dos pasos. Esta contraseña no se volverá a mostrar.
+            tendrá que crear su propia contraseña. Esta contraseña no se volverá a mostrar.
           </p>
           <div className="w-full rounded-box border border-line bg-panel p-4">
             <p className="text-[12px] text-muted">Correo</p>

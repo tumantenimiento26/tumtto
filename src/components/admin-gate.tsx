@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { fetchRequireAal2 } from '@/lib/data/store';
 import { Spinner } from '@/components/ui';
 import { MOCK, SKIP_MFA } from '@/lib/mock';
 import { AsideConsole, AuthShell } from '@/components/auth-shell';
@@ -34,7 +35,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     if (!loading && !session) router.replace('/login');
   }, [loading, session, router]);
 
-  // Verificación en 2 pasos obligatoria: sin factor TOTP verificado o con la
+  // Verificación en 2 pasos solo si platform_settings.admin_require_aal2: sin factor TOTP verificado o con la
   // sesión todavía en aal1, el paso se termina en /login (?mfa=1), que
   // enrola o pide el código. Si la consulta falla no se deja un spinner
   // infinito: se manda al login a reintentar.
@@ -46,6 +47,10 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     let live = true;
     (async () => {
       try {
+        if (!(await fetchRequireAal2())) {
+          if (live) setMfaOk(true);
+          return;
+        }
         const [{ data: aal, error: e1 }, { data: factors, error: e2 }] = await Promise.all([
           supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
           supabase.auth.mfa.listFactors(),
@@ -119,14 +124,13 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
           lead: 'Crea tu contraseña personal para entrar a la consola.',
           bullets: [
             'La contraseña temporal deja de servir',
-            'Después activas la verificación en dos pasos',
           ],
           children: <AsideConsole />,
         }}
       >
         <ForcePasswordChange
           onDone={() => {
-            // El token ya se renovó: el efecto del 2FA retoma el flujo.
+            // El token ya se renovó: el efecto del 2FA (si aplica) retoma el flujo.
           }}
           onCancel={() => void signOut().then(() => router.replace('/login'))}
         />

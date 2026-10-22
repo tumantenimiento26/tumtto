@@ -74,8 +74,7 @@ export function ForcePasswordChange({
         Crea tu contraseña
       </h1>
       <p className="mt-1.5 text-[14.5px] text-muted">
-        Entraste con una contraseña temporal. Elige una propia para continuar;
-        después configurarás la verificación en dos pasos.
+        Entraste con una contraseña temporal. Elige una propia para continuar.
       </p>
       <form onSubmit={submit} noValidate className="mt-6 flex flex-col gap-4">
         <div>

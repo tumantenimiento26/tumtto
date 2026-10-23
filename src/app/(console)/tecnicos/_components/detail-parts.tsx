@@ -270,7 +270,15 @@ export function IneTile({ status }: { status: string | null }) {
   );
 }
 
-export function CheckRow({ label, ok }: { label: string; ok: boolean | null }) {
+export function CheckRow({
+  label,
+  ok,
+  score,
+}: {
+  label: string;
+  ok: boolean | null;
+  score?: number;
+}) {
   const Icon = ok === true ? CheckCircle2 : ok === false ? XCircle : CircleDashed;
   return (
     <div className="flex items-center justify-between border-t border-divider py-2.5 first:border-t-0">
@@ -282,6 +290,7 @@ export function CheckRow({ label, ok }: { label: string; ok: boolean | null }) {
       >
         <Icon size={15} />
         {ok === true ? 'Aprobada' : ok === false ? 'Rechazada' : 'Pendiente'}
+        {score != null && ` · ${Math.round(score)}%`}
       </span>
     </div>
   );

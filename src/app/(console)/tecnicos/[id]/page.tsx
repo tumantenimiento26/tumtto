@@ -68,6 +68,8 @@ import {
   ago,
   backgroundCheckOk,
   diditChecks,
+  diditSessionMeta,
+  diditWarnings,
   kycGroup,
   slaLabel,
   slaRemainingHours,
@@ -348,17 +350,22 @@ export default function TecnicoDetailPage() {
               {latest ? (
                 <>
                   {diditChecks(latest.raw_decision).map(c => (
-                    <CheckRow key={c.label} label={c.label} ok={c.ok} />
+                    <CheckRow key={c.label} label={c.label} ok={c.ok} score={c.score} />
                   ))}
                   <div className="my-2">
                     <OcrSummary data={latest.raw_decision} title="Datos de la INE" />
                   </div>
+                  {diditWarnings(latest.raw_decision).map((w, i) => (
+                    <div key={i} className="mb-1 font-sans text-[12px] text-warning-ink">
+                      ⚠ {w}
+                    </div>
+                  ))}
                   <KV label="Sesión" value={latest.didit_session_id.slice(0, 12)} mono />
                   <KV
                     label="Estado"
                     value={
-                      <Badge tone={latest.status === 'approved' ? 'success' : latest.status === 'declined' ? 'danger' : 'warning'}>
-                        {latest.status}
+                      <Badge tone={diditSessionMeta(latest.status).tone}>
+                        {diditSessionMeta(latest.status).label}
                       </Badge>
                     }
                   />

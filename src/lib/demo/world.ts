@@ -708,6 +708,7 @@ function build(): World {
     id: string,
     technician_id: string,
     status: KycSession['status'],
+    raw_decision: KycSession['raw_decision'] = null,
   ): KycSession => ({
     id,
     technician_id,
@@ -717,15 +718,35 @@ function build(): World {
     status,
     verification_url: 'https://verify.didit.me/session/demo',
     session_token: null,
-    raw_decision: null,
+    raw_decision,
     last_webhook_at: null,
     ...ts(),
   });
+  // Forma V3: decision.{id_verifications,liveness_checks,face_matches}[].
+  const v3 = (name: string, warn: string[] = []) => ({
+    simulated: true,
+    status: 'Approved',
+    decision: {
+      id_verifications: [
+        {
+          node_id: 'node_id_doc_1',
+          status: 'Approved',
+          document_type: 'INE',
+          document_number: 'IDMEX0123456789',
+          full_name: name,
+          issuing_state: 'MEX',
+          warnings: warn.map(message => ({ code: 'WARN', message })),
+        },
+      ],
+      liveness_checks: [{ node_id: 'node_liveness_1', status: 'Approved', score: 96, method: 'PASSIVE' }],
+      face_matches: [{ node_id: 'node_face_1', status: 'Approved', score: 93, warnings: [] }],
+    },
+  });
   const kycSessions: KycSession[] = [
-    kyc('kyc-carla', 'u-carla', 'in_review'),
-    kyc('kyc-miguel', 'u-miguel', 'in_review'),
+    kyc('kyc-carla', 'u-carla', 'in_review', v3('Carla Ruiz')),
+    kyc('kyc-miguel', 'u-miguel', 'in_review', v3('Miguel Soto', ['Documento con brillo parcial'])),
     kyc('kyc-fer', 'u-fer', 'in_review'),
-    kyc('kyc-ivan', 'u-ivan', 'in_progress'),
+    kyc('kyc-ivan', 'u-ivan', 'awaiting_user'),
     kyc('kyc-roberto', 'u-roberto', 'declined'),
   ];
 

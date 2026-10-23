@@ -63,6 +63,8 @@ import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
 import { useAuth } from '@/lib/auth';
 import {
+  CRIMINAL_RECORD_VALID_MONTHS,
+  DONE_STATUSES,
   KYC_GROUP_META,
   ORDER_STATUS,
   ago,
@@ -96,7 +98,6 @@ import { RatingsCard } from '../_components/RatingsCard';
 import { SettlementCard } from '../../liquidaciones/_components/SettlementCard';
 import { ratingSummary } from '@/lib/ratingModeration';
 
-const DONE = new Set(['completed', 'paid', 'closed']);
 const money = (c: number) =>
   (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -129,7 +130,7 @@ export default function TecnicoDetailPage() {
     if (!tech) return null;
     const cats = getCategories();
     const orders = getAllRequests().filter(o => o.technician_id === tech.id);
-    const done = orders.filter(o => DONE.has(o.status));
+    const done = orders.filter(o => DONE_STATUSES.has(o.status));
     const since30 = Date.now() - 30 * 864e5;
     const allPays = getAllPayments();
     const commissions = getTechnicianCommissions();
@@ -194,7 +195,7 @@ export default function TecnicoDetailPage() {
   const bgOk = backgroundCheckOk(data.docs);
   const approveTitle = bgOk
     ? undefined
-    : 'Primero aprueba la carta de antecedentes (vigente, menos de 3 meses).';
+    : `Primero aprueba la carta de antecedentes (vigente, menos de ${CRIMINAL_RECORD_VALID_MONTHS} meses).`;
 
   // Promedio mostrado: solo calificaciones visibles (el servidor hace lo mismo en technicians).
   const shown =
@@ -312,7 +313,7 @@ export default function TecnicoDetailPage() {
             </div>
             {!bgOk && !docsMissing && (
               <p className="mt-3 font-sans text-[12.5px] text-warning-ink">
-                Para aprobar al técnico la carta de antecedentes debe estar aprobada y vigente (3 meses).
+                Para aprobar al técnico la carta de antecedentes debe estar aprobada y vigente ({CRIMINAL_RECORD_VALID_MONTHS} meses).
               </p>
             )}
             {docsMissing ? (

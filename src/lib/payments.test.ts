@@ -20,6 +20,7 @@ import {
   filterCashReviews,
   groupByOrder,
   isFailedCharge,
+  isNoCharge,
   kpiWindow,
   orderGmv,
   parsePaymentSummary,
@@ -126,12 +127,15 @@ describe('acciones', () => {
     expect(awaitingBasePayment(ord(4004))).toBe(false);
   });
 
-  it('refundablePayments: lo cobrado con saldo, tarifa base primero', () => {
+  it('refundablePayments: lo cobrado con saldo por tarjeta; el efectivo no se reembolsa por la app', () => {
     const r = refundablePayments(pays(4001));
-    expect(r.map(p => p.kind)).toEqual(['base_fee', 'quote']);
+    expect(r.map(p => p.kind)).toEqual(['base_fee']);
     expect(refundablePayments(pays(4003))).toHaveLength(0);
     expect(paymentLabel(r[0])).toBe('Tarifa base · Tarjeta');
-    expect(paymentLabel(r[1])).toBe('Presupuesto · Efectivo');
+    expect(paymentLabel(pays(4001).find(p => p.kind === 'quote')!)).toBe('Presupuesto · Efectivo');
+    const cashOnly = pays(4001).filter(p => p.method === 'cash');
+    expect(cashOnly.length).toBeGreaterThan(0);
+    expect(refundablePayments(cashOnly)).toHaveLength(0);
   });
 
   it('un presupuesto «no cobrado» no cuenta como cobro rechazado', () => {
@@ -471,5 +475,19 @@ describe('pagos en persona: efectivo único (visita + cotización)', () => {
     expect(s?.base?.method).toBe('cash');
     expect(s?.quote.includesBaseCents).toBe(30000);
     expect(s?.quote.expectedCents).toBe(130000);
+  });
+});
+
+describe('isNoCharge', () => {
+  it('cancelada/expirada con la visita anulada y sin efectivo = sin cargo', () => {
+    expect(isNoCharge('cancelled', 'void', null)).toBe(true);
+    expect(isNoCharge('expired', 'void', 0)).toBe(true);
+    expect(isNoCharge('cancelled', 'cash_pending', null)).toBe(true);
+  });
+  it('no aplica si hubo cobro, efectivo recibido o la orden sigue viva', () => {
+    expect(isNoCharge('cancelled', 'paid', null)).toBe(false);
+    expect(isNoCharge('cancelled', 'void', 5000)).toBe(false);
+    expect(isNoCharge('working', 'cash_pending', null)).toBe(false);
+    expect(isNoCharge('paid', 'paid', 130000)).toBe(false);
   });
 });

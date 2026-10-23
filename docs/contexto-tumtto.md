@@ -374,7 +374,7 @@ selectores y mutadores puros; `useTick()` es el mecanismo de re-render.
   Está montado en el layout raíz (`AuthProvider`).
 - `src/components/admin-gate.tsx` sigue protegiendo la consola con
   `localStorage.getItem('tumtto-admin') === '1'`, y `src/app/login/page.tsx` valida
-  contra credenciales **hardcodeadas** (`admin@tumantenimiento.mx` / `tumtto2026`).
+  contra credenciales **hardcodeadas** (`<admin-email>` / `<password>`).
 
 Es decir: el proveedor de auth real existe pero **la consola todavía no lo usa**.
 
@@ -1109,7 +1109,7 @@ camino (Edge Function o invitación admin) que asigne el rol técnico en el alta
 **Datos de prueba**
 
 `localStorage.setItem('tumtto-admin','1')` · credenciales hardcodeadas
-`admin@tumantenimiento.mx` / `tumtto2026` de `src/app/login/page.tsx`.
+`<admin-email>` / `<password>` de `src/app/login/page.tsx`.
 
 **Pasos**
 

@@ -72,7 +72,7 @@
           
           <div style="display: flex; align-items: center; gap: 12px; color: #9CA3AF; font-size: 12px;"><span style="flex: 1; height: 1px; background: #EEF2F8;"></span>¿Eres técnico y no tienes cuenta?<span style="flex: 1; height: 1px; background: #EEF2F8;"></span></div>
           <a href="Web Registro Tecnico.dc.html" style="height: 50px; border-radius: 10px; border: 1px solid #D6DEE8; display: flex; align-items: center; justify-content: center; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; color: #0E2C56;" style-hover="background: #F5F8FC; color: #0E2C56;">Regístrate como técnico</a>
-          <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #9CA3AF; text-align: center;">Demo: <b style="color: #6B7280;">admin@tumantenimiento.mx</b> entra a la consola con verificación en 2 pasos; cualquier otro correo continúa en la app. <b style="color: #6B7280;">error@correo.com</b> muestra credenciales incorrectas.</p>
+          <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #9CA3AF; text-align: center;">Demo: <b style="color: #6B7280;"><admin-email></b> entra a la consola con verificación en 2 pasos; cualquier otro correo continúa en la app. <b style="color: #6B7280;">error@correo.com</b> muestra credenciales incorrectas.</p>
         </div>
       </sc-if>
 
@@ -163,7 +163,7 @@ class Component extends DCLogic {
     const hs = typeof location !== 'undefined' ? location.hash.slice(1) : '';
     const out = typeof location !== 'undefined' && /out=1/.test(location.search + location.hash);
     const map = { forgot: 'forgot', reset: 'reset', mfa: 'mfa', app: 'app' };
-    this.state = { wide: typeof window === 'undefined' || window.innerWidth >= 760, method: 'mail', phone: '', otp: '', otpLeft: 30, step: map[hs] || 'login', email: hs === 'mfa' ? 'admin@tumantenimiento.mx' : hs === 'app' ? 'maria.castillo@gmail.com' : '', pass: '', showPass: false, remember: true, errors: {}, tried: false, loading: false, authError: '', attempts: 0, lockUntil: 0, code: '', codeErr: '', np: '', np2: '', shake: 0, resent: false, out, now: Date.now() };
+    this.state = { wide: typeof window === 'undefined' || window.innerWidth >= 760, method: 'mail', phone: '', otp: '', otpLeft: 30, step: map[hs] || 'login', email: hs === 'mfa' ? '<admin-email>' : hs === 'app' ? 'maria.castillo@gmail.com' : '', pass: '', showPass: false, remember: true, errors: {}, tried: false, loading: false, authError: '', attempts: 0, lockUntil: 0, code: '', codeErr: '', np: '', np2: '', shake: 0, resent: false, out, now: Date.now() };
   }
   componentDidMount() { this._rs = () => this.setState({ wide: window.innerWidth >= 760 }); window.addEventListener('resize', this._rs); this._tk = setInterval(() => { const s = this.state; if (s.lockUntil) this.setState({ now: Date.now() }); if (s.step === 'otp' && s.otpLeft > 0) this.setState({ otpLeft: s.otpLeft - 1 }); }, 1000); }
   componentWillUnmount() { window.removeEventListener('resize', this._rs); clearInterval(this._tk); clearTimeout(this._t); }

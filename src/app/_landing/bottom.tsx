@@ -473,7 +473,7 @@ const FAQS: [string, string][] = [
   ],
   [
     '¿Qué necesito para registrarme como técnico?',
-    'INE vigente, carta de antecedentes no penales (con vigencia no mayor a 3 meses), CLABE para tus cobros y — según tu especialidad — certificación de oficio. El comprobante de domicilio es opcional. Creas tu cuenta aquí, subes tus documentos desde la app y nuestro equipo revisa tu perfil para activarlo.',
+    'INE vigente, carta de antecedentes no penales (con vigencia no mayor a 12 meses), CLABE para tus cobros y — según tu especialidad — certificación de oficio. El comprobante de domicilio es opcional. Creas tu cuenta aquí, subes tus documentos desde la app y nuestro equipo revisa tu perfil para activarlo.',
   ],
 ];
 

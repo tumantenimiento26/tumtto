@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CRIMINAL_RECORD_VALID_MONTHS,
   activeFilterCount,
+  completedJobs,
+  docValidity,
   diditChecks,
   diditSessionMeta,
   diditWarnings,
@@ -141,5 +144,32 @@ describe('Didit V3', () => {
     expect(diditSessionMeta('awaiting_user').label).toBe('Esperando al técnico');
     expect(diditSessionMeta('kyc_expired').tone).toBe('danger');
     expect(diditSessionMeta('zzz').label).toBe('zzz');
+  });
+});
+
+describe('vigencia de antecedentes', () => {
+  it('12 meses, igual que app.has_valid_criminal_record del backend', () => {
+    expect(CRIMINAL_RECORD_VALID_MONTHS).toBe(12);
+    const now = new Date('2026-10-23T12:00:00');
+    const doc = (issued_on: string) => ({ kind: 'criminal_record', issued_on });
+    expect(docValidity(doc('2026-02-01'), now)?.expired).toBe(false); // 8 meses
+    expect(docValidity(doc('2025-12-01'), now)?.expired).toBe(false); // 10 meses
+    expect(docValidity(doc('2025-09-01'), now)?.expired).toBe(true); // 13 meses
+  });
+});
+
+describe('completedJobs', () => {
+  it('cuenta completed / paid / closed del técnico (misma regla en la orden y en su ficha)', () => {
+    const orders = [
+      { technician_id: 't1', status: 'completed' },
+      { technician_id: 't1', status: 'paid' },
+      { technician_id: 't1', status: 'closed' },
+      { technician_id: 't1', status: 'cancelled' },
+      { technician_id: 't1', status: 'working' },
+      { technician_id: 't2', status: 'paid' },
+    ];
+    expect(completedJobs(orders, 't1')).toBe(3);
+    expect(completedJobs(orders, 't2')).toBe(1);
+    expect(completedJobs(orders, 'x')).toBe(0);
   });
 });

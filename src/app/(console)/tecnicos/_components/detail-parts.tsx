@@ -40,7 +40,7 @@ import {
   upsertTechRate,
   type TechDocument,
 } from '@/lib/data/store';
-import { DOC_LABEL, RATE_MAX, RATE_MIN, docValidity, extractedData, rateError } from '@/lib/techConsole';
+import { CRIMINAL_RECORD_VALID_MONTHS, DOC_LABEL, RATE_MAX, RATE_MIN, docValidity, extractedData, rateError } from '@/lib/techConsole';
 
 type Tech = NonNullable<ReturnType<typeof getTechnician>>;
 
@@ -124,7 +124,7 @@ const REVIEW_TONE = {
 
 /**
  * Tile de documento: previsualización (abre URL firmada), vigencia de los
- * antecedentes (3 meses) y, con permiso `kyc`, aprobar/rechazar por documento
+ * antecedentes (12 meses) y, con permiso `kyc`, aprobar/rechazar por documento
  * (technician_documents.review_*). Rechazar pide el motivo.
  */
 export function DocTile({ doc, canReview }: { doc: TechDocument; canReview: boolean }) {
@@ -302,7 +302,7 @@ export const REJECT_REASONS = [
   'Documentos ilegibles',
   'Información inconsistente',
   'Documento expirado',
-  'Antecedentes con más de 3 meses',
+  `Antecedentes con más de ${CRIMINAL_RECORD_VALID_MONTHS} meses`,
   'Otro',
 ];
 

@@ -28,6 +28,7 @@ import {
   buildPaymentSummary,
   canWaiveBase,
   cashDiff,
+  isNoCharge,
   reviewReason,
   type PayOrder,
   type PaymentSummary,
@@ -107,6 +108,7 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
   const baseCash = b?.method === 'cash';
   const online = onlinePaymentsEnabled();
   const baseInCash = q.includesBaseCents;
+  const noCharge = isNoCharge(order.status, b?.status, q.receivedCents);
   const qs = s.quoteState;
   const qStatus = QUOTE_STATUS[qs.status];
   const ruleBadge =
@@ -151,8 +153,19 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
               value={s.closedByQuoteRejection ? '—' : c.quoteCents > 0 ? money(c.quoteCents, true) : '—'}
             />
             <div className="my-0.5 border-t border-divider" />
-            <Line label="Total del servicio" value={money(c.totalCents, true)} strong />
+            <Line label="Total del servicio" value={noCharge ? 'Sin cargo' : money(c.totalCents, true)} strong />
           </dl>
+          {noCharge && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-btn bg-panel px-3 py-2 text-[12.5px] text-body">
+              <XCircle size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden />
+              <p>
+                <b className="font-semibold text-navy">
+                  Servicio {order.status === 'expired' ? 'expirado' : 'cancelado'}.
+                </b>{' '}
+                No se cobra nada: la visita queda sin cargo.
+              </p>
+            </div>
+          )}
           {s.closedByQuoteRejection && (
             <div className="mt-2.5 flex items-start gap-2 rounded-btn bg-warning-soft px-3 py-2 text-[12.5px] text-body">
               <XCircle size={15} className="mt-0.5 shrink-0 text-warning-ink" aria-hidden />
@@ -374,7 +387,9 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
           </dl>
         ) : qs.status === 'draft' || qs.status === 'sent' ? null : (
           <p className="text-[13px] text-muted">
-            {s.paymentModel === 'base_cash'
+            {noCharge
+              ? 'Servicio sin cobro: no hubo cotización ni efectivo.'
+              : s.paymentModel === 'base_cash'
               ? 'Sin cotización todavía. Se paga en efectivo al técnico al terminar.'
               : 'Sin pago registrado.'}
           </p>

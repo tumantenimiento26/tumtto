@@ -146,14 +146,42 @@ describe('snapshotCommission (espejo de app.snapshot_technician_commission)', ()
   });
 });
 
+describe('orderCollected: el efectivo único en persona', () => {
+  const quote = {
+    kind: 'quote' as const,
+    status: 'paid' as const,
+    amount_cents: 130000,
+    refunded_cents: 0,
+    cash_received_cents: 130000,
+    cash_status: 'client_confirmed',
+    base_included_cents: 30000,
+  };
+  it('la visita incluida se reporta como tarifa base y el resto como cotización', () => {
+    expect(orderCollected([quote])).toEqual({ baseCents: 30000, quoteCents: 100000 });
+  });
+  it('cotización rechazada: todo lo cobrado es tarifa base', () => {
+    expect(
+      orderCollected([{ ...quote, amount_cents: 30000, cash_received_cents: 30000 }]),
+    ).toEqual({ baseCents: 30000, quoteCents: 0 });
+  });
+  it('si se recibió menos que la visita, la base no excede lo cobrado', () => {
+    expect(orderCollected([{ ...quote, cash_received_cents: 20000 }])).toEqual({ baseCents: 20000, quoteCents: 0 });
+  });
+  it('sin base incluida todo es cotización (como antes)', () => {
+    expect(orderCollected([{ ...quote, base_included_cents: 0 }])).toEqual({ baseCents: 0, quoteCents: 130000 });
+  });
+});
+
 describe('revisión de efectivo en admin_owned', () => {
-  it('no hay comisión de plataforma que recalcular', () => {
+  it('la comisión de plataforma sigue lo recibido (informativa, ya no se pone en 0)', () => {
     const pay = pays(4024).find(p => p.kind === 'quote')!;
     for (const outcome of ['confirm_technician', 'adjust_amount', 'not_collected'] as const) {
       const r = applyCashResolution(ord(4024), pay, outcome, 'nota', 100000, AT);
-      expect(r.payment.commission_cents).toBe(0);
-      expect(r.payment.platform_fee_cents).toBe(0);
-      expect(r.order.commission_cents).toBe(0);
+      const expected =
+        outcome === 'confirm_technician' ? pay.commission_cents : outcome === 'adjust_amount' ? 15000 : 0;
+      expect(r.payment.commission_cents).toBe(expected);
+      expect(r.payment.platform_fee_cents).toBe(expected);
+      expect(r.order.commission_cents).toBe(expected);
     }
     // el modelo anterior sigue recalculando la comisión
     const legacy = applyCashResolution(ord(4006), pays(4006).find(p => p.kind === 'quote')!, 'adjust_amount', 'n', 200000, AT);

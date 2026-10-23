@@ -465,10 +465,26 @@ export const failedBaseRefunds = <T extends Pick<PayOrder, 'base_fee_status' | '
 export const awaitingBasePayment = (o: Pick<PayOrder, 'payment_model' | 'base_fee_status'>) =>
   o.payment_model === 'base_cash' && (o.base_fee_status === 'pending' || o.base_fee_status === 'failed');
 
-/** Pagos reembolsables de una orden (cobrados con saldo por devolver). */
+/**
+ * Orden cancelada/expirada sin cobro: la visita quedó en `void` (o nunca se cobró) y no hubo
+ * efectivo recibido. Se muestra como «Sin cargo», no como un total por cobrar.
+ */
+export const isNoCharge = (
+  orderStatus: string,
+  baseStatus: string | null | undefined,
+  receivedCents: number | null | undefined,
+) =>
+  (orderStatus === 'cancelled' || orderStatus === 'expired') &&
+  (baseStatus == null || ['void', 'not_required', 'cash_pending', 'pending', 'failed'].includes(baseStatus)) &&
+  !((receivedCents ?? 0) > 0);
+
+/**
+ * Pagos reembolsables de una orden (cobrados con saldo por devolver). El efectivo
+ * no se reembolsa por la app (no hay cargo en Stripe): lo resuelve la revisión de efectivo.
+ */
 export const refundablePayments = (payments: PayRow[]) =>
   payments
-    .filter(p => p.status === 'paid' && p.amount_cents - p.refunded_cents > 0)
+    .filter(p => p.status === 'paid' && p.method !== 'cash' && p.amount_cents - p.refunded_cents > 0)
     .sort((a, b) => Number(a.kind !== 'base_fee') - Number(b.kind !== 'base_fee'));
 
 /** «Tarifa base · Tarjeta», «Presupuesto · Efectivo»… */
@@ -517,12 +533,10 @@ export function applyCashResolution(
       : outcome === 'not_collected'
         ? 0
         : (pay.cash_received_cents ?? pay.amount_cents);
-  // admin_owned: el efectivo es de Tu Mantenimiento, no hay comisión de plataforma.
-  const commission = isAdminOwned(order)
-    ? 0
-    : outcome === 'confirm_technician'
-      ? pay.commission_cents
-      : commissionOf(received, order.commission_bps ?? 1500);
+  // Comisión de plataforma sobre lo recibido (visita + cotización). En admin_owned es
+  // informativa (sin deuda del técnico) pero ya no se pone en 0.
+  const commission =
+    outcome === 'confirm_technician' ? pay.commission_cents : commissionOf(received, order.commission_bps ?? 1500);
   const payment: PayRow = {
     ...pay,
     review_status: 'resolved',

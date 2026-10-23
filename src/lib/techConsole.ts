@@ -68,8 +68,18 @@ export function rateError(raw: string): string | null {
   return null;
 }
 
-/** Vigencia de la carta de antecedentes: 3 meses desde su expedición. */
-export const CRIMINAL_RECORD_VALID_MONTHS = 3;
+/** Estados que cuentan como trabajo realizado (misma regla en la ficha del técnico y en la orden). */
+export const DONE_STATUSES: ReadonlySet<string> = new Set(['completed', 'paid', 'closed']);
+
+/** Trabajos completados de un técnico a partir de sus órdenes. */
+export const completedJobs = (orders: { technician_id: string | null; status: string }[], techId: string) =>
+  orders.filter(o => o.technician_id === techId && DONE_STATUSES.has(o.status)).length;
+
+/**
+ * Vigencia de la carta de antecedentes: 12 meses desde su expedición. Debe coincidir con
+ * app.has_valid_criminal_record (backend), que decide quién puede tomar servicios.
+ */
+export const CRIMINAL_RECORD_VALID_MONTHS = 12;
 
 /** Vence/venció: solo aplica a antecedentes con fecha de expedición. */
 export function docValidity(

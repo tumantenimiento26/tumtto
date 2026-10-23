@@ -70,7 +70,9 @@ import {
   getRequest,
   getTickets,
   getTechByUser,
+  getAllRequests,
   getUnassignedAlertMinutes,
+  onlinePaymentsEnabled,
   listOrderEvidence,
   listQuoteAttachments,
   loadWorld,
@@ -86,6 +88,7 @@ import {
   type OrderMessage,
 } from '@/lib/data/store';
 import type { RequestStatus } from '@/lib/demo/world';
+import { completedJobs } from '@/lib/techConsole';
 import { orderCode } from '@/lib/orderCode';
 import { fmtDateTime } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
@@ -106,24 +109,10 @@ import type { ServiceTicket } from '@/lib/ticket';
 import type { QuoteAttachment } from '@/lib/quoteAttachments';
 import { ServiceFormSheet } from '../_components/ServiceFormSheet';
 import { PaymentBreakdown } from '../_components/PaymentBreakdown';
+import { STEPS, stepperProgress } from '@/lib/orderStepper';
 import { paymentLabel, refundablePayments, rejectedCloseIds, type PayRow } from '@/lib/payments';
 import { EmergencyDispatchCard } from '../_components/EmergencyDispatch';
 import { includedSurchargeCents, isEmergency, surchargeLabel } from '@/lib/emergency';
-
-// Stepper de 8 estados del handoff (closing cuenta como "En servicio";
-// closed como "Pagado"). Cancelado/expirado = nodo terminal rojo.
-const STEPS: { label: string; statuses: RequestStatus[] }[] = [
-  { label: 'Solicitado', statuses: ['requested'] },
-  { label: 'Aceptado', statuses: ['accepted'] },
-  { label: 'En camino', statuses: ['enroute'] },
-  { label: 'En sitio', statuses: ['onsite'] },
-  { label: 'Cotización', statuses: ['quote'] },
-  { label: 'En servicio', statuses: ['working', 'closing'] },
-  { label: 'Completado', statuses: ['completed'] },
-  { label: 'Pagado', statuses: ['paid', 'closed'] },
-];
-const stepIndex = (s: RequestStatus) =>
-  STEPS.findIndex(st => st.statuses.includes(s));
 
 // Estados que el admin puede forzar con transition_service_order. `completed`
 // y `paid` los fijan el flujo de cierre y el pago (close_service_order /
@@ -258,19 +247,8 @@ export default function ServicioDetailPage() {
   const notes = getNotes(req.id);
 
   const terminal = req.status === 'cancelled' || req.status === 'expired';
-  // Cierre por cotización rechazada: el servicio termina en el paso «Cotización».
   const rejectedClose = rejectedCloseIds([req], getOrderQuotes(req.id)).has(req.id);
-  const current = terminal
-    ? // Último paso alcanzado antes de cancelar/expirar.
-      Math.max(
-        0,
-        ...events
-          .map(e => stepIndex(e.from_status as RequestStatus))
-          .filter(i => i >= 0),
-      )
-    : rejectedClose
-      ? stepIndex('quote')
-      : stepIndex(req.status);
+  const { current, finished } = stepperProgress({ status: req.status, rejectedClose, events });
   const reachedAt = (step: number) => {
     const ev = events.find(e =>
       STEPS[step].statuses.includes(e.to_status as RequestStatus),
@@ -306,6 +284,8 @@ export default function ServicioDetailPage() {
   const refundOptions = refundablePayments(getOrderPayments(req.id));
   const refundable = refundOptions.length > 0;
   const refundedAny = getOrderPayments(req.id).some(p => p.status === 'refunded');
+  // En persona (flag apagado) todo es efectivo: no hay nada que reembolsar por la app.
+  const showRefund = onlinePaymentsEnabled() || refundable || refundedAny;
   const cancellable = !terminal && !['completed', 'paid', 'closed'].includes(req.status);
 
   const address = [req.address_line, req.neighborhood, req.municipality].filter(Boolean).join(', ');
@@ -461,7 +441,7 @@ export default function ServicioDetailPage() {
           {STEPS.map((st, i) => {
             const done =
               i < current ||
-              (!terminal && i === current && (rejectedClose || ['paid', 'closed'].includes(req.status)));
+              (!terminal && i === current && finished);
             const now = !terminal && i === current && !done;
             const lastReached = terminal && i === current;
             const t = i <= current ? reachedAt(i) : null;
@@ -769,7 +749,7 @@ export default function ServicioDetailPage() {
                   <div className="flex items-center gap-1 text-[12.5px] text-muted">
                     <Star size={12} className="text-warning" fill="currentColor" />
                     {techRec && techRec.rating_avg > 0 ? techRec.rating_avg.toFixed(1) : 'nuevo'}
-                    <span>· {techRec?.rating_count ?? 0} trabajos</span>
+                    <span>· {completedJobs(getAllRequests(), techProfile.id)} trabajos</span>
                   </div>
                 </div>
               </div>
@@ -854,6 +834,7 @@ export default function ServicioDetailPage() {
                 onChange={s => setForceTo(s)}
                 disabled={busy !== null || !canSupport}
               />
+              {showRefund && (
               <Button
                 variant="secondary"
                 icon={RotateCcw}
@@ -871,6 +852,7 @@ export default function ServicioDetailPage() {
               >
                 {!refundable && refundedAny ? 'Reembolso emitido' : 'Reembolsar'}
               </Button>
+              )}
               <Button
                 variant="destructive"
                 icon={Ban}

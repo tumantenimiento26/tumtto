@@ -58,7 +58,10 @@ export function computeTechnicianCommission(
 }
 
 /** Dinero cobrado al cliente en una orden (neto de reembolsos, sin comisión Stripe). */
-export function orderCollected(payments: Pick<Pay, 'kind' | 'status' | 'amount_cents' | 'refunded_cents' | 'cash_received_cents' | 'cash_status'>[]) {
+export function orderCollected(
+  payments: (Pick<Pay, 'kind' | 'status' | 'amount_cents' | 'refunded_cents' | 'cash_received_cents' | 'cash_status'> &
+    Partial<Pick<Pay, 'base_included_cents'>>)[],
+) {
   let base = 0;
   let quote = 0;
   for (const p of payments) {
@@ -69,8 +72,14 @@ export function orderCollected(payments: Pick<Pay, 'kind' | 'status' | 'amount_c
       ['pending', 'authorized', 'paid', 'refunded'].includes(p.status) &&
       p.cash_status != null &&
       p.cash_status !== 'pending_technician'
-    )
-      quote += Math.max((p.cash_received_cents ?? p.amount_cents) - p.refunded_cents, 0);
+    ) {
+      // Pago único en persona: la visita (base_included_cents) viaja en el efectivo
+      // y se reporta como tarifa base cobrada; el resto es cotización.
+      const collected = Math.max((p.cash_received_cents ?? p.amount_cents) - p.refunded_cents, 0);
+      const inBase = Math.min(p.base_included_cents ?? 0, collected);
+      base += inBase;
+      quote += collected - inBase;
+    }
   }
   return { baseCents: base, quoteCents: quote };
 }

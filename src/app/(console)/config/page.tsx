@@ -8,6 +8,7 @@ import {
   Wrench,
   Clock,
   ShieldCheck,
+  Scale,
   ShieldAlert,
   Siren,
   Moon,
@@ -37,6 +38,7 @@ import {
   ONLINE_PAYMENTS_KEY,
   onlinePaymentsEnabled,
   getSettingList,
+  getSettingStr,
   getEmergencyConfig,
   saveSettings,
 } from '@/lib/data/store';
@@ -63,7 +65,8 @@ type SectionId =
   | 'emergency'
   | 'security'
   | 'companies'
-  | 'tools';
+  | 'tools'
+  | 'legal';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'commission', label: 'Comisiones y precios', icon: Banknote },
@@ -74,6 +77,14 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
   { id: 'security', label: 'Seguridad', icon: ShieldCheck },
   { id: 'companies', label: 'Empresas de técnicos', icon: Building2 },
   { id: 'tools', label: 'Catálogo de herramientas', icon: Wrench },
+  { id: 'legal', label: 'Legal', icon: Scale },
+];
+
+// Versión = fecha de publicación del texto en el sitio (legal_*_version).
+const LEGAL_VERSIONS: [string, string, string][] = [
+  ['legal_terms_version', 'Términos y condiciones', 'Fecha de la versión publicada en /terminos.'],
+  ['legal_privacy_version', 'Aviso de privacidad', 'Fecha de la versión publicada en /aviso-de-privacidad.'],
+  ['legal_biometric_version', 'Consentimiento biométrico', 'Texto del consentimiento antes de Didit (técnicos).'],
 ];
 
 // Métodos que las apps muestran (platform_settings.enabled_payment_methods).
@@ -111,6 +122,9 @@ function readForm(): SettingsMap {
     [EMERGENCY_KEYS.surchargeMode]: em.surchargeMode,
     [EMERGENCY_KEYS.surchargeBps]: em.surchargeBps,
     [EMERGENCY_KEYS.surchargeFixedCents]: em.surchargeFixedCents,
+    ...Object.fromEntries(
+      LEGAL_VERSIONS.map(([key]) => [key, getSettingStr(key, '2026-10-26')]),
+    ),
   };
 }
 
@@ -133,6 +147,9 @@ const LABELS: Record<string, string> = {
   account_deletion_grace_days: 'Gracia para baja de cuenta',
   enabled_payment_methods: 'Métodos de pago',
   admin_require_aal2: 'Exigir 2 pasos en la API',
+  legal_terms_version: 'Versión de los términos',
+  legal_privacy_version: 'Versión del aviso de privacidad',
+  legal_biometric_version: 'Versión del consentimiento biométrico',
   unassigned_alert_minutes: 'Alerta de solicitud sin técnico',
 };
 
@@ -546,6 +563,29 @@ export default function ConfigPage() {
                   que todavía no haya configurado su autenticador (o que use la API fuera de la
                   consola con una sesión aal1) perderá acceso a los datos hasta completarlo.
                   Actívala solo cuando todo el equipo tenga MFA.
+                </p>
+              </div>
+            </Section>
+          )}
+
+          {active === 'legal' && (
+            <Section title="Versiones vigentes">
+              {LEGAL_VERSIONS.map(([key, label, desc]) => (
+                <Row key={key} label={label} desc={desc}>
+                  <Input
+                    type="date"
+                    value={String(form[key] ?? '')}
+                    onChange={e => set(key, e.target.value)}
+                    aria-label={label}
+                  />
+                </Row>
+              ))}
+              <div className="flex items-start gap-2.5 px-5 py-4 font-sans text-[12.5px] text-warning-ink">
+                <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+                <p>
+                  Cambia la fecha solo cuando publiques un texto nuevo en el sitio: cada usuario
+                  tendrá que aceptarlo de nuevo al abrir la app. Las aceptaciones quedan
+                  registradas (legal_acceptances) como evidencia.
                 </p>
               </div>
             </Section>

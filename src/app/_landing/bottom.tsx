@@ -677,10 +677,12 @@ export function Footer() {
             reservados.
           </span>
           <div className="ml-auto flex flex-wrap gap-[18px]">
-            {/* ponytail: /terminos aún no existe; el aviso de privacidad sí. */}
-            <span className="text-[12.5px] text-lp-muted">
+            <Link
+              href="/terminos"
+              className="text-[12.5px] text-lp-muted hover:text-white"
+            >
               Términos y condiciones
-            </span>
+            </Link>
             <Link
               href="/aviso-de-privacidad"
               className="text-[12.5px] text-lp-muted hover:text-white"

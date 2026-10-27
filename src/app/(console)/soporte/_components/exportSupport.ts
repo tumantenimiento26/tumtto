@@ -1,4 +1,4 @@
-// CSV del tab activo de Soporte (disputas, tickets, KYC pendiente, contacto).
+// CSV del tab activo de Soporte (disputas, tickets, KYC pendiente, contacto, reportes).
 import { exportCsv } from '@/components/admin';
 import {
   getAllDisputes,
@@ -12,8 +12,10 @@ import { CONTACT_STATUS_LABEL, CONTACT_TYPE_LABEL } from '@/lib/contactAdmin';
 import { orderCode } from '@/lib/orderCode';
 import { disputeCode } from '@/lib/supportFormat';
 import { fmtDateTime } from '@/lib/dates';
+import { REPORT_REASON_LABEL, useReports } from './ReportsView';
 
-const name = (id: string | null | undefined) => (id ? (getProfile(id)?.full_name ?? '') : '');
+const name = (id: string | null | undefined) =>
+  id ? (getProfile(id)?.full_name ?? '') : '';
 const when = (iso: string | null | undefined) =>
   iso ? fmtDateTime(iso, { dateStyle: 'short', timeStyle: 'short' }) : '';
 const STATUS: Record<string, string> = {
@@ -25,8 +27,24 @@ const STATUS: Record<string, string> = {
   closed: 'Cerrado',
 };
 
-export function exportSupportTab(tab: 'disputas' | 'tickets' | 'kyc' | 'contacto') {
+export function exportSupportTab(
+  tab: 'disputas' | 'tickets' | 'kyc' | 'contacto' | 'reportes',
+) {
   const day = new Date().toISOString().slice(0, 10);
+  if (tab === 'reportes')
+    return exportCsv(
+      `reportes-${day}.csv`,
+      useReports.getState().reports.map(r => ({
+        Motivo: REPORT_REASON_LABEL[r.reason] ?? r.reason,
+        'Reportado por': name(r.reporter_id),
+        Reportado: name(r.reported_user_id),
+        Servicio: r.service_order_id ? orderCode(r.service_order_id) : '',
+        Detalle: r.details ?? '',
+        Estado: r.status,
+        Nota: r.admin_note ?? '',
+        Creado: when(r.created_at),
+      })),
+    );
   if (tab === 'disputas')
     return exportCsv(
       `disputas-${day}.csv`,

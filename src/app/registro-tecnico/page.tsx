@@ -143,6 +143,8 @@ export default function RegistroTecnicoPage() {
           municipality: zona,
           years_experience: exp,
           ...(invite ? { invite_code: invite } : {}),
+          // Checkbox obligatorio: el backend lo guarda en legal_acceptances.
+          legal_accepted: terms,
         },
         // El correo de confirmación abre la app (App Link) o su respaldo web.
         emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -460,8 +462,16 @@ export default function RegistroTecnicoPage() {
                     label={
                       <span className="text-[13.5px] text-body">
                         Acepto los{' '}
-                        {/* ponytail: /terminos aún no existe. */}
-                        <b className="font-semibold text-navy">Términos</b> y el{' '}
+                        <Link
+                          href="/terminos"
+                          target="_blank"
+                          rel="noopener"
+                          onClick={e => e.stopPropagation()}
+                          className="font-semibold text-primary underline underline-offset-2"
+                        >
+                          Términos
+                        </Link>{' '}
+                        y el{' '}
                         <Link
                           href="/aviso-de-privacidad"
                           target="_blank"

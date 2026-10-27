@@ -543,6 +543,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"legal_acceptances": {
+                  Row: {
+                    "accepted_at": string,"document": string,"source": string,"user_id": string,"version": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accepted_at"?: string,"document": string,"source": string,"user_id": string,"version": string
+                  }
+                  Update: {
+                    "accepted_at"?: string,"document"?: string,"source"?: string,"user_id"?: string,"version"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"messages": {
                   Row: {
                     "body": string,"created_at": string,"id": string,"read_at": string | null,"sender_id": string,"service_order_id": string,"updated_at": string
@@ -1867,7 +1881,10 @@ isOneToOne: true
                 }
           }
           Functions: {
-            "accept_quote":
+            "accept_legal_documents":
+{ Args: { "p_documents": (string)[],"p_source"?: string }; Returns: undefined
+                           },
+"accept_quote":
 { Args: { "p_quote_id": string }; Returns: {
               "accepted_at": string | null,
 "address_line": string | null,
@@ -3980,6 +3997,9 @@ isOneToOne: true
 { Args: { "p_order_id": string }; Returns: {
               "color": string,"make": string,"model": string,"plate": string,"year": number
             }[]
+                           },
+"pending_legal_documents":
+{ Args: Record<PropertyKey, never>; Returns: (string)[]
                            },
 "prepare_payout_topup":
 { Args: { "p_request_id": string }; Returns: Json

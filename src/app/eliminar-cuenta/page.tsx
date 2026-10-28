@@ -29,8 +29,9 @@ export default function EliminarCuentaPage() {
       <Section n={2} title="Sin la app">
         <p>
           Escríbenos a <ContactEmail /> desde el correo de tu cuenta con el
-          asunto «Eliminar mi cuenta». Confirmaremos tu identidad y la
-          eliminaremos en un máximo de 5 días hábiles.
+          asunto «Eliminar mi cuenta». Confirmaremos tu identidad y
+          registraremos tu solicitud en un máximo de 5 días hábiles; desde ahí
+          aplican los mismos plazos que en la app.
         </p>
       </Section>
 
@@ -45,8 +46,9 @@ export default function EliminarCuentaPage() {
             ubicación, fotos, documentos y datos de verificación.
           </li>
           <li>
-            Conservamos, sin datos que te identifiquen, el registro de los
-            servicios y pagos que la ley fiscal nos obliga a guardar.
+            Conservamos bloqueados, durante 5 años, solo los registros de
+            servicios y pagos que la ley fiscal nos obliga a guardar, y después
+            los eliminamos.
           </li>
         </ul>
       </Section>

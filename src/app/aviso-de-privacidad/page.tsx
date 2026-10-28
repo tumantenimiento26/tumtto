@@ -108,6 +108,15 @@ export default function AvisoDePrivacidadPage() {
           sin tu consentimiento, salvo las exigidas por la ley o por autoridad
           competente.
         </p>
+        <p>
+          <strong>Transferencias internacionales:</strong> nuestros servidores y
+          base de datos (Supabase) están en Estados Unidos, y los servicios de
+          mapas (Mapbox) y de verificación de identidad (Didit) pueden procesar
+          datos fuera de México. Estos proveedores actúan como encargados, solo
+          por nuestra cuenta y con medidas de seguridad equivalentes a las que
+          exige la LFPDPPP. Al aceptar este aviso consientes estas
+          transferencias.
+        </p>
       </Section>
 
       <Section n={5} title="Derechos ARCO, revocación y eliminación de cuenta">
@@ -134,10 +143,11 @@ export default function AvisoDePrivacidadPage() {
       <Section n={6} title="Conservación">
         <p>
           Conservamos tus datos mientras tu cuenta esté activa. Al eliminarla,
-          la borramos o anonimizamos 30 días después de tu solicitud;
-          conservamos solo los registros de servicios y pagos que exijan las
-          obligaciones legales y fiscales aplicables{' '}
-          <Pending>plazo por confirmar</Pending>.
+          la borramos o anonimizamos 30 días después de tu solicitud. Los
+          registros de servicios y pagos que exigen las obligaciones fiscales y
+          mercantiles los conservamos bloqueados, sin usarlos para otro fin,
+          durante 5 años (Código Fiscal de la Federación, art. 30) y después los
+          eliminamos.
         </p>
       </Section>
 

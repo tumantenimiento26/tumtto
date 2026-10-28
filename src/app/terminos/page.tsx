@@ -90,12 +90,37 @@ export default function TerminosPage() {
           Los técnicos son prestadores independientes y responden por la calidad
           de su trabajo. Tumantenimiento verifica su identidad y documentos, da
           seguimiento a cada servicio y media en aclaraciones y disputas a
-          través de soporte <Pending>alcance de garantía por confirmar</Pending>
-          .
+          través de soporte.
         </p>
       </Section>
 
-      <Section n={6} title="Cancelación de la cuenta">
+      <Section n={6} title="Garantía de 30 días">
+        <ul className={ul}>
+          <li>
+            Los trabajos pagados a través de Tumantenimiento tienen una garantía
+            de mano de obra de 30 días naturales a partir de la fecha de pago.
+          </li>
+          <li>
+            Si en ese plazo vuelve a presentarse la misma falla en el trabajo
+            realizado, repórtala desde la app (Ajustes › Centro de ayuda) o a{' '}
+            <ContactEmail /> y coordinaremos una visita sin costo del mismo
+            técnico o de otro técnico verificado.
+          </li>
+          <li>
+            No cubre refacciones o materiales (aplica la garantía de su
+            fabricante), fallas distintas a las del trabajo realizado, daños por
+            mal uso, accidentes o intervención de terceros, ni trabajos pagados
+            fuera de la plataforma.
+          </li>
+          <li>
+            Si la falla no puede corregirse, revisaremos tu caso y podremos
+            reembolsar total o parcialmente la mano de obra. Esto no limita tus
+            derechos conforme a la Ley Federal de Protección al Consumidor.
+          </li>
+        </ul>
+      </Section>
+
+      <Section n={7} title="Cancelación de la cuenta">
         <p>
           Puedes eliminar tu cuenta en cualquier momento desde la app o como se
           explica en{' '}
@@ -109,12 +134,14 @@ export default function TerminosPage() {
         </p>
       </Section>
 
-      <Section n={7} title="Contacto y cambios">
+      <Section n={8} title="Contacto y cambios">
         <p>
           Dudas: <ContactEmail />. Podemos actualizar estos términos; la versión
           vigente estará siempre en esta página con su fecha de actualización.
-          Se rigen por las leyes de México{' '}
-          <Pending>jurisdicción por confirmar</Pending>.
+          Estos términos se rigen por las leyes federales de México. Para
+          cualquier controversia, las partes se someten a los tribunales
+          competentes de Guadalajara, Jalisco, sin perjuicio de tu derecho a
+          acudir a la Procuraduría Federal del Consumidor (PROFECO).
         </p>
       </Section>
     </LegalPage>

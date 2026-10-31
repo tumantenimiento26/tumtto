@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 // Borrador: el texto legal definitivo lo revisa y aprueba el responsable.
-const UPDATED = '26 de octubre de 2026';
+const UPDATED = '31 de octubre de 2026';
 
 export default function AvisoDePrivacidadPage() {
   return (
@@ -103,7 +103,9 @@ export default function AvisoDePrivacidadPage() {
           servicio (nombre, foto, dirección o ubicación y chat, solo lo
           necesario); nuestro proveedor de alojamiento y base de datos; el
           proveedor de verificación de identidad (Didit); el proveedor de mapas
-          (Mapbox); y el proveedor de envío de correo. Todos actúan bajo
+          (Mapbox); el servicio de notificaciones push (Firebase Cloud
+          Messaging de Google; en iPhone, el servicio de notificaciones de
+          Apple); y el proveedor de envío de correo. Todos actúan bajo
           obligaciones de confidencialidad. No realizamos otras transferencias
           sin tu consentimiento, salvo las exigidas por la ley o por autoridad
           competente.
@@ -111,8 +113,9 @@ export default function AvisoDePrivacidadPage() {
         <p>
           <strong>Transferencias internacionales:</strong> nuestros servidores y
           base de datos (Supabase) están en Estados Unidos, y los servicios de
-          mapas (Mapbox) y de verificación de identidad (Didit) pueden procesar
-          datos fuera de México. Estos proveedores actúan como encargados, solo
+          mapas (Mapbox), de verificación de identidad (Didit) y de
+          notificaciones push (Google y Apple) pueden procesar datos fuera de
+          México. Estos proveedores actúan como encargados, solo
           por nuestra cuenta y con medidas de seguridad equivalentes a las que
           exige la LFPDPPP. Al aceptar este aviso consientes estas
           transferencias.

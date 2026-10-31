@@ -75,6 +75,7 @@ import { formatPhone } from '@/lib/phone';
 import { loadContactMessages, useContact } from '@/lib/data/contactStore';
 import { newContactCount } from '@/lib/contactAdmin';
 import { ContactView } from './_components/ContactView';
+import { ReportsView, loadReports, useReports } from './_components/ReportsView';
 import { exportSupportTab } from './_components/exportSupport';
 import { ClientDocActions, ClientDocDetails } from '../clientes/_components/ClientDocCard';
 import { OcrSummary } from '../tecnicos/_components/detail-parts';
@@ -90,7 +91,7 @@ import {
   type Resolution,
 } from '@/lib/supportFormat';
 
-type TabKey = 'disputas' | 'tickets' | 'kyc' | 'contacto';
+type TabKey = 'disputas' | 'tickets' | 'kyc' | 'contacto' | 'reportes';
 
 const TICKET_STATUS: Record<TicketStatus, { label: string; tone: Tone }> = {
   open: { label: 'Abierto', tone: 'danger' },
@@ -128,8 +129,10 @@ export default function SoportePage() {
   const [tab, setTab] = useState<TabKey>('disputas');
   const [newTicketOpen, setNewTicketOpen] = useState(false);
   const contactNew = useContact(s => newContactCount(s.messages));
+  const reportsOpen = useReports(s => s.reports.filter(r => r.status === 'open').length);
   useEffect(() => {
     void loadContactMessages();
+    void loadReports();
     // ?tab=contacto (enlace del correo y de las notificaciones). Sin
     // useSearchParams para no exigir Suspense en esta página.
     if (new URLSearchParams(window.location.search).get('tab') === 'contacto')
@@ -185,6 +188,7 @@ export default function SoportePage() {
           { value: 'tickets', label: 'Tickets', count: openTickets.length },
           { value: 'kyc', label: 'Cola KYC', count: kycCount },
           { value: 'contacto', label: 'Contacto', count: contactNew },
+          { value: 'reportes', label: 'Reportes', count: reportsOpen },
         ]}
       />
 
@@ -195,6 +199,8 @@ export default function SoportePage() {
           <TicketsView />
         ) : tab === 'kyc' ? (
           <KycView />
+        ) : tab === 'reportes' ? (
+          <ReportsView />
         ) : (
           <ContactView />
         )}

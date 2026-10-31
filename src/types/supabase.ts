@@ -259,6 +259,62 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"content_reports": {
+                  Row: {
+                    "admin_note": string | null,"created_at": string,"details": string | null,"id": string,"message_id": string | null,"rating_id": string | null,"reason": string,"reported_user_id": string,"reporter_id": string,"resolved_at": string | null,"resolved_by": string | null,"service_order_id": string | null,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "admin_note"?: string | null,"created_at"?: string,"details"?: string | null,"id"?: string,"message_id"?: string | null,"rating_id"?: string | null,"reason": string,"reported_user_id": string,"reporter_id": string,"resolved_at"?: string | null,"resolved_by"?: string | null,"service_order_id"?: string | null,"status"?: string
+                  }
+                  Update: {
+                    "admin_note"?: string | null,"created_at"?: string,"details"?: string | null,"id"?: string,"message_id"?: string | null,"rating_id"?: string | null,"reason"?: string,"reported_user_id"?: string,"reporter_id"?: string,"resolved_at"?: string | null,"resolved_by"?: string | null,"service_order_id"?: string | null,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "content_reports_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: false
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_rating_id_fkey"
+      columns: ["rating_id"]
+isOneToOne: false
+      referencedRelation: "order_ratings"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_rating_id_fkey"
+      columns: ["rating_id"]
+isOneToOne: false
+      referencedRelation: "technician_public_reviews"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_reported_user_id_fkey"
+      columns: ["reported_user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_reporter_id_fkey"
+      columns: ["reporter_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_resolved_by_fkey"
+      columns: ["resolved_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "content_reports_service_order_id_fkey"
+      columns: ["service_order_id"]
+isOneToOne: false
+      referencedRelation: "service_orders"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"coverage_zones": {
                   Row: {
                     "created_at": string,"geom": unknown,"id": string,"is_active": boolean,"name": string,"slug": string,"updated_at": string
@@ -312,6 +368,20 @@ isOneToOne: false
       referencedRelation: "profiles"
       referencedColumns: ["id"]
     }
+                  ]
+                },"didit_webhook_events": {
+                  Row: {
+                    "created_at": string,"error": string | null,"event_type": string,"id": string,"payload": NonNullable<Json>,"processed_at": string | null,"session_id": string | null,"updated_at": string,"vendor_data": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"error"?: string | null,"event_type": string,"id": string,"payload"?: NonNullable<Json>,"processed_at"?: string | null,"session_id"?: string | null,"updated_at"?: string,"vendor_data"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"error"?: string | null,"event_type"?: string,"id"?: string,"payload"?: NonNullable<Json>,"processed_at"?: string | null,"session_id"?: string | null,"updated_at"?: string,"vendor_data"?: string | null
+                  }
+                  Relationships: [
+                    
                   ]
                 },"disputes": {
                   Row: {
@@ -472,6 +542,20 @@ isOneToOne: false
       referencedRelation: "technicians"
       referencedColumns: ["id"]
     }
+                  ]
+                },"legal_acceptances": {
+                  Row: {
+                    "accepted_at": string,"document": string,"source": string,"user_id": string,"version": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accepted_at"?: string,"document": string,"source": string,"user_id": string,"version": string
+                  }
+                  Update: {
+                    "accepted_at"?: string,"document"?: string,"source"?: string,"user_id"?: string,"version"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"messages": {
                   Row: {
@@ -1685,6 +1769,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"user_blocks": {
+                  Row: {
+                    "blocked_id": string,"blocker_id": string,"created_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "blocked_id": string,"blocker_id"?: string,"created_at"?: string
+                  }
+                  Update: {
+                    "blocked_id"?: string,"blocker_id"?: string,"created_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "user_blocks_blocked_id_fkey"
+      columns: ["blocked_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "user_blocks_blocker_id_fkey"
+      columns: ["blocker_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -1771,7 +1881,10 @@ isOneToOne: true
                 }
           }
           Functions: {
-            "accept_quote":
+            "accept_legal_documents":
+{ Args: { "p_documents": (string)[],"p_source"?: string }; Returns: undefined
+                           },
+"accept_quote":
 { Args: { "p_quote_id": string }; Returns: {
               "accepted_at": string | null,
 "address_line": string | null,
@@ -2141,6 +2254,7 @@ isOneToOne: true
 "admin_confirm_transfer_refund":
 { Args: { "p_order_id": string,"p_reference": string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -2407,6 +2521,7 @@ isOneToOne: true
 "admin_refund_order":
 { Args: { "p_amount_cents"?: number,"p_order_id": string,"p_payment_id"?: string,"p_reason"?: string,"p_stripe_refund_id"?: string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -2599,6 +2714,7 @@ isOneToOne: true
 "admin_resolve_cash_review":
 { Args: { "p_notes"?: string,"p_order_id": string,"p_outcome": string,"p_received_cents"?: number }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -3278,6 +3394,9 @@ isOneToOne: true
 "choose_base_fee_transfer":
 { Args: { "p_order_id": string }; Returns: Json
                            },
+"claim_didit_event":
+{ Args: { "p_event_id": string,"p_event_type": string,"p_payload"?: Json,"p_session_id"?: string,"p_vendor_data"?: string }; Returns: boolean
+                           },
 "claim_push_outbox":
 { Args: { "p_limit"?: number }; Returns: {
               "attempts": number,
@@ -3382,6 +3501,7 @@ isOneToOne: true
 "confirm_cash_payment":
 { Args: { "p_order_id": string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -3670,6 +3790,7 @@ isOneToOne: true
 "dispute_cash_payment":
 { Args: { "p_order_id": string,"p_paid_cents"?: number,"p_reason"?: string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -3804,6 +3925,9 @@ isOneToOne: true
 "list_service_tickets":
 { Args: { "p_order_id": string }; Returns: Json
                            },
+"mark_didit_event_processed":
+{ Args: { "p_error"?: string,"p_event_id": string }; Returns: undefined
+                           },
 "mark_messages_read":
 { Args: { "p_order_id": string }; Returns: number
                            },
@@ -3874,6 +3998,9 @@ isOneToOne: true
               "color": string,"make": string,"model": string,"plate": string,"year": number
             }[]
                            },
+"pending_legal_documents":
+{ Args: Record<PropertyKey, never>; Returns: (string)[]
+                           },
 "prepare_payout_topup":
 { Args: { "p_request_id": string }; Returns: Json
                            },
@@ -3883,6 +4010,7 @@ isOneToOne: true
 "record_base_fee_refund_failure":
 { Args: { "p_error"?: string,"p_payment_id": string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -4130,6 +4258,7 @@ isOneToOne: true
 "report_cash_collected":
 { Args: { "p_order_id": string }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,
@@ -4187,6 +4316,9 @@ isOneToOne: true
         isOneToOne: true
         isSetofReturn: false
       } },
+"report_content":
+{ Args: { "p_details"?: string,"p_message_id"?: string,"p_rating_id"?: string,"p_reason": string,"p_reported_user_id"?: string,"p_service_order_id"?: string }; Returns: string
+                           },
 "report_order_location":
 { Args: { "p_accuracy_m"?: number,"p_heading"?: number,"p_lat": number,"p_lng": number,"p_order_id": string,"p_speed_mps"?: number }; Returns: {
               "accuracy_m": number | null,
@@ -4455,6 +4587,7 @@ isOneToOne: true
 "technician_confirm_cash":
 { Args: { "p_order_id": string,"p_received_cents"?: number }; Returns: {
               "amount_cents": number,
+"base_included_cents": number,
 "cash_confirmed_at": string | null,
 "cash_confirmed_by": string | null,
 "cash_debt_recovered_cents": number,

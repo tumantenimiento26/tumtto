@@ -4,7 +4,7 @@
 
 export const APP_SCHEME = 'tumtto';
 export const ANDROID_PACKAGE =
-  process.env.NEXT_PUBLIC_ANDROID_PACKAGE || 'com.tumttomobile';
+  process.env.NEXT_PUBLIC_ANDROID_PACKAGE || 'mx.tumtto.app';
 /** Vacíos hasta publicar en las tiendas. */
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL || '';
 export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || '';

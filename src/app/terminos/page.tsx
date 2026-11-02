@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 // Borrador: el texto legal definitivo lo revisa y aprueba el responsable.
-const UPDATED = '26 de octubre de 2026';
+const UPDATED = '31 de octubre de 2026';
 
 export default function TerminosPage() {
   return (
@@ -41,6 +41,11 @@ export default function TerminosPage() {
           responsable de lo que ocurra con tu cuenta. Los técnicos deben
           completar la verificación de identidad y documentos antes de recibir
           servicios.
+        </p>
+        <p>
+          La app puede enviarte notificaciones sobre tus servicios. Puedes
+          desactivarlas en la configuración de la app o de tu teléfono, aunque
+          podrías dejar de recibir avisos importantes.
         </p>
       </Section>
 

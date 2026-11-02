@@ -14,7 +14,7 @@ test('el fragmento viaja como query', () => {
 test('intent:// con paquete y respaldo codificado', () => {
   expect(schemeUrl('invitacion/ABC')).toBe('tumtto://invitacion/ABC');
   expect(intentUrl('invitacion/ABC', 'https://tumtto.mx/x?a=1')).toBe(
-    'intent://invitacion/ABC#Intent;scheme=tumtto;package=com.tumttomobile;' +
+    'intent://invitacion/ABC#Intent;scheme=tumtto;package=mx.tumtto.app;' +
       'S.browser_fallback_url=https%3A%2F%2Ftumtto.mx%2Fx%3Fa%3D1;end',
   );
 });

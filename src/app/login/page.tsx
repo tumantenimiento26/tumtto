@@ -25,6 +25,7 @@ import { MOCK, SKIP_MFA } from '@/lib/mock';
 import { APP_STORE_URL, PLAY_STORE_URL, schemeUrl } from '@/lib/appLinks';
 import {
   EMAIL_RE,
+  authMessage,
   failureMessage,
   firstName,
   lockSecondsLeft,
@@ -45,20 +46,6 @@ type Step =
   | 'forgot'
   | 'sent'
   | 'redirect';
-
-/** Traduce el error de Supabase Auth; el genérico sólo cubre lo que no reconocemos. */
-function authMessage(raw: string): string {
-  const m = raw.toLowerCase();
-  if (m.includes('invalid login credentials'))
-    return 'Correo o contraseña incorrectos.';
-  if (m.includes('email not confirmed'))
-    return 'Tu correo aún no está confirmado. Revisa tu bandeja.';
-  if (m.includes('too many requests') || m.includes('rate limit'))
-    return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
-  if (m.includes('fetch') || m.includes('network'))
-    return 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.';
-  return 'No pudimos iniciar sesión. Inténtalo de nuevo.';
-}
 
 const ASIDE = {
   kicker: 'Consola de operación · ZMG',

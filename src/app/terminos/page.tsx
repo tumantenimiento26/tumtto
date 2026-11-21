@@ -133,7 +133,7 @@ export default function TerminosPage() {
             href="/eliminar-cuenta"
             className="font-semibold text-[var(--lp-link)] hover:text-white"
           >
-            tumtto.mx/eliminar-cuenta
+            tumtto.com/eliminar-cuenta
           </a>
           . Podemos suspender cuentas que incumplan estos términos.
         </p>

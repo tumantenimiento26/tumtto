@@ -137,7 +137,7 @@ export default function AvisoDePrivacidadPage() {
             href="/eliminar-cuenta"
             className="font-semibold text-[var(--lp-link)] hover:text-white"
           >
-            tumtto.mx/eliminar-cuenta
+            tumtto.com/eliminar-cuenta
           </a>
           .
         </p>

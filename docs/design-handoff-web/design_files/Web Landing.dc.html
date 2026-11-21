@@ -111,15 +111,15 @@
       <svg width="32" height="32" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg>
       <span style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 17px; letter-spacing: -0.2px; color: {{ navFg }}; transition: color .3s;">Tumantenimiento</span>
     </a>
-    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+    <sc-if value="{{ navWide }}" hint-placeholder-val="{{ true }}">
       <nav style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
-        <sc-for list="{{ links }}" as="l" hint-placeholder-count="6"><button onClick="{{ l.go }}" style="position: relative; height: 36px; padding: 0 12px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 500; color: {{ l.c }}; transition: color .2s, background .2s;" style-hover="background: {{ navHov }};">{{ l.t }}<span style="position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px; border-radius: 2px; background: #18C1FF; transform: scaleX({{ l.sx }}); transform-origin: left; transition: transform .35s cubic-bezier(.2,.8,.2,1);"></span></button></sc-for>
+        <sc-for list="{{ links }}" as="l" hint-placeholder-count="6"><button onClick="{{ l.go }}" style="position: relative; height: 36px; padding: 0 9px; white-space: nowrap; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 500; color: {{ l.c }}; transition: color .2s, background .2s;" style-hover="background: {{ navHov }};">{{ l.t }}<span style="position: absolute; left: 9px; right: 9px; bottom: 4px; height: 2px; border-radius: 2px; background: #18C1FF; transform: scaleX({{ l.sx }}); transform-origin: left; transition: transform .35s cubic-bezier(.2,.8,.2,1);"></span></button></sc-for>
       </nav>
     </sc-if>
     <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
-      <a href="Web Login.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 10px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; color: {{ navFg }};" style-hover="color: #18C1FF;">Iniciar sesión</a>
-      <a href="Web Registro Tecnico.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; box-sizing: border-box; border-radius: 10px; border: 1px solid {{ navBtnBd }}; color: {{ navFg }}; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; transition: background .2s, color .3s, border-color .3s;" style-hover="background: {{ navHov }}; color: {{ navFg }};">Soy técnico</a>
-      <button onClick="{{ ctaNav }}" style="position: relative; overflow: hidden; height: 40px; padding: 0 16px; border: none; border-radius: 10px; background: #0A6BCF; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: background .15s;" style-hover="background: #095FB8;">{{ ctaLabel }}<span style="position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: shine 3.5s ease-in-out 1.5s infinite;"></span></button>
+      <a href="Web Login.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 10px; white-space: nowrap; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; color: {{ navFg }};" style-hover="color: #18C1FF;">Iniciar sesión</a>
+      <a href="Web Registro Tecnico.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; white-space: nowrap; box-sizing: border-box; border-radius: 10px; border: 1px solid {{ navBtnBd }}; color: {{ navFg }}; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; transition: background .2s, color .3s, border-color .3s;" style-hover="background: {{ navHov }}; color: {{ navFg }};">Soy técnico</a>
+      <button onClick="{{ ctaNav }}" style="position: relative; overflow: hidden; height: 40px; padding: 0 16px; white-space: nowrap; border: none; border-radius: 10px; background: #0A6BCF; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: background .15s;" style-hover="background: #095FB8;">{{ ctaLabel }}<span style="position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: shine 3.5s ease-in-out 1.5s infinite;"></span></button>
     </div>
   </div>
 </header>
@@ -453,6 +453,107 @@
   </div>
 </section>
 
+<section id="planes" data-screen-label="Planes" style="position: relative;">
+  <div style="max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-top: 112px; padding-bottom: 112px;">
+    <div style="display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: flex-end; margin-bottom: 36px;">
+      <div style="flex: 1 1 460px; min-width: 0;">
+        <h2 data-reveal="0" style="margin: 0 0 14px; font-family: Manrope, sans-serif; font-weight: 800; font-size: clamp(32px, 4vw, 46px); line-height: 1.06; letter-spacing: -1.2px; color: #E8EEF7; text-wrap: balance; transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1);">Mantenimiento resuelto todo el año</h2>
+        <p data-reveal="0.05" style="margin: 0; max-width: 560px; font-size: 17px; line-height: 1.65; color: #9FB0C8; text-wrap: pretty; transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1);">Un plan cubre tus visitas, baja el costo de cada reparación y agenda las revisiones por ti. Sigues pagando solo el trabajo que apruebas.</p>
+      </div>
+      <div data-reveal="0.1" style="display: flex; flex-wrap: wrap; gap: 10px; transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1);">
+        <div role="group" aria-label="Tipo de cliente" style="display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: #0A1830; border: 1px solid rgba(90,176,255,0.12);"><sc-for list="{{ audOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.go }}" aria-pressed="{{ o.on }}" style="height: 38px; padding: 0 16px; border: none; border-radius: 8px; background: {{ o.bg }}; color: {{ o.fg }}; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s;">{{ o.l }}</button></sc-for></div>
+        <div role="group" aria-label="Frecuencia de pago" style="display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: #0A1830; border: 1px solid rgba(90,176,255,0.12);"><sc-for list="{{ billOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.go }}" aria-pressed="{{ o.on }}" style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border: none; border-radius: 8px; background: {{ o.bg }}; color: {{ o.fg }}; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s;">{{ o.l }}<sc-if value="{{ o.hasTag }}" hint-placeholder-val="{{ false }}"><span style="padding: 2px 8px; border-radius: 999px; background: {{ o.tagBg }}; color: {{ o.tagFg }}; font-size: 11.5px; font-weight: 700;">2 meses gratis</span></sc-if></button></sc-for></div>
+      </div>
+    </div>
+
+    <div data-reveal="0.1" style="transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1);">
+      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+        <div id="plan-matrix" style="position: relative; overflow: hidden; border-radius: 16px; background: rgba(13,33,63,0.72); border: 1px solid rgba(90,176,255,0.14); backdrop-filter: blur(10px);">
+          <div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: {{ pm.hlLeft }}; width: 24.6667%; background: linear-gradient(160deg, #0A3A78, #0B2A55 60%, #081C38); box-shadow: inset 1px 0 0 rgba(24,193,255,0.32), inset -1px 0 0 rgba(24,193,255,0.32); transition: left .5s cubic-bezier(.2,.8,.2,1);"></div>
+          <div style="position: relative; display: grid; grid-template-columns: 26% repeat(3, 1fr);">
+            <div style="padding: 30px 24px 26px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;">
+              <p style="margin: 0; font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px; color: #E8EEF7;">Qué incluye cada plan</p>
+              <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #9FB0C8;">Precios en pesos mexicanos. Cambia de plan o cancela desde la app.</p>
+            </div>
+            <sc-for list="{{ pm.cols }}" as="c" hint-placeholder-count="3">
+              <div style="padding: 22px 22px 26px; display: flex; flex-direction: column;">
+                <div style="height: 26px; margin-bottom: 10px;"><sc-if value="{{ c.hasPill }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(24,193,255,0.14); color: #18C1FF; font-size: 12px; font-weight: 700; animation: pop .3s cubic-bezier(.2,.8,.2,1) both;"><svg width="12" height="12" aria-hidden="true"><use href="#{{ c.pillIcon }}"></use></svg>{{ c.pill }}</span></sc-if></div>
+                <h3 style="margin: 0; font-family: Manrope, sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -.3px; color: #fff;">{{ c.name }}</h3>
+                <p style="margin: 4px 0 18px; min-height: 40px; font-size: 13.5px; line-height: 1.5; color: {{ c.mut }}; transition: color .4s;">{{ c.who }}</p>
+                <div style="display: flex; align-items: baseline; gap: 6px; font-family: Manrope, sans-serif; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;"><span style="font-size: {{ c.priceSize }}; letter-spacing: -1px; line-height: 1.1;">{{ c.price }}</span><span style="font-size: 14px; font-weight: 700; color: {{ c.mut }};">{{ c.per }}</span></div>
+                <p style="margin: 6px 0 18px; min-height: 36px; font-size: 12.5px; line-height: 1.45; color: {{ c.mut }}; transition: color .4s;">{{ c.note }}</p>
+                <button onClick="{{ c.go }}" style="margin-top: auto; height: 46px; border-radius: 10px; border: 1px solid {{ c.ctaBd }}; background: {{ c.ctaBg }}; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14.5px; cursor: pointer; transition: background .2s, border-color .2s, transform .15s;" style-hover="background: {{ c.ctaHov }};" style-active="transform: scale(.985);">{{ c.cta }}</button>
+              </div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ pm.rows }}" as="r" hint-placeholder-count="5">
+            <div style="position: relative; display: grid; grid-template-columns: 26% repeat(3, 1fr); border-top: 1px solid rgba(90,176,255,0.10);">
+              <div style="padding: 18px 24px; display: flex; align-items: flex-start; gap: 12px;">
+                <span style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.06); color: #18C1FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="17" height="17" aria-hidden="true"><use href="#{{ r.icon }}"></use></svg></span>
+                <div><p style="margin: 0; font-size: 14.5px; font-weight: 600; color: #E8EEF7;">{{ r.label }}</p><p style="margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: #8FA0B8;">{{ r.help }}</p></div>
+              </div>
+              <sc-for list="{{ r.cells }}" as="x" hint-placeholder-count="3">
+                <div style="padding: 18px 22px;"><p style="margin: 0; font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px; color: {{ x.fg }}; font-variant-numeric: tabular-nums;">{{ x.main }}</p><p style="margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: {{ x.mut }}; transition: color .4s;">{{ x.sub }}</p></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <sc-for list="{{ pm.cards }}" as="c" hint-placeholder-count="3">
+            <div style="border-radius: 16px; background: {{ c.bg }}; border: 1px solid {{ c.bd }}; padding: 22px 20px; transition: border-color .3s;">
+              <sc-if value="{{ c.hasPill }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; margin-bottom: 12px; border-radius: 999px; background: rgba(24,193,255,0.14); color: #18C1FF; font-size: 12px; font-weight: 700;"><svg width="12" height="12" aria-hidden="true"><use href="#{{ c.pillIcon }}"></use></svg>{{ c.pill }}</span></sc-if>
+              <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div style="min-width: 0;"><h3 style="margin: 0; font-family: Manrope, sans-serif; font-weight: 800; font-size: 20px; color: #fff;">{{ c.name }}</h3><p style="margin: 3px 0 0; font-size: 13.5px; line-height: 1.5; color: {{ c.mut }};">{{ c.who }}</p></div>
+                <div style="display: flex; align-items: baseline; gap: 5px; font-family: Manrope, sans-serif; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;"><span style="font-size: 30px; letter-spacing: -.8px;">{{ c.price }}</span><span style="font-size: 13.5px; color: {{ c.mut }};">{{ c.per }}</span></div>
+              </div>
+              <p style="margin: 6px 0 14px; font-size: 12.5px; color: {{ c.mut }};">{{ c.note }}</p>
+              <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="5">
+                <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(90,176,255,0.12);">
+                  <span style="width: 32px; height: 32px; border-radius: 9px; background: rgba(255,255,255,0.06); color: #18C1FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="15" height="15" aria-hidden="true"><use href="#{{ r.icon }}"></use></svg></span>
+                  <div style="flex: 1; min-width: 0;"><p style="margin: 0; font-size: 12.5px; color: {{ c.mut }};">{{ r.label }}</p><p style="margin: 1px 0 0; font-size: 15px; font-weight: 600; color: {{ r.fg }};">{{ r.main }} <span style="font-weight: 400; font-size: 13.5px; color: {{ c.mut }};">{{ r.sub }}</span></p></div>
+                </div>
+              </sc-for>
+              <button onClick="{{ c.go }}" style="width: 100%; margin-top: 8px; height: 50px; border-radius: 10px; border: 1px solid {{ c.ctaBd }}; background: {{ c.ctaBg }}; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;" style-hover="background: {{ c.ctaHov }};">{{ c.cta }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ isHogar }}" hint-placeholder-val="{{ true }}">
+      <div id="plan-calc" style="margin-top: 16px; border-radius: 16px; background: rgba(13,33,63,0.72); border: 1px solid rgba(90,176,255,0.14); backdrop-filter: blur(10px); padding: clamp(20px, 3vw, 28px); display: flex; flex-wrap: wrap; gap: 24px 40px; align-items: center;">
+        <div style="flex: 1 1 360px; min-width: 0;">
+          <h3 style="margin: 0 0 4px; font-family: Manrope, sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -.3px; color: #E8EEF7;">¿Te conviene un plan?</h3>
+          <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.55; color: #9FB0C8;">Mueve el control y te decimos cuál, o si te sale mejor pagar por servicio.</p>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px;"><label for="plan-use" style="font-size: 14px; font-weight: 600; color: #E8EEF7;">Veces que llamas a un técnico al año</label><span style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 22px; color: #fff; font-variant-numeric: tabular-nums;">{{ pc.n }}</span></div>
+          <input id="plan-use" type="range" min="1" max="14" value="{{ pc.n }}" onChange="{{ setUse }}" style="width: 100%; accent-color: #5AB0FF; margin: 0 0 16px; cursor: pointer;">
+          <button onClick="{{ toggleEmg }}" role="switch" aria-checked="{{ pc.emg }}" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #1D3557; border-radius: 12px; background: rgba(255,255,255,0.03); cursor: pointer; text-align: left;" style-hover="background: rgba(255,255,255,0.06);"><span style="flex: 1;"><span style="display: block; font-size: 14px; font-weight: 600; color: #E8EEF7;">Contar una emergencia al año</span><span style="display: block; font-size: 12.5px; color: #9FB0C8;">Sin plan lleva recargo de 30%</span></span><span style="position: relative; width: 46px; height: 28px; border-radius: 999px; background: {{ pc.emgBg }}; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ pc.emgX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></span></button>
+        </div>
+        <div aria-live="polite" style="flex: 1 1 400px; min-width: 0; padding: 22px; border-radius: 12px; background: #0B1D38;">
+          <p style="margin: 0 0 16px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 17px; line-height: 1.35; color: #E8EEF7; text-wrap: balance;">{{ pc.verdict }}</p>
+          <sc-for list="{{ pc.bars }}" as="b" hint-placeholder-count="2">
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-size: 13px; color: #B8C4D6;"><span>{{ b.l }}</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: {{ b.fg }};">{{ b.v }}</span></div>
+              <div style="height: 8px; border-radius: 999px; background: #1D3557; overflow: hidden;"><div style="height: 100%; width: {{ b.w }}; border-radius: 999px; background: {{ b.c }}; transition: width .5s cubic-bezier(.2,.8,.2,1);"></div></div>
+            </div>
+          </sc-for>
+          <p style="margin: 14px 0 0; font-size: 14.5px; font-weight: 600; color: {{ pc.saveFg }};">{{ pc.save }}</p>
+          <p style="margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: #8FA0B8;">{{ pc.foot }}</p>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isBiz }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top: 16px; border-radius: 16px; background: rgba(13,33,63,0.72); border: 1px solid rgba(90,176,255,0.14); backdrop-filter: blur(10px); padding: clamp(20px, 3vw, 28px); display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center;">
+        <div style="flex: 1 1 420px; min-width: 0;"><h3 style="margin: 0 0 4px; font-family: Manrope, sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -.3px; color: #E8EEF7;">¿Condominio, cadena o más de tres sucursales?</h3><p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #9FB0C8;">Armamos el plan con las visitas, revisiones y tiempos de respuesta que tu operación necesita, con un solo contacto para todas tus ubicaciones.</p></div>
+        <button style="display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 22px; border: none; border-radius: 10px; background: #0A6BCF; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; transition: background .15s, transform .15s;" style-hover="background: #095FB8; transform: translateY(-2px);"><svg width="17" height="17" aria-hidden="true"><use href="#i-msg"></use></svg>Hablar con ventas</button>
+      </div>
+    </sc-if>
+    <p style="margin: 18px 0 0; max-width: 820px; font-size: 13px; line-height: 1.6; color: #8FA0B8;">Los planes aplican en la Zona Metropolitana de Guadalajara. Paga con tarjeta y se renueva solo, o por transferencia o efectivo: en ese caso tu plan se activa cuando confirmamos tu pago.</p>
+  </div>
+</section>
+
 <section id="unete" data-screen-label="Para técnicos">
   <div style="max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-top: 112px; padding-bottom: 112px;">
     <div data-reveal="0" style="position: relative; overflow: hidden; border-radius: 20px; background: linear-gradient(150deg, #0B2F63, #081C3A 55%, #061429); border: 1px solid rgba(24,193,255,0.22); color: #fff; transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1);">
@@ -510,7 +611,7 @@
   <div style="max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-top: 64px;">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px 40px; padding-bottom: 48px;">
       <div><div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><svg width="32" height="32" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg><span style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 17px;">Tumantenimiento</span></div><p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #8FA0B8; max-width: 280px;">Servicios de mantenimiento a domicilio con técnicos verificados en la Zona Metropolitana de Guadalajara.</p></div>
-      <div><p style="margin: 0 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #6F819B;">Servicios</p><div style="display: flex; flex-direction: column; gap: 10px;"><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Plomería</a><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Electricidad</a><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Gas</a><a onClick="{{ goPrecios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Precios</a></div></div>
+      <div><p style="margin: 0 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #6F819B;">Servicios</p><div style="display: flex; flex-direction: column; gap: 10px;"><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Plomería</a><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Electricidad</a><a onClick="{{ goServicios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Gas</a><a onClick="{{ goPrecios }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Precios</a><a onClick="{{ goPlanes }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Planes</a></div></div>
       <div><p style="margin: 0 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #6F819B;">Plataforma</p><div style="display: flex; flex-direction: column; gap: 10px;"><a onClick="{{ goComo }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Cómo funciona</a><a onClick="{{ goTecnicos }}" style="font-size: 14px; color: #B8C4D6; cursor: pointer;" style-hover="color: #fff;">Técnicos verificados</a><a href="Web Registro Tecnico.dc.html" style="font-size: 14px; color: #B8C4D6;" style-hover="color: #fff;">Únete como técnico</a><a href="Web Login.dc.html" style="font-size: 14px; color: #B8C4D6;" style-hover="color: #fff;">Acceso admin</a></div></div>
       <div><p style="margin: 0 0 14px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #6F819B;">Contacto</p><div style="display: flex; flex-direction: column; gap: 10px;"><a href="mailto:soporte@tumantenimiento.mx" style="font-size: 14px; color: #B8C4D6;" style-hover="color: #fff;">soporte@tumantenimiento.mx</a><span style="font-size: 14px; color: #B8C4D6;">+52 33 0000 0000</span><span style="font-size: 14px; color: #B8C4D6;">Guadalajara, Jalisco, México</span></div></div>
     </div>
@@ -520,8 +621,21 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;ctaPrincipal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;app&quot;,&quot;solicitar&quot;],&quot;default&quot;:&quot;app&quot;,&quot;tsType&quot;:&quot;'app' | 'solicitar'&quot;,&quot;section&quot;:&quot;Hero&quot;},&quot;movimiento&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;completo&quot;,&quot;reducido&quot;],&quot;default&quot;:&quot;completo&quot;,&quot;tsType&quot;:&quot;'completo' | 'reducido'&quot;,&quot;section&quot;:&quot;Efectos&quot;},&quot;mapaOscuro&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Mapa&quot;}}">
 class Component extends DCLogic {
-  state = { cat: 0, catAuto: true, wide: typeof window === 'undefined' ? true : window.innerWidth >= 980, scrolled: false, sec: '', step: 0, vstep: -1, est: 0, urg: false, jobs: 12, tk: 0, faq: 0 };
+  state = { cat: 0, catAuto: true, wide: typeof window === 'undefined' ? true : window.innerWidth >= 980, nw: typeof window === 'undefined' ? true : window.innerWidth >= 1280, scrolled: false, sec: '', step: 0, vstep: -1, est: 0, urg: false, jobs: 12, tk: 0, faq: 0, aud: 'hogar', bill: 'mes', use: 6, emg: false };
   PRE = [['Fugas de agua', 300, 1500], ['Contactos y apagadores', 200, 1200], ['Calentadores', 400, 2500], ['Regulador de gas', 300, 1500], ['Pintura interior', 500, 4000], ['Puertas y portones', 600, 5000]];
+  // Planes de suscripción: datos de ejemplo. En producción vienen de la consola (Planes y suscripciones).
+  PLANS = {
+    hogar: [
+      { name: 'Esencial', who: 'Para departamentos y casas que piden pocos servicios', price: 149, visits: 3, visTxt: 'En cualquier categoría', disc: 10, discTxt: 'en mano de obra', emg: 15, emgMain: 'Recargo reducido', emgTxt: '15% en lugar de 30%', prev: 1, prevTxt: 'Aire acondicionado o gas', war: 30 },
+      { name: 'Hogar Plus', top: true, who: 'Para la casa familiar que siempre tiene algo que arreglar', price: 299, visits: 6, visTxt: 'En cualquier categoría', disc: 15, discTxt: 'en mano de obra', emg: 0, emgMain: 'Sin recargo', emgTxt: 'Te asignamos técnico antes que al resto', prev: 2, prevTxt: 'Aire acondicionado y gas', war: 60 },
+      { name: 'Hogar Total', who: 'Para casas grandes o con más de una propiedad', price: 549, visits: 12, visTxt: 'Hasta 2 domicilios', disc: 20, discTxt: 'en mano de obra y materiales', emg: 0, emgMain: 'Sin recargo', emgTxt: 'Primero en la fila de asignación', prev: 4, prevTxt: 'Aire, gas, plomería y eléctrica', war: 90 },
+    ],
+    negocio: [
+      { name: 'Local', who: 'Un local, consultorio u oficina', price: 890, visits: 6, visTxt: '1 ubicación', disc: 10, discTxt: 'en mano de obra', emg: 15, emgMain: 'Recargo reducido', emgTxt: '15% en lugar de 30%', prev: 2, prevTxt: 'Aire acondicionado y eléctrica', war: 30 },
+      { name: 'Negocio Plus', top: true, who: 'Restaurantes, tiendas y oficinas con hasta 3 sucursales', price: 1690, visits: 18, visTxt: 'Hasta 3 ubicaciones', disc: 15, discTxt: 'en mano de obra', emg: 0, emgMain: 'Sin recargo', emgTxt: 'Te asignamos técnico antes que al resto', prev: 6, prevTxt: 'Calendario por sucursal', war: 60 },
+      { name: 'Corporativo', custom: true, who: 'Condominios, cadenas y corporativos', cells: [['Las que necesites', 'Por ubicación'], ['Tarifa por volumen', 'Según servicios al mes'], ['Respuesta acordada', 'Con tiempos por contrato'], ['Calendario propio', 'Por sucursal o edificio'], ['Extendida', 'Definida en el contrato']] },
+    ],
+  };
   money(v) { return '$' + Math.round(v).toLocaleString('es-MX'); }
   go(id) { return () => { const el = document.getElementById(id); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: 'smooth' }); }; }
   renderVals() {
@@ -541,8 +655,8 @@ class Component extends DCLogic {
     const p = this.PRE[s.est], k = s.urg ? 1.2 : 1, mn = p[1] * k, mx = p[2] * k, typ = Math.round((mn + (mx - mn) * 0.32) / 10) * 10, pos = ((typ - mn) / (mx - mn)) * 100;
     const TK = [['Plomería', 1180], ['Electricidad', 860], ['Aire acondicionado', 1620]];
     const ug = s.urg;
-    const FAQ = [['¿Cómo verifican a los técnicos?', 'Cada técnico pasa por verificación de identidad (INE por ambos lados), comprobante de domicilio, certificaciones de oficio cuando aplican — como gas LP — y una entrevista con nuestro equipo de operaciones. Solo los perfiles aprobados pueden recibir solicitudes.'], ['¿Cuánto cuesta un servicio?', 'Cada servicio publica su rango — por ejemplo, una fuga va de $300 a $1,500 MXN. Al elegir técnico ves su precio base, y antes de empezar te confirma la cotización final. Cualquier extra requiere tu aprobación en la app.'], ['¿Qué incluye la garantía de 30 días?', 'Si el problema reaparece dentro de los 30 días siguientes al servicio, tu técnico regresa a revisarlo sin costo adicional. Nuestro equipo de soporte coordina la visita.'], ['¿Cómo y cuándo pago?', 'Pagas con tarjeta desde la app cuando el servicio está completado. El pago está protegido: el técnico lo recibe solo al terminar el trabajo, y tienes soporte directo si algo no salió bien.'], ['¿En qué zonas están disponibles?', 'Operamos en la Zona Metropolitana de Guadalajara: Guadalajara, Zapopan, Tlaquepaque y Tlajomulco de Zúñiga. Si tu colonia aún no aparece, propónla desde la app y la priorizamos.'], ['¿Qué necesito para registrarme como técnico?', 'INE vigente, comprobante de domicilio, CLABE para tus cobros y — según tu especialidad — certificación de oficio. Descargas la app, subes tus documentos y nuestro equipo revisa tu perfil para activarlo.']];
-    const LINKS = [['servicios', 'Servicios'], ['como', 'Cómo funciona'], ['tecnicos', 'Técnicos'], ['cobertura', 'Cobertura'], ['precios', 'Precios'], ['trabajos', 'Trabajos'], ['faq', 'FAQ']];
+    const FAQ = [['¿Cómo verifican a los técnicos?', 'Cada técnico pasa por verificación de identidad (INE por ambos lados), comprobante de domicilio, certificaciones de oficio cuando aplican — como gas LP — y una entrevista con nuestro equipo de operaciones. Solo los perfiles aprobados pueden recibir solicitudes.'], ['¿Cuánto cuesta un servicio?', 'Cada servicio publica su rango — por ejemplo, una fuga va de $300 a $1,500 MXN. Al elegir técnico ves su precio base, y antes de empezar te confirma la cotización final. Cualquier extra requiere tu aprobación en la app.'], ['¿Qué incluye la garantía de 30 días?', 'Si el problema reaparece dentro de los 30 días siguientes al servicio, tu técnico regresa a revisarlo sin costo adicional. Nuestro equipo de soporte coordina la visita.'], ['¿Cómo y cuándo pago?', 'Pagas con tarjeta desde la app cuando el servicio está completado. El pago está protegido: el técnico lo recibe solo al terminar el trabajo, y tienes soporte directo si algo no salió bien.'], ['¿Cómo funcionan los planes de mantenimiento?', 'Pagas una cuota mensual o anual y tu plan incluye visitas sin costo, un descuento en cada cotización, mejores condiciones en emergencias y revisiones preventivas que agendamos por ti. Puedes pagar con tarjeta, y se renueva solo, o por transferencia o efectivo; en ese caso el plan se activa cuando confirmamos tu pago. Si pides pocos servicios al año, pagar por servicio sigue siendo una buena opción.'], ['¿En qué zonas están disponibles?', 'Operamos en la Zona Metropolitana de Guadalajara: Guadalajara, Zapopan, Tlaquepaque y Tlajomulco de Zúñiga. Si tu colonia aún no aparece, propónla desde la app y la priorizamos.'], ['¿Qué necesito para registrarme como técnico?', 'INE vigente, comprobante de domicilio, CLABE para tus cobros y — según tu especialidad — certificación de oficio. Descargas la app, subes tus documentos y nuestro equipo revisa tu perfil para activarlo.']];
+    const LINKS = [['servicios', 'Servicios'], ['como', 'Cómo funciona'], ['tecnicos', 'Técnicos'], ['cobertura', 'Cobertura'], ['precios', 'Precios'], ['planes', 'Planes'], ['trabajos', 'Trabajos'], ['faq', 'FAQ']];
     const CD = [
       ['Plomería', 'i-drop', 'Fugas, calentadores, drenaje y sanitarios. La especialidad con más técnicos en la red.', '$300', [['Fugas de agua', 300, 1500], ['Calentadores', 400, 2500], ['Drenaje de cocina', 350, 1200], ['Instalación de WC', 500, 1800]], '48', '24 min', '4.8', 'rgba(10,107,207,0.35)'],
       ['Electricidad', 'i-zap', 'Contactos, apagadores, lámparas y tableros, con técnicos que revisan la instalación completa.', '$200', [['Contactos y apagadores', 200, 1200], ['Instalación de lámparas', 250, 1400], ['Tableros eléctricos', 600, 3500], ['Cortos circuitos', 300, 1500]], '39', '27 min', '4.7', 'rgba(245,185,74,0.25)'],
@@ -556,7 +670,31 @@ class Component extends DCLogic {
     const catTabs = CD.map(([name, icon, , from], i) => { const on = i === ci; return { name, icon, from, on, n: String(i + 1).padStart(2, '0'), go: () => this.setState({ cat: i, catAuto: false }), bg: on ? 'rgba(10,107,207,0.16)' : 'transparent', bd: on ? 'rgba(24,193,255,0.35)' : 'transparent', icBg: on ? '#0A6BCF' : 'rgba(255,255,255,0.05)', icFg: on ? '#fff' : '#8FA0B8', sub: on ? '#18C1FF' : '#6F819B', num: on ? '#18C1FF' : '#4F6A90', bar: on && s.catAuto ? 'catbar 5s linear both' : 'none' }; });
     const cat = { name: cc[0], lower: cc[0].toLowerCase(), upper: cc[0].toUpperCase(), icon: cc[1], desc: cc[2], n: String(ci + 1).padStart(2, '0'), aura: cc[8], subs: cc[4].map(([t, a, b], i) => ({ t, r: this.money(a) + ' – ' + this.money(b), l: (a / allMax * 100) + '%', w: Math.max((b - a) / allMax * 100, 6) + '%', d: (i * 0.06) + 's' })), stats: [[cc[5], 'TÉCNICOS'], [cc[6], 'LLEGADA MEDIA'], [cc[7] + ' ★', 'CALIFICACIÓN']].map(([v, l]) => ({ v, l })) };
     const catPhotos = CD.map(([name], i) => ({ id: 'cat-' + i, ph: 'Foto de trabajo · ' + name.toLowerCase(), op: i === ci ? 1 : 0, pe: i === ci ? 'auto' : 'none' }));
+    // ---------- Planes
+    const PL = this.PLANS[s.aud], isH = s.aud === 'hogar', yr = s.bill === 'anio', n = s.use;
+    const VF = 350, QT = 1180, PV = 650; // servicio típico: costo de visita, cotización y valor de una revisión preventiva
+    const cost = (pl, k) => ({ sin: k * (VF + QT) + pl.prev * PV + (s.emg ? QT * 0.3 : 0), con: pl.price * (yr ? 10 : 12) + Math.max(0, k - pl.visits) * VF + k * QT * (1 - pl.disc / 100) + (s.emg ? QT * pl.emg / 100 : 0) });
+    const best = k => { let b = -1, sv = 0; PL.forEach((pl, i) => { if (pl.custom) return; const c = cost(pl, k); if (c.sin - c.con > sv) { sv = c.sin - c.con; b = i; } }); return b; };
+    const rec = isH ? best(n) : -1, em = rec >= 0 ? rec : PL.findIndex(pl => pl.top);
+    let from = 0; if (isH && rec < 0) { for (let k = n + 1; k <= 14; k++) { if (best(k) >= 0) { from = k; break; } } }
+    const pCols = PL.map((pl, i) => { const on = i === em; return { name: pl.name, who: pl.who, price: pl.custom ? 'A la medida' : this.money(yr ? Math.round(pl.price * 10 / 12) : pl.price), priceSize: pl.custom ? '28px' : '40px', per: pl.custom ? '' : '/mes', note: pl.custom ? 'Cotizamos según tus ubicaciones y servicios.' : yr ? `Un pago de ${this.money(pl.price * 10)} al año. Ahorras ${this.money(pl.price * 2)}.` : 'Cobro mensual. Cancelas cuando quieras.', hasPill: on, pill: rec === i ? 'Te conviene' : 'Más elegido', pillIcon: rec === i ? 'i-check' : 'i-star', cta: pl.custom ? 'Hablar con ventas' : 'Contratar en la app', go: pl.custom ? () => {} : () => window.scrollTo({ top: 0, behavior: 'smooth' }), ctaBg: on ? '#0A6BCF' : 'transparent', ctaBd: on ? '#0A6BCF' : 'rgba(255,255,255,0.22)', ctaHov: on ? '#095FB8' : 'rgba(255,255,255,0.08)', mut: on ? '#C3D3EA' : '#9FB0C8' }; });
+    const PR = [['i-wrench', 'Visitas incluidas', 'Sin pagar el costo de visita', pl => [pl.visits + ' al año', pl.visTxt]], ['i-bill', 'Descuento en tu cotización', 'En cada servicio que apruebes', pl => [pl.disc + '%', pl.discTxt]], ['i-zap', 'Emergencias y prioridad', 'Cuando no puede esperar', pl => [pl.emgMain, pl.emgTxt]], ['i-cal', 'Revisiones preventivas', 'Las agendamos y te avisamos', pl => [pl.prev + ' al año', pl.prevTxt]], ['i-shield', 'Garantía', 'Si el problema regresa, volvemos', pl => [pl.war + ' días', 'En cada servicio']]];
+    const pRows = PR.map(([icon, label, help, fn], ri) => ({ icon, label, help, cells: PL.map((pl, i) => { const [main, sub] = pl.custom ? pl.cells[ri] : fn(pl); return { main, sub, fg: '#fff', mut: i === em ? '#C3D3EA' : '#9FB0C8' }; }) }));
+    const pCards = pCols.map((c, i) => ({ ...c, bg: i === em ? 'linear-gradient(160deg, #0A3A78, #0B2A55 60%, #081C38)' : 'rgba(13,33,63,0.72)', bd: i === em ? 'rgba(24,193,255,0.32)' : 'rgba(90,176,255,0.14)', rows: pRows.map(r => ({ icon: r.icon, label: r.label, main: r.cells[i].main, sub: r.cells[i].sub, fg: '#fff' })) }));
+    const rp = rec >= 0 ? PL[rec] : null, rc = rp ? cost(rp, n) : null, np = PL[em], nc = isH ? cost(np, n) : null, pps = n * (VF + QT) + (s.emg ? QT * 0.3 : 0), sv = n === 1 ? 'servicio' : 'servicios';
+    const pc = !isH ? { bars: [] } : {
+      n, emg: s.emg, emgBg: s.emg ? '#0A6BCF' : '#D6DEE8', emgX: s.emg ? 'translateX(18px)' : 'translateX(0px)',
+      verdict: rp ? `Con ${n} ${sv} al año te conviene ${rp.name}.` : `Con ${n} ${sv} al año te sale mejor pagar por servicio.`,
+      bars: rp ? [{ l: 'Lo mismo sin plan', v: this.money(rc.sin), w: '100%', c: '#3A557C', fg: '#B8C4D6' }, { l: 'Con ' + rp.name, v: this.money(rc.con), w: (rc.con / rc.sin * 100) + '%', c: '#0A6BCF', fg: '#fff' }] : [{ l: 'Pagando por servicio', v: this.money(pps), w: (pps / nc.con * 100) + '%', c: '#0A6BCF', fg: '#fff' }, { l: 'Con ' + np.name, v: this.money(nc.con), w: '100%', c: '#3A557C', fg: '#B8C4D6' }],
+      save: rp ? `Ahorras ${this.money(rc.sin - rc.con)} al año` : from ? `Un plan te conviene desde ${from} servicios al año.` : 'Con este uso ningún plan te ahorra.',
+      saveFg: rp ? '#5FD39B' : '#B8C4D6',
+      foot: (rp ? `Cuenta ${rp.prev} ${rp.prev === 1 ? 'revisión preventiva incluida' : 'revisiones preventivas incluidas'} con valor de ${this.money(rp.prev * PV)}. ` : '') + 'Cálculo con un servicio típico: visita de $350 y cotización de $1,180.',
+    };
     const out = {
+      pm: { hlLeft: `calc(26% + ${em} * 24.6667%)`, cols: pCols, rows: pRows, cards: pCards }, pc, isHogar: isH, isBiz: !isH, narrow: !s.wide, navWide: s.nw,
+      audOpts: [['hogar', 'Hogar'], ['negocio', 'Negocios']].map(([k, l]) => { const on = s.aud === k; return { l, on, go: () => this.setState({ aud: k }), bg: on ? '#fff' : 'transparent', fg: on ? '#0E2C56' : '#9FB0C8' }; }),
+      billOpts: [['mes', 'Mensual', false], ['anio', 'Anual', true]].map(([k, l, hasTag]) => { const on = s.bill === k; return { l, on, hasTag, tagBg: on ? '#E5F7EE' : 'rgba(95,211,155,0.14)', tagFg: on ? '#0F7A4D' : '#5FD39B', go: () => this.setState({ bill: k }), bg: on ? '#fff' : 'transparent', fg: on ? '#0E2C56' : '#9FB0C8' }; }),
+      setUse: e => this.setState({ use: +e.target.value }), toggleEmg: () => this.setState({ emg: !s.emg }), goPlanes: this.go('planes'),
       catTabs, cat, catPhotos, catAnim: (ci % 2 ? 'catinA' : 'catinB') + ' .5s cubic-bezier(.2,.8,.2,1) both', catPause: () => { this._catHover = true; }, catResume: () => { this._catHover = false; },
       catListMax: s.wide ? '320px' : '100%', catListDir: s.wide ? 'column' : 'row', catListBr: s.wide ? '1px solid rgba(90,176,255,0.12)' : 'none', catListBb: s.wide ? 'none' : '1px solid rgba(90,176,255,0.12)', catTabMin: s.wide ? '0' : '220px',
       wide: s.wide, navBg: dark ? 'rgba(6,27,58,0)' : 'rgba(255,255,255,0.88)', navBd: dark ? 'rgba(255,255,255,0.06)' : '#E1E8F0', navSh: dark ? 'none' : '0 10px 30px -20px rgba(6,27,58,0.35)', navFg: dark ? '#fff' : '#0E2C56', navHov: dark ? 'rgba(255,255,255,0.08)' : '#F0F7FF', navBtnBd: dark ? 'rgba(255,255,255,0.22)' : '#D6DEE8', navH: s.scrolled ? '62px' : '76px',
@@ -589,9 +727,9 @@ class Component extends DCLogic {
   componentDidMount() {
     const hs = (location.hash || '').slice(1); if (hs && hs !== 'top') { this._ht = setTimeout(() => { const el = document.getElementById(hs); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: 'auto' }); }, 450); }
     this._reduced = (this.props.movimiento ?? 'completo') === 'reducido' || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    this._rs = () => { const w = window.innerWidth >= 980; if (w !== this.state.wide) this.setState({ wide: w }); };
+    this._rs = () => { const w = window.innerWidth >= 980, nw = window.innerWidth >= 1280; if (w !== this.state.wide || nw !== this.state.nw) this.setState({ wide: w, nw }); };
     window.addEventListener('resize', this._rs);
-    const ids = ['servicios', 'como', 'tecnicos', 'trabajos', 'cobertura', 'precios', 'faq'];
+    const ids = ['servicios', 'como', 'tecnicos', 'trabajos', 'cobertura', 'precios', 'planes', 'faq'];
     this._sc = () => { const y = window.scrollY, h = document.documentElement.scrollHeight - window.innerHeight; const bar = document.getElementById('sp'); if (bar) bar.style.width = (h > 0 ? y / h * 100 : 0) + '%'; const sc = y > 40; if (sc !== this.state.scrolled) this.setState({ scrolled: sc }); let cur = ''; for (const id of ids) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < 140) cur = id; } if (cur !== this.state.sec) this.setState({ sec: cur }); };
     this._scRaw = this._sc; this._sc = () => { if (this._scq) return; this._scq = true; requestAnimationFrame(() => { this._scq = false; this._scRaw(); }); }; window.addEventListener('scroll', this._sc, { passive: true }); this._scRaw();
     if (this._reduced) { document.querySelectorAll('[data-anim]').forEach(el => { el.style.animationPlayState = 'paused'; }); this.setState({ vstep: 4 }); }

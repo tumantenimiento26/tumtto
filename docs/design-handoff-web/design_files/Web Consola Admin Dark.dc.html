@@ -48,8 +48,12 @@
 </helmet>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
-<linearGradient id="tm-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0E2C56"></stop><stop offset="0.55" stop-color="#0A6BCF"></stop><stop offset="1" stop-color="#18C1FF"></stop></linearGradient>
-<mask id="tm-cut"><rect width="512" height="512" fill="#000"></rect><path d="M256 118 L398 246 L398 402 L114 402 L114 246 Z" fill="#fff" stroke="#fff" stroke-width="44" stroke-linejoin="round" stroke-linecap="round"></path><g transform="translate(258 300) rotate(-36) scale(0.72) translate(0 -40)"><path d="M-44 -118 Q-62 -112 -62 -80 L-60 -30 Q-58 -4 -38 6 Q-22 14 -22 32 L-22 176 Q-22 198 0 198 Q22 198 22 176 L22 32 Q22 14 38 6 Q58 -4 60 -30 L62 -80 Q62 -112 44 -118 L30 -74 Q26 -60 16 -52 Q0 -44 -16 -52 Q-26 -60 -30 -74 Z" fill="#000"></path></g></mask>
+<linearGradient id="tm-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E2347"></stop><stop offset="1" stop-color="#081631"></stop></linearGradient>
+<linearGradient id="tm-blue" x1="0" y1="75" x2="0" y2="387" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2D8BF5"></stop><stop offset="1" stop-color="#1360DA"></stop></linearGradient>
+<linearGradient id="tm-ribbon" x1="115" y1="0" x2="390" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#F4F7FC"></stop><stop offset=".42" stop-color="#EEF3FB"></stop><stop offset=".7" stop-color="#4C97F2"></stop><stop offset="1" stop-color="#1A68DE"></stop></linearGradient>
+<linearGradient id="tm-gold" x1="0" y1="117" x2="0" y2="234" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFC93A"></stop><stop offset="1" stop-color="#F2A50C"></stop></linearGradient>
+<mask id="tm-jaw"><rect width="512" height="512" fill="#fff"></rect><rect x="243" y="100" width="24" height="52" rx="12" fill="#000"></rect></mask>
+<symbol id="tm-logo" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="url(#tm-bg)"></rect><path d="M146 377H93V190L256 75L419 190V377H380" fill="none" stroke="url(#tm-blue)" stroke-width="22" stroke-linejoin="round"></path><path d="M203 156L166 199H187L174 226L211 184H190Z" fill="#F4F7FC"></path><g mask="url(#tm-jaw)" fill="url(#tm-gold)"><circle cx="255" cy="148" r="31"></circle><path d="M242 160H268V234L242 224Z"></path></g><path d="M325 160C325 160 300 188 300 207A25 25 0 0 0 350 207C350 188 325 160 325 160Z" fill="url(#tm-blue)"></path><path d="M310 206A15 15 0 0 0 322 222" fill="none" stroke="#BFE0FF" stroke-width="4" stroke-linecap="round" opacity=".85"></path><path d="M115 238H238L310 286L361 238H390V387H361V281L310 327L231 270H192V387H161V270H115Z" fill="url(#tm-ribbon)"></path><path d="M227 292L255 306V387H227Z" fill="url(#tm-blue)"></path><g fill="#F4F7FC"><rect x="274" y="339" width="21.5" height="21.5" rx="2"></rect><rect x="300.5" y="339" width="21.5" height="21.5" rx="2"></rect><rect x="274" y="365.5" width="21.5" height="21.5" rx="2"></rect><rect x="300.5" y="365.5" width="21.5" height="21.5" rx="2"></rect></g></symbol>
 <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><g fill="currentColor" fill-opacity=".18" stroke="none"><circle cx="11" cy="11" r="8"></circle></g><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
 <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="currentColor" fill-opacity=".18" stroke="none"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path></g><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
 <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g fill="currentColor" fill-opacity=".18" stroke="none"><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"></path></g><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></symbol>
@@ -117,7 +121,7 @@
     <div style="position: absolute; inset: 0; background-image: linear-gradient(rgba(90,176,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(90,176,255,0.05) 1px, transparent 1px); background-size: 72px 72px; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);"></div>
   </div>
     <div style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 26px; text-align: center; animation: up .4s ease both;">
-      <span style="position: relative; display: flex;"><span style="position: absolute; inset: -14px; border-radius: 28px; background: radial-gradient(circle, rgba(24,193,255,0.35), transparent 70%);"></span><span style="position: relative;"><svg width="56" height="56" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg></span></span>
+      <span style="position: relative; display: flex;"><span style="position: absolute; inset: -14px; border-radius: 28px; background: radial-gradient(circle, rgba(24,193,255,0.35), transparent 70%);"></span><span style="position: relative;"><svg width="56" height="56" viewBox="0 0 512 512" aria-hidden="true"><use href="#tm-logo"></use></svg></span></span>
       <div><div style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 20px; color: #fff;">Tumantenimiento</div><div style="margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #18C1FF;">Consola de operación</div></div>
     </div>
     <div style="position: relative; width: 100%; max-width: 420px; box-sizing: border-box; background: #13223A; border-radius: 16px; padding: clamp(24px, 4vw, 34px); box-shadow: 0 40px 100px -30px rgba(0,0,0,0.75), 0 0 0 1px rgba(90,176,255,0.12); animation: up .5s cubic-bezier(.2,.8,.2,1) both;">
@@ -153,7 +157,7 @@
     <sc-if value="{{ scrim }}" hint-placeholder-val="{{ false }}"><div onClick="{{ toggleSide }}" style="position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); animation: fade .2s ease both;"></div></sc-if>
     <aside data-screen-label="Sidebar" style="position: {{ sidePos }}; top: 0; bottom: 0; left: 0; z-index: 60; width: {{ sideW }}; height: 100vh; margin-left: {{ sideML }}; transform: {{ sideTX }}; box-shadow: {{ sideSh }}; flex-shrink: 0; background: #060E1C; border-right: 1px solid #1B2B45; color: #fff; display: flex; flex-direction: column; transition: width .32s cubic-bezier(.3,1,.4,1), margin-left .32s cubic-bezier(.3,1,.4,1), transform .32s cubic-bezier(.3,1,.4,1), box-shadow .3s; overflow: hidden;">
       <div style="height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 11px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-shrink: 0;">
-        <svg width="32" height="32" viewBox="0 0 512 512" style="flex-shrink: 0;" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg>
+        <svg width="32" height="32" viewBox="0 0 512 512" style="flex-shrink: 0;" aria-hidden="true"><use href="#tm-logo"></use></svg>
         <sc-if value="{{ navFull }}" hint-placeholder-val="{{ true }}">
           <div style="min-width: 0; white-space: nowrap;">
             <div style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 14.5px; line-height: 1.1;">Tumantenimiento</div>
@@ -192,7 +196,7 @@
     <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
       <header style="height: 64px; flex-shrink: 0; background: #13223A; border-bottom: 1px solid #22344F; display: flex; align-items: center; gap: 14px; padding: 0 24px; position: relative; z-index: 30;">
         <button onClick="{{ toggleSide }}" aria-label="Mostrar u ocultar menú" title="Menú (⌘B)" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid #22344F; background: #13223A; color: #8FA0B8; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" style-hover="background: #1B2B45; color: #E8EEF7;"><svg width="18" height="18" aria-hidden="true"><use href="#i-panel"></use></svg></button>
-        <sc-if value="{{ drawerClosed }}" hint-placeholder-val="{{ false }}"><svg width="30" height="30" viewBox="0 0 512 512" style="flex-shrink: 0; animation: pop .25s ease both;" aria-hidden="true"><rect width="512" height="512" rx="112" fill="url(#tm-grad)"></rect><rect width="512" height="512" rx="112" fill="#fff" mask="url(#tm-cut)"></rect></svg></sc-if>
+        <sc-if value="{{ drawerClosed }}" hint-placeholder-val="{{ false }}"><svg width="30" height="30" viewBox="0 0 512 512" style="flex-shrink: 0; animation: pop .25s ease both;" aria-hidden="true"><use href="#tm-logo"></use></svg></sc-if>
         <div style="min-width: 0;">
           <div style="display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #6F819B; white-space: nowrap;">
             <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="2"><span style="display: inline-flex; align-items: center; gap: 6px;"><sc-if value="{{ c.sep }}" hint-placeholder-val="{{ false }}"><span>/</span></sc-if><a onClick="{{ c.go }}" style="color: {{ c.color }}; cursor: {{ c.cursor }};">{{ c.t }}</a></span></sc-for>
@@ -1642,6 +1646,176 @@
           </div>
         </sc-if>
 
+        <sc-if value="{{ S.planes }}" hint-placeholder-val="{{ false }}">
+          <div data-screen-label="Planes" style="display: flex; flex-direction: column; gap: 16px; max-width: 1320px; margin: 0 auto; padding-bottom: 80px;">
+            <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; animation: up .4s ease both;">
+              <div>
+                <h1 style="margin: 0 0 4px; font-family: Manrope, sans-serif; font-weight: 800; font-size: 27px; letter-spacing: -.6px;">Planes y suscripciones</h1>
+                <p style="margin: 0; font-size: 14px; color: #8FA0B8;">Define el precio y lo que incluye cada plan. Los cambios aplican a contrataciones y renovaciones nuevas.</p>
+              </div>
+              <button onClick="{{ pl.add }}" style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border: none; border-radius: 10px; background: #0A6BCF; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 14px; cursor: pointer;" style-hover="background: #095FB8;"><svg width="16" height="16" aria-hidden="true"><use href="#i-plus"></use></svg>Nuevo plan</button>
+            </div>
+            <div style="display: flex; gap: 22px; border-bottom: 1px solid #22344F; overflow-x: auto; scrollbar-width: none;">
+              <sc-for list="{{ pl.tabs }}" as="t" hint-placeholder-count="2">
+                <button onClick="{{ t.go }}" style="position: relative; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0; border: none; background: none; color: {{ t.fg }}; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;" style-hover="color: #E8EEF7;">{{ t.label }}<span style="min-width: 22px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: {{ t.nBg }}; color: {{ t.nFg }}; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;">{{ t.n }}</span><span style="position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: {{ t.bar }};"></span></button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ pl.isPlans }}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; animation: up .4s ease both;">
+                <div role="group" aria-label="Tipo de cliente" style="display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: #0B1729;"><sc-for list="{{ pl.audSeg }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.go }}" style="height: 32px; padding: 0 14px; border: none; border-radius: 8px; background: {{ o.bg }}; color: {{ o.fg }}; box-shadow: {{ o.sh }}; font-size: 13px; font-weight: 600; cursor: pointer;">{{ o.label }}</button></sc-for></div>
+                <p style="margin: 0; font-size: 13px; color: #8FA0B8;"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #E8EEF7;">{{ pl.sumSubs }}</span> suscriptores activos · <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #E8EEF7;">{{ pl.sumMrr }}</span> de ingreso recurrente al mes</p>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;">
+                <div style="flex: 1 1 320px; max-width: 440px; min-width: 0; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0;">
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .45s ease both;">
+                    <sc-for list="{{ pl.list }}" as="p" hint-placeholder-count="3">
+                      <div onClick="{{ p.open }}" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #1B2B45; background: {{ p.bg }}; cursor: pointer; transition: background .12s;" style-hover="background: {{ p.hov }};">
+                        <div style="flex: 1; min-width: 0;">
+                          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span style="font-family: Manrope, sans-serif; font-weight: 700; font-size: 15.5px;">{{ p.name }}</span><sc-if value="{{ p.top }}" hint-placeholder-val="{{ false }}"><span style="padding: 2px 8px; border-radius: 999px; background: #12325A; color: #5AB0FF; font-size: 11.5px; font-weight: 700;">Más elegido</span></sc-if></div>
+                          <div style="margin-top: 2px; font-size: 12.5px; color: #8FA0B8;"><span style="font-family: 'JetBrains Mono', monospace; color: #E8EEF7; font-weight: 600;">{{ p.price }}</span> · {{ p.subsTxt }}</div>
+                          <div style="margin-top: 2px; font-size: 12.5px; font-weight: 600; color: {{ p.stC }};">{{ p.stTxt }}</div>
+                        </div>
+                        <button onClick="{{ p.toggle }}" role="switch" aria-checked="{{ p.on }}" aria-label="{{ p.tgLabel }}" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ p.tgBg }}; cursor: pointer; transition: background .25s; padding: 0; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ p.tgX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .5s ease both;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px;"><span style="font-size: 13.5px; font-weight: 600;">Así se ve en el landing</span><a href="Web Landing.dc.html#planes" target="_blank" style="font-size: 12.5px; font-weight: 600;">Abrir landing</a></div>
+                    <div style="background: #050F22; padding: 16px;">
+                      <div style="border-radius: 14px; background: {{ pl.pv.bg }}; border: 1px solid {{ pl.pv.bd }}; padding: 20px; color: #fff; transition: background .3s, border-color .3s;">
+                        <sc-if value="{{ pl.pv.top }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; margin-bottom: 10px; border-radius: 999px; background: #18C1FF; color: #04203F; font-size: 11.5px; font-weight: 800;"><svg width="11" height="11" aria-hidden="true"><use href="#i-star"></use></svg>Más elegido</span></sc-if>
+                        <div style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 19px;">{{ pl.pv.name }}</div>
+                        <div style="margin-top: 2px; font-size: 13px; line-height: 1.5; color: {{ pl.pv.mut }};">{{ pl.pv.who }}</div>
+                        <div style="display: flex; align-items: baseline; gap: 5px; margin-top: 12px; font-family: Manrope, sans-serif; font-weight: 800; font-variant-numeric: tabular-nums;"><span style="font-size: {{ pl.pv.priceSize }}; letter-spacing: -.8px; line-height: 1.1;">{{ pl.pv.price }}</span><span style="font-size: 13px; color: {{ pl.pv.mut }};">{{ pl.pv.per }}</span></div>
+                        <div style="margin: 4px 0 14px; font-size: 12px; color: {{ pl.pv.mut }};">{{ pl.pv.note }}</div>
+                        <sc-for list="{{ pl.pv.lines }}" as="l" hint-placeholder-count="4"><div style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(90,176,255,0.14); font-size: 13.5px; line-height: 1.45; color: #E8EEF7; animation: up .25s ease both;"><svg width="14" height="14" style="color: #5FD39B; flex-shrink: 0; margin-top: 3px;" aria-hidden="true"><use href="#i-check"></use></svg>{{ l.t }}</div></sc-for>
+                        <sc-if value="{{ pl.pv.none }}" hint-placeholder-val="{{ false }}"><div style="padding: 10px 0 0; border-top: 1px solid rgba(90,176,255,0.14); font-size: 13px; color: {{ pl.pv.mut }};">Este plan todavía no incluye beneficios. Activa al menos uno.</div></sc-if>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="flex: 2 1 540px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .4s ease both;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #1B2B45; font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px;">Plan</div>
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #1B2B45; flex-wrap: wrap;">
+                      <label for="pl-name" style="flex: 1; min-width: 200px;"><div style="font-size: 14px; font-weight: 600;">Nombre</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">Como lo ve el cliente en la app y el landing.</div></label>
+                      <input id="pl-name" value="{{ pl.ed.name }}" onChange="{{ pl.ed.setName }}" maxlength="24" style="width: 280px; max-width: 100%; height: 42px; box-sizing: border-box; border: 1px solid {{ pl.ed.nameBd }}; border-radius: 10px; padding: 0 12px; font-size: 14px; color: #E8EEF7; outline: none; background: transparent;" style-focus="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #1B2B45; flex-wrap: wrap;">
+                      <label for="pl-who" style="flex: 1; min-width: 200px;"><div style="font-size: 14px; font-weight: 600;">Para quién es</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">Una línea bajo el nombre.</div></label>
+                      <input id="pl-who" value="{{ pl.ed.who }}" onChange="{{ pl.ed.setWho }}" maxlength="70" style="width: 280px; max-width: 100%; height: 42px; box-sizing: border-box; border: 1px solid #22344F; border-radius: 10px; padding: 0 12px; font-size: 14px; color: #E8EEF7; outline: none; background: transparent;" style-focus="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px;">
+                      <div style="flex: 1; min-width: 0;"><div style="font-size: 14px; font-weight: 600;">Marcar como más elegido</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">Se resalta en el landing. Solo un plan por tipo de cliente.</div></div>
+                      <button onClick="{{ pl.ed.toggleTop }}" role="switch" aria-checked="{{ pl.ed.top }}" aria-label="Marcar como más elegido" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ pl.ed.topBg }}; cursor: pointer; padding: 0; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ pl.ed.topX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                    </div>
+                  </div>
+
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .45s ease both;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #1B2B45; font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px;">Precio</div>
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #1B2B45;">
+                      <div style="flex: 1; min-width: 0;"><div style="font-size: 14px; font-weight: 600;">Precio a la medida</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">Sin precio público: el landing muestra “Hablar con ventas”.</div></div>
+                      <button onClick="{{ pl.ed.toggleCustom }}" role="switch" aria-checked="{{ pl.ed.custom }}" aria-label="Precio a la medida" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ pl.ed.customBg }}; cursor: pointer; padding: 0; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ pl.ed.customX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                    </div>
+                    <sc-if value="{{ pl.ed.priced }}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #1B2B45; flex-wrap: wrap;">
+                        <label for="pl-price" style="flex: 1; min-width: 200px;"><div style="font-size: 14px; font-weight: 600;">Precio mensual</div><div style="font-size: 12.5px; color: {{ pl.ed.priceHelpC }}; margin-top: 2px;">{{ pl.ed.priceHelp }}</div></label>
+                        <span style="display: flex; align-items: center; width: 200px; max-width: 100%; height: 42px; border: 1px solid {{ pl.ed.priceBd }}; border-radius: 10px; overflow: hidden; background: #13223A;" style-focus-within="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);"><span style="padding: 0 0 0 12px; color: #6F819B; font-family: 'JetBrains Mono', monospace;">$</span><input id="pl-price" inputmode="numeric" value="{{ pl.ed.price }}" onChange="{{ pl.ed.setPrice }}" style="flex: 1; min-width: 0; border: none; outline: none; background: transparent; padding: 0 8px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #E8EEF7;"><span style="padding: 0 12px; height: 100%; display: flex; align-items: center; background: #0F1D33; border-left: 1px solid #22344F; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8FA0B8;">MXN</span></span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #1B2B45;">
+                        <div style="flex: 1; min-width: 0;"><div style="font-size: 14px; font-weight: 600;">Ofrecer pago anual</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">{{ pl.ed.anualHelp }}</div></div>
+                        <button onClick="{{ pl.ed.toggleAnual }}" role="switch" aria-checked="{{ pl.ed.anual }}" aria-label="Ofrecer pago anual" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ pl.ed.anualBg }}; cursor: pointer; padding: 0; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ pl.ed.anualX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                      </div>
+                      <sc-if value="{{ pl.ed.anual }}" hint-placeholder-val="{{ true }}">
+                        <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; flex-wrap: wrap; animation: up .25s ease both;">
+                          <div style="flex: 1; min-width: 200px;"><div style="font-size: 14px; font-weight: 600;">Meses gratis al pagar el año</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">El cliente paga los meses restantes en una sola exhibición.</div></div>
+                          <span style="display: inline-flex; align-items: center; height: 40px; border: 1px solid #22344F; border-radius: 10px; overflow: hidden; background: #13223A;"><button onClick="{{ pl.ed.gratisDec }}" aria-label="Menos meses gratis" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-minus"></use></svg></button><span style="min-width: 44px; height: 100%; display: flex; align-items: center; justify-content: center; border-left: 1px solid #1B2B45; border-right: 1px solid #1B2B45; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;">{{ pl.ed.gratis }}</span><button onClick="{{ pl.ed.gratisInc }}" aria-label="Más meses gratis" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-plus"></use></svg></button></span>
+                        </div>
+                      </sc-if>
+                    </sc-if>
+                  </div>
+
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .5s ease both;">
+                    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #1B2B45;"><span style="font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px;">Qué incluye</span><span style="font-size: 12.5px; color: #8FA0B8;">{{ pl.benCount }}</span></div>
+                    <sc-for list="{{ pl.benefits }}" as="b" hint-placeholder-count="5">
+                      <div style="padding: 16px 20px; border-bottom: 1px solid #1B2B45;">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                          <span style="width: 40px; height: 40px; border-radius: 10px; background: {{ b.icBg }}; color: {{ b.icFg }}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .2s, color .2s;"><svg width="19" height="19" aria-hidden="true"><use href="#{{ b.icon }}"></use></svg></span>
+                          <div style="flex: 1; min-width: 0;"><div style="font-size: 14.5px; font-weight: 600;">{{ b.title }}</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">{{ b.sum }}</div></div>
+                          <button onClick="{{ b.toggle }}" role="switch" aria-checked="{{ b.on }}" aria-label="{{ b.title }}" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ b.tgBg }}; cursor: pointer; padding: 0; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ b.tgX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                        </div>
+                        <sc-if value="{{ b.on }}" hint-placeholder-val="{{ true }}">
+                          <div style="margin: 10px 0 0 54px; display: flex; flex-direction: column; animation: up .25s ease both;">
+                            <sc-for list="{{ b.ctls }}" as="k" hint-placeholder-count="2">
+                              <div style="display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding: 8px 0;">
+                                <span style="flex: 0 0 150px; font-size: 13px; font-weight: 500; color: #B8C4D6;">{{ k.label }}</span>
+                                <sc-if value="{{ k.isStep }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; height: 40px; border: 1px solid #22344F; border-radius: 10px; overflow: hidden; background: #13223A;"><button onClick="{{ k.dec }}" aria-label="Menos" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-minus"></use></svg></button><span style="min-width: 44px; height: 100%; display: flex; align-items: center; justify-content: center; border-left: 1px solid #1B2B45; border-right: 1px solid #1B2B45; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;">{{ k.v }}</span><button onClick="{{ k.inc }}" aria-label="Más" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-plus"></use></svg></button></span></sc-if>
+                                <sc-if value="{{ k.isPct }}" hint-placeholder-val="{{ false }}"><span style="display: flex; align-items: center; width: 110px; height: 40px; border: 1px solid #22344F; border-radius: 10px; overflow: hidden; background: #13223A;" style-focus-within="border-color: #0A6BCF; box-shadow: 0 0 0 4px rgba(10,107,207,0.15);"><input inputmode="numeric" aria-label="{{ k.label }}" value="{{ k.v }}" onChange="{{ k.set }}" style="flex: 1; min-width: 0; border: none; outline: none; background: transparent; padding: 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #E8EEF7;"><span style="padding: 0 12px; height: 100%; display: flex; align-items: center; background: #0F1D33; border-left: 1px solid #22344F; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8FA0B8;">%</span></span></sc-if>
+                                <sc-if value="{{ k.isSeg }}" hint-placeholder-val="{{ true }}"><div role="group" aria-label="{{ k.label }}" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: #0B1729;"><sc-for list="{{ k.opts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.go }}" style="height: 32px; padding: 0 12px; border: none; border-radius: 8px; background: {{ o.bg }}; color: {{ o.fg }}; box-shadow: {{ o.sh }}; font-size: 13px; font-weight: 600; cursor: pointer;">{{ o.label }}</button></sc-for></div></sc-if>
+                                <sc-if value="{{ k.isChips }}" hint-placeholder-val="{{ false }}"><div role="group" aria-label="{{ k.label }}" style="flex: 1 1 260px; display: flex; flex-wrap: wrap; gap: 6px;"><sc-for list="{{ k.opts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.go }}" aria-pressed="{{ o.on }}" style="height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ o.bd }}; background: {{ o.bg }}; color: {{ o.fg }}; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, color .15s;">{{ o.t }}</button></sc-for></div></sc-if>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+
+                  <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .55s ease both;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #1B2B45; font-family: Manrope, sans-serif; font-weight: 700; font-size: 16px;">Cobro</div>
+                    <sc-for list="{{ pl.pay }}" as="m" hint-placeholder-count="2">
+                      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #1B2B45;">
+                        <span style="width: 40px; height: 40px; border-radius: 10px; background: {{ m.icBg }}; color: {{ m.icFg }}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="19" height="19" aria-hidden="true"><use href="#{{ m.icon }}"></use></svg></span>
+                        <div style="flex: 1; min-width: 0;"><div style="font-size: 14px; font-weight: 600;">{{ m.title }}</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">{{ m.help }}</div></div>
+                        <button onClick="{{ m.toggle }}" role="switch" aria-checked="{{ m.on }}" aria-label="{{ m.title }}" style="position: relative; width: 46px; height: 28px; border: none; border-radius: 999px; background: {{ m.tgBg }}; cursor: pointer; padding: 0; transition: background .25s; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(6,27,58,0.3); transform: {{ m.tgX }}; transition: transform .25s cubic-bezier(.3,1.4,.5,1);"></span></button>
+                      </div>
+                    </sc-for>
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; flex-wrap: wrap;">
+                      <div style="flex: 1; min-width: 200px;"><div style="font-size: 14px; font-weight: 600;">Días de gracia</div><div style="font-size: 12.5px; color: #8FA0B8; margin-top: 2px;">Si el cobro falla o el pago no llega, el plan sigue activo estos días.</div></div>
+                      <span style="display: inline-flex; align-items: center; height: 40px; border: 1px solid #22344F; border-radius: 10px; overflow: hidden; background: #13223A;"><button onClick="{{ pl.ed.graciaDec }}" aria-label="Menos días de gracia" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-minus"></use></svg></button><span style="min-width: 44px; height: 100%; display: flex; align-items: center; justify-content: center; border-left: 1px solid #1B2B45; border-right: 1px solid #1B2B45; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;">{{ pl.ed.gracia }}</span><button onClick="{{ pl.ed.graciaInc }}" aria-label="Más días de gracia" style="width: 40px; height: 100%; border: none; background: #13223A; color: #E8EEF7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" style-hover="background: #1B2B45;"><svg width="14" height="14" aria-hidden="true"><use href="#i-plus"></use></svg></button></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ pl.dirty }}" hint-placeholder-val="{{ false }}">
+                <div role="status" style="position: sticky; bottom: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; background: #22344F; color: #fff; border-radius: 12px; box-shadow: 0 18px 40px -16px rgba(6,27,58,0.6); animation: up .3s ease both; flex-wrap: wrap;">
+                  <svg width="18" height="18" style="color: {{ pl.barIc }}; flex-shrink: 0;" aria-hidden="true"><use href="#i-alert"></use></svg>
+                  <div style="flex: 1; min-width: 220px;"><div style="font-size: 14px; font-weight: 600;">{{ pl.barTitle }}</div><div style="font-size: 12.5px; color: #B8C4D6; margin-top: 1px;">{{ pl.barSub }}</div></div>
+                  <button onClick="{{ pl.discard }}" style="height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.22); background: transparent; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 13.5px; cursor: pointer;" style-hover="background: rgba(255,255,255,0.08);">Descartar</button>
+                  <button onClick="{{ pl.save }}" aria-disabled="{{ pl.invalid }}" style="height: 38px; padding: 0 16px; border-radius: 10px; border: none; background: #0A6BCF; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 13.5px; cursor: {{ pl.saveCur }}; opacity: {{ pl.saveOp }};" style-hover="background: #095FB8;">Guardar cambios</button>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ pl.isSubs }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; animation: up .4s ease both;">
+                <div role="group" aria-label="Estado de la suscripción" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: #0B1729;"><sc-for list="{{ pl.subSeg }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.go }}" style="height: 32px; padding: 0 14px; border: none; border-radius: 8px; background: {{ o.bg }}; color: {{ o.fg }}; box-shadow: {{ o.sh }}; font-size: 13px; font-weight: 600; cursor: pointer;">{{ o.label }}</button></sc-for></div>
+                <p style="margin: 0; font-size: 13px; color: #8FA0B8;">Los pagos por transferencia o efectivo se activan al confirmarlos.</p>
+              </div>
+              <div style="background: #13223A; border: 1px solid #22344F; border-radius: 12px; overflow: hidden; animation: up .45s ease both;">
+                <div style="overflow-x: auto;"><div style="min-width: 1100px;">
+                  <div style="display: grid; grid-template-columns: 1.9fr 1.1fr 84px 116px 136px 96px 124px 156px; gap: 12px; padding: 11px 20px; background: #0F1D33; border-bottom: 1px solid #22344F; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #8FA0B8;"><span>Cliente</span><span>Plan</span><span>Ciclo</span><span>Método</span><span>Renueva</span><span>Visitas</span><span>Estado</span><span></span></div>
+                  <sc-for list="{{ pl.subRows }}" as="r" hint-placeholder-count="8">
+                    <div style="display: grid; grid-template-columns: 1.9fr 1.1fr 84px 116px 136px 96px 124px 156px; gap: 12px; align-items: center; min-height: 60px; padding: 0 20px; border-bottom: 1px solid #1B2B45; font-size: 13.5px; transition: background .12s;" style-hover="background: #1B2B45;">
+                      <div style="display: flex; align-items: center; gap: 10px; min-width: 0;"><span style="width: 34px; height: 34px; border-radius: 50%; background: #12325A; color: #5AB0FF; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ r.ini }}</span><div style="min-width: 0;"><div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.cli }}</div><div style="font-size: 12px; color: #8FA0B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><span style="font-family: 'JetBrains Mono', monospace;">{{ r.id }}</span> · {{ r.zona }}</div></div></div>
+                      <div><div style="font-weight: 600;">{{ r.plan }}</div><div style="font-size: 12px; color: #8FA0B8;">{{ r.aud }}</div></div>
+                      <span>{{ r.ciclo }}</span>
+                      <span>{{ r.met }}</span>
+                      <span style="color: {{ r.renC }};">{{ r.renueva }}</span>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">{{ r.uso }}</span>
+                      <span><span style="display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: {{ r.pBg }}; color: {{ r.pFg }};">{{ r.stTxt }}</span></span>
+                      <span style="display: flex; justify-content: flex-end;"><sc-if value="{{ r.pending }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.confirm }}" style="height: 34px; padding: 0 12px; border: none; border-radius: 10px; background: #1E6B4B; color: #fff; font-family: Manrope, sans-serif; font-weight: 700; font-size: 12.5px; cursor: pointer; white-space: nowrap;" style-hover="background: #237A56;">Confirmar pago</button></sc-if><sc-if value="{{ r.due }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.remind }}" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #2A3C58; background: #13223A; color: #E8EEF7; font-family: Manrope, sans-serif; font-weight: 700; font-size: 12.5px; cursor: pointer; white-space: nowrap;" style-hover="background: #1B2B45;">Enviar recordatorio</button></sc-if></span>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ pl.subEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding: 40px 20px; text-align: center; font-size: 14px; color: #8FA0B8;">No hay suscripciones en este estado.</div></sc-if>
+                </div></div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
         <sc-if value="{{ S.config }}" hint-placeholder-val="{{ false }}">
           <div data-screen-label="Configuración" style="display: flex; flex-direction: column; gap: 16px; max-width: 1180px; margin: 0 auto; padding-bottom: 80px;">
             <div style="animation: up .4s ease both;">
@@ -1934,7 +2108,7 @@
   </div>
 </sc-if>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;pantallaInicial&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;login&quot;, &quot;dashboard&quot;, &quot;servicios&quot;, &quot;servicio&quot;, &quot;clientes&quot;, &quot;cliente&quot;, &quot;tecnicos&quot;, &quot;tecnico&quot;, &quot;regiones&quot;, &quot;finanzas&quot;, &quot;soporte&quot;, &quot;reportes&quot;, &quot;catalogo&quot;, &quot;config&quot;], &quot;default&quot;: &quot;dashboard&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Prototipo&quot;}, &quot;sidebarCompacta&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Prototipo&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;pantallaInicial&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;login&quot;, &quot;dashboard&quot;, &quot;servicios&quot;, &quot;servicio&quot;, &quot;clientes&quot;, &quot;cliente&quot;, &quot;tecnicos&quot;, &quot;tecnico&quot;, &quot;regiones&quot;, &quot;finanzas&quot;, &quot;soporte&quot;, &quot;reportes&quot;, &quot;catalogo&quot;, &quot;planes&quot;, &quot;config&quot;], &quot;default&quot;: &quot;dashboard&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Prototipo&quot;}, &quot;sidebarCompacta&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Prototipo&quot;}}">
 class Component extends DCLogic {
   CATS = [
     { id: 'plumbing', name: 'Plomería', icon: 'i-drop', on: true, min: 300, max: 2500, comm: '', subs: ['Fugas de agua', 'Calentadores', 'Drenaje', 'Instalación de WC'], techs: 48, orders: 142, rating: 4.8, ticket: 1180 },
@@ -2018,6 +2192,28 @@ class Component extends DCLogic {
     { id: 'a3', n: 'Carla Ruiz', email: 'carla@tumantenimiento.mx', rol: 'Onboarding', mfa: true, last: 'hace 1 d', pend: false },
     { id: 'a4', n: 'Pedro Lara', email: 'pedro@tumantenimiento.mx', rol: 'Legal', mfa: false, last: 'hace 5 d', pend: false },
   ];
+  // Planes de suscripción y suscriptores: datos de ejemplo (precios y beneficios por definir con el cliente).
+  PLANES = [
+    { id: 'h-esencial', aud: 'hogar', name: 'Esencial', who: 'Para departamentos y casas que piden pocos servicios', price: 149, anual: true, gratis: 2, custom: false, top: false, on: true, subs: 64, vis: { on: true, n: 3, per: 'anio', cats: [] }, disc: { on: true, pct: 10, scope: 'labor' }, emg: { on: true, mode: 'red', pct: 15, prio: 'normal' }, prev: { on: true, n: 1, items: ['ac'] }, war: { on: false, d: 60 }, pay: { card: true, manual: true, gracia: 5 } },
+    { id: 'h-plus', aud: 'hogar', name: 'Hogar Plus', who: 'Para la casa familiar que siempre tiene algo que arreglar', price: 299, anual: true, gratis: 2, custom: false, top: true, on: true, subs: 86, vis: { on: true, n: 6, per: 'anio', cats: [] }, disc: { on: true, pct: 15, scope: 'labor' }, emg: { on: true, mode: 'none', pct: 15, prio: 'alta' }, prev: { on: true, n: 2, items: ['ac', 'gas'] }, war: { on: true, d: 60 }, pay: { card: true, manual: true, gracia: 5 } },
+    { id: 'h-total', aud: 'hogar', name: 'Hogar Total', who: 'Para casas grandes o con más de una propiedad', price: 549, anual: true, gratis: 2, custom: false, top: false, on: true, subs: 23, vis: { on: true, n: 12, per: 'anio', cats: [] }, disc: { on: true, pct: 20, scope: 'all' }, emg: { on: true, mode: 'none', pct: 15, prio: 'max' }, prev: { on: true, n: 4, items: ['ac', 'gas', 'plumb', 'elec'] }, war: { on: true, d: 90 }, pay: { card: true, manual: true, gracia: 5 } },
+    { id: 'n-local', aud: 'negocio', name: 'Local', who: 'Un local, consultorio u oficina', price: 890, anual: true, gratis: 2, custom: false, top: false, on: true, subs: 27, vis: { on: true, n: 6, per: 'anio', cats: [] }, disc: { on: true, pct: 10, scope: 'labor' }, emg: { on: true, mode: 'red', pct: 15, prio: 'normal' }, prev: { on: true, n: 2, items: ['ac', 'elec'] }, war: { on: false, d: 60 }, pay: { card: true, manual: true, gracia: 10 } },
+    { id: 'n-plus', aud: 'negocio', name: 'Negocio Plus', who: 'Restaurantes, tiendas y oficinas con hasta 3 sucursales', price: 1690, anual: true, gratis: 2, custom: false, top: true, on: true, subs: 12, vis: { on: true, n: 18, per: 'anio', cats: [] }, disc: { on: true, pct: 15, scope: 'labor' }, emg: { on: true, mode: 'none', pct: 15, prio: 'alta' }, prev: { on: true, n: 6, items: ['ac', 'gas', 'elec'] }, war: { on: true, d: 60 }, pay: { card: true, manual: true, gracia: 10 } },
+    { id: 'n-corp', aud: 'negocio', name: 'Corporativo', who: 'Condominios, cadenas y corporativos', price: 0, anual: false, gratis: 0, custom: true, top: false, on: true, subs: 2, vis: { on: true, n: 40, per: 'anio', cats: [] }, disc: { on: true, pct: 20, scope: 'all' }, emg: { on: true, mode: 'none', pct: 15, prio: 'max' }, prev: { on: true, n: 12, items: ['ac', 'gas', 'plumb', 'elec'] }, war: { on: true, d: 90 }, pay: { card: false, manual: true, gracia: 15 } },
+  ];
+  SUBS = [
+    { id: 'SUB-0214', cli: 'María Castillo', zona: 'Zapopan', plan: 'h-plus', ciclo: 'Anual', met: 'Tarjeta', renueva: '14 nov 2027', uso: 1, st: 'active' },
+    { id: 'SUB-0213', cli: 'Jorge Salas', zona: 'Guadalajara', plan: 'h-esencial', ciclo: 'Mensual', met: 'Transferencia', renueva: 'Sin activar', uso: 0, st: 'pending' },
+    { id: 'SUB-0212', cli: 'Clínica Dental Arcos', zona: 'Zapopan', plan: 'n-local', ciclo: 'Mensual', met: 'Transferencia', renueva: 'Sin activar', uso: 0, st: 'pending' },
+    { id: 'SUB-0209', cli: 'Laura Méndez', zona: 'Tlaquepaque', plan: 'h-plus', ciclo: 'Mensual', met: 'Tarjeta', renueva: '2 dic 2026', uso: 3, st: 'active' },
+    { id: 'SUB-0205', cli: 'Ricardo Vega', zona: 'Zapopan', plan: 'h-total', ciclo: 'Anual', met: 'Transferencia', renueva: '28 oct 2027', uso: 5, st: 'active' },
+    { id: 'SUB-0198', cli: 'Patricia Ortiz', zona: 'Guadalajara', plan: 'h-esencial', ciclo: 'Mensual', met: 'Efectivo', renueva: 'Venció el 15 nov', uso: 2, st: 'due' },
+    { id: 'SUB-0191', cli: 'Café La Estación', zona: 'Guadalajara', plan: 'n-plus', ciclo: 'Anual', met: 'Tarjeta', renueva: '3 sep 2027', uso: 7, st: 'active' },
+    { id: 'SUB-0187', cli: 'Andrés Navarro', zona: 'Zapopan', plan: 'h-plus', ciclo: 'Mensual', met: 'Efectivo', renueva: 'Sin activar', uso: 0, st: 'pending' },
+    { id: 'SUB-0176', cli: 'Sofía Aguilar', zona: 'Tlajomulco', plan: 'h-esencial', ciclo: 'Mensual', met: 'Tarjeta', renueva: 'Venció el 11 nov', uso: 1, st: 'due' },
+    { id: 'SUB-0164', cli: 'Fernando Ruiz', zona: 'Zapopan', plan: 'h-plus', ciclo: 'Mensual', met: 'Tarjeta', renueva: 'Canceló el 30 oct', uso: 2, st: 'cancelled' },
+  ];
+  PREV = [['ac', 'Aire acondicionado'], ['gas', 'Instalación de gas'], ['plumb', 'Plomería'], ['elec', 'Instalación eléctrica'], ['appl', 'Electrodomésticos']];
   CFG = { nombre: 'Tumantenimiento', email: 'soporte@tumantenimiento.mx', tel: '+52 33 0000 0000', rfc: 'TUM260101AB1', mant: false, reg: true, comision: '15', urgente: '20', mCard: '3.6', mOxxo: '3.9', mWallet: '3.5', mCash: '0', tarifaBase: '250', reducida: true, ttl: '30', reasignar: true, radio: '15', slaSop: '4', cancelHoras: '4', penal: '15', cobrarPenal: true, tecCancel: '3', noShow: '100', push: true, mail: true, sms: false, resumen: true, alertKyc: true, nKyc: true, nDisp: true, nTck: true, nPO: true, nSvc: true, nPay: true, nSys: true, quiet: false, nSound: true };
   FEED_POOL = [
     ['i-plus', 'info', 'Nueva solicitud de Plomería en Zapopan', 'servicios'],
@@ -2063,14 +2259,14 @@ class Component extends DCLogic {
     const cp = x => JSON.parse(JSON.stringify(x));
     this.state = {
       screen: ((typeof location !== 'undefined' && (location.hash.match(/s=(\w+)/) || [])[1]) || (p && p.pantallaInicial) || 'dashboard'), loading: false, narrow: typeof window !== 'undefined' && window.innerWidth < 1100, drawer: !(typeof window !== 'undefined' && window.innerWidth < 1100) && !(p && p.sidebarCompacta), loginStep: 1, cp: 0,
-      sel: { svc: 'SVC-2851', cli: 'c1', tec: 't6', disp: 'DSP-0142', zone: 'gdl', cat: 'plumbing', tck: 'TCK-311' },
-      f: { dash: '7d', gmvMetric: 'gmv', svcTab: 'todos', svcCat: 'all', svcQ: '', cliTab: 'todos', cliQ: '', tecTab: 'todos', tecQ: '', tecCat: 'all', finRange: '30d', finTab: 'tx', finMethod: 'all', supTab: 'disputas', repRange: '30d', cfgTab: 'general', compare: true },
+      sel: { svc: 'SVC-2851', cli: 'c1', tec: 't6', disp: 'DSP-0142', zone: 'gdl', cat: 'plumbing', plan: 'h-plus', tck: 'TCK-311' },
+      f: { dash: '7d', gmvMetric: 'gmv', svcTab: 'todos', svcCat: 'all', svcQ: '', cliTab: 'todos', cliQ: '', tecTab: 'todos', tecQ: '', tecCat: 'all', finRange: '30d', finTab: 'tx', finMethod: 'all', supTab: 'disputas', repRange: '30d', cfgTab: 'general', planAud: 'hogar', planTab: 'planes', subF: 'all', compare: true },
       hv: {},
-      d: { services: cp(this.SERV), techs: cp(this.TECHS), clients: cp(this.CLIENTS), disputes: cp(this.DISP), tickets: cp(this.TCK), payouts: cp(this.PAYOUTS), cats: cp(this.CATS), zones: cp(this.ZONES), admins: cp(this.ADMINS) },
+      d: { services: cp(this.SERV), techs: cp(this.TECHS), clients: cp(this.CLIENTS), disputes: cp(this.DISP), tickets: cp(this.TCK), payouts: cp(this.PAYOUTS), cats: cp(this.CATS), plans: cp(this.PLANES), subs: cp(this.SUBS), zones: cp(this.ZONES), admins: cp(this.ADMINS) },
       notes: { 'SVC-2851': [{ t: 'Cliente pidió factura. Enviar al cierre.', by: 'Luis Ortega', at: 'hace 3 min' }] },
       tnotes: { t1: [{ t: 'Técnico destacado del mes de agosto.', by: 'Carla Ruiz', at: 'hace 12 d' }] },
       cfg: cp(this.CFG), cfgBase: cp(this.CFG),
-      catDraft: null, subDraft: '',
+      catDraft: null, planDraft: null, subDraft: '',
       modal: null, toast: null, palette: false, pq: '', pIdx: 0, notif: false,
       feed: this.FEED_POOL.slice(0, 5).map((e, i) => ({ k: i, e, at: Date.now() - (i + 1) * 97000 })), feedI: 5, now: Date.now(),
       resol: 'parcial', reply: '', noteDraft: '', tnoteDraft: '', sf: { zonas: [], metodo: 'all', urg: false, disputa: false, monto: 'all' }, tf: { zonas: [], rating: 'all', disp: 'all', orden: 'jobs' }, cf: { zonas: [], gasto: 'all', orden: 'recent' }, fpOpen: null, snack: null, offline: false, notifs: this.NOTIF.map(([id, type, title, body, min, read, to]) => ({ id, type, title, body, ts: Date.now() - min * 60000, read, to })), nSel: [], nTab: 'all', nType: 'all', estTab: 'errores', fs: null, dd: null, ddq: '', calV: [new Date().getFullYear(), new Date().getMonth()], rangeV: [new Date().getFullYear(), new Date().getMonth()], range: { k: 'all', a: null, b: null }, rangeDraft: null, rangeOpen: false, svcSort: { k: 'upd', dir: 1 }, svcSel: [], svcPage: 0, rowMenu: null, rates: {}, rateEdit: false, rateDraft: null,
@@ -2255,6 +2451,7 @@ class Component extends DCLogic {
     const openT = D.tickets.filter(t => t.st !== 'resolved');
     const pendPO = D.payouts.filter(p => p.st === 'pending');
     const waiting = D.services.filter(x => x.st === 'requested');
+    const pendSub = D.subs.filter(x => x.st === 'pending');
     const NTV = s.notifs.filter(n => s.cfg[this.NT[n.type][3]]), nUnread = NTV.filter(n => !n.read).length;
     const act = ['requested', 'accepted', 'enroute', 'onsite', 'quote', 'working'];
     const parent = { servicio: 'servicios', cliente: 'clientes', tecnico: 'tecnicos' }[scr] || scr;
@@ -2265,14 +2462,14 @@ class Component extends DCLogic {
       ['Usuarios', [['clientes', 'Clientes', 'i-users', 0], ['tecnicos', 'Técnicos', 'i-id', pendingKyc.length]]],
       ['Operación', [['servicios', 'Servicios', 'i-wrench', waiting.length], ['regiones', 'Regiones y cobertura', 'i-map', 0], ['finanzas', 'Finanzas', 'i-wallet', pendPO.length], ['soporte', 'Soporte y disputas', 'i-scale', openD.length + openT.length]]],
       ['Analítica', [['reportes', 'Reportes', 'i-trend', 0]]],
-      ['Sistema', [['catalogo', 'Catálogo', 'i-grid', 0], ['config', 'Configuración', 'i-sliders', 0], ['estados', 'Estados y errores', 'i-alert', 0]]],
+      ['Sistema', [['catalogo', 'Catálogo', 'i-grid', 0], ['planes', 'Planes', 'i-shield', pendSub.length], ['config', 'Configuración', 'i-sliders', 0], ['estados', 'Estados y errores', 'i-alert', 0]]],
     ].map(([t, items]) => ({ t, items: items.map(([k, label, icon, badge]) => { const on = parent === k; return { label, icon, badge, hasBadge: badge > 0, badgePos: s.drawer ? 'static' : 'absolute', bSize: s.drawer ? '20px' : '10px', bPad: s.drawer ? '6px' : '0px', bFont: s.drawer ? '11px' : '0px', bBorder: s.drawer ? 'none' : '2px solid ' + (on ? '#0A6BCF' : '#060E1C'), go: go(k), bg: on ? '#0A6BCF' : 'transparent', fg: on ? '#FFFFFF' : '#B8C4D6', bar: 0 }; }) }));
 
     const svc = D.services.find(x => x.id === s.sel.svc) || D.services[0];
     const cli = CL(s.sel.cli) || D.clients[0];
     const tec = T(s.sel.tec) || D.techs[0];
-    const TITLES = { dashboard: 'Panel de control', servicios: 'Servicios', servicio: svc.id + ' · ' + svc.cat, clientes: 'Clientes', cliente: cli.nombre, tecnicos: 'Técnicos', tecnico: tec.nombre, regiones: 'Regiones y cobertura', finanzas: 'Finanzas', soporte: 'Soporte y disputas', reportes: 'Reportes y analítica', catalogo: 'Catálogo de servicios', config: 'Configuración del sistema', estados: 'Estados y errores', notificaciones: 'Centro de notificaciones', e404: 'Página no encontrada', e500: 'Error del servidor', offline: 'Sin conexión', e403: 'Sin permisos', mant: 'Mantenimiento', sesion: 'Sesión expirada' };
-    const GROUP = { dashboard: 'Inicio', servicios: 'Operación', servicio: 'Operación', clientes: 'Usuarios', cliente: 'Usuarios', tecnicos: 'Usuarios', tecnico: 'Usuarios', regiones: 'Operación', finanzas: 'Operación', soporte: 'Operación', reportes: 'Analítica', catalogo: 'Sistema', config: 'Sistema', estados: 'Sistema', notificaciones: 'Inicio' };
+    const TITLES = { dashboard: 'Panel de control', servicios: 'Servicios', servicio: svc.id + ' · ' + svc.cat, clientes: 'Clientes', cliente: cli.nombre, tecnicos: 'Técnicos', tecnico: tec.nombre, regiones: 'Regiones y cobertura', finanzas: 'Finanzas', soporte: 'Soporte y disputas', reportes: 'Reportes y analítica', catalogo: 'Catálogo de servicios', planes: 'Planes y suscripciones', config: 'Configuración del sistema', estados: 'Estados y errores', notificaciones: 'Centro de notificaciones', e404: 'Página no encontrada', e500: 'Error del servidor', offline: 'Sin conexión', e403: 'Sin permisos', mant: 'Mantenimiento', sesion: 'Sesión expirada' };
+    const GROUP = { dashboard: 'Inicio', servicios: 'Operación', servicio: 'Operación', clientes: 'Usuarios', cliente: 'Usuarios', tecnicos: 'Usuarios', tecnico: 'Usuarios', regiones: 'Operación', finanzas: 'Operación', soporte: 'Operación', reportes: 'Analítica', catalogo: 'Sistema', planes: 'Sistema', config: 'Sistema', estados: 'Sistema', notificaciones: 'Inicio' };
     const crumbs = [{ t: GROUP[scr] || '', go: () => {}, color: '#6F819B', cursor: 'default', sep: false }];
     if (parent !== scr) crumbs.push({ t: TITLES[parent], go: go(parent), color: '#0A6BCF', cursor: 'pointer', sep: true });
 
@@ -2448,6 +2645,74 @@ class Component extends DCLogic {
     const catDirty = JSON.stringify({ n: cd.name, a: cd.min, b: cd.max, c: cd.comm, s: cd.subs }) !== JSON.stringify({ n: cat.name, a: cat.min, b: cat.max, c: cat.comm, s: cat.subs });
     const cdv = { name: cd.name, min: String(cd.min), max: String(cd.max), comm: cd.comm, icon: cat.icon, subs: cd.subs.map((t, i) => ({ t, rm: () => setCd({ subs: cd.subs.filter((_, j) => j !== i) }) })), dirty: catDirty, commHint: cd.comm ? `Sobrescribe la comisión global (${s.cfg.comision}%)` : `Usa la comisión global (${s.cfg.comision}%)`, techs: cat.techs, orders: cat.orders, btnOp: catDirty ? 1 : 0.45 };
 
+    // ---------- Planes y suscripciones
+    const PA = f.planAud, plansA = D.plans.filter(p => p.aud === PA);
+    const plan = plansA.find(p => p.id === s.sel.plan) || plansA[0];
+    const pd = s.planDraft && s.planDraft.id === plan.id ? s.planDraft : JSON.parse(JSON.stringify(plan));
+    const setPd = patch => this.setState({ planDraft: { ...pd, ...patch } });
+    const setB = (k, patch) => setPd({ [k]: { ...pd[k], ...patch } });
+    const planCore = x => { const { on, subs, ...r } = x; return JSON.stringify(r); }; // publicar/pausar y el conteo no son parte del borrador
+    const planDirty = planCore(pd) !== planCore(plan);
+    const leavePlan = fn => { const prev = s.planDraft, ps = s.sel.plan, pa = f.planAud; fn(); if (planDirty) this.snack(`Cambios sin guardar en ${pd.name} descartados`, () => this.setState(x => ({ planDraft: prev, sel: { ...x.sel, plan: ps }, f: { ...x.f, planAud: pa } }))); };
+    const low = t => t.charAt(0).toLowerCase() + t.slice(1), CN = Object.fromEntries(D.cats.map(c => [c.id, c.name])), PN = Object.fromEntries(this.PREV);
+    const ctl = o => ({ isStep: false, isPct: false, isSeg: false, isChips: false, ...o });
+    const stp = (label, v, set, min, max) => ctl({ label, isStep: true, v: String(v), dec: () => set(Math.max(min, v - 1)), inc: () => set(Math.min(max, v + 1)) });
+    const pctc = (label, v, set) => ctl({ label, isPct: true, v: String(v), set: e => set(Math.min(90, +e.target.value.replace(/\D/g, '') || 0)) });
+    const sgm = (label, opts, cur, set) => ctl({ label, isSeg: true, opts: this.seg(opts, cur, set) });
+    const chp = (label, opts) => ctl({ label, isChips: true, opts: opts.map(([t, on, go]) => ({ t, on, go, bg: on ? '#12325A' : '#13223A', fg: on ? '#5AB0FF' : '#B8C4D6', bd: on ? '#2B5A8A' : '#2A3C58' })) });
+    const tog = (arr, id) => arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
+    const PRIO = { normal: 'normal', alta: 'alta', max: 'máxima' };
+    const bSum = {
+      vis: b => `${b.n} ${b.per === 'mes' ? 'al mes' : 'al año'} · ${b.cats.length ? b.cats.map(c => low(CN[c] || c)).join(', ') : 'todas las categorías'}`,
+      disc: b => `${b.pct}% en ${b.scope === 'all' ? 'mano de obra y materiales' : 'mano de obra'}`,
+      emg: b => `${b.mode === 'none' ? 'Sin recargo' : b.mode === 'red' ? `Recargo de ${b.pct}% en lugar de 30%` : 'Recargo normal de 30%'} · prioridad ${PRIO[b.prio]}`,
+      prev: b => `${b.n} al año · ${b.items.length ? b.items.map(i => low(PN[i])).join(', ') : 'elige qué se revisa'}`,
+      war: b => `${b.d} días en cada servicio`,
+    };
+    const BEN = [
+      ['vis', 'i-wrench', 'Visitas incluidas', 'El cliente no paga el costo de visita.', () => [stp('Visitas sin costo', pd.vis.n, n => setB('vis', { n }), 1, 60), sgm('Periodo', [['mes', 'Al mes'], ['anio', 'Al año']], pd.vis.per, per => setB('vis', { per })), chp('Categorías', [['Todas', !pd.vis.cats.length, () => setB('vis', { cats: [] })], ...D.cats.map(c => [c.name, pd.vis.cats.includes(c.id), () => setB('vis', { cats: tog(pd.vis.cats, c.id) })])])]],
+      ['disc', 'i-bill', 'Descuento en cotización', 'Se aplica cuando el cliente aprueba la cotización.', () => [pctc('Descuento', pd.disc.pct, pct => setB('disc', { pct })), sgm('Aplica a', [['labor', 'Mano de obra'], ['all', 'Mano de obra y materiales']], pd.disc.scope, scope => setB('disc', { scope }))]],
+      ['emg', 'i-zap', 'Emergencias y prioridad', 'Recargo de emergencia y lugar en la fila de asignación.', () => [sgm('Recargo', [['full', 'Normal 30%'], ['red', 'Reducido'], ['none', 'Sin recargo']], pd.emg.mode, mode => setB('emg', { mode })), ...(pd.emg.mode === 'red' ? [pctc('Recargo reducido', pd.emg.pct, pct => setB('emg', { pct }))] : []), sgm('Prioridad', [['normal', 'Normal'], ['alta', 'Alta'], ['max', 'Máxima']], pd.emg.prio, prio => setB('emg', { prio }))]],
+      ['prev', 'i-cal', 'Preventivos programados', 'Revisiones que se agendan solas, con recordatorio al cliente.', () => [stp('Revisiones al año', pd.prev.n, n => setB('prev', { n }), 1, 24), chp('Qué se revisa', this.PREV.map(([id, t]) => [t, pd.prev.items.includes(id), () => setB('prev', { items: tog(pd.prev.items, id) })]))]],
+      ['war', 'i-shield', 'Garantía extendida', 'Sin este beneficio aplica la garantía estándar de 30 días.', () => [sgm('Cobertura', [[60, '60 días'], [90, '90 días'], [180, '180 días']], pd.war.d, d => setB('war', { d }))]],
+    ];
+    const benefits = BEN.map(([k, icon, title, off, ctls]) => { const b = pd[k], t = this.tg(b.on); return { icon, title, on: b.on, sum: b.on ? bSum[k](b) : off, tgBg: t.bg, tgX: t.x, toggle: () => setB(k, { on: !b.on }), icBg: b.on ? '#12325A' : '#1B2B45', icFg: b.on ? '#5AB0FF' : '#6F819B', ctls: b.on ? ctls() : [] }; });
+    const nBen = ['vis', 'disc', 'emg', 'prev', 'war'].filter(k => pd[k].on).length;
+    const anualTotal = pd.price * (12 - pd.gratis);
+    const pvLines = [pd.vis.on && `${pd.vis.n} ${pd.vis.n === 1 ? 'visita' : 'visitas'} ${pd.vis.per === 'mes' ? 'al mes' : 'al año'} sin costo de visita`, pd.disc.on && `${pd.disc.pct}% de descuento en ${pd.disc.scope === 'all' ? 'mano de obra y materiales' : 'mano de obra'}`, pd.emg.on && `Emergencias ${pd.emg.mode === 'none' ? 'sin recargo' : pd.emg.mode === 'red' ? `con recargo de ${pd.emg.pct}%` : 'con recargo normal'}${pd.emg.prio !== 'normal' ? ` y prioridad ${PRIO[pd.emg.prio]}` : ''}`, pd.prev.on && `${pd.prev.n} ${pd.prev.n === 1 ? 'revisión preventiva' : 'revisiones preventivas'} al año`, `Garantía de ${pd.war.on ? pd.war.d : 30} días`].filter(Boolean).map(t => ({ t }));
+    const pv = { top: pd.top, name: pd.name || 'Sin nombre', who: pd.who, bg: pd.top ? 'linear-gradient(172deg, #0A6BCF 0%, #0B4FA0 36%, #0A2E63 100%)' : '#0D213F', bd: pd.top ? 'rgba(24,193,255,0.38)' : 'rgba(90,176,255,0.14)', mut: pd.top ? '#E6F0FC' : '#9FB0C8', price: pd.custom ? 'A la medida' : pd.price > 0 ? this.money(pd.price) : 'Sin precio', priceSize: pd.custom || !(pd.price > 0) ? '24px' : '34px', per: pd.custom || !(pd.price > 0) ? '' : '/mes', note: pd.custom ? 'Cotización según ubicaciones y servicios' : !(pd.price > 0) ? 'Define el precio mensual' : pd.anual ? `o ${this.money(anualTotal)} al año` : 'Cobro mensual', lines: pvLines, none: nBen === 0 };
+    const planErr = !pd.name.trim() ? 'Escribe un nombre para el plan.' : !pd.custom && !(pd.price > 0) ? 'Define un precio mensual mayor a $0.' : !pd.pay.card && !pd.pay.manual ? 'Activa al menos un método de cobro.' : nBen === 0 ? 'Activa al menos un beneficio.' : '';
+    const tT = this.tg(pd.top), tC = this.tg(pd.custom), tA = this.tg(pd.anual), priceOk = pd.price > 0;
+    const ed = {
+      name: pd.name, setName: e => setPd({ name: e.target.value }), nameBd: pd.name.trim() ? '#22344F' : '#F87171', who: pd.who, setWho: e => setPd({ who: e.target.value }),
+      top: pd.top, topBg: tT.bg, topX: tT.x, toggleTop: () => setPd({ top: !pd.top }),
+      custom: pd.custom, customBg: tC.bg, customX: tC.x, toggleCustom: () => setPd({ custom: !pd.custom }), priced: !pd.custom,
+      price: pd.price ? String(pd.price) : '', setPrice: e => setPd({ price: +e.target.value.replace(/\D/g, '').slice(0, 6) || 0 }), priceBd: priceOk ? '#22344F' : '#F87171', priceHelp: priceOk ? 'Los suscriptores actuales conservan su precio hasta renovar.' : 'Define un precio mayor a $0.', priceHelpC: priceOk ? '#8FA0B8' : '#F87171',
+      anual: pd.anual, anualBg: tA.bg, anualX: tA.x, toggleAnual: () => setPd({ anual: !pd.anual }), anualHelp: pd.anual ? `Un pago de ${this.money(anualTotal)} al año, equivale a ${this.money(anualTotal / 12)} al mes.` : 'El plan solo se ofrece con cobro mensual.',
+      gratis: String(pd.gratis), gratisDec: () => setPd({ gratis: Math.max(0, pd.gratis - 1) }), gratisInc: () => setPd({ gratis: Math.min(6, pd.gratis + 1) }),
+      gracia: String(pd.pay.gracia), graciaDec: () => setB('pay', { gracia: Math.max(0, pd.pay.gracia - 1) }), graciaInc: () => setB('pay', { gracia: Math.min(30, pd.pay.gracia + 1) }),
+    };
+    const payRows = [['card', 'i-card', 'Tarjeta con renovación automática', 'Se cobra cada periodo hasta que el cliente cancele.'], ['manual', 'i-bank', 'Transferencia o efectivo', 'El plan se activa cuando finanzas confirma el pago.']].map(([k, icon, title, help]) => { const on = pd.pay[k], t = this.tg(on); return { icon, title, help, on, tgBg: t.bg, tgX: t.x, toggle: () => setB('pay', { [k]: !on }), icBg: on ? '#12325A' : '#1B2B45', icFg: on ? '#5AB0FF' : '#6F819B' }; });
+    const planList = plansA.map(p => { const t = this.tg(p.on), on = p.id === plan.id; return { name: p.name, top: p.top, on: p.on, price: p.custom ? 'A la medida' : p.price > 0 ? this.money(p.price) + '/mes' : 'Sin precio', subsTxt: p.subs === 1 ? '1 suscriptor' : p.subs + ' suscriptores', stTxt: p.on ? 'Publicado' : 'Pausado', stC: p.on ? '#5FD39B' : '#8FA0B8', bg: on ? '#10284A' : '#13223A', hov: on ? '#10284A' : '#1B2B45', tgBg: t.bg, tgX: t.x, tgLabel: (p.on ? 'Pausar ' : 'Publicar ') + p.name,
+      open: () => { if (!on) leavePlan(() => this.setState(x => ({ sel: { ...x.sel, plan: p.id }, planDraft: null }))); },
+      toggle: e => { e.stopPropagation(); if (!p.on && !p.custom && !(p.price > 0)) { this.toast('bad', 'No se puede publicar', 'Define un precio mensual antes de publicar el plan.'); return; } this.upd('plans', p.id, { on: !p.on }); this.snack(p.on ? `${p.name} pausado · ya no admite contrataciones${p.subs ? `; ${p.subs} suscriptores siguen activos` : ''}` : `${p.name} publicado en el landing y la app`, () => this.upd('plans', p.id, { on: p.on })); } }; });
+    const savePlan = () => { if (planErr) { this.toast('bad', 'No se pudo guardar', planErr); return; } const { on, subs, ...patch } = pd; this.setState(x => ({ d: { ...x.d, plans: x.d.plans.map(p => p.id === plan.id ? { ...p, ...patch } : pd.top && p.aud === plan.aud ? { ...p, top: false } : p) }, planDraft: null })); this.toast('ok', 'Plan guardado', `${pd.name} · visible en el landing y la app en unos minutos.`); };
+    const addPlan = () => leavePlan(() => { const id = 'p' + Date.now(); this.setState(x => ({ d: { ...x.d, plans: [...x.d.plans, { id, aud: PA, name: 'Plan nuevo', who: '', price: 0, anual: true, gratis: 2, custom: false, top: false, on: false, subs: 0, vis: { on: true, n: 2, per: 'anio', cats: [] }, disc: { on: false, pct: 10, scope: 'labor' }, emg: { on: false, mode: 'red', pct: 15, prio: 'normal' }, prev: { on: false, n: 1, items: [] }, war: { on: false, d: 60 }, pay: { card: true, manual: true, gracia: 5 } }] }, sel: { ...x.sel, plan: id }, f: { ...x.f, planTab: 'planes' }, planDraft: null })); this.toast('ok', 'Plan creado en pausa', 'Define precio y beneficios; publícalo cuando esté listo.'); });
+    const STS = { active: ['Activa', 'ok'], pending: ['Por activar', 'warn'], due: ['Pago vencido', 'bad'], cancelled: ['Cancelada', 'mute'] };
+    const subRows = D.subs.filter(x => f.subF === 'all' || x.st === f.subF).map(x => { const p = D.plans.find(q => q.id === x.plan) || { name: 'Plan eliminado', vis: { on: false } }, [stTxt, tone] = STS[x.st]; return { id: x.id, cli: x.cli, ini: this.ini(x.cli), zona: x.zona, plan: p.name, aud: p.aud === 'negocio' ? 'Negocios' : 'Hogar', ciclo: x.ciclo, met: x.met, renueva: x.renueva, renC: x.st === 'due' ? '#F87171' : x.st === 'active' ? '#E8EEF7' : '#8FA0B8', uso: x.st === 'pending' ? 'Sin uso' : `${x.uso} de ${p.vis.on ? p.vis.n : 0}`, stTxt, pBg: this.P[tone][0], pFg: this.P[tone][1], pending: x.st === 'pending', due: x.st === 'due',
+      confirm: () => { this.upd('subs', x.id, { st: 'active', renueva: x.ciclo === 'Anual' ? '20 nov 2027' : '20 dic 2026' }); this.toast('ok', 'Plan activado', `${x.cli} · ${p.name}, cobro ${x.ciclo.toLowerCase()}.`); },
+      remind: () => this.toast('ok', 'Recordatorio enviado', `${x.cli} recibe el aviso en la app y por correo.`) }; });
+    const subsTotal = D.plans.reduce((a, p) => a + p.subs, 0), subN = k => D.subs.filter(x => x.st === k).length;
+    const pl = {
+      tabs: this.tabs([['planes', 'Planes', D.plans.length], ['subs', 'Suscriptores', subsTotal]], f.planTab, k => this.setF('planTab', k)), isPlans: f.planTab === 'planes', isSubs: f.planTab === 'subs',
+      audSeg: this.seg([['hogar', 'Hogar'], ['negocio', 'Negocios']], PA, k => { if (k !== PA) leavePlan(() => this.setState(x => ({ f: { ...x.f, planAud: k }, planDraft: null }))); }),
+      sumSubs: String(plansA.reduce((a, p) => a + p.subs, 0)), sumMrr: this.money(plansA.reduce((a, p) => a + (p.custom ? 0 : p.price * p.subs), 0)),
+      list: planList, pv, ed, benefits, benCount: `${nBen} de 5 activos`, pay: payRows, add: addPlan,
+      dirty: planDirty, invalid: !!planErr, barTitle: planErr || `Cambios sin guardar en ${pd.name}`, barSub: planErr ? 'Corrígelo para poder guardar.' : plan.subs ? `${plan.subs} suscriptores conservan sus condiciones actuales hasta su renovación.` : 'Este plan aún no tiene suscriptores.', barIc: planErr ? '#F87171' : '#F59E0B', saveOp: planErr ? 0.45 : 1, saveCur: planErr ? 'not-allowed' : 'pointer',
+      discard: () => this.setState({ planDraft: null }), save: savePlan,
+      subSeg: this.seg([['all', 'Todas'], ['active', 'Activas'], ['pending', `Por activar · ${subN('pending')}`], ['due', `Pago vencido · ${subN('due')}`], ['cancelled', 'Canceladas']], f.subF, k => this.setF('subF', k)), subRows, subEmpty: !subRows.length,
+    };
+
     // ---------- Config
     const C = s.cfg, setC = (k, v) => this.setState(x => ({ cfg: { ...x.cfg, [k]: v } }));
     const txt = (k, label, help, suf) => ({ isText: true, isTg: false, label, help, v: C[k], suf: suf || '', hasSuf: !!suf, set: e => setC(k, e.target.value) });
@@ -2468,7 +2733,7 @@ class Component extends DCLogic {
 
     // ---------- Palette
     const pq = s.pq.trim().toLowerCase();
-    const scrs = Object.entries({ dashboard: 'Dashboard', servicios: 'Servicios', clientes: 'Clientes', tecnicos: 'Técnicos', regiones: 'Regiones y cobertura', finanzas: 'Finanzas', soporte: 'Soporte y disputas', reportes: 'Reportes', catalogo: 'Catálogo', config: 'Configuración', estados: 'Estados y errores', notificaciones: 'Notificaciones', e404: 'Ver error 404', e500: 'Ver error 500', e403: 'Ver sin permisos', offline: 'Ver sin conexión', mant: 'Ver mantenimiento', sesion: 'Ver sesión expirada' });
+    const scrs = Object.entries({ dashboard: 'Dashboard', servicios: 'Servicios', clientes: 'Clientes', tecnicos: 'Técnicos', regiones: 'Regiones y cobertura', finanzas: 'Finanzas', soporte: 'Soporte y disputas', reportes: 'Reportes', catalogo: 'Catálogo', planes: 'Planes y suscripciones', config: 'Configuración', estados: 'Estados y errores', notificaciones: 'Notificaciones', e404: 'Ver error 404', e500: 'Ver error 500', e403: 'Ver sin permisos', offline: 'Ver sin conexión', mant: 'Ver mantenimiento', sesion: 'Ver sesión expirada' });
     let pres = [
       ...scrs.filter(([k, l]) => !pq || l.toLowerCase().includes(pq)).slice(0, pq ? 4 : 5).map(([k, l]) => ({ icon: 'i-arrow-r', t: l, sub: 'Ir a pantalla', go: go(k) })),
       ...(pq ? D.services.filter(x => [x.id, CL(x.c).nombre, x.cat].join(' ').toLowerCase().includes(pq)).slice(0, 4).map(x => ({ icon: this.CAT_ICON[x.cat] || 'i-wrench', t: x.id + ' · ' + CL(x.c).nombre, sub: 'Servicio · ' + this.ST[x.st][0], go: go('servicio', { svc: x.id }) })) : []),
@@ -2520,7 +2785,7 @@ class Component extends DCLogic {
     const adminRoles = mSel([['Admin Soporte', 'Soporte'], ['Onboarding', 'Onboarding'], ['Legal', 'Legal'], ['Super Admin', 'Super Admin']], 'rol', 'Admin Soporte');
 
     const S = { login: scr === 'login', app: scr !== 'login' };
-    const KNOWN = ['dashboard', 'servicios', 'servicio', 'clientes', 'cliente', 'tecnicos', 'tecnico', 'regiones', 'finanzas', 'soporte', 'reportes', 'catalogo', 'config', 'estados', 'notificaciones'];
+    const KNOWN = ['dashboard', 'servicios', 'servicio', 'clientes', 'cliente', 'tecnicos', 'tecnico', 'regiones', 'finanzas', 'soporte', 'reportes', 'catalogo', 'planes', 'config', 'estados', 'notificaciones'];
     KNOWN.forEach(k => { S[k] = !s.loading && scr === k; });
     S.err = !s.loading && scr !== 'login' && !KNOWN.includes(scr);
     const nRel = ts => { const m = Math.max(0, Math.round((s.now - ts) / 60000)); return m < 1 ? 'ahora' : m < 60 ? 'hace ' + m + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'ayer'; };
@@ -2642,7 +2907,7 @@ class Component extends DCLogic {
       newTicket: () => this.openModal('ticketNew', { asunto: '', de: '', rol: 'Cliente', prio: 'media' }), kycQueue, kycQEmpty: kycQueue.length === 0,
       repRange: this.seg([['7d', '7 días'], ['30d', '30 días'], ['90d', '90 días']], f.repRange, k => this.setF('repRange', k)), repKpis, repChart, repTotal: rv.reduce((a, b) => a + b, 0).toLocaleString('es-MX'), funnel, funLeave: () => this.hover('fun', null), catPerf, topTechs, heat, heatTip, slots: SLOTS.map((t, i) => ({ t, c: H.heat && H.heat[1] === i ? '#E8EEF7' : '#6F819B' })), heatLeave: () => this.hover('heat', null), cold,
       exportRep: () => this.toast('ok', 'Reporte exportado', 'reporte-operacion-sep-2026.csv se descargó.'),
-      cats, cdv, setCdName: e => setCd({ name: e.target.value }), setCdMin: e => setCd({ min: +e.target.value.replace(/\D/g, '') || 0 }), setCdMax: e => setCd({ max: +e.target.value.replace(/\D/g, '') || 0 }), setCdComm: e => setCd({ comm: e.target.value.replace(/[^\d.]/g, '') }),
+      pl, cats, cdv, setCdName: e => setCd({ name: e.target.value }), setCdMin: e => setCd({ min: +e.target.value.replace(/\D/g, '') || 0 }), setCdMax: e => setCd({ max: +e.target.value.replace(/\D/g, '') || 0 }), setCdComm: e => setCd({ comm: e.target.value.replace(/[^\d.]/g, '') }),
       subDraft: s.subDraft, setSub: e => this.setState({ subDraft: e.target.value }), addSub: () => { const t = s.subDraft.trim(); if (!t) return; setCd({ subs: [...cd.subs, t] }); this.setState({ subDraft: '' }); },
       saveCat: () => { this.upd('cats', cat.id, { name: cd.name, min: cd.min, max: cd.max, comm: cd.comm, subs: cd.subs }); this.setState({ catDraft: null }); this.toast('ok', 'Categoría guardada', `${cd.name} · cambios visibles en la app en minutos.`); },
       discardCat: () => this.setState({ catDraft: null }), newCat: () => this.openModal('catNew', { name: '' }),

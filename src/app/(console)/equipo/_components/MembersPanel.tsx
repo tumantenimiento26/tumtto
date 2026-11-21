@@ -52,17 +52,17 @@ export function MembersPanel({ openAdd = false }: { openAdd?: boolean }) {
 
   return (
     <>
-      <Card className="overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
           <div>
-            <div className="font-display text-[16px] font-bold text-navy">
+            <h2 className="font-display text-[16px] font-bold text-navy">
               Miembros del equipo
-            </div>
+            </h2>
             <p className="mt-0.5 font-sans text-[12.5px] text-muted">
               {staff.length} con acceso a la consola.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               icon={Mail}

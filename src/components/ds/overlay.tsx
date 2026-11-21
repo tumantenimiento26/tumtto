@@ -2,30 +2,162 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { X, type LucideIcon } from 'lucide-react';
 
-/** Monta en document.body (overlays fuera de contenedores con scroll/transform). */
+const noopSubscribe = () => () => {};
+
+/**
+ * Monta en document.body (overlays fuera de contenedores con scroll/transform).
+ * En cliente monta en el mismo commit, así los efectos de foco ya encuentran
+ * el panel; solo en la hidratación espera al segundo render.
+ */
 export function Portal({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   return mounted ? createPortal(children, document.body) : null;
 }
 
-/** Escape cierra (paleta, modales, sheets, menús). */
-export function useEscape(onEscape: () => void, active = true) {
+/* ── Capas con foco (WCAG 2.4.3 / 2.1.1) ──
+   Pila de overlays abiertos: solo la capa de arriba atiende Escape y Tab, así
+   un Select abierto dentro de un Sheet cierra solo el Select. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export function focusables(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    el => !el.closest('[inert]') && el.getClientRects().length > 0,
+  );
+}
+
+type LayerKind = 'modal' | 'dialog' | 'menu' | 'listbox';
+interface Layer {
+  root: () => HTMLElement | null;
+  kind: LayerKind;
+  onEscape?: () => void;
+  /** menu/listbox: Tab cierra y el foco sigue desde el disparador. */
+  onTabOut?: () => void;
+}
+const layers: Layer[] = [];
+
+function onLayerKey(e: KeyboardEvent) {
+  const top = layers[layers.length - 1];
+  if (!top) return;
+  if (e.key === 'Escape') {
+    if (!top.onEscape) return;
+    e.preventDefault();
+    e.stopPropagation();
+    top.onEscape();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  if (top.kind === 'menu' || top.kind === 'listbox') {
+    // Sin preventDefault: el navegador mueve el foco desde el disparador.
+    top.onTabOut?.();
+    return;
+  }
+  const root = top.root();
+  if (!root) return;
+  const list = focusables(root);
+  const active = document.activeElement as HTMLElement | null;
+  if (list.length === 0) {
+    e.preventDefault();
+    root.focus();
+    return;
+  }
+  const first = list[0];
+  const last = list[list.length - 1];
+  const inside = !!active && root.contains(active);
+  if (e.shiftKey && (!inside || active === first || active === root)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (!inside || active === last)) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+const coarse = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(pointer: coarse)').matches;
+
+/**
+ * Registra un overlay en la pila de foco mientras `active`:
+ * - al abrir mueve el foco adentro (`initial`: primer control, el propio
+ *   panel o nada si el foco se queda en el disparador, p. ej. un Select);
+ * - Tab queda atrapado (modal/dialog) o cierra (menu/listbox);
+ * - Escape llama `onEscape`; al cerrar devuelve el foco a `returnTo` (o a lo
+ *   que estaba enfocado al abrir) si el foco no se fue a otro lado.
+ */
+export function useFocusLayer(
+  ref: React.RefObject<HTMLElement | null>,
+  active: boolean,
+  {
+    kind,
+    onEscape,
+    onTabOut,
+    initial = 'first',
+    returnTo,
+  }: {
+    kind: LayerKind;
+    onEscape?: () => void;
+    onTabOut?: () => void;
+    initial?: 'first' | 'container' | 'none';
+    returnTo?: React.RefObject<HTMLElement | null>;
+  },
+) {
+  const cbs = useRef({ onEscape, onTabOut });
+  cbs.current = { onEscape, onTabOut };
   useEffect(() => {
     if (!active) return;
-    const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onEscape();
+    const prev = document.activeElement as HTMLElement | null;
+    const root = ref.current;
+    const trigger = returnTo?.current ?? prev;
+    const layer: Layer = {
+      root: () => ref.current,
+      kind,
+      onEscape: () => cbs.current.onEscape?.(),
+      onTabOut: () => cbs.current.onTabOut?.(),
     };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onEscape, active]);
+    if (layers.length === 0) document.addEventListener('keydown', onLayerKey, true);
+    layers.push(layer);
+
+    if (root && !root.contains(document.activeElement) && initial !== 'none') {
+      const pick =
+        initial === 'container' || coarse()
+          ? null
+          : (root.querySelector<HTMLElement>('[data-autofocus]') ??
+            (kind === 'menu'
+              ? root.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')
+              : focusables(root).find(el => !el.hasAttribute('data-overlay-close')) ??
+                focusables(root)[0]));
+      if (pick) pick.focus();
+      else {
+        if (!root.hasAttribute('tabindex')) root.setAttribute('tabindex', '-1');
+        root.focus({ preventScroll: true });
+      }
+    }
+
+    return () => {
+      const i = layers.indexOf(layer);
+      if (i >= 0) layers.splice(i, 1);
+      if (layers.length === 0) document.removeEventListener('keydown', onLayerKey, true);
+      const now = document.activeElement;
+      const lost = !now || now === document.body || !!root?.contains(now);
+      if (trigger?.isConnected && lost) trigger.focus({ preventScroll: true });
+    };
+    // `initial`/`kind` solo importan al abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 }
 
 /** Bloquea el scroll del body mientras hay un overlay modal abierto. */
@@ -45,7 +177,10 @@ type Align = 'start' | 'end';
 /**
  * Popover anclado a un elemento, en position:fixed dentro de un portal, así
  * no lo recorta el overflow de tablas/tarjetas. Se reposiciona en scroll/resize
- * y cierra con clic fuera o Escape.
+ * y cierra con clic fuera o Escape (el foco vuelve al disparador).
+ * `kind`: dialog (foco adentro, Tab circula), menu (foco al primer ítem,
+ * flechas, Tab cierra) o listbox (el foco se queda en el disparador o en el
+ * buscador; Tab cierra).
  */
 export function Popover({
   anchor,
@@ -56,6 +191,8 @@ export function Popover({
   width,
   className = '',
   offset = 6,
+  kind = 'dialog',
+  'aria-label': ariaLabel,
 }: {
   anchor: React.RefObject<HTMLElement | null>;
   open: boolean;
@@ -65,6 +202,8 @@ export function Popover({
   width?: number | 'anchor';
   className?: string;
   offset?: number;
+  kind?: 'dialog' | 'menu' | 'listbox';
+  'aria-label'?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; w?: number }>();
@@ -110,14 +249,25 @@ export function Popover({
     return () => document.removeEventListener('mousedown', h);
   }, [open, onClose, anchor]);
 
-  useEscape(onClose, open);
+  useFocusLayer(panel, open, {
+    kind,
+    onEscape: onClose,
+    onTabOut: () => {
+      // El foco pasa al disparador y el Tab del navegador sigue desde ahí.
+      if (panel.current?.contains(document.activeElement)) anchor.current?.focus();
+      onClose();
+    },
+    initial: kind === 'listbox' ? 'none' : 'first',
+    returnTo: anchor,
+  });
 
   if (!open) return null;
   return (
     <Portal>
       <div
         ref={panel}
-        role="dialog"
+        role={kind === 'dialog' ? 'dialog' : undefined}
+        aria-label={kind === 'dialog' ? ariaLabel : undefined}
         className={`anim-pop fixed z-[90] rounded-box border border-line bg-card shadow-float ${className}`}
         style={{
           top: pos?.top ?? -9999,
@@ -147,25 +297,49 @@ export function Menu({
   items: (MenuItem | 'divider')[];
   onClose: () => void;
 }) {
+  // Flechas ↑↓ / Inicio / Fin entre ítems (WAI-ARIA menu); Tab cierra (Popover).
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const list = Array.from(
+      e.currentTarget.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not([disabled])',
+      ),
+    );
+    if (!list.length) return;
+    const i = list.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === 'ArrowDown'
+        ? list[(i + 1) % list.length]
+        : e.key === 'ArrowUp'
+          ? list[(i - 1 + list.length) % list.length]
+          : e.key === 'Home'
+            ? list[0]
+            : e.key === 'End'
+              ? list[list.length - 1]
+              : null;
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+  };
   return (
-    <div role="menu" className="min-w-[180px] p-1.5">
+    <div role="menu" className="min-w-[180px] p-1.5" onKeyDown={onKeyDown}>
       {items.map((it, i) =>
         it === 'divider' ? (
-          <div key={i} className="my-1 h-px bg-divider" />
+          <div key={i} role="separator" className="my-1 h-px bg-divider" />
         ) : (
           <button
             key={it.label}
             role="menuitem"
             type="button"
+            tabIndex={-1}
             disabled={it.disabled}
             onClick={() => {
               onClose();
               it.onSelect();
             }}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors disabled:opacity-40 ${
+            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors focus-visible:-outline-offset-2 disabled:opacity-40 ${
               it.destructive
-                ? 'text-error hover:bg-error-soft'
-                : 'text-navy hover:bg-panel'
+                ? 'text-error hover:bg-error-soft focus:bg-error-soft'
+                : 'text-navy hover:bg-panel focus:bg-panel'
             }`}
           >
             {it.icon && (
@@ -224,7 +398,10 @@ export function Modal({
   const close = useCallback(() => {
     if (dismissible) onClose();
   }, [dismissible, onClose]);
-  useEscape(close, open);
+  const box = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descId = useId();
+  useFocusLayer(box, open, { kind: 'modal', onEscape: close });
   useScrollLock(open);
   if (!open) return null;
   const tile = {
@@ -239,10 +416,12 @@ export function Modal({
       {/* Celular (≤640 px): pantalla completa con scroll y botones al pie. */}
       <div className="pointer-events-none fixed inset-0 z-[81] grid place-items-center p-4 max-[640px]:place-items-stretch max-[640px]:p-0">
         <div
+          ref={box}
           role="dialog"
           aria-modal="true"
-          aria-label={title}
-          className="anim-modal pointer-events-auto w-full max-w-[var(--modal-w)] rounded-modal border border-line bg-card p-6 shadow-modal max-[640px]:flex max-[640px]:max-w-none max-[640px]:flex-col max-[640px]:overflow-y-auto max-[640px]:rounded-none max-[640px]:border-0"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descId : undefined}
+          className="anim-modal pointer-events-auto outline-none w-full max-w-[var(--modal-w)] rounded-modal border border-line bg-card p-6 shadow-modal max-[640px]:flex max-[640px]:max-w-none max-[640px]:flex-col max-[640px]:overflow-y-auto max-[640px]:rounded-none max-[640px]:border-0"
           style={{ '--modal-w': `${width}px` } as React.CSSProperties}
         >
           {Icon && (
@@ -252,11 +431,17 @@ export function Modal({
               <Icon size={24} />
             </div>
           )}
-          <h2 className="font-display text-[19px] font-extrabold tracking-[-0.3px] text-navy">
+          <h2
+            id={titleId}
+            className="font-display text-[19px] font-extrabold tracking-[-0.3px] text-navy"
+          >
             {title}
           </h2>
           {description && (
-            <div className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+            <div
+              id={descId}
+              className="mt-1.5 text-[13.5px] leading-relaxed text-muted"
+            >
               {description}
             </div>
           )}
@@ -296,17 +481,20 @@ export function Sheet({
   /** Para animar el footer (p. ej. `animate-shake` al fallar la validación). */
   footerClassName?: string;
 }) {
-  useEscape(onClose, open);
+  const box = useRef<HTMLElement>(null);
+  const titleId = useId();
+  useFocusLayer(box, open, { kind: 'modal', onEscape: onClose });
   useScrollLock(open);
   if (!open) return null;
   return (
     <Portal>
       <Scrim onClick={onClose} />
       <aside
+        ref={box}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
-        className="anim-sheet fixed inset-y-0 right-0 z-[81] flex w-full flex-col border-l border-line bg-card shadow-sheet"
+        aria-labelledby={titleId}
+        className="anim-sheet fixed inset-y-0 right-0 z-[81] flex w-full flex-col border-l border-line bg-card shadow-sheet outline-none"
         style={{ maxWidth: width }}
       >
         <header className="flex items-start gap-3 border-b border-line px-6 py-5">
@@ -316,7 +504,10 @@ export function Sheet({
                 {kicker}
               </p>
             )}
-            <h2 className="font-display text-[18px] font-extrabold tracking-[-0.3px] text-navy">
+            <h2
+              id={titleId}
+              className="font-display text-[18px] font-extrabold tracking-[-0.3px] text-navy"
+            >
               {title}
             </h2>
           </div>
@@ -324,6 +515,7 @@ export function Sheet({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
+            data-overlay-close
             className="grid h-9 w-9 place-items-center rounded-btn text-muted hover:bg-panel hover:text-navy"
           >
             <X size={18} />

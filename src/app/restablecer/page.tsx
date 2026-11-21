@@ -89,7 +89,7 @@ export default function RestablecerPage() {
     <button
       type="button"
       onClick={() => setShow(s => !s)}
-      className="flex items-center text-muted hover:text-navy"
+      className="-mr-2 grid h-10 w-10 place-items-center rounded-btn text-muted hover:bg-panel hover:text-navy"
       aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
     >
       {show ? <EyeOff size={17} /> : <Eye size={17} />}

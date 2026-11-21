@@ -207,17 +207,13 @@ export default function CatalogoPage() {
                       checked={c.is_active}
                       disabled={busy === `toggle-${c.id}`}
                       onChange={() => void onToggle(c)}
-                      label={
-                        <span className="sr-only">
-                          {c.is_active ? 'Pausar' : 'Publicar'} {c.name}
-                        </span>
-                      }
+                      aria-label={`Publicar ${c.name}`}
                     />
                   </span>
                 </div>
-                <h3 className="mt-3 font-display text-[17px] font-bold text-navy">
+                <h2 className="mt-3 font-display text-[17px] font-bold text-navy">
                   {c.name}
-                </h3>
+                </h2>
                 <span
                   className={`font-sans text-[12.5px] font-semibold ${
                     c.is_active ? 'text-success' : 'text-muted'

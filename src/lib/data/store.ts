@@ -629,6 +629,15 @@ export const getCashReviewOrders = () => w().orders.filter(o => o.cash_review_op
 export const getFailedBaseRefunds = () => failedBaseRefunds(w().orders);
 /** TUM-03: órdenes con un comprobante de transferencia por revisar (badge y avisos). */
 export const getTransferReviewOrders = () => w().orders.filter(o => o.base_fee_status === 'in_review');
+/**
+ * Lo que «Revisión de pagos» muestra: sin pagos en línea la página solo tiene
+ * la pestaña Efectivo, así que menú, dashboard y avisos no cuentan
+ * transferencias (antes el menú decía 6 y la página enseñaba 3).
+ */
+export const getVisibleTransferReviewOrders = () =>
+  onlinePaymentsEnabled() ? getTransferReviewOrders() : [];
+export const getPaymentReviewCount = () =>
+  getCashReviewOrders().length + getVisibleTransferReviewOrders().length;
 /** Decisión 7: servicios terminados con el adelanto aún adeudado (para el contador de la pestaña). */
 export const getOwedAdvanceOrders = () => w().orders.filter(isAdvanceOwed);
 /** TUM-03: transferencias aceptadas sobre solicitudes muertas que esperan el reembolso manual (finanzas). */
@@ -1795,6 +1804,15 @@ export type ReportKpiWindow = {
   quotes_rejected?: number;
 };
 export type ReportKpis = { current: ReportKpiWindow; previous: ReportKpiWindow };
+/**
+ * GMV (centavos) de una ventana con la definición de admin_report_kpis:
+ * órdenes pagadas en la ventana, sin cotizaciones rechazadas. El dashboard
+ * arma su gráfica con esto para que la suma de la curva sea la cifra del KPI.
+ */
+export function gmvCentsBetween(from: number, to: number): number {
+  return kpiWindow(w().orders, groupByOrder(w().payments), from, to, 'all', rejectedCloseIds(w().orders, w().quotes))
+    .gmv_cents;
+}
 /** admin_report_kpis devuelve jsonb: su forma es la de ReportKpis. */
 export const fetchReportKpis = async (from: Date, to: Date, method: MethodFilter = 'all') =>
   (await reportRpc('admin_report_kpis', from, to, method)) as ReportKpis | null;

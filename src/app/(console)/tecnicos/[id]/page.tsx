@@ -43,7 +43,6 @@ import {
   getTechMunicipality,
   getTechRadiusKm,
   getTechRates,
-  getTechRatings,
   getTechnician,
   getTechnicianCommissions,
   getWallet,
@@ -61,6 +60,7 @@ import {
 import { techAdminOwnedSummary, techIncome } from '@/lib/commission';
 import { formatPhone } from '@/lib/phone';
 import { orderCode } from '@/lib/orderCode';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { useAuth } from '@/lib/auth';
 import {
   CRIMINAL_RECORD_VALID_MONTHS,
@@ -96,7 +96,6 @@ import { ToolsCard } from '../_components/ToolsCard';
 import { CompanyToolsCard } from '../_components/CompanyToolsCard';
 import { RatingsCard } from '../_components/RatingsCard';
 import { SettlementCard } from '../../liquidaciones/_components/SettlementCard';
-import { ratingSummary } from '@/lib/ratingModeration';
 
 const money = (c: number) =>
   (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
@@ -125,6 +124,7 @@ export default function TecnicoDetailPage() {
 
   const tech = getTechnician(id);
   const profile = tech ? getProfile(tech.id) : null;
+  useDocumentTitle(profile?.full_name, 'Técnicos');
 
   const data = useMemo(() => {
     if (!tech) return null;
@@ -158,7 +158,6 @@ export default function TecnicoDetailPage() {
         b.created_at.localeCompare(a.created_at),
       ),
       docs: getTechDocuments(tech.id),
-      ratings: getTechRatings(tech.id),
       zone: getTechMunicipality(tech.id),
       radius: getTechRadiusKm(tech.id),
     };
@@ -197,9 +196,11 @@ export default function TecnicoDetailPage() {
     ? undefined
     : `Primero aprueba la carta de antecedentes (vigente, menos de ${CRIMINAL_RECORD_VALID_MONTHS} meses).`;
 
-  // Promedio mostrado: solo calificaciones visibles (el servidor hace lo mismo en technicians).
-  const shown =
-    data.ratings.length > 0 ? ratingSummary(data.ratings) : { avg: tech.rating_avg, count: tech.rating_count };
+  // Una sola fuente para la calificación: el agregado del servidor
+  // (technicians.rating_avg/count, solo calificaciones visibles), el mismo que
+  // usan la lista de técnicos y el dashboard. Recalcularlo con las reseñas
+  // cargadas daba otra cifra (4.6 aquí, 4.9 en la lista).
+  const shown = { avg: tech.rating_avg, count: tech.rating_count };
 
   const approve = () =>
     void run('approve', () => resolveKyc(tech.id, true), `Técnico aprobado · ${name}`);
@@ -414,7 +415,7 @@ export default function TecnicoDetailPage() {
             {[
               { l: 'Trabajos completados', v: String(data.jobs), i: Briefcase },
               {
-                l: 'Rating',
+                l: 'Calificación',
                 v: shown.avg > 0 ? shown.avg.toFixed(1) : '—',
                 sub: `${shown.count} reseñas`,
                 i: Star,
@@ -426,11 +427,11 @@ export default function TecnicoDetailPage() {
                     {
                       l: 'Comisiones ganadas',
                       v: money(data.adminOwned.commissionEarnedCents),
-                      sub: `${data.adminOwned.servicesCount} servicios · dinero de Tu Mantenimiento`,
+                      sub: `${data.adminOwned.servicesCount} servicios · dinero de Tumantenimiento`,
                       i: HandCoins,
                     },
                     {
-                      l: 'Efectivo de Tu Mantenimiento',
+                      l: 'Efectivo de Tumantenimiento',
                       v: money(data.adminOwned.cashHeldForAdminCents),
                       sub: 'Reportado por el técnico; debe entregarlo',
                       i: Building2,
@@ -445,7 +446,7 @@ export default function TecnicoDetailPage() {
                   </span>
                   <k.i size={16} className="text-primary" />
                 </div>
-                <div className="mt-2 font-display text-[24px] font-extrabold text-navy tabular">
+                <div className="mt-2 font-display text-[20px] font-extrabold text-navy tabular sm:text-[24px]">
                   {k.v}
                 </div>
                 {k.sub && <div className="font-sans text-[12px] text-muted">{k.sub}</div>}
@@ -453,8 +454,10 @@ export default function TecnicoDetailPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
-            <div className="flex flex-col gap-4">
+          {/* Dos columnas por tema y de alto parecido: operación (dinero,
+              tarifas, servicios, calificaciones) | perfil, cobro y equipo. */}
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-4">
               {canViewFinance && <SettlementCard techId={tech.id} />}
               <RatesCard techId={tech.id} rates={data.rates} />
               <Card padded>
@@ -485,11 +488,11 @@ export default function TecnicoDetailPage() {
                   })
                 )}
               </Card>
-            </div>
-            <div className="flex flex-col gap-4">
               <RatingsCard techId={tech.id} />
-              {canSensitive && <BankCard tech={tech} />}
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
               <TechTypeCard techId={tech.id} />
+              {canSensitive && <BankCard tech={tech} />}
               <VehiclesCard techId={tech.id} />
               <ToolsCard techId={tech.id} />
               <CompanyToolsCard techId={tech.id} />

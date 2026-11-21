@@ -9,7 +9,9 @@ import { BUILD, envLabel } from '@/lib/buildInfo';
 // Marco de las páginas públicas de acceso (login, registro de técnico,
 // contraseña nueva, callback de correo, invitación) — handoff web A2/B:
 // panel de marca navy con aura y rejilla a la izquierda, formulario blanco a
-// la derecha. Bajo 760px el panel queda arriba y más bajo.
+// la derecha. Bajo 760px el formulario va primero (con una franja de marca
+// arriba) y el panel queda debajo: en celular el botón principal entra en la
+// primera pantalla.
 
 export type AuthAsideProps = {
   kicker: string;
@@ -42,10 +44,21 @@ export function AuthShell({
   }, []);
 
   return (
-    <div className="grid min-h-screen w-full grid-cols-1 bg-card min-[760px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-      <AuthAside {...aside} />
+    <div
+      data-touch
+      className="grid min-h-screen w-full grid-cols-1 bg-card min-[760px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]"
+    >
       <main className="relative flex flex-col px-5 pb-8 pt-5 sm:px-10">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          <Link
+            href="/"
+            className="mr-auto flex items-center gap-2.5 min-[760px]:hidden"
+          >
+            <BrandMark size={32} className="rounded-lg" />
+            <span className="font-display text-[16px] font-extrabold text-navy">
+              Tumantenimiento
+            </span>
+          </Link>
           <Link
             href="/"
             className="inline-flex h-10 items-center gap-1.5 rounded-btn border border-line-strong bg-card px-3.5 font-display text-[14px] font-bold text-navy transition-colors hover:bg-panel"
@@ -54,28 +67,31 @@ export function AuthShell({
             Volver al sitio
           </Link>
         </div>
-        <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-8">
+        <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-8 max-[759px]:justify-start max-[759px]:pt-6">
           {children}
         </div>
         {footer && (
-          <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+          <p className="text-center font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
             Conexión cifrada ·{' '}
             <a
               href="mailto:soporte@tumantenimiento.mx"
-              className="hover:text-navy"
+              className="inline-flex min-h-6 items-center px-1 hover:text-navy"
             >
               Ayuda
             </a>
           </p>
         )}
       </main>
+      {/* En el DOM va después del formulario (teclado y lector llegan primero
+          al formulario); en escritorio se pinta a la izquierda. */}
+      <AuthAside {...aside} />
     </div>
   );
 }
 
 function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
   return (
-    <aside className="relative min-h-[260px] overflow-hidden bg-lp-page px-6 py-8 text-lp-text sm:px-10 min-[760px]:sticky min-[760px]:top-0 min-[760px]:h-screen min-[760px]:py-10">
+    <aside className="relative min-h-[260px] overflow-hidden bg-lp-page px-6 py-8 text-lp-text sm:px-10 min-[760px]:sticky min-[760px]:top-0 min-[760px]:order-first min-[760px]:h-screen min-[760px]:py-10">
       {/* Aura + rejilla doble enmascarada (mismo lenguaje que la landing) */}
       <div
         aria-hidden
@@ -111,9 +127,10 @@ function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-cyan">
             {kicker}
           </p>
-          <h2 className="mt-3 font-display text-[clamp(28px,3.4vw,40px)] font-extrabold leading-[1.08] tracking-[-1px]">
+          {/* <p>, no <h2>: el panel va antes del <h1> del formulario en el DOM. */}
+          <p className="mt-3 font-display text-[clamp(28px,3.4vw,40px)] font-extrabold leading-[1.08] tracking-[-1px]">
             {title}
-          </h2>
+          </p>
           <p className="mx-auto mt-4 max-w-[440px] text-[15px] leading-[1.65] text-lp-body">
             {lead}
           </p>
@@ -146,20 +163,25 @@ function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
 export function AsideConsole() {
   // Reloj solo en cliente: evita desajuste de hidratación con el HTML del server.
   const [now, setNow] = useState<Date | null>(null);
+  const tz = { timeZone: 'America/Mexico_City' } as const;
+  // La fecha de compilación también se formatea solo en cliente: el ICU de
+  // Node y el del navegador separan «a.m.» distinto y la página prerenderada
+  // fallaba la hidratación (React #418) en producción.
+  const [built, setBuilt] = useState('—');
   useEffect(() => {
     setNow(new Date());
+    if (BUILD.builtAt)
+      setBuilt(
+        new Date(BUILD.builtAt).toLocaleString('es-MX', {
+          timeZone: 'America/Mexico_City',
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+      );
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const tz = { timeZone: 'America/Mexico_City' } as const;
   const env = envLabel(BUILD.env);
-  const built = BUILD.builtAt
-    ? new Date(BUILD.builtAt).toLocaleString('es-MX', {
-        ...tz,
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : '—';
 
   return (
     <div className="rounded-box border border-lp-line bg-lp-card p-5 backdrop-blur-md">

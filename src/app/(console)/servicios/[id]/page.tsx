@@ -21,6 +21,7 @@ import {
   Siren,
   Star,
   UserCog,
+  UserPlus,
   Undo2,
 } from 'lucide-react';
 import {
@@ -30,7 +31,6 @@ import {
   EmptyState,
   ErrorPage,
   Input,
-  Kicker,
   Modal,
   ScreenSkeleton,
   Select,
@@ -90,6 +90,7 @@ import {
 import type { RequestStatus } from '@/lib/demo/world';
 import { completedJobs } from '@/lib/techConsole';
 import { orderCode } from '@/lib/orderCode';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { fmtDateTime } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
@@ -203,6 +204,7 @@ export default function ServicioDetailPage() {
   }, [ready, id]);
 
   const req = ready ? getRequest(id) : undefined;
+  useDocumentTitle(req ? orderCode(req.id) : null, 'Servicios');
 
   const events = useMemo(
     () => (req ? getOrderEvents(req.id) : []),
@@ -346,7 +348,7 @@ export default function ServicioDetailPage() {
             </div>
             <div className="text-[13px] text-body">
               {adminRequest
-                ? `El cliente pidió que Tumtto asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
+                ? `El cliente pidió que Tumantenimiento asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
                 : 'Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.'}
             </div>
           </div>
@@ -356,7 +358,7 @@ export default function ServicioDetailPage() {
                 Rechazar
               </Button>
             )}
-            <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
+            <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
               Asignar técnico
             </Button>
           </div>
@@ -456,11 +458,11 @@ export default function ServicioDetailPage() {
                 <span
                   className={`relative z-[1] grid h-6 w-6 place-items-center rounded-full border-2 ${
                     done
-                      ? 'border-primary bg-primary text-white'
+                      ? 'border-primary-fill bg-primary-fill text-white'
                       : now
                         ? 'border-primary bg-card'
                         : lastReached
-                          ? 'border-error bg-error text-white'
+                          ? 'border-error-fill bg-error-fill text-white'
                           : 'border-line-strong bg-card'
                   }`}
                 >
@@ -505,13 +507,13 @@ export default function ServicioDetailPage() {
           )}
           {(adminRequest || wantsReassign) && (
             <Card padded>
-              <Kicker className="mb-3">Ubicación del servicio</Kicker>
+              <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Ubicación del servicio</h2>
               <RequestMap center={wkbPoint(req.location)} label={address || undefined} />
               <p className="mt-3 text-[13.5px] text-body">{address || 'Dirección no disponible'}</p>
             </Card>
           )}
           <Card padded>
-            <Kicker className="mb-3">Descripción del problema</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Descripción del problema</h2>
             <p className="text-[15px] leading-relaxed text-navy">
               {req.description ? `“${req.description}”` : 'Sin descripción.'}
             </p>
@@ -626,7 +628,7 @@ export default function ServicioDetailPage() {
                       <div className="min-w-0 flex-1 pb-4">
                         <div className="flex flex-wrap items-baseline gap-2">
                           <span
-                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning' : 'text-navy'}`}
+                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning-ink' : 'text-navy'}`}
                           >
                             {e.is_revert
                               ? `Estado revertido: ${label(e.from_status)} → ${label(e.to_status)}`
@@ -660,13 +662,18 @@ export default function ServicioDetailPage() {
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={3}
+              aria-label="Nota interna"
               placeholder="Solo visible para el equipo admin…"
               onKeyDown={e => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void saveNote();
               }}
             />
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-[12px] text-faint">⌘↵ para guardar · queda en la bitácora admin</span>
+              <span className="text-[12px] text-faint">
+                {/* El atajo solo tiene sentido con teclado físico. */}
+                <span className="hidden [@media(pointer:fine)]:inline">⌘↵ para guardar · </span>
+                Queda en la bitácora admin
+              </span>
               <Button size="sm" onClick={() => void saveNote()} loading={busy === 'note'} disabled={!note.trim()}>
                 Guardar nota
               </Button>
@@ -690,7 +697,7 @@ export default function ServicioDetailPage() {
         {/* Columna lateral */}
         <div className="flex min-w-0 flex-col gap-4">
           <Card padded>
-            <Kicker className="mb-3">Cliente</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Cliente</h2>
             <div className="flex items-center gap-3">
               <Avatar name={client?.full_name} userId={client?.id} size={42} />
               <div className="min-w-0">
@@ -716,12 +723,12 @@ export default function ServicioDetailPage() {
 
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
-              <Kicker>Técnico</Kicker>
+              <h2 className="font-display text-[16px] font-bold text-navy">Técnico</h2>
               <span title={!terminal && !reassignable ? REASSIGN_BLOCKED_TIP : undefined}>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  icon={UserCog}
+                  variant="secondary"
+                  icon={req.technician_id ? UserCog : UserPlus}
                   onClick={() => setReassignOpen(true)}
                   disabled={terminal || !canSupport || !reassignable}
                   aria-label={
@@ -763,7 +770,7 @@ export default function ServicioDetailPage() {
             {req.assigned_by_admin_at && (
               <div className="mt-3 flex flex-col items-start gap-1.5 border-t border-divider pt-3">
                 <Badge tone="info" mono>
-                  Asignado por Tumtto
+                  Asignado por Tumantenimiento
                 </Badge>
                 <span className="text-[12.5px] text-muted">
                   {agoLabel(req.assigned_by_admin_at)}
@@ -789,7 +796,7 @@ export default function ServicioDetailPage() {
             <PaymentBreakdown order={req} />
           ) : (
           <Card padded>
-            <Kicker className="mb-3">Cobro y comisión</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Cobro y comisión</h2>
             <dl className="flex flex-col gap-2 text-[13.5px]">
               <Row label="Mano de obra" value={money(laborCents || null, true)} />
               <Row label="Materiales" value={money(materialsCents || null, true)} />
@@ -821,7 +828,7 @@ export default function ServicioDetailPage() {
           )}
 
           <Card padded>
-            <Kicker className="mb-3">Acciones del admin</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Acciones del admin</h2>
             <div className="flex flex-col gap-2.5">
               <Select
                 aria-label="Forzar estado"

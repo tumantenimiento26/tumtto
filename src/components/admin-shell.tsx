@@ -43,18 +43,19 @@ import {
   Menu as MenuIcon,
 } from 'lucide-react';
 
+import { MotionConfig } from 'framer-motion';
+
 import { canAccessPath } from '@/lib/staffRoles';
 import { PageTransition } from './motion';
 import { BrandMark } from './ui';
 import { Avatar } from './avatar';
 import { toast } from './toast';
-import { IconButton, Kicker, Portal, ScreenSkeleton, useEscape } from './ds';
+import { IconButton, Kicker, Portal, ScreenSkeleton, useFocusLayer } from './ds';
 import {
   getAllRequests,
   getClients,
   getOpenSupportCount,
-  getCashReviewOrders,
-  getTransferReviewOrders,
+  getPaymentReviewCount,
   getPendingKyc,
   getProfile,
   getTechniciansWithProfile,
@@ -190,7 +191,7 @@ function useNavGroups(): NavGroup[] {
           href: '/revision-pagos',
           icon: Banknote,
           label: 'Revisión de pagos',
-          badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
+          badge: getPaymentReviewCount,
         },
         {
           href: '/soporte',
@@ -292,7 +293,7 @@ function Sidebar({
 
   return (
     <aside
-      className={`relative flex h-full flex-col bg-sidebar text-white transition-[width] duration-300 ease-[cubic-bezier(.3,1,.4,1)] ${
+      className={`relative flex h-full flex-col bg-sidebar text-white [--color-focus:var(--color-cyan)] transition-[width] duration-300 ease-[cubic-bezier(.3,1,.4,1)] ${
         compact ? 'w-[76px]' : 'w-64'
       } ${overlay ? 'shadow-modal' : ''}`}
     >
@@ -305,7 +306,7 @@ function Sidebar({
             <div className="font-display text-[15px] font-extrabold leading-none">
               Tumantenimiento
             </div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+            <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-white/60">
               Consola admin
             </div>
           </div>
@@ -330,7 +331,7 @@ function Sidebar({
             {compact ? (
               <div className="mx-auto my-2 h-px w-8 bg-white/[0.08]" />
             ) : (
-              <p className="px-3 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+              <p className="px-3 pb-1.5 pt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/60">
                 {g.label}
               </p>
             )}
@@ -345,7 +346,7 @@ function Sidebar({
                   aria-current={active ? 'page' : undefined}
                   className={`relative mb-0.5 flex items-center gap-3 rounded-btn py-2.5 transition-colors ${
                     compact ? 'justify-center px-0' : 'px-3'
-                  } ${active ? 'bg-[#0a6bcf] text-white' : 'text-white/70 hover:bg-white/[0.06] hover:text-white'}`}
+                  } ${active ? 'bg-primary-fill text-white' : 'text-white/75 hover:bg-white/[0.06] hover:text-white'}`}
                 >
                   <span className="relative">
                     <it.icon size={19} strokeWidth={1.9} />
@@ -416,7 +417,7 @@ function Sidebar({
           onClick={onToggle}
           aria-label={compact ? 'Expandir menú' : 'Contraer menú'}
           title="⌘B"
-          className="absolute -right-3.5 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-line bg-card text-navy shadow-float transition-transform hover:scale-105"
+          className="absolute -right-3.5 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-line bg-card text-navy shadow-float transition-transform [--color-focus:var(--color-primary)] hover:scale-105"
         >
           <ChevronRight
             size={15}
@@ -451,7 +452,8 @@ function CommandPalette() {
     setQ('');
     setIdx(0);
   }, [setPalette]);
-  useEscape(close, palette);
+  const box = useRef<HTMLDivElement>(null);
+  useFocusLayer(box, palette, { kind: 'modal', onEscape: close });
 
   const items = useMemo<PaletteItem[]>(() => {
     if (!palette) return [];
@@ -514,6 +516,7 @@ function CommandPalette() {
       />
       <div className="pointer-events-none fixed inset-0 z-[81] flex justify-center px-4 pt-[12vh]">
         <div
+          ref={box}
           role="dialog"
           aria-modal="true"
           aria-label="Buscar"
@@ -544,7 +547,7 @@ function CommandPalette() {
               aria-label="Buscar"
               className="h-14 flex-1 bg-transparent text-[15px] text-navy outline-none placeholder:text-faint"
             />
-            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-faint">
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-faint [@media(pointer:coarse)]:hidden">
               esc
             </kbd>
           </div>
@@ -564,6 +567,8 @@ function CommandPalette() {
                   )}
                   <button
                     type="button"
+                    tabIndex={-1}
+                    aria-current={i === idx ? 'true' : undefined}
                     onMouseEnter={() => setIdx(i)}
                     onClick={() => go(it)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ${i === idx ? 'bg-panel' : ''}`}
@@ -587,7 +592,7 @@ function CommandPalette() {
               );
             })}
           </div>
-          <div className="flex gap-4 border-t border-line px-4 py-2.5 font-mono text-[11px] text-faint">
+          <div className="flex gap-4 border-t border-line px-4 py-2.5 font-mono text-[11px] text-faint [@media(pointer:coarse)]:hidden">
             <span>↑↓ moverse</span>
             <span>↵ abrir</span>
             <span>esc cerrar</span>
@@ -624,7 +629,7 @@ function NotificationsPanel({
   const { markRead } = useNotifState();
   const panel = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setNotifs(false), [setNotifs]);
-  useEscape(close, notifs);
+  useFocusLayer(panel, notifs, { kind: 'dialog', onEscape: close });
   useEffect(() => {
     if (!notifs) return;
     const h = (e: MouseEvent) => {
@@ -646,9 +651,9 @@ function NotificationsPanel({
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <p className="font-display text-[16px] font-bold text-navy">
+            <h2 className="font-display text-[16px] font-bold text-navy">
               Notificaciones
-            </p>
+            </h2>
             <p className="text-[12.5px] text-muted">{unread} sin leer</p>
           </div>
           <button
@@ -738,8 +743,10 @@ function Header({ onMenu, narrow }: { onMenu: () => void; narrow: boolean }) {
         onClick={onMenu}
         size={narrow ? 44 : 40}
       />
-      <div className="min-w-0">
-        <Kicker className="!text-[10px]">{group}</Kicker>
+      {/* Desde md el buscador ocupa el centro: el título no se encoge hasta
+          desaparecer («Ser…» a 768 px). En celular sí se trunca. */}
+      <div className="min-w-0 md:max-w-[50%] md:flex-shrink-0">
+        <Kicker className="!text-[11px]">{group}</Kicker>
         <p className="truncate font-display text-[16px] font-bold text-navy">
           {shownTitle}
         </p>
@@ -747,13 +754,13 @@ function Header({ onMenu, narrow }: { onMenu: () => void; narrow: boolean }) {
       <button
         type="button"
         onClick={() => setPalette(true)}
-        className="mx-auto hidden h-10 w-full max-w-[480px] items-center gap-2.5 rounded-btn border border-line bg-panel px-3.5 text-left text-[13.5px] text-faint transition-colors hover:border-line-strong md:flex"
+        className="mx-auto hidden h-10 min-w-0 max-w-[480px] flex-1 items-center gap-2.5 rounded-btn border border-line bg-panel px-3.5 text-left text-[13.5px] text-muted transition-colors hover:border-line-strong md:flex"
       >
         <Search size={16} />
         <span className="flex-1 truncate">
           Buscar servicio, cliente, técnico o pantalla
         </span>
-        <kbd className="rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[11px]">
+        <kbd className="rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[11px] [@media(pointer:coarse)]:hidden">
           ⌘K
         </kbd>
       </button>
@@ -836,6 +843,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const hydrateTheme = useTheme(s => s.hydrate);
   const [navigating, setNavigating] = useState(false);
   const first = useRef(true);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useFocusLayer(drawerRef, narrow && drawer, {
+    kind: 'modal',
+    onEscape: () => setDrawer(false),
+  });
   useAssignmentsLive();
 
   // Tema solo dentro de la consola; al salir (login) se quita.
@@ -896,6 +908,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [onMenu, setPalette]);
 
   return (
+    // reducedMotion="user": con «reducir movimiento» framer solo hace fundidos.
+    <MotionConfig reducedMotion="user">
     <div className="flex h-screen overflow-hidden bg-page">
       {/* Sidebar en flujo solo en escritorio (>1024px); en celular/tablet vive en el cajón. */}
       <div className="relative z-30 hidden flex-shrink-0 min-[1025px]:block">
@@ -908,7 +922,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             className="anim-fade fixed inset-0 z-[60] bg-[rgba(6,27,58,0.55)] backdrop-blur-[2px]"
             onClick={() => setDrawer(false)}
           />
-          <div className="anim-fade fixed inset-y-0 left-0 z-[61]">
+          <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú"
+            className="anim-fade fixed inset-y-0 left-0 z-[61] outline-none"
+          >
             <Sidebar
               compact={false}
               overlay
@@ -931,31 +951,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
     </div>
-  );
-}
-
-/**
- * @deprecated Popover anterior (absoluto, se recorta dentro de contenedores con
- * overflow). Usa `Popover` de `@/components/ds` (fixed + portal). Se conserva
- * para las pantallas aún no rediseñadas.
- */
-export function Popover({
-  onClose,
-  children,
-  className = '',
-}: {
-  onClose: () => void;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <>
-      <div onClick={onClose} className="fixed inset-0 z-40" />
-      <div
-        className={`absolute right-0 top-full z-50 mt-2 rounded-xl border border-line bg-card p-1.5 shadow-overlay ${className}`}
-      >
-        {children}
-      </div>
-    </>
+    </MotionConfig>
   );
 }

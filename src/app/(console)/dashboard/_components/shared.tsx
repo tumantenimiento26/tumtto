@@ -76,9 +76,9 @@ export function CardHead({
   return (
     <div className="flex items-center justify-between gap-3">
       {kicker ? (
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+        <h2 className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
           {kicker}
-        </span>
+        </h2>
       ) : (
         <h2 className="font-display text-[16px] font-bold text-navy">
           {title}
@@ -89,7 +89,7 @@ export function CardHead({
         <button
           type="button"
           onClick={onLink}
-          className="text-[13px] font-semibold text-primary hover:underline"
+          className="inline-flex min-h-6 items-center text-[13px] font-semibold text-primary hover:underline"
         >
           {link}
         </button>

@@ -17,6 +17,7 @@ import {
   Badge,
   Button,
   Chip,
+  ListCard,
   DataTable,
   EmptyState,
   ErrorPage,
@@ -28,7 +29,6 @@ import {
   Select,
   Sheet,
   Tabs,
-  Card,
   Kicker,
   toast,
   type DataColumn,
@@ -91,7 +91,7 @@ interface Row {
 
 const DONE = new Set(['completed', 'paid', 'closed']);
 const ORDER_OPTIONS = [
-  { value: 'rating', label: 'Mejor rating' },
+  { value: 'rating', label: 'Mejor calificación' },
   { value: 'jobs', label: 'Más trabajos' },
   { value: 'name', label: 'Nombre A–Z' },
 ] as const;
@@ -214,7 +214,7 @@ export default function TecnicosPage() {
         Teléfono: r.phone,
         Especialidades: r.cats.join(' / '),
         Zona: r.zone,
-        Rating: r.rating || '',
+        Calificación: r.rating || '',
         Trabajos: r.jobs,
         Disponible: r.available ? 'Sí' : 'No',
         KYC: KYC_GROUP_META[r.kyc].label,
@@ -253,7 +253,7 @@ export default function TecnicosPage() {
       key: 'type',
       header: 'Tipo',
       sortValue: r => r.type,
-      render: r => <TechTypeBadge techId={r.id} />,
+      render: r => <TechTypeBadge techId={r.id} stacked />,
     },
     {
       key: 'cats',
@@ -275,7 +275,7 @@ export default function TecnicosPage() {
     },
     {
       key: 'rating',
-      header: 'Rating',
+      header: 'Calificación',
       sortValue: r => r.rating,
       render: r =>
         r.rating > 0 ? (
@@ -299,24 +299,21 @@ export default function TecnicosPage() {
       ),
     },
     {
-      key: 'avail',
-      header: 'Disponibilidad',
-      sortValue: r => (r.available ? 1 : 0),
-      render: r => (
-        <span className="inline-flex items-center gap-2 font-sans text-[13px] text-body">
-          <span
-            className={`h-2 w-2 rounded-full ${r.available ? 'bg-success' : 'bg-faint'}`}
-          />
-          {r.available ? 'Disponible' : 'No disponible'}
-        </span>
-      ),
-    },
-    {
       key: 'kyc',
       header: 'Estado',
       sortValue: r => r.kyc,
+      // Disponibilidad bajo el estado de verificación: una columna menos a 1440 px.
       render: r => (
-        <Badge tone={KYC_GROUP_META[r.kyc].tone}>{KYC_GROUP_META[r.kyc].label}</Badge>
+        <span className="flex flex-col items-start gap-1">
+          <Badge tone={KYC_GROUP_META[r.kyc].tone}>{KYC_GROUP_META[r.kyc].label}</Badge>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[12.5px] text-body">
+            <span
+              aria-hidden
+              className={`h-2 w-2 rounded-full ${r.available ? 'bg-success' : 'bg-faint'}`}
+            />
+            {r.available ? 'Disponible' : 'No disponible'}
+          </span>
+        </span>
       ),
     },
   ];
@@ -345,23 +342,24 @@ export default function TecnicosPage() {
         }
       />
 
-      <Card padded={false} className="overflow-hidden">
-        <div className="border-b border-line px-5 pt-3">
+      <ListCard
+        tabs={
           <Tabs
+            aria-label="Estado de verificación"
             tabs={tabs}
             value={f.tab}
             onChange={tab => setF(p => ({ ...p, tab }))}
           />
-        </div>
-
-        <div className="flex flex-col gap-3 p-5 pb-4">
-          <div className="flex flex-wrap items-center gap-3">
+        }
+        toolbar={
+          <>
+          <div className="flex flex-wrap items-center gap-2.5">
             <Input
               icon={Search}
               value={f.q}
               onChange={e => setF(p => ({ ...p, q: e.target.value }))}
-              placeholder="Nombre, teléfono, zona o placas"
-              wrapperClassName="w-full max-w-sm"
+              placeholder="Nombre, celular, zona o placas"
+              wrapperClassName="min-w-[220px] flex-1 sm:max-w-[360px]"
               aria-label="Buscar técnicos"
             />
             <Button
@@ -374,7 +372,7 @@ export default function TecnicosPage() {
             >
               Filtros
               {nFilters > 0 && (
-                <span className="ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] text-white">
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">
                   {nFilters}
                 </span>
               )}
@@ -399,7 +397,7 @@ export default function TecnicosPage() {
               ))}
               {f.minRating > 0 && (
                 <Chip onRemove={() => setF(p => ({ ...p, minRating: 0 }))}>
-                  Rating ≥ {f.minRating.toFixed(1)}
+                  Calificación ≥ {f.minRating.toFixed(1)}
                 </Chip>
               )}
               {f.type && (
@@ -424,14 +422,14 @@ export default function TecnicosPage() {
               )}
             </div>
           )}
-
-        </div>
-
+          </>
+        }
+      >
         <DataTable
           rows={filtered}
           rowKey={r => r.id}
           columns={columns}
-          onRowClick={r => router.push(`/tecnicos/${r.id}`)}
+          rowHref={r => `/tecnicos/${r.id}`}
           selectable
           bulkActions={(selected, clear) => (
             <Button
@@ -471,7 +469,7 @@ export default function TecnicosPage() {
             <EmptyState
               kind="no-results"
               title="Sin técnicos con estos filtros"
-              description="Prueba con otra zona, categoría o quita el rating mínimo."
+              description="Prueba con otra zona, categoría o quita la calificación mínima."
               action={
                 <Button variant="secondary" size="sm" onClick={() => setF(EMPTY_FILTERS)}>
                   Limpiar filtros
@@ -481,7 +479,7 @@ export default function TecnicosPage() {
             />
           }
         />
-      </Card>
+      </ListCard>
 
       {/* Filtros */}
       <Sheet
@@ -555,7 +553,7 @@ export default function TecnicosPage() {
             )}
           </section>
           <section>
-            <Kicker className="mb-2.5">Rating mínimo</Kicker>
+            <Kicker className="mb-2.5">Calificación mínima</Kicker>
             <Segmented
               options={[
                 { value: '0', label: 'Todos' },

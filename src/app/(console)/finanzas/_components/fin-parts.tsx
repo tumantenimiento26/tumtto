@@ -51,7 +51,7 @@ export function KpiCard({
             delta === 'nuevo'
               ? 'bg-info-soft text-primary'
               : delta === '0.0%'
-                ? 'bg-segment text-muted'
+                ? 'bg-segment text-body'
               : bad
                 ? 'bg-error-soft text-error'
                 : 'bg-success-soft text-success'

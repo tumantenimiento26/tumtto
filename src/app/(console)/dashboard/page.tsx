@@ -24,6 +24,8 @@ import {
   useWorldFailed,
   useWorldReady,
   type ReportKpis,
+  gmvCentsBetween,
+  getVisibleTransferReviewOrders,
 } from '@/lib/data/store';
 import {
   activity,
@@ -117,8 +119,11 @@ export default function DashboardPage() {
 
     // KPIs de la banda
     const m = getMetrics();
-    const gmvSerie = series('gmv', bks, orders, payments);
-    const gmvPrev = series('gmv', prevBks, orders, payments);
+    // GMV por cubeta con la misma definición que el KPI (admin_report_kpis):
+    // la suma de la curva es la cifra «GMV del periodo».
+    const gmvOf = (bs: typeof bks) => bs.map(b => Math.round(gmvCentsBetween(b.start, b.end) / 100));
+    const gmvSerie = gmvOf(bks);
+    const gmvPrev = gmvOf(prevBks);
     const svcSerie = series('servicios', bks, orders, payments);
     const acceptedSerie = bks.map(
       b =>
@@ -227,7 +232,7 @@ export default function DashboardPage() {
         onClick: () => router.push('/revision-pagos?tab=efectivo'),
       });
     // Comprobantes de transferencia del adelanto por cotejar (TUM-03).
-    const transfers = orders.filter(o => o.base_fee_status === 'in_review');
+    const transfers = getVisibleTransferReviewOrders();
     if (transfers.length)
       attention.push({
         id: 'transfer-reviews',
@@ -330,10 +335,11 @@ export default function DashboardPage() {
 
     return {
       kpis,
+      gmvDelta,
       chart: {
         labels: bks.map(b => b.label),
-        values: series(metric, bks, orders, payments),
-        prev: series(metric, prevBks, orders, payments),
+        values: metric === 'gmv' ? gmvSerie : series(metric, bks, orders, payments),
+        prev: metric === 'gmv' ? gmvPrev : series(metric, prevBks, orders, payments),
       },
       pipeline: pipeline(orders),
       attention,
@@ -379,6 +385,7 @@ export default function DashboardPage() {
             labels={data.chart.labels}
             values={data.chart.values}
             prev={data.chart.prev}
+            periodDelta={metric === 'gmv' ? data.gmvDelta : undefined}
           />
         </div>
         <div className="min-w-0 flex-[1_1_340px]">

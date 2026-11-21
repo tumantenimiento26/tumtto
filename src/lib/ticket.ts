@@ -3,7 +3,7 @@
 // vista previa de la consola sea idéntica al ticket impreso / PDF. Puro.
 
 export const COLS = 32;
-export const BRAND = 'Tu Mantenimiento';
+export const BRAND = 'Tumantenimiento';
 
 export type TicketCopy = 'cliente' | 'tecnico' | 'admin';
 export const TICKET_COPIES: readonly { key: TicketCopy; label: string; tab: string }[] = [

@@ -436,20 +436,20 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
       {adminOwned && (
         <section aria-label="Ingreso y comisión" className="mt-4 border-t border-divider pt-3 text-[13.5px]">
           <h3 className="mb-2 flex items-center gap-1.5 font-display text-[14px] font-bold text-navy">
-            <Building2 size={15} className="text-primary" aria-hidden /> Dinero de Tu Mantenimiento
+            <Building2 size={15} className="text-primary" aria-hidden /> Dinero de Tumantenimiento
           </h3>
           {snap ? (
             <>
               <dl className="flex flex-col gap-1.5">
                 <Line label="Tarifa base cobrada" value={money(snap.base_collected_cents, true)} />
                 <Line label="Efectivo cobrado" value={money(snap.quote_collected_cents, true)} />
-                <Line label="Ingreso Tu Mantenimiento" value={money(snap.gross_collected_cents, true)} strong />
+                <Line label="Ingreso Tumantenimiento" value={money(snap.gross_collected_cents, true)} strong />
                 <Line
                   label={`Comisión técnico · ${commissionRateLabel(snap.commission_type, snap.commission_value)}`}
                   value={`−${money(snap.commission_cents, true)}`}
                 />
                 <Line
-                  label="Neto Tu Mantenimiento"
+                  label="Neto Tumantenimiento"
                   value={money((snap.gross_collected_cents ?? 0) - snap.commission_cents, true)}
                   tone="success"
                 />
@@ -460,13 +460,13 @@ export function PaymentBreakdown({ order }: { order: PayOrder }) {
             </>
           ) : (
             <p className="text-[12.5px] text-muted">
-              Todo lo que paga el cliente es ingreso de Tu Mantenimiento. La comisión del técnico se calcula al terminar
+              Todo lo que paga el cliente es ingreso de Tumantenimiento. La comisión del técnico se calcula al terminar
               el servicio (o al cancelarse después de iniciar la visita).
             </p>
           )}
           {q.receivedCents != null && q.receivedCents > 0 && quotePay?.status !== 'failed' && (
             <p className="mt-1.5 rounded-btn bg-info-soft px-3 py-2 text-[12.5px] text-body">
-              El efectivo ({money(q.receivedCents, true)}) es de Tu Mantenimiento: el técnico debe entregarlo o
+              El efectivo ({money(q.receivedCents, true)}) es de Tumantenimiento: el técnico debe entregarlo o
               depositarlo. No se descuenta comisión de su saldo.
             </p>
           )}

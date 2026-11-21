@@ -231,7 +231,7 @@ export function commissionReportCsvRows(rows: TechCommissionReportRow[]): Record
     'Efectivo cobrado': pesos(r.quote_collected_cents),
     'Ingreso bruto': pesos(r.gross_collected_cents),
     'Comisión técnico': pesos(r.commission_cents),
-    'Ingreso neto Tu Mantenimiento': pesos(r.admin_net_cents),
+    'Ingreso neto Tumantenimiento': pesos(r.admin_net_cents),
   }));
 }
 

@@ -3,6 +3,20 @@
 
 export const EMAIL_RE = /\S+@\S+\.\S+/;
 
+/** Traduce el error de Supabase Auth; el genérico sólo cubre lo que no reconocemos. */
+export function authMessage(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes('invalid login credentials'))
+    return 'Correo o contraseña incorrectos.';
+  if (m.includes('email not confirmed'))
+    return 'Tu correo aún no está confirmado. Revisa tu bandeja.';
+  if (m.includes('too many requests') || m.includes('rate limit'))
+    return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
+  if (m.includes('fetch') || m.includes('network'))
+    return 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.';
+  return 'No pudimos iniciar sesión. Inténtalo de nuevo.';
+}
+
 /** 0–4: largo ≥8, letra, número y (símbolo o ≥12). Igual que el handoff. */
 export function passwordScore(p: string): number {
   if (!p) return 0;

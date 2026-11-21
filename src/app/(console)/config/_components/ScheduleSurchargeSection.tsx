@@ -101,10 +101,10 @@ function RulesCard({ canEdit }: { canEdit: boolean }) {
   const [del, setDel] = useState<ScheduleRule | null>(null);
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
         <div>
-          <div className="font-display text-[16px] font-bold text-navy">Reglas de recargo</div>
+          <h2 className="font-display text-[16px] font-bold text-navy">Reglas de recargo</h2>
           <div className="font-sans text-[12px] text-muted">
             {rules.filter(r => r.is_active).length} activas de {rules.length}.
           </div>
@@ -381,9 +381,9 @@ function HolidaysCard({ canEdit }: { canEdit: boolean }) {
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="border-b border-divider px-5 py-4">
-        <div className="font-display text-[16px] font-bold text-navy">Calendario de festivos</div>
+        <h2 className="font-display text-[16px] font-bold text-navy">Calendario de festivos</h2>
         <div className="font-sans text-[12px] text-muted">
           Las reglas de tipo «Día festivo» aplican en estas fechas. Vienen sembrados los festivos obligatorios de la LFT.
         </div>

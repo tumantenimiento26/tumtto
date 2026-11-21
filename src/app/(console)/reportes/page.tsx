@@ -223,7 +223,7 @@ export default function ReportesPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Reportes y analítica"
-        description="Metas del PRD a 6 meses frente a la operación actual."
+        description="Metas a 6 meses frente a la operación actual."
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <PeriodFilters value={range} onChange={setRange} kicker="Reportes">
@@ -369,7 +369,7 @@ export default function ReportesPage() {
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card padded>
-          <Kicker className="mb-4">Servicios completados</Kicker>
+          <Kicker as="h2" className="mb-4">Servicios completados</Kicker>
           {series.every(p => p.value === 0 && p.prev === 0) ? (
             <EmptyState
               compact
@@ -394,14 +394,14 @@ export default function ReportesPage() {
           )}
         </Card>
         <Card padded>
-          <Kicker className="mb-4">Embudo de conversión</Kicker>
+          <Kicker as="h2" className="mb-4">Embudo de conversión</Kicker>
           <Funnel steps={steps} />
         </Card>
       </div>
 
       <Card padded>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <Kicker>Demanda por día y franja</Kicker>
+          <Kicker as="h2">Demanda por día y franja</Kicker>
           <span className="font-sans text-[12px] text-muted">
             Solicitudes creadas · {label} · 8–20 h
           </span>
@@ -411,7 +411,7 @@ export default function ReportesPage() {
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <Card padded>
-          <Kicker className="mb-4">Desempeño por categoría</Kicker>
+          <Kicker as="h2" className="mb-4">Desempeño por categoría</Kicker>
           {catRows.length ? (
             <HBars rows={catRows} controls showPct />
           ) : (
@@ -420,7 +420,7 @@ export default function ReportesPage() {
         </Card>
         <Card padded>
           <div className="mb-4 flex items-center justify-between">
-            <Kicker>Zonas frías</Kicker>
+            <Kicker as="h2">Zonas frías</Kicker>
             <Badge tone="warning" dot>
               <Snowflake size={11} /> Demanda sin cobertura
             </Badge>
@@ -459,7 +459,7 @@ export default function ReportesPage() {
       </div>
 
       <Card padded>
-        <Kicker className="mb-4">Top técnicos</Kicker>
+        <Kicker as="h2" className="mb-4">Top técnicos</Kicker>
         <DataTable
           rows={techRows}
           rowKey={r => r.id}
@@ -471,7 +471,7 @@ export default function ReportesPage() {
               render: r => (
                 <span
                   className={`inline-grid h-6 w-6 place-items-center rounded-md font-mono text-[11px] font-bold ${
-                    r.rank <= 3 ? 'bg-action text-white' : 'bg-chip text-muted'
+                    r.rank <= 3 ? 'bg-action text-white' : 'bg-chip text-body'
                   }`}
                 >
                   {r.rank}

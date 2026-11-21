@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Lock } from 'lucide-react';
 
-import { Button, Card, Checkbox, toast } from '@/components/ds';
+import { Button, Card, Checkbox, toast, ScrollX } from '@/components/ds';
 import { saveRolePermissions, type RoleRow } from '@/lib/data/staff';
 import {
   matrixDirty,
@@ -60,12 +60,12 @@ export function MatrixEditor({
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
         <div>
-          <div className="font-display text-[16px] font-bold text-navy">
+          <h2 className="font-display text-[16px] font-bold text-navy">
             Permisos de {role.name}
-          </div>
+          </h2>
           <p className="mt-0.5 font-sans text-[12.5px] text-muted">
             {readOnly
               ? 'Super admin siempre tiene acceso total y no se puede editar.'
@@ -78,7 +78,7 @@ export function MatrixEditor({
           </span>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <ScrollX>
         <table className="w-full min-w-[420px] border-collapse">
           <thead>
             <tr className="bg-panel">
@@ -141,7 +141,7 @@ export function MatrixEditor({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       {!readOnly && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5">
           <p

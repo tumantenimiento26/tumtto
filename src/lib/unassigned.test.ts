@@ -33,7 +33,7 @@ describe('bandeja', () => {
     expect(inUnassignedInbox(order({ status: 'accepted' }))).toBe(false);
     expect(inUnassignedInbox(order({ technician_id: 't1' }))).toBe(false);
   });
-  it('distingue solicitudes que Tumtto asigna', () => {
+  it('distingue solicitudes que Tumantenimiento asigna', () => {
     expect(isAdminRequest({ assignment_mode: 'admin' })).toBe(true);
     expect(isAdminRequest({ assignment_mode: 'emergency' })).toBe(false);
   });

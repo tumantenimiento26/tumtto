@@ -98,8 +98,8 @@ export const OUTCOMES: { value: ReviewOutcome; label: string; hint: string }[] =
  * cuánto efectivo debe entregar el técnico.
  */
 export const OUTCOMES_ADMIN_OWNED: typeof OUTCOMES = [
-  { ...OUTCOMES[0], hint: 'Se acepta el monto que reportó el técnico: es lo que debe entregar a Tu Mantenimiento.' },
-  { ...OUTCOMES[1], hint: 'Se fija el monto realmente cobrado: es lo que el técnico debe entregar a Tu Mantenimiento.' },
+  { ...OUTCOMES[0], hint: 'Se acepta el monto que reportó el técnico: es lo que debe entregar a Tumantenimiento.' },
+  { ...OUTCOMES[1], hint: 'Se fija el monto realmente cobrado: es lo que el técnico debe entregar a Tumantenimiento.' },
   { ...OUTCOMES[2], hint: 'No hubo cobro: el técnico no entrega efectivo de este servicio y no se cobra al cliente.' },
 ];
 export const outcomesFor = (model: RevenueModel) => (model === 'admin_owned' ? OUTCOMES_ADMIN_OWNED : OUTCOMES);

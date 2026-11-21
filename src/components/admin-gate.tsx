@@ -157,8 +157,8 @@ function Panel({
   busy?: boolean;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-6 text-center shadow-card">
+    <div className="flex min-h-screen items-center justify-center bg-page p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 text-center shadow-card">
         <h1 className="font-display text-lg font-semibold text-navy">
           {title}
         </h1>
@@ -166,7 +166,7 @@ function Panel({
         <button
           onClick={onAction}
           disabled={busy}
-          className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-5 w-full rounded-xl bg-primary-fill px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {actionLabel}
         </button>
@@ -178,7 +178,7 @@ function Panel({
 function Resolving() {
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-app"
+      className="flex min-h-screen items-center justify-center bg-page"
       role="status"
       aria-label="Cargando tu cuenta"
     >

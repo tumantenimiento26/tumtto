@@ -1,6 +1,8 @@
 'use client';
 
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef, useState } from 'react';
+import { onMapFailure } from '@/lib/mapFailure';
 import { Map as MapIcon, MapPin } from 'lucide-react';
 import type { LngLat } from '@/lib/geo';
 import { useTheme } from '@/lib/theme';
@@ -20,7 +22,7 @@ export function RequestMap({
   height?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const [noToken, setNoToken] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const lng = center?.[0];
   const lat = center?.[1];
   const dark = useTheme(s => s.theme) === 'dark';
@@ -29,7 +31,7 @@ export function RequestMap({
     if (lng == null || lat == null) return;
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
     if (!token) {
-      setNoToken(true);
+      setUnavailable(true);
       return;
     }
     let cancelled = false;
@@ -39,13 +41,20 @@ export function RequestMap({
       const mapboxgl = (await import('mapbox-gl')).default;
       if (cancelled || !host.current) return;
       mapboxgl.accessToken = token;
-      map = new mapboxgl.Map({
-        container: host.current,
-        style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
-        center: [lng, lat],
-        zoom: 14,
-        attributionControl: false,
-      });
+      try {
+        map = new mapboxgl.Map({
+          container: host.current,
+          style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
+          center: [lng, lat],
+          zoom: 14,
+          attributionControl: false,
+        });
+      } catch {
+        // Sin WebGL el constructor lanza.
+        setUnavailable(true);
+        return;
+      }
+      onMapFailure(map, () => !cancelled && setUnavailable(true));
       map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false, showCompass: false }), 'bottom-left');
       map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
       new mapboxgl.Marker({ color: '#0A6BCF' }).setLngLat([lng, lat]).addTo(map);
@@ -59,7 +68,7 @@ export function RequestMap({
     };
   }, [lng, lat, dark]);
 
-  if (lng == null || lat == null || noToken) {
+  if (lng == null || lat == null || unavailable) {
     return (
       <div
         style={{ height }}
@@ -80,7 +89,7 @@ export function RequestMap({
             </div>
           )}
           <div className="mt-1 text-[12px] text-faint">
-            {center ? 'Mapa no disponible: falta NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN.' : 'La solicitud no trae coordenadas.'}
+            {center ? 'No pudimos cargar el mapa.' : 'La solicitud no trae coordenadas.'}
           </div>
         </div>
       </div>

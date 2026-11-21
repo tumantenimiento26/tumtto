@@ -188,12 +188,12 @@ describe('revisión de efectivo en admin_owned', () => {
     expect(legacy.payment.commission_cents).toBe(30000);
   });
 
-  it('las pistas de cada resultado hablan del efectivo de Tu Mantenimiento', () => {
+  it('las pistas de cada resultado hablan del efectivo de Tumantenimiento', () => {
     expect(outcomesFor('technician_owned')).toBe(OUTCOMES);
     expect(outcomesFor('admin_owned')).toBe(OUTCOMES_ADMIN_OWNED);
     expect(OUTCOMES_ADMIN_OWNED.map(o => o.value)).toEqual(OUTCOMES.map(o => o.value));
     expect(hints(OUTCOMES_ADMIN_OWNED)).not.toMatch(/comisi/i);
-    expect(hints(OUTCOMES_ADMIN_OWNED)).toMatch(/Tu Mantenimiento/);
+    expect(hints(OUTCOMES_ADMIN_OWNED)).toMatch(/Tumantenimiento/);
   });
 
   it('efectivo por técnico: admin_owned sin tarifa acreditada ni comisión generada', () => {
@@ -266,12 +266,12 @@ describe('reporte de comisiones (espejo de admin_report_technician_commissions)'
     expect(z.net).toBe(z.gross - z.commission);
     expect(z.gross).toBe(z.base + z.quote);
     const csv = commissionReportCsvRows(r);
-    expect(csv[0]['Ingreso neto Tu Mantenimiento']).toBe(Number(r[0].admin_net_cents) / 100);
+    expect(csv[0]['Ingreso neto Tumantenimiento']).toBe(Number(r[0].admin_net_cents) / 100);
     expect(csv[0]).toHaveProperty('Comisión técnico');
   });
 });
 
-describe('técnico: comisiones y efectivo de Tu Mantenimiento', () => {
+describe('técnico: comisiones y efectivo de Tumantenimiento', () => {
   const snaps = [4022, 4025, 4026, 4028].map(f => snap(f));
 
   it('resumen admin_owned (espejo de get_technician_cash_summary.admin_owned)', () => {

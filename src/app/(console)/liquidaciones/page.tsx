@@ -99,7 +99,7 @@ export default function LiquidacionesPage() {
       sortValue: r => r.pending_commissions_count + r.pending_cash_count,
       render: r => (
         <span className="block whitespace-nowrap font-sans text-[12.5px] leading-snug text-body">
-          {r.pending_commissions_count} comisiones
+          {r.pending_commissions_count} {r.pending_commissions_count === 1 ? 'comisión' : 'comisiones'}
           <br />
           {r.pending_cash_count} de efectivo
         </span>

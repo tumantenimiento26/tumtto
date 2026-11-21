@@ -446,7 +446,7 @@ export default function TecnicoDetailPage() {
                   </span>
                   <k.i size={16} className="text-primary" />
                 </div>
-                <div className="mt-2 font-display text-[24px] font-extrabold text-navy tabular">
+                <div className="mt-2 font-display text-[20px] font-extrabold text-navy tabular sm:text-[24px]">
                   {k.v}
                 </div>
                 {k.sub && <div className="font-sans text-[12px] text-muted">{k.sub}</div>}

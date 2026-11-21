@@ -9,7 +9,7 @@ import {
 } from '../_landing/legal';
 
 export const metadata: Metadata = {
-  title: 'Aviso de privacidad · Tumantenimiento',
+  title: 'Aviso de privacidad',
   description:
     'Cómo Tumantenimiento trata tus datos personales y cómo ejercer tus derechos ARCO.',
 };

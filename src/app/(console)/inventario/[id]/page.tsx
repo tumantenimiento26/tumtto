@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { Ban, CheckCircle2, ChevronLeft, Pencil, RotateCcw, UserPlus, Wrench } from 'lucide-react';
 import { Badge, Button, Card, ErrorPage, ScreenSkeleton } from '@/components/ds';
 import { useAction } from '@/components/use-action';
@@ -54,6 +55,7 @@ export default function ToolDetailPage() {
   useEffect(() => {
     void loadExtras();
   }, []);
+  useDocumentTitle(ready && loaded ? getCompanyTool(id)?.name : null, 'Inventario');
 
   if (failed) return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void loadWorld(true) }} />;
   if (!ready || !loaded) return <ScreenSkeleton kind="detail" />;

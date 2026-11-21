@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { Banknote, ChevronLeft, HandCoins, Undo2, User } from 'lucide-react';
 import { Badge, Button, Card, EmptyState, ErrorPage, ScreenSkeleton } from '@/components/ds';
 import { UserIcon } from '@/components/user-avatar';
@@ -46,6 +47,7 @@ export default function LiquidacionDetailPage() {
   const { summary, state, reload } = useSettlement(id);
   const [dialog, setDialog] = useState<'payout' | 'cash' | null>(null);
   const [voiding, setVoiding] = useState<HistoryItem | null>(null);
+  useDocumentTitle(ready ? getProfile(id)?.full_name : null, 'Liquidaciones');
 
   if (state === 'failed') return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void reload() }} />;
   if (!ready || !summary) return <ScreenSkeleton kind="detail" />;
@@ -98,7 +100,7 @@ export default function LiquidacionDetailPage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div>
               <h2 className="font-display text-[16px] font-bold text-navy">Comisiones por pagar</h2>
-              <p className="font-sans text-[12px] text-muted">Lo que Tu Mantenimiento le debe por servicios terminados.</p>
+              <p className="font-sans text-[12px] text-muted">Lo que Tumantenimiento le debe por servicios terminados.</p>
             </div>
             {edit && (
               <Button variant="approve" size="sm" icon={Banknote} disabled={summary.pending_commissions.length === 0} onClick={() => setDialog('payout')}>
@@ -136,7 +138,7 @@ export default function LiquidacionDetailPage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div>
               <h2 className="font-display text-[16px] font-bold text-navy">Efectivo por entregar</h2>
-              <p className="font-sans text-[12px] text-muted">Dinero de Tu Mantenimiento que el técnico cobró en efectivo.</p>
+              <p className="font-sans text-[12px] text-muted">Dinero de Tumantenimiento que el técnico cobró en efectivo.</p>
             </div>
             {edit && (
               <Button variant="approve" size="sm" icon={HandCoins} disabled={summary.pending_cash.length === 0} onClick={() => setDialog('cash')}>

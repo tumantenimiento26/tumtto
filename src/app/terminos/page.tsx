@@ -8,7 +8,7 @@ import {
 } from '../_landing/legal';
 
 export const metadata: Metadata = {
-  title: 'Términos y condiciones · Tumantenimiento',
+  title: 'Términos y condiciones',
   description: 'Condiciones de uso de la app y el sitio de Tumantenimiento.',
 };
 

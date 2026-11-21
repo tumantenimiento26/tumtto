@@ -1,5 +1,9 @@
+import type { Metadata } from 'next';
+
 import { OpenInApp } from '@/components/open-in-app';
 import { PLAY_STORE_URL } from '@/lib/appLinks';
+
+export const metadata: Metadata = { title: 'Invitación' };
 
 // Enlace de invitación: https://<dominio>/invitacion/CODIGO[?rol=tecnico].
 // Con el App Link verificado Android abre la app directo y esta página no se

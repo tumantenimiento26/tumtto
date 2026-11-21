@@ -55,6 +55,7 @@ import {
 import type { Payment, ServiceRequest } from '@/lib/demo/world';
 import { paymentLabel } from '@/lib/payments';
 import { orderCode } from '@/lib/orderCode';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { formatPhone } from '@/lib/phone';
 import {
   Avatar,
@@ -94,6 +95,7 @@ export default function ClientDetailPage() {
   useEffect(() => {
     void loadExtras();
   }, []);
+  useDocumentTitle(ready ? getProfile(id)?.full_name : null, 'Clientes');
 
   if (failed)
     return (

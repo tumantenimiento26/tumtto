@@ -29,7 +29,7 @@ export function CompaniesSection() {
   }, []);
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-divider px-5 py-4">
         <div>
           <h2 className="font-display text-[16px] font-bold text-navy">Empresas de técnicos</h2>

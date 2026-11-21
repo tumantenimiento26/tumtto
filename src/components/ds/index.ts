@@ -45,6 +45,7 @@ export {
 } from './overlay';
 export type { MenuItem } from './overlay';
 export { DataTable } from './data-table';
+export { ScrollX } from './scroll-edges';
 export type { DataColumn, SortState } from './data-table';
 export { toast, snackbar } from '../toast';
 export type { DateRange } from '@/lib/calendar';

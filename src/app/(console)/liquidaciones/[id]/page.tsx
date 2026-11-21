@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { Banknote, ChevronLeft, HandCoins, Undo2, User } from 'lucide-react';
-import { Badge, Button, Card, EmptyState, ErrorPage, ScreenSkeleton } from '@/components/ds';
+import { Badge, Button, Card, EmptyState, ErrorPage, ScreenSkeleton, ScrollX } from '@/components/ds';
 import { UserIcon } from '@/components/user-avatar';
 import { useAuth } from '@/lib/auth';
 import { fmtDate, fmtDateTime } from '@/lib/dates';
@@ -77,7 +77,7 @@ export default function LiquidacionDetailPage() {
               ))}
             </div>
           </div>
-          <Button variant="secondary" size="sm" icon={User} href={`/tecnicos/${id}`}>
+          <Button variant="secondary" size="sm" icon={User} href={`/tecnicos/${id}`} className="max-sm:w-full">
             Ver perfil
           </Button>
         </div>
@@ -111,7 +111,7 @@ export default function LiquidacionDetailPage() {
           {summary.pending_commissions.length === 0 ? (
             <EmptyState kind="all-clear" title="Nada por pagar" description="Todas las comisiones están pagadas." compact />
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full min-w-[460px] border-collapse">
                 <thead>
                   <tr className="bg-panel"><Th>Servicio</Th><Th>Fecha</Th><Th right>Cobrado</Th><Th right>Comisión</Th></tr>
@@ -130,7 +130,7 @@ export default function LiquidacionDetailPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </Card>
 
@@ -149,7 +149,7 @@ export default function LiquidacionDetailPage() {
           {summary.pending_cash.length === 0 ? (
             <EmptyState kind="all-clear" title="Sin efectivo pendiente" description="No tiene efectivo por entregar." compact />
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full min-w-[360px] border-collapse">
                 <thead>
                   <tr className="bg-panel"><Th>Servicio</Th><Th>Cobrado el</Th><Th right>Efectivo</Th></tr>
@@ -164,7 +164,7 @@ export default function LiquidacionDetailPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </Card>
       </div>

@@ -221,8 +221,8 @@ export default function ClientDetailPage() {
         />
       </div>
 
-      <Card className="overflow-hidden">
-        <Tabs className="px-5" tabs={tabs} value={tab} onChange={setTab} />
+      <Card padded={false} className="overflow-hidden">
+        <Tabs className="px-5" aria-label="Secciones del cliente" tabs={tabs} value={tab} onChange={setTab} />
         <div className="p-5">
           {tab === 'historial' &&
             (requests.length === 0 ? (
@@ -234,7 +234,7 @@ export default function ClientDetailPage() {
                     <button
                       type="button"
                       onClick={() => router.push(`/servicios/${r.id}`)}
-                      className="flex w-full items-center gap-3 rounded-btn px-2 py-3 text-left hover:bg-panel"
+                      className="flex w-full items-start gap-3 rounded-btn px-2 py-3 text-left hover:bg-panel sm:items-center"
                     >
                       <CategoryTile slug={catOf(r.category_id)?.slug} size={32} />
                       <div className="min-w-0 flex-1">
@@ -252,9 +252,18 @@ export default function ClientDetailPage() {
                         <div className="font-mono text-[11.5px] text-muted">
                           {orderCode(r.id)} · {timeAgo(r.created_at)}
                         </div>
+                        {/* Celular: estado y monto bajo el título (no le roban ancho). */}
+                        <div className="mt-1.5 flex items-center gap-2 sm:hidden">
+                          <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
+                          <span className="ml-auto font-mono text-[13px] font-semibold text-navy tabular">
+                            {money(r.quoted_total_cents)}
+                          </span>
+                        </div>
                       </div>
-                      <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
-                      <span className="w-[84px] text-right font-mono text-[13px] font-semibold text-navy tabular">
+                      <Badge tone={STATUS[r.status].tone} className="max-sm:hidden">
+                        {STATUS[r.status].label}
+                      </Badge>
+                      <span className="w-[84px] text-right font-mono text-[13px] font-semibold text-navy tabular max-sm:hidden">
                         {money(r.quoted_total_cents)}
                       </span>
                     </button>

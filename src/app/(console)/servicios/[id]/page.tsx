@@ -21,6 +21,7 @@ import {
   Siren,
   Star,
   UserCog,
+  UserPlus,
   Undo2,
 } from 'lucide-react';
 import {
@@ -90,6 +91,7 @@ import {
 import type { RequestStatus } from '@/lib/demo/world';
 import { completedJobs } from '@/lib/techConsole';
 import { orderCode } from '@/lib/orderCode';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { fmtDateTime } from '@/lib/dates';
 import { useAuth } from '@/lib/auth';
 import { formatPhone } from '@/lib/phone';
@@ -203,6 +205,7 @@ export default function ServicioDetailPage() {
   }, [ready, id]);
 
   const req = ready ? getRequest(id) : undefined;
+  useDocumentTitle(req ? orderCode(req.id) : null, 'Servicios');
 
   const events = useMemo(
     () => (req ? getOrderEvents(req.id) : []),
@@ -346,7 +349,7 @@ export default function ServicioDetailPage() {
             </div>
             <div className="text-[13px] text-body">
               {adminRequest
-                ? `El cliente pidió que Tumtto asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
+                ? `El cliente pidió que Tumantenimiento asigne al técnico. Lleva ${ageLabel(req.created_at)} esperando; asígnalo o recházala con un motivo.`
                 : 'Nadie aceptó dentro del tiempo límite. La solicitud sigue activa: asigna un técnico a mano.'}
             </div>
           </div>
@@ -356,7 +359,7 @@ export default function ServicioDetailPage() {
                 Rechazar
               </Button>
             )}
-            <Button size="sm" icon={UserCog} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
+            <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setReassignOpen(true)} disabled={!canSupport}>
               Asignar técnico
             </Button>
           </div>
@@ -456,11 +459,11 @@ export default function ServicioDetailPage() {
                 <span
                   className={`relative z-[1] grid h-6 w-6 place-items-center rounded-full border-2 ${
                     done
-                      ? 'border-primary bg-primary text-white'
+                      ? 'border-primary-fill bg-primary-fill text-white'
                       : now
                         ? 'border-primary bg-card'
                         : lastReached
-                          ? 'border-error bg-error text-white'
+                          ? 'border-error-fill bg-error-fill text-white'
                           : 'border-line-strong bg-card'
                   }`}
                 >
@@ -660,13 +663,18 @@ export default function ServicioDetailPage() {
               value={note}
               onChange={e => setNote(e.target.value)}
               rows={3}
+              aria-label="Nota interna"
               placeholder="Solo visible para el equipo admin…"
               onKeyDown={e => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void saveNote();
               }}
             />
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-[12px] text-faint">⌘↵ para guardar · queda en la bitácora admin</span>
+              <span className="text-[12px] text-faint">
+                {/* El atajo solo tiene sentido con teclado físico. */}
+                <span className="hidden [@media(pointer:fine)]:inline">⌘↵ para guardar · </span>
+                Queda en la bitácora admin
+              </span>
               <Button size="sm" onClick={() => void saveNote()} loading={busy === 'note'} disabled={!note.trim()}>
                 Guardar nota
               </Button>
@@ -720,8 +728,8 @@ export default function ServicioDetailPage() {
               <span title={!terminal && !reassignable ? REASSIGN_BLOCKED_TIP : undefined}>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  icon={UserCog}
+                  variant="secondary"
+                  icon={req.technician_id ? UserCog : UserPlus}
                   onClick={() => setReassignOpen(true)}
                   disabled={terminal || !canSupport || !reassignable}
                   aria-label={
@@ -763,7 +771,7 @@ export default function ServicioDetailPage() {
             {req.assigned_by_admin_at && (
               <div className="mt-3 flex flex-col items-start gap-1.5 border-t border-divider pt-3">
                 <Badge tone="info" mono>
-                  Asignado por Tumtto
+                  Asignado por Tumantenimiento
                 </Badge>
                 <span className="text-[12.5px] text-muted">
                   {agoLabel(req.assigned_by_admin_at)}

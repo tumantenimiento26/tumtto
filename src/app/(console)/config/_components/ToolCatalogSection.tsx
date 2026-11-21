@@ -57,7 +57,7 @@ export function ToolCatalogSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Card className="overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
           <div className="min-w-0">
             <h2 className="font-display text-[16px] font-bold text-navy">Catálogo de herramientas</h2>
@@ -151,7 +151,7 @@ export function ToolCatalogSection() {
       </Card>
 
       {!unavailable && (
-        <Card className="overflow-hidden">
+        <Card padded={false} className="overflow-hidden">
           <div className="border-b border-divider px-5 py-4">
             <h2 className="font-display text-[16px] font-bold text-navy">Por revisar (texto libre)</h2>
             <div className="font-sans text-[12px] text-muted">

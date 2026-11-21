@@ -60,11 +60,11 @@ export function TechnicianCommissionSection() {
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider px-5 py-4">
-        <span className="flex items-center gap-2 font-display text-[16px] font-bold text-navy">
+        <h2 className="flex items-center gap-2 font-display text-[16px] font-bold text-navy">
           <HandCoins size={17} className="text-primary" aria-hidden /> Comisión del técnico
-        </span>
+        </h2>
         {cfg && <Badge tone="info">Vigente: {commissionRateLabel(cfg.type, cfg.value)}</Badge>}
       </div>
       {cfg === undefined ? (

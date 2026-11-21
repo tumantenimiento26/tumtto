@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import {
   Badge,
@@ -69,7 +68,6 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'er
 
 export function CashByTechnician({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [rows, setRows] = useState<CashTechRow[] | null | undefined>(undefined);
 
   useEffect(() => {
@@ -172,7 +170,6 @@ const PAGE = 100;
 
 export function PaymentsReport({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [method, setMethod] = useState<MethodFilter>('all');
   const [cashStatus, setCashStatus] = useState<CashStatus | null>(null);
   const [onlyReview, setOnlyReview] = useState(false);
@@ -374,7 +371,6 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
 
 export function TechnicianCommissions({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [rows, setRows] = useState<TechCommissionReportRow[] | null | undefined>(undefined);
 
   useEffect(() => {

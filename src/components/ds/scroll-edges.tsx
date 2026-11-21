@@ -46,3 +46,23 @@ export function EdgeFade({
     />
   );
 }
+
+/** Contenedor con scroll horizontal y sombras de borde (tablas internas angostas). */
+export function ScrollX({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const scroll = useScrollEdges();
+  return (
+    <div className={`relative ${className}`}>
+      <EdgeFade side="left" show={scroll.left} />
+      <EdgeFade side="right" show={scroll.right} />
+      <div ref={scroll.ref} className="overflow-x-auto">
+        {children}
+      </div>
+    </div>
+  );
+}

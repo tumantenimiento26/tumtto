@@ -121,6 +121,7 @@ export function useFocusLayer(
     if (!active) return;
     const prev = document.activeElement as HTMLElement | null;
     const root = ref.current;
+    const trigger = returnTo?.current ?? prev;
     const layer: Layer = {
       root: () => ref.current,
       kind,
@@ -150,10 +151,9 @@ export function useFocusLayer(
       const i = layers.indexOf(layer);
       if (i >= 0) layers.splice(i, 1);
       if (layers.length === 0) document.removeEventListener('keydown', onLayerKey, true);
-      const target = returnTo?.current ?? prev;
       const now = document.activeElement;
       const lost = !now || now === document.body || !!root?.contains(now);
-      if (target?.isConnected && lost) target.focus({ preventScroll: true });
+      if (trigger?.isConnected && lost) trigger.focus({ preventScroll: true });
     };
     // `initial`/`kind` solo importan al abrir.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Lock } from 'lucide-react';
 
-import { Button, Card, Checkbox, toast } from '@/components/ds';
+import { Button, Card, Checkbox, toast, ScrollX } from '@/components/ds';
 import { saveRolePermissions, type RoleRow } from '@/lib/data/staff';
 import {
   matrixDirty,
@@ -78,7 +78,7 @@ export function MatrixEditor({
           </span>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <ScrollX>
         <table className="w-full min-w-[420px] border-collapse">
           <thead>
             <tr className="bg-panel">
@@ -141,7 +141,7 @@ export function MatrixEditor({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       {!readOnly && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5">
           <p

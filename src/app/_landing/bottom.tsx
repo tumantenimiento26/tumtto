@@ -182,7 +182,7 @@ export function Coverage() {
 const PROMISES = [
   'Rangos publicados por servicio, sin letra chica',
   'Cotización confirmada antes de empezar el trabajo',
-  'Pago con tarjeta, protegido de inicio a fin',
+  'Pagas en persona al terminar: efectivo o transferencia',
   'Garantía de 30 días en cada servicio completado',
 ];
 
@@ -315,7 +315,7 @@ export function Pricing() {
 
 /* ── Para técnicos: beneficios + calculadora ── */
 const PERKS = [
-  { t: 'Cobra directo a tu CLABE', b: 'Retiros a tu cuenta, sin intermediarios.', icon: Landmark },
+  { t: 'Cobra en tu CLABE', b: 'Tus comisiones, depositadas a tu cuenta.', icon: Landmark },
   { t: 'Tú pones tu horario', b: 'Disponibilidad por día y hora, a tu medida.', icon: Calendar },
   { t: 'Trabaja en tu zona', b: 'Define tu radio de cobertura en el mapa.', icon: MapPin },
   { t: 'Soporte que responde', b: 'Equipo de operaciones local, en la ZMG.', icon: CircleHelp },
@@ -384,6 +384,15 @@ export function ForTechs() {
                 <div
                   role="radiogroup"
                   aria-label="Categoría"
+                  // Flechas ←→ entre opciones (patrón radiogroup: una sola parada de Tab).
+                  onKeyDown={ev => {
+                    const d = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1 : 0;
+                    if (!d) return;
+                    ev.preventDefault();
+                    const next = (tk + d + TICKETS.length) % TICKETS.length;
+                    setTk(next);
+                    ev.currentTarget.querySelectorAll<HTMLElement>('[role=radio]')[next]?.focus();
+                  }}
                   className="mb-[18px] flex gap-1 rounded-btn bg-[#0A1830] p-1"
                 >
                   {TICKETS.map(([label], i) => {
@@ -393,8 +402,11 @@ export function ForTechs() {
                         key={label}
                         role="radio"
                         aria-checked={on}
+                        tabIndex={on ? 0 : -1}
                         onClick={() => setTk(i)}
-                        className={`min-h-[34px] min-w-0 flex-1 hyphens-auto rounded-lg px-1.5 py-1 text-[13px] font-semibold leading-tight transition-all duration-150 ${
+                        // flex-auto: cada opción toma el ancho de su texto; «Aire
+                        // acondicionado» parte en el espacio, nunca a mitad de palabra.
+                        className={`min-h-[34px] min-w-0 flex-auto rounded-lg px-1.5 py-1 text-[13px] font-semibold leading-tight transition-all duration-150 [text-wrap:balance] ${
                           on
                             ? 'bg-white text-navy shadow-[0_1px_2px_rgba(14,44,86,0.1)]'
                             : 'text-lp-muted hover:text-white'
@@ -438,7 +450,7 @@ export function ForTechs() {
                 </div>
                 <div className="mt-3.5 flex items-center gap-2 text-[12.5px] font-semibold text-[var(--lp-ok)]">
                   <Landmark size={15} />
-                  Retiros diarios a tu CLABE, sin mínimo mayor a $100
+                  Tus comisiones se depositan a tu CLABE
                 </div>
               </div>
             </div>
@@ -465,7 +477,7 @@ const FAQS: [string, string][] = [
   ],
   [
     '¿Cómo y cuándo pago?',
-    'Pagas con tarjeta desde la app cuando el servicio está completado. El pago está protegido: el técnico lo recibe solo al terminar el trabajo, y tienes soporte directo si algo no salió bien.',
+    'Pagas en persona cuando el servicio está completado: en efectivo al técnico o por transferencia a la cuenta que indique Tumantenimiento, y ambos confirman el pago en la app. Tienes soporte directo si algo no salió bien.',
   ],
   [
     '¿En qué zonas están disponibles?',

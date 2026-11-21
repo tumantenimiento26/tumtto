@@ -1,9 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import {
   Check,
-  CreditCard,
+  Banknote,
   FileText,
   Home,
   IdCard,
@@ -362,11 +363,13 @@ export function Categories({ reduced }: { reduced: boolean }) {
                 {/* ponytail: fotos estáticas por categoría; las que faltan quedan con el rayado. */}
                 <div className="lp-stripes relative min-h-[240px] flex-1 overflow-hidden rounded-[14px] border border-[rgba(90,176,255,0.16)]">
                   {c.img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    // next/image: carga diferida, tamaño según el ancho real y WebP/AVIF.
+                    <Image
                       src={c.img}
                       alt={`Técnico de ${c.name.toLowerCase()} trabajando`}
-                      className="absolute inset-0 h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 760px) 100vw, 440px"
+                      className="object-cover"
                       style={{ objectPosition: c.imgPos }}
                     />
                   ) : (
@@ -436,9 +439,9 @@ const STEPS: [string, string, string, LucideIcon, string[]][] = [
   [
     '04',
     'Paga al terminar',
-    'Pago protegido con tarjeta cuando el trabajo está completo. Después, califica.',
-    CreditCard,
-    ['Pago protegido', 'Garantía de 30 días'],
+    'Pagas en efectivo o transferencia cuando el trabajo está completo. Después, califica.',
+    Banknote,
+    ['Pago al terminar', 'Garantía de 30 días'],
   ],
 ];
 

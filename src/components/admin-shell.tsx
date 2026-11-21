@@ -743,7 +743,9 @@ function Header({ onMenu, narrow }: { onMenu: () => void; narrow: boolean }) {
         onClick={onMenu}
         size={narrow ? 44 : 40}
       />
-      <div className="min-w-0 max-w-[50%] flex-shrink-0">
+      {/* Desde md el buscador ocupa el centro: el título no se encoge hasta
+          desaparecer («Ser…» a 768 px). En celular sí se trunca. */}
+      <div className="min-w-0 md:max-w-[50%] md:flex-shrink-0">
         <Kicker className="!text-[11px]">{group}</Kicker>
         <p className="truncate font-display text-[16px] font-bold text-navy">
           {shownTitle}

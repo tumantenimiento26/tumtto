@@ -6,16 +6,16 @@ const t = (p: Partial<ZoneAssignCandidate>): ZoneAssignCandidate => ({
 });
 
 describe('zoneAssignOptions', () => {
-  it('lists Tumtto technicians first, then third parties and independents', () => {
+  it('lists Tumantenimiento technicians first, then third parties and independents', () => {
     const opts = zoneAssignOptions(
       [t({ name: 'Zoe', type: 'independent' }), t({ name: 'Ana', type: 'third_party' }), t({ name: 'Beto', type: 'tumtto' })],
       'z1',
     );
     expect(opts.map(o => o.label)).toEqual(['Beto', 'Ana', 'Zoe']);
-    expect(opts[0].hint).toContain('Tumtto');
+    expect(opts[0].hint).toContain('Tumantenimiento');
   });
 
-  it('keeps Tumtto technicians with KYC pending but drops other unapproved ones', () => {
+  it('keeps Tumantenimiento technicians with KYC pending but drops other unapproved ones', () => {
     const opts = zoneAssignOptions(
       [t({ name: 'Propio', type: 'tumtto', kycApproved: false }), t({ name: 'Indep', kycApproved: false })],
       'z1',

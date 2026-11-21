@@ -90,7 +90,7 @@ function FileRow({ file, onDelete, ownerLabel }: { file: ToolAttachment; onDelet
           type="button"
           onClick={onDelete}
           aria-label={`Eliminar ${file.file_name}`}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-muted transition-colors hover:bg-tint hover:text-danger"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-muted transition-colors hover:bg-error-soft hover:text-error"
         >
           <Trash2 size={15} />
         </button>

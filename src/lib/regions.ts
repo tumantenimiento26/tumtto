@@ -190,7 +190,7 @@ export type ZoneAssignCandidate = {
 };
 
 const TYPE_ORDER = { tumtto: 0, third_party: 1, independent: 2 } as const;
-const TYPE_LABEL = { tumtto: 'Tumtto', third_party: 'Tercero', independent: 'Independiente' } as const;
+const TYPE_LABEL = { tumtto: 'Tumantenimiento', third_party: 'Tercero', independent: 'Independiente' } as const;
 
 /**
  * Opciones del selector «Asignar técnico a esta zona»: primero los técnicos de

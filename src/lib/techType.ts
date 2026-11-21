@@ -5,7 +5,7 @@ type Tone = 'info' | 'warning' | 'neutral';
 export const TECH_TYPES: TechType[] = ['tumtto', 'third_party', 'independent'];
 
 export const TECH_TYPE_LABEL: Record<TechType, string> = {
-  tumtto: 'Tumtto',
+  tumtto: 'Tumantenimiento',
   third_party: 'Tercero',
   independent: 'Independiente',
 };

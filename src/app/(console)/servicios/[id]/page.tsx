@@ -628,7 +628,7 @@ export default function ServicioDetailPage() {
                       <div className="min-w-0 flex-1 pb-4">
                         <div className="flex flex-wrap items-baseline gap-2">
                           <span
-                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning' : 'text-navy'}`}
+                            className={`font-display text-[13.5px] font-bold ${e.is_revert ? 'text-warning-ink' : 'text-navy'}`}
                           >
                             {e.is_revert
                               ? `Estado revertido: ${label(e.from_status)} → ${label(e.to_status)}`

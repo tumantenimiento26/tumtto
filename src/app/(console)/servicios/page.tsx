@@ -378,7 +378,7 @@ export default function ServiciosPage() {
         return (
           <span
             className={`inline-flex items-center gap-1 whitespace-nowrap font-mono text-[12.5px] font-semibold ${
-              tone === 'danger' ? 'text-error' : tone === 'warning' ? 'text-warning' : 'text-muted'
+              tone === 'danger' ? 'text-error' : tone === 'warning' ? 'text-warning-ink' : 'text-muted'
             }`}
           >
             <Clock size={13} aria-hidden />

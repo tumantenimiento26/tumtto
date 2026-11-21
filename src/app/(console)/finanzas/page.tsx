@@ -462,7 +462,7 @@ export default function FinanzasPage() {
           <span className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
             {getCashReviewOrders().length}{' '}
             {getCashReviewOrders().length === 1 ? 'revisión de efectivo abierta' : 'revisiones de efectivo abiertas'}
-            <span className="ml-2 font-normal text-muted">El efectivo no cuadra entre técnico y cliente</span>
+            <span className="ml-2 font-normal text-body">El efectivo no cuadra entre técnico y cliente</span>
           </span>
           <span className="inline-flex items-center gap-1 font-sans text-[13px] font-semibold text-primary">
             Revisar <ChevronRight size={14} aria-hidden />

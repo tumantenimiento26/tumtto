@@ -78,7 +78,7 @@ function RowTitle({
   onActivate?: () => void;
   children: React.ReactNode;
 }) {
-  const cls = 'block w-fit max-w-full rounded-md text-left';
+  const cls = 'block min-h-6 w-fit max-w-full rounded-md text-left';
   if (href)
     return (
       <Link href={href} className={cls}>
@@ -285,7 +285,7 @@ export function DataTable<T>({
                       <button
                         type="button"
                         onClick={() => toggleSort(c.key)}
-                        className={`inline-flex items-center gap-1 uppercase hover:text-navy ${active ? 'text-navy' : ''}`}
+                        className={`-my-1 inline-flex min-h-6 items-center gap-1 uppercase hover:text-navy ${active ? 'text-navy' : ''}`}
                       >
                         {c.header}
                         <ArrowUp

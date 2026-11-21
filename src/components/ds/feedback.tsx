@@ -257,7 +257,7 @@ const ILLU_TONE = {
   },
   neutral: {
     ring: 'bg-chip border-line-strong',
-    chip: 'bg-chip text-muted',
+    chip: 'bg-chip text-body',
     badge: 'bg-action text-white',
   },
 };

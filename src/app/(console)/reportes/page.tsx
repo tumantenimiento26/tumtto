@@ -471,7 +471,7 @@ export default function ReportesPage() {
               render: r => (
                 <span
                   className={`inline-grid h-6 w-6 place-items-center rounded-md font-mono text-[11px] font-bold ${
-                    r.rank <= 3 ? 'bg-action text-white' : 'bg-chip text-muted'
+                    r.rank <= 3 ? 'bg-action text-white' : 'bg-chip text-body'
                   }`}
                 >
                   {r.rank}

@@ -89,7 +89,7 @@ export function CardHead({
         <button
           type="button"
           onClick={onLink}
-          className="text-[13px] font-semibold text-primary hover:underline"
+          className="inline-flex min-h-6 items-center text-[13px] font-semibold text-primary hover:underline"
         >
           {link}
         </button>

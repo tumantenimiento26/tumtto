@@ -152,7 +152,7 @@ export default function AsignacionesPage() {
               tone === 'danger'
                 ? 'text-error'
                 : tone === 'warning'
-                  ? 'text-warning'
+                  ? 'text-warning-ink'
                   : 'text-muted'
             }`}
           >

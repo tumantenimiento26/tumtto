@@ -448,7 +448,7 @@ export default function NotificacionesPage() {
                   t.count > 0 && (
                     <span
                       className={`min-w-6 rounded-full px-1.5 py-0.5 text-center font-mono text-[11px] ${
-                        on ? 'bg-white/20 text-white' : 'bg-chip text-muted'
+                        on ? 'bg-white/20 text-white' : 'bg-chip text-body'
                       }`}
                     >
                       {t.count}

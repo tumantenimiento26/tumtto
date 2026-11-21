@@ -84,8 +84,11 @@ export default function LiquidacionesPage() {
       header: 'Último movimiento',
       hideOnMobile: true,
       render: r => (
-        <span className="font-sans text-[12px] text-muted">
-          Pago: {day(r.last_payout_at)} · Efectivo: {day(r.last_delivery_at)}
+        // Dos líneas fijas: partidas al azar le quitaban ancho al nombre.
+        <span className="block whitespace-nowrap font-sans text-[12px] leading-snug text-muted">
+          Pago: {day(r.last_payout_at)}
+          <br />
+          Efectivo: {day(r.last_delivery_at)}
         </span>
       ),
     },
@@ -95,8 +98,10 @@ export default function LiquidacionesPage() {
       hideOnMobile: true,
       sortValue: r => r.pending_commissions_count + r.pending_cash_count,
       render: r => (
-        <span className="font-sans text-[12.5px] text-body">
-          {r.pending_commissions_count} comisiones · {r.pending_cash_count} efectivo
+        <span className="block whitespace-nowrap font-sans text-[12.5px] leading-snug text-body">
+          {r.pending_commissions_count} comisiones
+          <br />
+          {r.pending_cash_count} de efectivo
         </span>
       ),
     },

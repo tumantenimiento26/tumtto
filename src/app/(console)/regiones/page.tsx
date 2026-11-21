@@ -327,14 +327,16 @@ export default function RegionesPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <Card padded={false} className="min-w-0 overflow-hidden">
+          {/* El mapa llena el alto de la fila (lo marca el panel de zona): sin hueco blanco abajo. */}
+          <Card padded={false} className="flex min-w-0 flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <Kicker as="h2">Mapa de cobertura</Kicker>
               <span className="font-sans text-[12px] text-muted">
                 {mapZones.length} zonas con geometría · calor = solicitudes 30 d
               </span>
             </div>
-            <CoverageMap
+            <div className="h-[420px] xl:h-auto xl:min-h-[420px] xl:flex-1">
+              <CoverageMap
               zones={mapZones}
               demand={data.demand}
               techs={data.bases}
@@ -343,8 +345,9 @@ export default function RegionesPage() {
                 const row = data.rows.find(r => r.zoneId === id);
                 if (row) setSelected(row.name);
               }}
-              height={420}
+              height="100%"
             />
+            </div>
           </Card>
 
         <Card padded className="h-fit">

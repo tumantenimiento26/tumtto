@@ -102,7 +102,8 @@ export function CoverageMap({
   techs: MapTechBase[];
   selected: string;
   onSelect: (id: string) => void;
-  height?: number;
+  /** px, o '100%' para llenar un contenedor con alto definido. */
+  height?: number | string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 
 import {
@@ -17,7 +17,7 @@ import {
   startOfDay,
   type DateRange,
 } from '@/lib/calendar';
-import { controlClass } from './field';
+import { controlClass, useFieldControl } from './field';
 import { Chip, Kicker } from './controls';
 import { Button } from './button';
 import { Sheet } from './overlay';
@@ -100,7 +100,7 @@ function MonthCalendar({
               aria-label={formatLong(d)}
               className={`relative h-[38px] rounded-[7px] text-[13.5px] tabular transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
                 sel
-                  ? 'bg-primary font-bold text-white'
+                  ? 'bg-primary-fill font-bold text-white'
                   : inside
                     ? 'bg-info-soft font-medium text-navy'
                     : out
@@ -146,6 +146,8 @@ export function DatePicker({
   'aria-label'?: string;
 }) {
   const anchor = useRef<HTMLButtonElement>(null);
+  const ctrl = useFieldControl();
+  const valueId = useId();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => value ?? new Date());
   const pick = (d: Date) => {
@@ -157,13 +159,21 @@ export function DatePicker({
       <button
         ref={anchor}
         type="button"
+        id={ctrl.id}
         aria-label={ariaLabel}
+        // Con <Field label>: «Fecha deseada, 21 de noviembre» (etiqueta + valor).
+        aria-labelledby={
+          !ariaLabel && ctrl.labelId ? `${ctrl.labelId} ${valueId}` : undefined
+        }
+        aria-describedby={ctrl['aria-describedby']}
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(o => !o)}
         className={`${controlClass(error)} gap-2.5 px-3 text-left ${open ? 'border-primary shadow-focus' : ''}`}
       >
         <Calendar size={17} className="text-primary" />
         <span
+          id={valueId}
           className={`flex-1 truncate ${value ? 'text-navy' : 'text-faint'}`}
         >
           {value ? formatLong(value) : placeholder}
@@ -173,7 +183,12 @@ export function DatePicker({
           className={`text-muted transition-transform duration-[250ms] ${open ? 'rotate-180' : ''}`}
         />
       </button>
-      <Popover anchor={anchor} open={open} onClose={() => setOpen(false)}>
+      <Popover
+        anchor={anchor}
+        open={open}
+        onClose={() => setOpen(false)}
+        aria-label="Elegir fecha"
+      >
         {/* Style Guide: presets como chips arriba y el calendario de la consola. */}
         <div className="flex w-[min(320px,calc(100vw-16px))] flex-col gap-3 p-3.5">
           <div className="flex flex-wrap gap-2">

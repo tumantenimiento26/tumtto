@@ -137,7 +137,7 @@ export function EmptyState({
       >
         <Icon size={22} />
       </div>
-      <h3 className="font-display text-[16px] font-bold text-navy">{title}</h3>
+      <h2 className="font-display text-[16px] font-bold text-navy">{title}</h2>
       {description && (
         <p className="mt-1 max-w-sm text-[13.5px] text-muted">{description}</p>
       )}
@@ -249,12 +249,12 @@ const ILLU_TONE = {
   danger: {
     ring: 'bg-error-soft border-error-line',
     chip: 'bg-error-soft text-error',
-    badge: 'bg-error text-white',
+    badge: 'bg-error-fill text-white',
   },
   warning: {
     ring: 'bg-warning-soft border-warning-ring',
     chip: 'bg-warning-soft text-warning-ink',
-    badge: 'bg-warning text-white',
+    badge: 'bg-warning text-deep',
   },
   neutral: {
     ring: 'bg-chip border-line-strong',

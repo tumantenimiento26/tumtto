@@ -18,6 +18,7 @@ export {
   Kicker,
   PageHeader,
   Card,
+  ListCard,
   Segmented,
   Toggle,
   Chip,
@@ -34,7 +35,14 @@ export {
   ErrorPage,
 } from './feedback';
 export type { EmptyKind, ErrorKind } from './feedback';
-export { Portal, useEscape, Popover, Menu, Modal, Sheet } from './overlay';
+export {
+  Portal,
+  useFocusLayer,
+  Popover,
+  Menu,
+  Modal,
+  Sheet,
+} from './overlay';
 export type { MenuItem } from './overlay';
 export { DataTable } from './data-table';
 export type { DataColumn, SortState } from './data-table';

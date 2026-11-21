@@ -75,7 +75,7 @@ export function Button({
   'aria-label'?: string;
 }) {
   const off = disabled || loading;
-  const cls = `inline-flex select-none items-center justify-center whitespace-nowrap rounded-btn font-display font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:shadow-focus ${VARIANT[variant]} ${SIZE[size]} ${full ? 'w-full' : ''} ${off ? 'pointer-events-none opacity-55' : ''} ${className}`;
+  const cls = `inline-flex select-none items-center justify-center whitespace-nowrap rounded-btn font-display font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.985] focus-visible:shadow-focus ${VARIANT[variant]} ${SIZE[size]} ${full ? 'w-full' : ''} ${off ? 'pointer-events-none opacity-55' : ''} ${className}`;
   const content = (
     <>
       {loading ? (
@@ -136,12 +136,12 @@ export function IconButton({
       aria-label={label}
       title={label}
       aria-pressed={active}
-      className={`relative grid flex-shrink-0 place-items-center rounded-btn border border-line bg-card text-muted transition-colors hover:bg-panel hover:text-navy focus-visible:outline-none focus-visible:shadow-focus ${active ? 'bg-panel text-navy' : ''} ${className}`}
+      className={`relative grid flex-shrink-0 place-items-center rounded-btn border border-line bg-card text-muted transition-colors hover:bg-panel hover:text-navy focus-visible:shadow-focus ${active ? 'bg-panel text-navy' : ''} ${className}`}
       style={{ width: size, height: size }}
     >
-      <Icon size={18} strokeWidth={2} />
+      <Icon size={18} strokeWidth={2} aria-hidden />
       {typeof badge === 'number' && badge > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full border-2 border-card bg-error px-1 text-center font-sans text-[10px] font-bold leading-[14px] text-white">
+        <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full border-2 border-card bg-error-fill px-1 text-center font-sans text-[10px] font-bold leading-[14px] text-white">
           {badge > 99 ? '99+' : badge}
         </span>
       )}

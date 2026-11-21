@@ -68,7 +68,7 @@ Set lineal 24×24, trazo 2–2.2, relleno tint 18% opcional (sprite `<symbol id=
 
 ### A. Landing (`Web Landing.dc.html` → `src/app/page.tsx`)
 Fondo fijo: 3 auras radiales (azul `rgba(10,107,207,.42)`, cian `.22`, azul violáceo `.30`, blur 40–60px, deriva 26/32/38 s) + rejilla doble (120px y 24px, `rgba(90,176,255,.05/.025)`) + viñeta.
-1. **Nav fija**: transparente sobre el hero → al hacer scroll > 40px: `rgba(6,20,44,.78)` + blur 16 + borde, altura 76→62px. Links con subrayado cian animado según sección visible. Barra de progreso de scroll 3px cian arriba. CTA "Descargar app" con destello (shine) cada 3.5 s. "Soy técnico" → `/registro-tecnico`.
+1. **Nav fija** (links de sección solo ≥1280px; debajo de 640px se ocultan el nombre y "Soy técnico", quedan ícono, "Iniciar sesión" y la descarga): transparente sobre el hero → al hacer scroll > 40px: `rgba(6,20,44,.78)` + blur 16 + borde, altura 76→62px. Links con subrayado cian animado según sección visible. Barra de progreso de scroll 3px cian arriba. CTA "Descargar app" con destello (shine) cada 3.5 s. "Soy técnico" → `/registro-tecnico`.
 2. **Hero**: spotlight radial que sigue al cursor (CSS vars `--mx/--my`), parallax de tarjetas flotantes (`--px/--py`, ±8–28px). Pill "89 técnicos en línea · ZMG" (número vivo). H1 palabra por palabra (`wordin` .8s, blur 6px→0, stagger 70ms). Botones de tienda blancos. Prueba social (avatares + 4.9★ + 3,346 servicios). Teléfono con home de la app + 3 tarjetas flotantes (reseña, "Identidad verificada", "Llega en 15 min"). Pie: coordenadas mono, haz de luz cian recorriendo una línea, marquee de servicios (40 s).
 3. **Stats**: 4 KPIs con count-up al entrar en vista (1.6 s ease-out cubic).
 4. **Categorías**: bento (Plomería destacada 2×2 en ≥980px). Tilt 3D al mover el cursor (rotateX ±7°, rotateY ±9°, glare radial siguiendo el cursor).
@@ -160,6 +160,9 @@ Fondo `#050F22` con 2 auras + rejilla enmascarada. Header: logo + "Volver al sit
 - Listas: filtros por lista (`sf/tf/cf`), `range{kind,a,b}`, `sort{key,dir}`, `selection[]`, `page`.
 - Notificaciones: `notifications[] {id,type,title,body,ts,read,to:[route,params]}`, `nSel[]`, `nTab`, `nType`; preferencias en `platform_settings`/perfil admin.
 - Landing: `scrolled`, `activeSection`, `step`, `verifStep`, `estimator{service,urgent}`, `calc{jobs,category}`, `faqOpen`.
+
+## Copy de pagos
+El landing, el login y el registro describen el modo de pago vigente (Términos): el cliente paga al terminar, en efectivo al técnico o por transferencia, y confirma el monto en la app; el técnico cobra sus comisiones en su CLABE por liquidación. No prometer pago con tarjeta ni retiros diarios mientras no estén activos (la sección Planes es la única que menciona tarjeta, como propuesta).
 
 ## Assets
 - Logo: el ícono vigente (casa + llave + gota + TM, `src/app/icon.svg` / `BrandMark` en `src/components/ui.tsx`). En los prototipos vive como `<symbol id="tm-logo">` y se usa con `<use href="#tm-logo">`.

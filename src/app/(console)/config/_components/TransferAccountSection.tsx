@@ -87,12 +87,12 @@ export function TransferAccountSection() {
   const noneActive = !!accts && !hasActiveDeposit(accts);
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider px-5 py-4">
-        <span className="flex items-center gap-2 font-display text-[16px] font-bold text-navy">
+        <h2 className="flex items-center gap-2 font-display text-[16px] font-bold text-navy">
           <Landmark size={17} className="text-primary" aria-hidden /> Cuentas
           para transferencias
-        </span>
+        </h2>
         <div className="flex items-center gap-3">
           {accts && (
             <Badge tone={noneActive || !accts.length ? 'warning' : 'success'}>
@@ -127,7 +127,7 @@ export function TransferAccountSection() {
           {noneActive && list.length > 0 && (
             <div
               role="alert"
-              className="mx-5 mt-3 flex items-start gap-2 rounded-card border border-warning/40 bg-warning-soft px-3.5 py-3 font-sans text-[13px] text-warning-ink"
+              className="mx-5 mt-3 flex items-start gap-2 rounded-box border border-warning/40 bg-warning-soft px-3.5 py-3 font-sans text-[13px] text-warning-ink"
             >
               <AlertTriangle
                 size={16}

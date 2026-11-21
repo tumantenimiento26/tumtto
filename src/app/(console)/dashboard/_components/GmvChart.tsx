@@ -37,12 +37,18 @@ export function GmvChart({
   labels,
   values,
   prev,
+  periodDelta,
 }: {
   metric: DashMetric;
   onMetric: (m: DashMetric) => void;
   labels: string[];
   values: number[];
   prev: number[];
+  /**
+   * Variación del periodo ya calculada (la del KPI de la banda). Si llega, la
+   * cifra «vs periodo anterior» es la misma en la banda y en la gráfica.
+   */
+  periodDelta?: number | null;
 }) {
   const gid = useId().replace(/:/g, '');
   const reduced = useReducedMotion();
@@ -54,7 +60,7 @@ export function GmvChart({
     metric === 'servicios' ? v.toLocaleString('es-MX') : money(v);
   const n = values.length;
 
-  const { max, cur, old, avg, peak, total, delta } = useMemo(() => {
+  const { max, cur, old, avg, peak, total, delta: chartDelta } = useMemo(() => {
     // Piso del eje: sin ventas, un tope de 1 daba ticks "$1 $1 $1 $0".
     const floor = metric === 'servicios' ? 4 : 1000;
     const max = niceMax(Math.max(floor, ...values, ...(showPrev ? prev : [])));
@@ -86,6 +92,7 @@ export function GmvChart({
       delta: deltaPct(total, prevTotal),
     };
   }, [values, prev, showPrev, metric]);
+  const delta = periodDelta !== undefined ? periodDelta : chartDelta;
 
   const xPct = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 50);
   const yPx = (v: number) => H - (Math.min(v, max) / max) * H;
@@ -369,9 +376,10 @@ export function GmvChart({
             i % labelEvery === 0 || i === n - 1 ? (
               <span
                 key={i}
-                className={`absolute bottom-1.5 -translate-x-1/2 font-mono text-[10.5px] transition-colors ${
-                  hover === i ? 'font-bold text-primary' : 'text-faint'
-                }`}
+                // Primera/última etiqueta alineadas hacia dentro: centradas tocaban el borde.
+                className={`absolute bottom-1.5 font-mono text-[11px] transition-colors ${
+                  i === 0 ? '' : i === n - 1 ? '-translate-x-full' : '-translate-x-1/2'
+                } ${hover === i ? 'font-bold text-primary' : 'text-faint'}`}
                 style={{ left: `${xPct(i)}%` }}
               >
                 {l}

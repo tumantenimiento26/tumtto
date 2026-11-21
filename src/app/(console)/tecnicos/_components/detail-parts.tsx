@@ -23,6 +23,7 @@ import {
   Modal,
   Sheet,
   Textarea,
+  ScrollX,
 } from '@/components/ds';
 import { CategoryIcon } from '@/components/category-icon';
 import { useAction } from '@/components/use-action';
@@ -60,7 +61,7 @@ export function CardHead({
 }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
-      <Kicker>{title}</Kicker>
+      <Kicker as="h2">{title}</Kicker>
       {action}
     </div>
   );
@@ -497,7 +498,7 @@ export function RatesCard({ techId, rates }: { techId: string; rates: RateRow[] 
         </p>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full min-w-[420px]">
               <thead>
                 <tr className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted">
@@ -533,7 +534,7 @@ export function RatesCard({ techId, rates }: { techId: string; rates: RateRow[] 
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
           <p className="mt-3 font-sans text-[12px] text-muted">
             Rango permitido por tarifa: ${RATE_MIN} – ${RATE_MAX.toLocaleString('es-MX')} MXN. Los
             cambios aplican a cotizaciones nuevas.

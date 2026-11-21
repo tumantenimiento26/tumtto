@@ -1,6 +1,8 @@
 'use client';
 
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef, useState } from 'react';
+import { onMapFailure } from '@/lib/mapFailure';
 import { Trash2, Undo2 } from 'lucide-react';
 import {
   geometryCenter,
@@ -50,7 +52,7 @@ export function ZoneDrawMap({
     value && !polygonToPoints(value).length ? value : null,
   );
   const [ready, setReady] = useState(false);
-  const [noToken, setNoToken] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const dark = useTheme(s => s.theme) === 'dark';
 
   const pointsRef = useRef(points);
@@ -70,7 +72,7 @@ export function ZoneDrawMap({
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
     if (!token) {
-      setNoToken(true);
+      setUnavailable(true);
       return;
     }
     let cancelled = false;
@@ -81,15 +83,22 @@ export function ZoneDrawMap({
       if (cancelled || !host.current) return;
       mapboxgl.accessToken = token;
       const start = value ? geometryCenter(value) : null;
-      map = new mapboxgl.Map({
-        container: host.current,
-        style: dark
-          ? 'mapbox://styles/mapbox/dark-v11'
-          : 'mapbox://styles/mapbox/light-v11',
-        center: start ?? ZMG_CENTER,
-        zoom: start ? 11 : 9.9,
-        attributionControl: false,
-      });
+      try {
+        map = new mapboxgl.Map({
+          container: host.current,
+          style: dark
+            ? 'mapbox://styles/mapbox/dark-v11'
+            : 'mapbox://styles/mapbox/light-v11',
+          center: start ?? ZMG_CENTER,
+          zoom: start ? 11 : 9.9,
+          attributionControl: false,
+        });
+      } catch {
+        // Sin WebGL el constructor lanza.
+        setUnavailable(true);
+        return;
+      }
+      onMapFailure(map, () => !cancelled && setUnavailable(true));
       mapRef.current = map;
       map.addControl(
         new mapboxgl.NavigationControl({ showCompass: false }),
@@ -181,14 +190,14 @@ export function ZoneDrawMap({
     src.setData({ type: 'FeatureCollection', features });
   }, [ready, points, base]);
 
-  if (noToken)
+  if (unavailable)
     return (
       <div
         className="grid place-items-center rounded-box border border-dashed border-line bg-panel p-6 text-center text-[13px] text-muted"
         style={{ height }}
       >
-        Define NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN para dibujar en el mapa, o
-        importa un archivo .geojson.
+        No pudimos cargar el mapa para dibujar. Puedes importar la zona desde
+        un archivo .geojson.
       </div>
     );
 

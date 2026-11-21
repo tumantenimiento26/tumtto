@@ -61,7 +61,7 @@ export function ToolsCard({ techId }: { techId: string }) {
                       title={canEdit ? undefined : 'Tu rol no edita herramienta'}
                       aria-label={`Quitar ${t.name}`}
                       onClick={() => setRemoving(t)}
-                      className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-tint hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                      className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-error-soft hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <X size={12} />
                     </button>

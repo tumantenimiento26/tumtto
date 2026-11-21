@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import {
   Badge,
@@ -54,7 +53,7 @@ import { money } from './fin-parts';
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'error' | 'warning' }) {
   return (
-    <div className="min-w-0 rounded-card border border-line bg-card px-3.5 py-3">
+    <div className="min-w-0 rounded-box border border-line bg-card px-3.5 py-3">
       <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted">{label}</div>
       <div
         className={`mt-1 font-display text-[18px] font-extrabold tabular ${
@@ -69,7 +68,6 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'er
 
 export function CashByTechnician({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [rows, setRows] = useState<CashTechRow[] | null | undefined>(undefined);
 
   useEffect(() => {
@@ -116,8 +114,8 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-[640px] font-sans text-[13px] text-muted">
           Efectivo cobrado por técnico en {label} (por fecha de reporte). En servicios del modelo anterior, la comisión
-          del efectivo es deuda del técnico y se descuenta sola de su saldo. En servicios con dinero de Tu Mantenimiento
-          el efectivo es de Tu Mantenimiento: ahí la comisión generada y la tarifa base acreditada valen 0 (la ganancia
+          del efectivo es deuda del técnico y se descuenta sola de su saldo. En servicios con dinero de Tumantenimiento
+          el efectivo es de Tumantenimiento: ahí la comisión generada y la tarifa base acreditada valen 0 (la ganancia
           del técnico está en «Comisiones de técnicos»).
         </p>
         <Button
@@ -154,7 +152,7 @@ export function CashByTechnician({ from, to, label }: { from: Date; to: Date; la
             rowKey={r => r.technician_id}
             columns={cols}
             loading={rows === undefined}
-            onRowClick={r => router.push(`/tecnicos/${r.technician_id}`)}
+            rowHref={r => `/tecnicos/${r.technician_id}`}
             initialSort={{ key: 'pen', dir: 'desc' }}
             pageSize={8}
             minWidth={1380}
@@ -172,7 +170,6 @@ const PAGE = 100;
 
 export function PaymentsReport({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [method, setMethod] = useState<MethodFilter>('all');
   const [cashStatus, setCashStatus] = useState<CashStatus | null>(null);
   const [onlyReview, setOnlyReview] = useState(false);
@@ -344,7 +341,7 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
             rowKey={r => r.order_id}
             columns={cols}
             loading={data === undefined}
-            onRowClick={r => router.push(`/servicios/${r.order_id}`)}
+            rowHref={r => `/servicios/${r.order_id}`}
             pageSize={8}
             minWidth={1320}
             empty={<EmptyState kind="no-results" compact title="Sin servicios" description="No hay servicios con esos filtros en el periodo." />}
@@ -374,7 +371,6 @@ export function PaymentsReport({ from, to, label }: { from: Date; to: Date; labe
 
 export function TechnicianCommissions({ from, to, label }: { from: Date; to: Date; label: string }) {
   const tick = useTick();
-  const router = useRouter();
   const [rows, setRows] = useState<TechCommissionReportRow[] | null | undefined>(undefined);
 
   useEffect(() => {
@@ -400,14 +396,14 @@ export function TechnicianCommissions({ from, to, label }: { from: Date; to: Dat
     { key: 'cash', header: 'Efectivo', align: 'right', sortValue: r => Number(r.quote_collected_cents), render: r => <span className="font-mono text-[12.5px] tabular">{num(r.quote_collected_cents)}</span> },
     { key: 'gross', header: 'Ingreso bruto', align: 'right', sortValue: r => Number(r.gross_collected_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-navy tabular">{num(r.gross_collected_cents)}</span> },
     { key: 'comm', header: 'Comisión técnico', align: 'right', sortValue: r => Number(r.commission_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-warning-ink tabular">{num(r.commission_cents)}</span> },
-    { key: 'net', header: 'Neto Tu Mantenimiento', align: 'right', sortValue: r => Number(r.admin_net_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-success tabular">{num(r.admin_net_cents)}</span> },
+    { key: 'net', header: 'Neto Tumantenimiento', align: 'right', sortValue: r => Number(r.admin_net_cents), render: r => <span className="font-mono text-[12.5px] font-semibold text-success tabular">{num(r.admin_net_cents)}</span> },
   ];
 
   return (
     <div className="p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-[640px] font-sans text-[13px] text-muted">
-          Servicios con dinero de Tu Mantenimiento terminados en {label}: todo lo cobrado es ingreso de Tu Mantenimiento
+          Servicios con dinero de Tumantenimiento terminados en {label}: todo lo cobrado es ingreso de Tumantenimiento
           y el técnico gana su comisión (tarifa congelada en cada servicio). El pago de comisiones llega con nómina; no
           pasa por la cartera.
         </p>
@@ -431,7 +427,7 @@ export function TechnicianCommissions({ from, to, label }: { from: Date; to: Dat
             <Stat label="Servicios" value={String(totals.services)} />
             <Stat label="Ingreso bruto" value={num(totals.gross)} />
             <Stat label="Comisión técnicos" value={num(totals.commission)} tone={totals.commission ? 'warning' : undefined} />
-            <Stat label="Neto Tu Mantenimiento" value={num(totals.net)} />
+            <Stat label="Neto Tumantenimiento" value={num(totals.net)} />
             <Stat label="Efectivo cobrado" value={num(totals.quote)} />
           </div>
           <DataTable
@@ -439,11 +435,11 @@ export function TechnicianCommissions({ from, to, label }: { from: Date; to: Dat
             rowKey={r => r.technician_id}
             columns={cols}
             loading={rows === undefined}
-            onRowClick={r => router.push(`/tecnicos/${r.technician_id}`)}
+            rowHref={r => `/tecnicos/${r.technician_id}`}
             initialSort={{ key: 'comm', dir: 'desc' }}
             pageSize={8}
             minWidth={980}
-            empty={<EmptyState kind="no-results" compact title="Sin comisiones en el periodo" description="Ningún servicio con dinero de Tu Mantenimiento terminó en estas fechas." />}
+            empty={<EmptyState kind="no-results" compact title="Sin comisiones en el periodo" description="Ningún servicio con dinero de Tumantenimiento terminó en estas fechas." />}
           />
         </>
       )}

@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { Banknote, ChevronLeft, HandCoins, Undo2, User } from 'lucide-react';
-import { Badge, Button, Card, EmptyState, ErrorPage, ScreenSkeleton } from '@/components/ds';
+import { Badge, Button, Card, EmptyState, ErrorPage, ScreenSkeleton, ScrollX } from '@/components/ds';
 import { UserIcon } from '@/components/user-avatar';
 import { useAuth } from '@/lib/auth';
 import { fmtDate, fmtDateTime } from '@/lib/dates';
@@ -46,6 +47,7 @@ export default function LiquidacionDetailPage() {
   const { summary, state, reload } = useSettlement(id);
   const [dialog, setDialog] = useState<'payout' | 'cash' | null>(null);
   const [voiding, setVoiding] = useState<HistoryItem | null>(null);
+  useDocumentTitle(ready ? getProfile(id)?.full_name : null, 'Liquidaciones');
 
   if (state === 'failed') return <ErrorPage kind="500" primary={{ label: 'Reintentar', onClick: () => void reload() }} />;
   if (!ready || !summary) return <ScreenSkeleton kind="detail" />;
@@ -75,7 +77,7 @@ export default function LiquidacionDetailPage() {
               ))}
             </div>
           </div>
-          <Button variant="secondary" size="sm" icon={User} href={`/tecnicos/${id}`}>
+          <Button variant="secondary" size="sm" icon={User} href={`/tecnicos/${id}`} className="max-sm:w-full">
             Ver perfil
           </Button>
         </div>
@@ -98,7 +100,7 @@ export default function LiquidacionDetailPage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div>
               <h2 className="font-display text-[16px] font-bold text-navy">Comisiones por pagar</h2>
-              <p className="font-sans text-[12px] text-muted">Lo que Tu Mantenimiento le debe por servicios terminados.</p>
+              <p className="font-sans text-[12px] text-muted">Lo que Tumantenimiento le debe por servicios terminados.</p>
             </div>
             {edit && (
               <Button variant="approve" size="sm" icon={Banknote} disabled={summary.pending_commissions.length === 0} onClick={() => setDialog('payout')}>
@@ -109,7 +111,7 @@ export default function LiquidacionDetailPage() {
           {summary.pending_commissions.length === 0 ? (
             <EmptyState kind="all-clear" title="Nada por pagar" description="Todas las comisiones están pagadas." compact />
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full min-w-[460px] border-collapse">
                 <thead>
                   <tr className="bg-panel"><Th>Servicio</Th><Th>Fecha</Th><Th right>Cobrado</Th><Th right>Comisión</Th></tr>
@@ -128,7 +130,7 @@ export default function LiquidacionDetailPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </Card>
 
@@ -136,7 +138,7 @@ export default function LiquidacionDetailPage() {
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div>
               <h2 className="font-display text-[16px] font-bold text-navy">Efectivo por entregar</h2>
-              <p className="font-sans text-[12px] text-muted">Dinero de Tu Mantenimiento que el técnico cobró en efectivo.</p>
+              <p className="font-sans text-[12px] text-muted">Dinero de Tumantenimiento que el técnico cobró en efectivo.</p>
             </div>
             {edit && (
               <Button variant="approve" size="sm" icon={HandCoins} disabled={summary.pending_cash.length === 0} onClick={() => setDialog('cash')}>
@@ -147,7 +149,7 @@ export default function LiquidacionDetailPage() {
           {summary.pending_cash.length === 0 ? (
             <EmptyState kind="all-clear" title="Sin efectivo pendiente" description="No tiene efectivo por entregar." compact />
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full min-w-[360px] border-collapse">
                 <thead>
                   <tr className="bg-panel"><Th>Servicio</Th><Th>Cobrado el</Th><Th right>Efectivo</Th></tr>
@@ -162,7 +164,7 @@ export default function LiquidacionDetailPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </Card>
       </div>

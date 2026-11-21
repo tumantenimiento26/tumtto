@@ -261,9 +261,9 @@ function ErrorsTab() {
               <ErrorIllustration kind={e.kind} />
             </div>
             <div className="p-5">
-              <h3 className="font-display text-[17px] font-bold text-navy">
+              <h2 className="font-display text-[17px] font-bold text-navy">
                 {e.title}
-              </h3>
+              </h2>
               <p className="mt-1 text-[13.5px] text-muted">{e.description}</p>
               <Button
                 className="mt-4"

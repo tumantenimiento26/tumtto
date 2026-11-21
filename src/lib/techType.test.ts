@@ -3,7 +3,7 @@ import { techTypeLabel, typeChangeText, typeCompanyValid } from './techType';
 
 describe('techType', () => {
   it('etiquetas', () => {
-    expect(techTypeLabel('tumtto')).toBe('Tumtto');
+    expect(techTypeLabel('tumtto')).toBe('Tumantenimiento');
     expect(techTypeLabel('independent', 'X')).toBe('Independiente');
     expect(techTypeLabel('third_party', 'Acme')).toBe('Tercero · Acme');
   });
@@ -19,7 +19,7 @@ describe('techType', () => {
       typeChangeText({ from_type: 'independent', to_type: 'third_party', to_company_id: 'c1' }, name),
     ).toBe('Tipo cambiado: Independiente → Tercero (Acme)');
     expect(typeChangeText({ from_type: 'tumtto', to_type: 'independent', note: 'baja' }, name)).toBe(
-      'Tipo cambiado: Tumtto → Independiente — baja',
+      'Tipo cambiado: Tumantenimiento → Independiente — baja',
     );
   });
 });

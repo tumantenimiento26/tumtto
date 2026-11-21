@@ -238,7 +238,7 @@ export default function NotificacionesPage() {
       <div className="flex flex-col gap-4">
 
         {/* Lista */}
-        <Card className="min-w-0 flex-1 overflow-hidden">
+        <Card padded={false} className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-4 py-3">
             {sel === 'none' ? (
               <Checkbox
@@ -305,7 +305,7 @@ export default function NotificacionesPage() {
               <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setFiltersOpen(true)}>
                 Filtros
                 {(type ? 1 : 0) + (tab !== 'todas' ? 1 : 0) > 0 && (
-                  <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                  <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">
                     {(type ? 1 : 0) + (tab !== 'todas' ? 1 : 0)}
                   </span>
                 )}
@@ -448,7 +448,7 @@ export default function NotificacionesPage() {
                   t.count > 0 && (
                     <span
                       className={`min-w-6 rounded-full px-1.5 py-0.5 text-center font-mono text-[11px] ${
-                        on ? 'bg-white/20 text-white' : 'bg-chip text-muted'
+                        on ? 'bg-white/20 text-white' : 'bg-chip text-body'
                       }`}
                     >
                       {t.count}

@@ -895,11 +895,20 @@ export function withHistory(w: World): {
     };
   });
 
+  // Maqueta coherente: el agregado de cada técnico (lista, dashboard, detalle)
+  // sale de sus calificaciones visibles, como hace el trigger del backend.
+  const ratedTechnicians = technicians.map(t => {
+    const visible = ratings.filter(r => r.reviewee_id === t.id && !r.is_hidden);
+    if (!visible.length) return t;
+    const avg = visible.reduce((acc, r) => acc + r.score, 0) / visible.length;
+    return { ...t, rating_avg: Math.round(avg * 100) / 100, rating_count: visible.length };
+  });
+
   return {
     world: {
       ...w,
       profiles,
-      technicians,
+      technicians: ratedTechnicians,
       technicianCategories,
       ...paymentModelDemo(
         { orders, events, payments, ledger, quotes: w.quotes },

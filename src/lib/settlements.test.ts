@@ -49,7 +49,7 @@ describe('formato', () => {
   });
   it('frases claras del saldo', () => {
     expect(balanceSentences('Ramón Torres', 43000, 135000)).toEqual([
-      expect.stringMatching(/^Tu Mantenimiento le debe .*430\.00 a Ramón\.$/),
+      expect.stringMatching(/^Tumantenimiento le debe .*430\.00 a Ramón\.$/),
       expect.stringMatching(/^Ramón debe entregar .*1,350\.00 en efectivo\.$/),
     ]);
     expect(balanceSentences('Ramón', 0, 0)[0]).toMatch(/al corriente/);

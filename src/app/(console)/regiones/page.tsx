@@ -288,7 +288,7 @@ export default function RegionesPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Regiones y cobertura"
-        description="Oferta y demanda por municipio de la ZMG · zonas reales de cobertura (GeoJSON), activar/pausar y asignar técnicos."
+        description="Oferta y demanda por municipio de la ZMG · zonas de cobertura, activar/pausar y asignar técnicos."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -320,22 +320,23 @@ export default function RegionesPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi index={0} label="Zonas activas" value={`${active}/${data.rows.length}`} sub={extras.unavailable.zones ? 'Zonas no disponibles (RPC)' : 'municipios con servicio'} />
+        <Kpi index={0} label="Zonas activas" value={`${active}/${data.rows.length}`} sub={extras.unavailable.zones ? 'Zonas no disponibles por ahora' : 'municipios con servicio'} />
         <Kpi index={1} label="Técnicos con base" value={String(withBase)} sub={`de ${data.techs.length} aprobados`} />
         <Kpi index={2} label="Solicitudes 7 d" value={String(data.demand7[0])} sub={`${deltaLabel(pctDelta(data.demand7[0], data.demand7[1]))} vs semana anterior`} />
         <Kpi index={3} label="Llegada media" value={data.eta != null ? `${data.eta} min` : '—'} sub="de aceptada a en sitio" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card padded={false} className="overflow-hidden">
+          {/* El mapa llena el alto de la fila (lo marca el panel de zona): sin hueco blanco abajo. */}
+          <Card padded={false} className="flex min-w-0 flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
-              <Kicker>Mapa de cobertura</Kicker>
+              <Kicker as="h2">Mapa de cobertura</Kicker>
               <span className="font-sans text-[12px] text-muted">
                 {mapZones.length} zonas con geometría · calor = solicitudes 30 d
               </span>
             </div>
-            <CoverageMap
+            <div className="h-[420px] xl:h-auto xl:min-h-[420px] xl:flex-1">
+              <CoverageMap
               zones={mapZones}
               demand={data.demand}
               techs={data.bases}
@@ -344,32 +345,12 @@ export default function RegionesPage() {
                 const row = data.rows.find(r => r.zoneId === id);
                 if (row) setSelected(row.name);
               }}
-              height={420}
+              height="100%"
             />
-          </Card>
-
-          <Card padded={false} className="overflow-hidden">
-            <div className="border-b border-line px-5 py-3">
-              <Kicker>Municipios</Kicker>
             </div>
-            <DataTable
-              rows={data.rows}
-              rowKey={r => r.name}
-              columns={cols}
-              onRowClick={r => setSelected(r.name)}
-              initialSort={{ key: 'demand', dir: 'desc' }}
-              pageSize={10}
-              empty={<EmptyState kind="first-use" title="Sin municipios" description="Aparecen cuando hay zonas, técnicos con base o solicitudes." compact />}
-            />
-            {extras.unavailable.zones && (
-              <p className="border-t border-divider px-5 py-3 font-sans text-[12px] text-muted">
-                No respondió <span className="font-mono">admin_list_coverage_zones</span>: los interruptores están deshabilitados.
-              </p>
-            )}
           </Card>
-        </div>
 
-        <Card padded className="h-fit xl:sticky xl:top-4">
+        <Card padded className="h-fit">
           {!sel ? (
             <EmptyState kind="first-use" title="Selecciona un municipio" compact />
           ) : (
@@ -464,6 +445,27 @@ export default function RegionesPage() {
             </div>
           )}
         </Card>
+
+          {/* A todo el ancho: junto al panel de zona no cabían sus 7 columnas. */}
+          <Card padded={false} className="overflow-hidden xl:col-span-2">
+            <div className="border-b border-line px-5 py-3">
+              <Kicker as="h2">Municipios</Kicker>
+            </div>
+            <DataTable
+              rows={data.rows}
+              rowKey={r => r.name}
+              columns={cols}
+              onRowClick={r => setSelected(r.name)}
+              initialSort={{ key: 'demand', dir: 'desc' }}
+              pageSize={10}
+              empty={<EmptyState kind="first-use" title="Sin municipios" description="Aparecen cuando hay zonas, técnicos con base o solicitudes." compact />}
+            />
+            {extras.unavailable.zones && (
+              <p className="border-t border-divider px-5 py-3 font-sans text-[12px] text-muted">
+                No pudimos cargar las zonas de cobertura: los interruptores están deshabilitados hasta que vuelvan.
+              </p>
+            )}
+          </Card>
       </div>
 
       <ZoneEditor

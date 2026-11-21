@@ -1,12 +1,31 @@
 'use client';
-import { forwardRef, useId } from 'react';
+import { createContext, forwardRef, useContext, useId } from 'react';
 import { Check, Minus, type LucideIcon } from 'lucide-react';
 
 /** Estilo base de controles de formulario: alto 42, radio 10, anillo de foco. */
 export const controlClass = (error?: boolean) =>
   `flex min-h-[42px] w-full items-center rounded-btn border bg-card text-[14px] text-navy transition-[border-color,box-shadow] focus-within:border-primary focus-within:shadow-focus ${
-    error ? 'border-error' : 'border-line hover:border-line-strong'
+    error ? 'border-error' : 'border-control hover:border-muted'
   }`;
+
+/**
+ * Lo que <Field> le pasa a su control: id (para `<label htmlFor>`) e id de la
+ * ayuda/error (`aria-describedby`). Input, Textarea, Select y DatePicker lo
+ * leen, así `<Field label><Select/></Field>` queda asociado sin props extra.
+ */
+const FieldCtx = createContext<{
+  id: string;
+  labelId?: string;
+  describedBy?: string;
+} | null>(null);
+export function useFieldControl(id?: string) {
+  const ctx = useContext(FieldCtx);
+  return {
+    id: id ?? ctx?.id,
+    labelId: ctx?.labelId,
+    'aria-describedby': ctx?.describedBy,
+  };
+}
 
 /** Etiqueta + control + ayuda/error debajo. */
 export function Field({
@@ -26,24 +45,41 @@ export function Field({
   htmlFor?: string;
   className?: string;
 }) {
+  const autoId = useId();
+  const id = htmlFor ?? autoId;
+  const msgId = `${id}-msg`;
+  const hasMsg = !!error || !!hint;
   return (
     <div className={className}>
       {label && (
         <label
-          htmlFor={htmlFor}
+          id={`${id}-label`}
+          htmlFor={id}
           className="mb-1.5 block text-[12.5px] font-semibold text-navy"
         >
           {label}
           {required && <span className="text-error"> *</span>}
         </label>
       )}
-      {children}
+      <FieldCtx.Provider
+        value={{
+          id,
+          labelId: label ? `${id}-label` : undefined,
+          describedBy: hasMsg ? msgId : undefined,
+        }}
+      >
+        {children}
+      </FieldCtx.Provider>
       {error ? (
-        <p role="alert" className="mt-1.5 text-[12px] text-error">
+        <p id={msgId} role="alert" className="mt-1.5 text-[12px] text-error">
           {error}
         </p>
       ) : (
-        hint && <p className="mt-1.5 text-[12px] text-muted">{hint}</p>
+        hint && (
+          <p id={msgId} className="mt-1.5 text-[12px] text-muted">
+            {hint}
+          </p>
+        )
       )}
     </div>
   );
@@ -82,7 +118,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   ref,
 ) {
   const autoId = useId();
-  const inputId = id ?? autoId;
+  const ctrl = useFieldControl(id);
+  const inputId = ctrl.id ?? autoId;
+  const ownField = !!label || typeof error === 'string' || !!hint;
+  const describedBy = ownField
+    ? typeof error === 'string' || hint
+      ? `${inputId}-msg`
+      : undefined
+    : ctrl['aria-describedby'];
   const control = (
     <div className={`${controlClass(!!error)} ${wrapperClassName}`}>
       {Icon && (
@@ -98,6 +141,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         id={inputId}
         required={required}
         aria-invalid={!!error || undefined}
+        aria-describedby={describedBy}
         className={`min-w-0 flex-1 bg-transparent px-3 py-2 outline-none placeholder:text-faint ${className}`}
         {...rest}
       />
@@ -108,7 +152,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       )}
     </div>
   );
-  if (!label && typeof error !== 'string' && !hint) return control;
+  if (!ownField) return control;
   return (
     <Field
       label={label}
@@ -127,13 +171,16 @@ export const Textarea = forwardRef<
   React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
     error?: boolean | string | null;
   }
->(function Textarea({ error, className = '', ...rest }, ref) {
+>(function Textarea({ error, className = '', id, ...rest }, ref) {
+  const ctrl = useFieldControl(id);
   return (
     <textarea
       ref={ref}
+      id={ctrl.id}
+      aria-describedby={ctrl['aria-describedby']}
       aria-invalid={!!error || undefined}
       className={`min-h-[96px] w-full resize-y rounded-btn border bg-card px-3 py-2.5 text-[14px] text-navy outline-none transition-[border-color,box-shadow] placeholder:text-faint focus:border-primary focus:shadow-focus ${
-        error ? 'border-error' : 'border-line hover:border-line-strong'
+        error ? 'border-error' : 'border-control hover:border-muted'
       } ${className}`}
       {...rest}
     />
@@ -148,6 +195,8 @@ export function Checkbox({
   label,
   disabled,
   className = '',
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
 }: {
   checked: boolean;
   indeterminate?: boolean;
@@ -155,11 +204,15 @@ export function Checkbox({
   label?: React.ReactNode;
   disabled?: boolean;
   className?: string;
+  /** Nombre accesible cuando no hay `label` visible (p. ej. filas de tabla). */
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }) {
   const on = checked || indeterminate;
   return (
     <label
-      className={`inline-flex cursor-pointer select-none items-center gap-2.5 ${disabled ? 'pointer-events-none opacity-50' : ''} ${className}`}
+      data-checkbox
+      className={`relative inline-flex min-h-6 min-w-6 cursor-pointer select-none items-center gap-2.5 ${disabled ? 'pointer-events-none opacity-50' : ''} ${className}`}
       onClick={e => e.stopPropagation()}
     >
       <input
@@ -167,14 +220,16 @@ export function Checkbox({
         className="peer sr-only"
         checked={checked}
         aria-checked={indeterminate ? 'mixed' : checked}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         disabled={disabled}
         onChange={e => onChange(e.target.checked)}
       />
       <span
-        className={`grid h-[18px] w-[18px] flex-shrink-0 place-items-center rounded-[5px] border transition-colors peer-focus-visible:shadow-focus ${
+        className={`grid h-[18px] w-[18px] flex-shrink-0 place-items-center rounded-[5px] border transition-colors peer-focus-visible:shadow-focus peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus ${
           on
-            ? 'border-primary bg-primary text-white'
-            : 'border-line-strong bg-card'
+            ? 'border-primary-fill bg-primary-fill text-white'
+            : 'border-control bg-card'
         }`}
       >
         {indeterminate ? (

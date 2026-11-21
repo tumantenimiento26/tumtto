@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import {
-  CreditCard,
+  Banknote,
   MapPin,
   MessageSquare,
   Phone as PhoneIcon,
@@ -72,8 +72,8 @@ const APP_CATS = [
   ['plomeria', 'Plomería'],
   ['electricidad', 'Electricidad'],
   ['gas', 'Gas'],
-  ['aire', 'Aire'],
-  ['linea-blanca', 'Línea blanca'],
+  ['aire', 'Aire acondicionado'],
+  ['linea-blanca', 'Electrodomésticos'],
   ['cerrajeria', 'Cerrajería'],
 ] as const;
 
@@ -112,7 +112,9 @@ export function HomeScreen() {
                 theme="light"
                 decorative
               />
-              <span className="text-[12.5px] font-semibold">{name}</span>
+              <span className="max-w-full text-center text-[12px] font-semibold leading-tight hyphens-auto [overflow-wrap:anywhere]">
+                {name}
+              </span>
             </div>
           ))}
         </div>
@@ -328,9 +330,9 @@ function PayScreen() {
           </div>
         </div>
         <div className="flex items-center gap-2.5 rounded-box border border-line bg-white p-3.5">
-          <CreditCard size={20} className="text-primary" />
-          <span className="flex-1 text-[14px]">Visa •• 4242</span>
-          <span className="text-[12px] font-semibold text-success">Protegido</span>
+          <Banknote size={20} className="text-primary" />
+          <span className="flex-1 text-[14px]">Efectivo o transferencia</span>
+          <span className="text-[12px] font-semibold text-success">Al terminar</span>
         </div>
         <div className="rounded-box border border-line bg-white p-4 text-center">
           <p className="mb-2 text-[14px] font-semibold">¿Cómo te fue con Ramón?</p>
@@ -341,7 +343,7 @@ function PayScreen() {
           </span>
         </div>
       </div>
-      <div className={`${CTA} bg-approve`}>Pagar $1,500</div>
+      <div className={`${CTA} bg-approve`}>Confirmar pago · $1,500</div>
     </div>
   );
 }

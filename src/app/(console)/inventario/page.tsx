@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Ban, Download, Eye, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, UserPlus } from 'lucide-react';
 import {
   Button,
-  Card,
   Chip,
   DataTable,
   EmptyState,
   ErrorPage,
   Input,
+  ListCard,
   PageHeader,
   ScreenSkeleton,
   Tabs,
@@ -179,15 +179,15 @@ export default function InventarioPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Inventario"
-        description="Herramienta propia de Tu Mantenimiento: alta, asignación a técnicos, reparación y baja."
+        description="Herramienta propia de Tumantenimiento: alta, asignación a técnicos, reparación y baja."
         actions={
           <>
+            <ImportButton entity="inventario" />
             {tab === 'herramientas' && (
               <Button variant="secondary" icon={Download} onClick={() => exportRows(visible)} disabled={!visible.length}>
                 Exportar
               </Button>
             )}
-            <ImportButton entity="inventario" />
             <Button icon={Plus} disabled={!canEdit} title={lock} onClick={() => setForm({ open: true, id: null })}>
               Nueva herramienta
             </Button>
@@ -195,9 +195,10 @@ export default function InventarioPage() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <ListCard
+        tabs={
         <Tabs
-          className="px-5"
+          aria-label="Vista del inventario"
           tabs={[
             { value: 'herramientas', label: 'Herramientas', count: rows.length },
             { value: 'por_tecnico', label: 'Asignada por técnico' },
@@ -206,7 +207,8 @@ export default function InventarioPage() {
           value={tab}
           onChange={setTab}
         />
-
+        }
+      >
         {missing ? (
           <EmptyState kind="no-results" title="Inventario no disponible" description="Las tablas de inventario aún no existen en este entorno." />
         ) : tab === 'por_tecnico' ? (
@@ -228,7 +230,7 @@ export default function InventarioPage() {
                 <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setFiltersOpen(true)}>
                   Filtros
                   {drawerCount > 0 && (
-                    <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">{drawerCount}</span>
+                    <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">{drawerCount}</span>
                   )}
                 </Button>
               </div>
@@ -247,7 +249,7 @@ export default function InventarioPage() {
               rows={visible}
               columns={columns}
               rowKey={r => r.id}
-              onRowClick={r => router.push(`/inventario/${r.id}`)}
+              rowHref={r => `/inventario/${r.id}`}
               initialSort={{ key: 'tool', dir: 'asc' }}
               pageSize={8}
               minWidth={980}
@@ -290,7 +292,7 @@ export default function InventarioPage() {
             />
           </>
         )}
-      </Card>
+      </ListCard>
 
       <ToolFiltersSheet
         open={filtersOpen}

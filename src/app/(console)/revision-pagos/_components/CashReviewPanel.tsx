@@ -94,7 +94,7 @@ export function CashReviewPanel() {
         <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setOpen(true)}>
           Filtros
           {nFilters > 0 && (
-            <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+            <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">
               {nFilters}
             </span>
           )}
@@ -152,7 +152,7 @@ export function CashReviewPanel() {
                     </Link>
                     <div className="flex flex-wrap items-center gap-2 font-sans text-[13.5px] font-semibold text-navy">
                       {reviewReason(r.review_reason)}
-                      {isAdminOwned(getRequest(r.order_id)) && <Badge tone="info">Efectivo de Tu Mantenimiento</Badge>}
+                      {isAdminOwned(getRequest(r.order_id)) && <Badge tone="info">Efectivo de Tumantenimiento</Badge>}
                     </div>
                     <div className="font-sans text-[12.5px] text-muted">
                       {r.technician_name ?? 'Técnico'} · {r.client_name ?? 'Cliente'} · {ago(r.review_opened_at)}

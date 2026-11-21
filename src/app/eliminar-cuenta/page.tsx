@@ -5,7 +5,7 @@ import { DeletionRequest } from './DeletionRequest';
 // Google Play exige una URL pública que permita solicitar la eliminación de la
 // cuenta y sus datos sin tener la app instalada.
 export const metadata: Metadata = {
-  title: 'Eliminar mi cuenta · Tumantenimiento',
+  title: 'Eliminar mi cuenta',
   description:
     'Solicita la eliminación de tu cuenta de Tumantenimiento desde la app o desde esta página, y consulta qué datos se borran.',
 };

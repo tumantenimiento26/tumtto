@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -137,7 +136,7 @@ export function EmptyState({
       >
         <Icon size={22} />
       </div>
-      <h3 className="font-display text-[16px] font-bold text-navy">{title}</h3>
+      <h2 className="font-display text-[16px] font-bold text-navy">{title}</h2>
       {description && (
         <p className="mt-1 max-w-sm text-[13.5px] text-muted">{description}</p>
       )}
@@ -164,10 +163,10 @@ const ERRORS: Record<
     code: '404',
     title: 'No encontramos esta página',
     description:
-      'La dirección no existe o el registro fue eliminado. Revisa el ID o búscalo con ⌘K.',
+      'La dirección no existe o el registro fue eliminado. Revisa el ID o búscalo desde el buscador de la consola.',
     steps: [
       'Revisa que el ID tenga el formato SVC-0000',
-      'Busca el registro con ⌘K',
+      'Busca el registro con el buscador de arriba',
       'Si llegaste por un enlace, avisa a quien lo compartió',
     ],
     icon: MapPin,
@@ -249,16 +248,16 @@ const ILLU_TONE = {
   danger: {
     ring: 'bg-error-soft border-error-line',
     chip: 'bg-error-soft text-error',
-    badge: 'bg-error text-white',
+    badge: 'bg-error-fill text-white',
   },
   warning: {
     ring: 'bg-warning-soft border-warning-ring',
     chip: 'bg-warning-soft text-warning-ink',
-    badge: 'bg-warning text-white',
+    badge: 'bg-warning text-deep',
   },
   neutral: {
     ring: 'bg-chip border-line-strong',
-    chip: 'bg-chip text-muted',
+    chip: 'bg-chip text-body',
     badge: 'bg-action text-white',
   },
 };
@@ -310,19 +309,20 @@ export function ErrorPage({
   primary,
   secondary,
   reference,
+  copy,
 }: {
   kind: ErrorKind;
   primary?: { label: string; href?: string; onClick?: () => void };
   secondary?: { label: string; href?: string; onClick?: () => void };
-  /** Código para soporte (se genera uno si no se da). */
+  /**
+   * Código real para soporte (p. ej. el `digest` de un error del servidor).
+   * Sin código no se muestra ninguno: uno inventado no lleva a ningún registro.
+   */
   reference?: string;
+  /** Texto propio (p. ej. el 404 público, que no habla de la consola). */
+  copy?: Partial<Pick<(typeof ERRORS)[ErrorKind], 'title' | 'description' | 'steps'>>;
 }) {
-  const e = ERRORS[kind];
-  const [ref] = useState(
-    () =>
-      reference ??
-      `REF-${kind.toUpperCase().slice(0, 4)}-${Date.now().toString(16).slice(-4).toUpperCase()}`,
-  );
+  const e = { ...ERRORS[kind], ...copy };
   return (
     <div className="mx-auto grid max-w-5xl items-center gap-10 py-10 md:grid-cols-2">
       <ErrorIllustration kind={kind} />
@@ -366,11 +366,11 @@ export function ErrorPage({
             </Button>
           )}
         </div>
-        <p className="mt-4 font-mono text-[11.5px] text-faint">
-          {ref} ·{' '}
+        <p className="mt-4 flex flex-wrap items-center gap-x-2 font-mono text-[11.5px] text-faint">
+          {reference && <span>{reference} ·</span>}
           <a
             href="mailto:soporte@tumantenimiento.mx"
-            className="font-sans font-semibold text-primary"
+            className="inline-flex min-h-6 items-center font-sans text-[13px] font-semibold text-primary hover:underline"
           >
             Contactar a soporte
           </a>

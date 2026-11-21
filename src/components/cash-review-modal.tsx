@@ -103,7 +103,7 @@ export function CashReviewModal({
 
           {model === 'admin_owned' && (
             <p className="rounded-btn bg-info-soft px-3 py-2 font-sans text-[12.5px] text-body">
-              Efectivo de Tu Mantenimiento: el resultado solo fija cuánto efectivo debe entregar el técnico. No hay
+              Efectivo de Tumantenimiento: el resultado solo fija cuánto efectivo debe entregar el técnico. No hay
               comisión de plataforma que recalcular; su comisión se ajusta con lo cobrado.
             </p>
           )}

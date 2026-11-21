@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { AuthProvider } from '@/lib/auth';
 import { THEME_SCRIPT } from '@/lib/theme';
@@ -23,9 +22,10 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Tumantenimiento',
+  // Cada ruta pone su título: «Servicios · Tumantenimiento».
+  title: { default: 'Tumantenimiento', template: '%s · Tumantenimiento' },
   description:
-    'Servicios de mantenimiento a domicilio — Cliente, Técnico y Admin.',
+    'Mantenimiento a domicilio con técnicos verificados en la zona metropolitana de Guadalajara.',
 };
 
 export default function RootLayout({

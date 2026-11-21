@@ -1,6 +1,8 @@
 'use client';
 
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef, useState } from 'react';
+import { onMapFailure } from '@/lib/mapFailure';
 import { Layers, HardHat, Flame, Hexagon, Map as MapIcon } from 'lucide-react';
 import { coverageRing, geometryCenter, type LngLat } from '@/lib/geo';
 import { HEAT_GRADIENT, HEAT_STOPS, heatColor } from '@/lib/heatScale';
@@ -100,7 +102,8 @@ export function CoverageMap({
   techs: MapTechBase[];
   selected: string;
   onSelect: (id: string) => void;
-  height?: number;
+  /** px, o '100%' para llenar un contenedor con alto definido. */
+  height?: number | string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,7 +114,7 @@ export function CoverageMap({
   const [ready, setReady] = useState(false);
   // El estilo base y las etiquetas siguen el tema: al cambiarlo se recrea el mapa.
   const dark = useTheme(s => s.theme) === 'dark';
-  const [noToken, setNoToken] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     zonas: true,
     demanda: true,
@@ -123,7 +126,7 @@ export function CoverageMap({
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
     if (!token) {
-      setNoToken(true);
+      setUnavailable(true);
       return;
     }
     let cancelled = false;
@@ -135,14 +138,21 @@ export function CoverageMap({
       if (cancelled || !host.current) return;
       mapboxgl.accessToken = token;
 
-      map = new mapboxgl.Map({
-        container: host.current,
-        style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
-        center: ZMG_CENTER,
-        zoom: 9.9,
-        pitch: 0,
-        attributionControl: false,
-      });
+      try {
+        map = new mapboxgl.Map({
+          container: host.current,
+          style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
+          center: ZMG_CENTER,
+          zoom: 9.9,
+          pitch: 0,
+          attributionControl: false,
+        });
+      } catch {
+        // Sin WebGL el constructor lanza.
+        setUnavailable(true);
+        return;
+      }
+      onMapFailure(map, () => !cancelled && setUnavailable(true));
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-left');
       map.addControl(new mapboxgl.ScaleControl({ unit: 'metric' }), 'bottom-right');
@@ -370,7 +380,7 @@ export function CoverageMap({
       map.setLayoutProperty(id, 'visibility', vis(layers.tecnicos));
   }, [layers, ready]);
 
-  if (noToken) {
+  if (unavailable) {
     return (
       <div
         style={{ height }}
@@ -380,8 +390,7 @@ export function CoverageMap({
           <MapIcon size={34} className="mx-auto text-primary" />
           <div className="mt-2 text-[14px] font-semibold text-navy">Mapa no disponible</div>
           <div className="mt-1 text-[12.5px] text-muted">
-            Define <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> en{' '}
-            <code className="font-mono">.env.local</code> para ver el mapa real.
+            No pudimos cargar el mapa. Los datos de cada municipio siguen en la tabla.
           </div>
         </div>
       </div>
@@ -425,7 +434,7 @@ export function CoverageMap({
                     {l.label}
                   </span>
                   <span
-                    className={`relative h-[22px] w-9 flex-shrink-0 rounded-full transition-colors ${on ? 'bg-primary' : 'bg-surface-3'}`}
+                    className={`relative h-[22px] w-9 flex-shrink-0 rounded-full transition-colors ${on ? 'bg-primary-fill' : 'bg-control'}`}
                   >
                     <span
                       className={`absolute left-[3px] top-[3px] h-4 w-4 rounded-full bg-white shadow-card transition-transform duration-200 ${on ? 'translate-x-[14px]' : ''}`}

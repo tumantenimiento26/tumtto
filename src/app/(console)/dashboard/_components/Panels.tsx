@@ -18,7 +18,7 @@ import {
   XCircle,
   type LucideIcon,
 } from 'lucide-react';
-import { Badge, Button, Card, EmptyState } from '@/components/ds';
+import { Badge, Button, Card, EmptyState, ScrollX } from '@/components/ds';
 import { orderCode } from '@/lib/orderCode';
 import { timeAgo } from '@/lib/data/notifications';
 import type { ActivityItem } from '@/lib/dashboard';
@@ -39,7 +39,7 @@ export interface AttentionItem {
 
 export function AttentionList({ items }: { items: AttentionItem[] }) {
   return (
-    <Card className="min-w-0 animate-up overflow-hidden">
+    <Card padded={false} className="min-w-0 animate-up overflow-hidden">
       <div className="flex items-center justify-between px-5 pb-2.5 pt-4">
         <h2 className="font-display text-[16px] font-bold text-navy">
           Requiere atención
@@ -116,7 +116,7 @@ export function LiveActivity({
   onOpen: (href: string) => void;
 }) {
   return (
-    <Card className="min-w-0 animate-up overflow-hidden">
+    <Card padded={false} className="min-w-0 animate-up overflow-hidden">
       <div className="flex items-center justify-between px-5 pb-2.5 pt-4">
         <h2 className="font-display text-[16px] font-bold text-navy">
           Actividad en vivo
@@ -269,7 +269,7 @@ export function RecentServices({
   onAll: () => void;
 }) {
   return (
-    <Card className="animate-up overflow-hidden">
+    <Card padded={false} className="animate-up overflow-hidden">
       <div className="px-5 pb-3 pt-4">
         <CardHead title="Servicios recientes" link="Ver todos" onLink={onAll} />
       </div>
@@ -281,7 +281,7 @@ export function RecentServices({
           description="Las solicitudes nuevas aparecerán aquí."
         />
       ) : (
-        <div className="overflow-x-auto">
+        <ScrollX>
           <div className="min-w-[820px]">
             {rows.map(r => {
               const s = STATUS_BADGE[r.status] ?? {
@@ -335,7 +335,7 @@ export function RecentServices({
               );
             })}
           </div>
-        </div>
+        </ScrollX>
       )}
     </Card>
   );

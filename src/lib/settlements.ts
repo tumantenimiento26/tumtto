@@ -101,7 +101,7 @@ export const netTone = (net: number): 'owes-tech' | 'owes-admin' | 'even' =>
 export function balanceSentences(name: string, owedToTech: number, owedToAdmin: number): string[] {
   const n = firstName(name);
   const out: string[] = [];
-  if (owedToTech > 0) out.push(`Tu Mantenimiento le debe ${money(owedToTech)} a ${n}.`);
+  if (owedToTech > 0) out.push(`Tumantenimiento le debe ${money(owedToTech)} a ${n}.`);
   if (owedToAdmin > 0) out.push(`${n} debe entregar ${money(owedToAdmin)} en efectivo.`);
   if (out.length === 0) out.push(`${n} está al corriente: no hay nada pendiente.`);
   return out;

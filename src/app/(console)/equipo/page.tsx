@@ -55,11 +55,11 @@ export default function EquipoPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Sistema"
         title="Equipo y roles"
         description="Agrega a tu equipo con una contraseña temporal y define qué secciones puede ver y editar cada rol."
       />
       <Tabs
+        aria-label="Vista del equipo"
         tabs={[
           { value: 'miembros', label: 'Miembros', count: staff.length },
           { value: 'roles', label: 'Roles y permisos', count: roles.length },

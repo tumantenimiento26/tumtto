@@ -240,25 +240,26 @@ export const PIPELINE: {
     key: 'buscando',
     label: 'Buscando técnico',
     statuses: ['requested'],
-    color: '#F59E0B',
+    color: 'var(--color-warning)',
   },
   {
     key: 'curso',
     label: 'En curso',
     statuses: ['accepted', 'enroute', 'onsite', 'quote', 'working'],
-    color: '#0A6BCF',
+    color: 'var(--color-primary)',
   },
   {
     key: 'cobro',
     label: 'Por cobrar',
     statuses: ['closing', 'completed'],
-    color: '#18C1FF',
+    color: 'var(--color-cyan)',
   },
   {
     key: 'cerrados',
     label: 'Pagados',
     statuses: ['paid', 'closed'],
-    color: '#1E6B4B',
+    // Token: en oscuro se aclara (#1E6B4B fijo quedaba en 2.5:1 sobre la tarjeta).
+    color: 'var(--color-success)',
   },
 ];
 

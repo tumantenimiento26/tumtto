@@ -1,6 +1,8 @@
 'use client';
 
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef, useState } from 'react';
+import { onMapFailure } from '@/lib/mapFailure';
 import { Map as MapIcon } from 'lucide-react';
 import { coverageRing } from '@/lib/geo';
 
@@ -139,12 +141,12 @@ function popupHtml(z: (typeof ZONES)[number]) {
 
 export function LandingMap() {
   const host = useRef<HTMLDivElement>(null);
-  const [noToken, setNoToken] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
     if (!token) {
-      setNoToken(true);
+      setUnavailable(true);
       return;
     }
     let cancelled = false;
@@ -163,16 +165,23 @@ export function LandingMap() {
       const padX = (Math.max(...lngs) - Math.min(...lngs)) * 0.1;
       const padY = (Math.max(...lats) - Math.min(...lats)) * 0.1;
 
-      map = new mapboxgl.Map({
-        container: host.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
-        bounds: [
-          [Math.min(...lngs) - padX, Math.min(...lats) - padY],
-          [Math.max(...lngs) + padX, Math.max(...lats) + padY],
-        ],
-        scrollZoom: false,
-        attributionControl: false,
-      });
+      try {
+        map = new mapboxgl.Map({
+          container: host.current,
+          style: 'mapbox://styles/mapbox/dark-v11',
+          bounds: [
+            [Math.min(...lngs) - padX, Math.min(...lats) - padY],
+            [Math.max(...lngs) + padX, Math.max(...lats) + padY],
+          ],
+          scrollZoom: false,
+          attributionControl: false,
+        });
+      } catch {
+        // Sin WebGL el constructor lanza.
+        setUnavailable(true);
+        return;
+      }
+      onMapFailure(map, () => !cancelled && setUnavailable(true));
       map.addControl(
         new mapboxgl.NavigationControl({ showCompass: false }),
         'top-left',
@@ -353,7 +362,7 @@ export function LandingMap() {
     };
   }, []);
 
-  if (noToken) {
+  if (unavailable) {
     return (
       <div className="grid h-full w-full place-items-center bg-[#0A1E3C] px-8 text-center">
         <div>
@@ -361,10 +370,8 @@ export function LandingMap() {
           <div className="mt-2 text-[14px] font-semibold text-white">
             Mapa no disponible
           </div>
-          <div className="mt-1 text-[12.5px] text-white/55">
-            Define{' '}
-            <code className="font-mono">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code>{' '}
-            en <code className="font-mono">.env.local</code>.
+          <div className="mt-1 text-[12.5px] text-white/70">
+            No pudimos cargar el mapa en este momento.
           </div>
         </div>
       </div>

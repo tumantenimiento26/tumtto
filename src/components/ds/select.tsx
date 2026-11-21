@@ -1,8 +1,8 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 
-import { controlClass } from './field';
+import { controlClass, useFieldControl } from './field';
 import { Popover } from './overlay';
 
 export type SelectOption<T extends string = string> = {
@@ -40,6 +40,8 @@ export function Select<T extends string>({
   'aria-label'?: string;
 }) {
   const anchor = useRef<HTMLButtonElement>(null);
+  const ctrl = useFieldControl();
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
@@ -78,9 +80,16 @@ export function Select<T extends string>({
       <button
         ref={anchor}
         type="button"
+        id={ctrl.id}
+        role="combobox"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={
+          open && !withSearch && list[idx] ? `${listId}-${idx}` : undefined
+        }
+        aria-describedby={ctrl['aria-describedby']}
         aria-label={ariaLabel}
         onClick={() => {
           setOpen(o => !o);
@@ -115,12 +124,17 @@ export function Select<T extends string>({
           setQ('');
         }}
         width="anchor"
+        kind="listbox"
       >
         {withSearch && (
           <div className="flex items-center gap-2 border-b border-divider px-3">
             <Search size={14} className="text-faint" />
             <input
               autoFocus
+              role="combobox"
+              aria-expanded
+              aria-controls={listId}
+              aria-activedescendant={list[idx] ? `${listId}-${idx}` : undefined}
               value={q}
               onChange={e => {
                 setQ(e.target.value);
@@ -133,18 +147,25 @@ export function Select<T extends string>({
             />
           </div>
         )}
-        <ul role="listbox" className="max-h-64 overflow-y-auto p-1.5">
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={ariaLabel ?? 'Opciones'}
+          className="max-h-64 overflow-y-auto p-1.5"
+        >
           {list.length === 0 && (
-            <li className="px-3 py-3 text-center text-[13px] text-muted">
+            <li role="none" className="px-3 py-3 text-center text-[13px] text-muted">
               Sin coincidencias
             </li>
           )}
           {list.map((o, i) => {
             const on = o.value === value;
             return (
-              <li key={o.value}>
+              <li key={o.value} role="none">
                 <button
                   type="button"
+                  id={`${listId}-${i}`}
+                  tabIndex={-1}
                   role="option"
                   aria-selected={on}
                   onMouseEnter={() => setIdx(i)}

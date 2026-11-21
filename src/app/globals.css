@@ -12,6 +12,13 @@
      Los mismos nombres cambian de valor en [data-theme='dark'] (abajo), así
      que `bg-card text-navy border-line` ya funciona en ambos temas. */
   --color-primary: #0a6bcf; /* acento, links, activo del sidebar */
+  /* Rellenos bajo texto blanco (contador, casilla, día elegido, activo del
+     sidebar): no se aclaran en oscuro como `primary`/`error`, que ahí son
+     color de texto/enlace (handoff: "primario fondo #0A6BCF" ≠ "link #5AB0FF"). */
+  --color-primary-fill: #0a6bcf;
+  --color-error-fill: #b42318;
+  /* Anillo de foco sólido (≥3:1) que acompaña al halo `shadow-focus`. */
+  --color-focus: #0a6bcf;
   --color-primary-hover: #095fb8;
   --color-primary-pressed: #0853a3;
   --color-primary-2: #0894ea;
@@ -52,9 +59,14 @@
   --color-line: #e1e8f0;
   --color-divider: #eef2f8;
   --color-line-strong: #d6dee8; /* borde de botón secundario */
+  /* Borde de campos, casillas e interruptor apagado: ≥3:1 sobre la tarjeta
+     (WCAG 1.4.11). `line` sigue para tarjetas y divisores. */
+  --color-control: #8794a6;
   --color-body: #374151;
   --color-muted: #6b7280;
-  --color-faint: #9ca3af;
+  /* Texto secundario (fechas, ejes, "hace 1 min"): ≥4.5:1 sobre tarjeta y
+     fondo. Antes #9ca3af (2.5:1); mismo tono gris azulado. */
+  --color-faint: #677284;
   --color-bar-idle: #c9ddf3;
   --color-tooltip: #061b3a;
 
@@ -107,6 +119,10 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --color-primary: #5ab0ff; /* links / acento sobre oscuro */
+  --color-primary-fill: #0a6bcf;
+  --color-error-fill: #dc2626;
+  --color-focus: #5ab0ff;
+  --color-control: #5b708e;
   --color-primary-hover: #7cc0ff;
   --color-primary-pressed: #3f9cf0;
   --color-navy: #e8eef7;
@@ -140,7 +156,7 @@
   --color-line-strong: #2a3c58;
   --color-body: #b8c4d6;
   --color-muted: #8fa0b8;
-  --color-faint: #6f819b;
+  --color-faint: #8396ae; /* antes #6f819b (4.0:1 sobre tarjeta) */
   --color-bar-idle: #22344f;
   --color-tooltip: #22344f;
 }
@@ -190,6 +206,27 @@
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
+}
+
+/* Foco visible: contorno sólido de 2 px (≥3:1) en todo control; los campos
+   conservan su borde azul + halo (handoff) y no lo duplican. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Movimiento reducido: las entradas de tarjeta (`animate-up`/`animate-pop`)
+   quedan en un fundido corto; los spinners siguen girando (son estado). */
+@media (prefers-reduced-motion: reduce) {
+  .animate-up,
+  .animate-pop {
+    animation: fade-in 0.15s ease-out both;
+  }
+  .animate-shake {
+    animation: none;
+  }
 }
 
 @keyframes pulse-ring {
@@ -301,10 +338,10 @@ html, body {
    suben a 44 px de alto. Solo con puntero grueso: el escritorio no cambia. */
 @media (pointer: coarse) {
   @layer base {
-    [data-console] :is(button, a[href], [role='tab'], [role='menuitem'], summary) {
+    :is([data-console], [data-touch]) :is(button, a[href], [role='tab'], [role='menuitem'], summary, label[data-checkbox]) {
       position: relative;
     }
-    [data-console] :is(button, a[href], [role='tab'], [role='menuitem'], summary)::after {
+    :is([data-console], [data-touch]) :is(button, a[href], [role='tab'], [role='menuitem'], summary, label[data-checkbox])::after {
       content: '';
       position: absolute;
       left: 50%;
@@ -313,7 +350,7 @@ html, body {
       height: max(100%, 44px);
       transform: translate(-50%, -50%);
     }
-    [data-console] :is(select, textarea, input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='range'])) {
+    :is([data-console], [data-touch]) :is(select, textarea, input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='range'])) {
       min-height: 44px;
     }
   }

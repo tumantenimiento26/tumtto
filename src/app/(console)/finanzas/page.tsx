@@ -386,7 +386,7 @@ export default function FinanzasPage() {
       </div>
       <p className="-mt-3 font-sans text-[12px] text-muted">
         «Comisión plataforma» y «Por cobrar · efectivo» solo cuentan servicios del modelo anterior (el técnico conserva
-        el dinero). En servicios con dinero de Tu Mantenimiento todo lo cobrado es ingreso de Tu Mantenimiento y el
+        el dinero). En servicios con dinero de Tumantenimiento todo lo cobrado es ingreso de Tumantenimiento y el
         técnico gana su comisión: ve la pestaña{' '}
         <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setTab('com')}>
           Comisiones de técnicos
@@ -426,7 +426,7 @@ export default function FinanzasPage() {
         <Card padded>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <Kicker>Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
+              <Kicker as="h2">Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
               <div className="mt-1 font-display text-[20px] font-extrabold text-navy tabular">
                 {money(m.bars.reduce((s, b) => s + b.gross, 0))}
               </div>
@@ -448,7 +448,7 @@ export default function FinanzasPage() {
           />
         </Card>
         <Card padded>
-          <Kicker className="mb-3">Desglose por método</Kicker>
+          <Kicker as="h2" className="mb-3">Desglose por método</Kicker>
           <MethodBreakdown rows={m.methods} />
         </Card>
       </div>
@@ -462,7 +462,7 @@ export default function FinanzasPage() {
           <span className="flex-1 font-sans text-[13.5px] font-semibold text-navy">
             {getCashReviewOrders().length}{' '}
             {getCashReviewOrders().length === 1 ? 'revisión de efectivo abierta' : 'revisiones de efectivo abiertas'}
-            <span className="ml-2 font-normal text-muted">El efectivo no cuadra entre técnico y cliente</span>
+            <span className="ml-2 font-normal text-body">El efectivo no cuadra entre técnico y cliente</span>
           </span>
           <span className="inline-flex items-center gap-1 font-sans text-[13px] font-semibold text-primary">
             Revisar <ChevronRight size={14} aria-hidden />
@@ -538,7 +538,7 @@ export default function FinanzasPage() {
               rows={txRows}
               rowKey={r => r.id}
               columns={txCols}
-              onRowClick={r => router.push(`/servicios/${r.orderId}`)}
+              rowHref={r => `/servicios/${r.orderId}`}
               initialSort={{ key: 'at', dir: 'desc' }}
               pageSize={8}
               empty={<EmptyState kind="no-results" title="Sin transacciones" description="No hay cobros en este periodo con ese método." compact />}

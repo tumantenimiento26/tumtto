@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Clock, Eye, Hourglass, UserCog } from 'lucide-react';
+import { CheckCircle2, Clock, Eye, Hourglass, UserCog, UserPlus } from 'lucide-react';
 import {
   Badge,
-  Card,
+  Button,
   DataTable,
   EmptyState,
   ErrorPage,
+  ListCard,
   PageHeader,
   ScreenSkeleton,
   Tabs,
@@ -44,7 +44,7 @@ const EMPTY: Record<AssignmentTab, { title: string; description: string }> = {
   pendientes: {
     title: 'Nada por asignar',
     description:
-      'Cuando un cliente pida que Tumtto asigne al técnico, la solicitud aparecerá aquí.',
+      'Cuando un cliente pida que Tumantenimiento asigne al técnico, la solicitud aparecerá aquí.',
   },
   asignadas: {
     title: 'Sin asignaciones por confirmar',
@@ -57,7 +57,7 @@ const EMPTY: Record<AssignmentTab, { title: string; description: string }> = {
   todas: {
     title: 'Aún no hay asignaciones',
     description:
-      'Las solicitudes «Que Tumtto asigne al técnico» aparecerán aquí.',
+      'Las solicitudes «Que Tumantenimiento asigne al técnico» aparecerán aquí.',
   },
 };
 
@@ -169,14 +169,9 @@ export default function AsignacionesPage() {
         r.technician ? (
           <span className="text-[13.5px] text-body">{r.technician.name}</span>
         ) : isPending(r) && canAssign ? (
-          <Link
-            href={`/servicios/${r.id}?asignar=1`}
-            onClick={e => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-btn border border-error-line bg-error-soft px-2.5 py-1 text-[12.5px] font-semibold text-error hover:brightness-95"
-          >
-            <UserCog size={13} aria-hidden />
+          <Button size="sm" variant="secondary" icon={UserPlus} href={`/servicios/${r.id}?asignar=1`}>
             Asignar técnico
-          </Link>
+          </Button>
         ) : (
           <span className="text-[13.5px] text-faint">Sin asignar</span>
         ),
@@ -218,16 +213,18 @@ export default function AsignacionesPage() {
     <div>
       <PageHeader
         title="Asignaciones"
-        description="Solicitudes donde el cliente pidió que Tumtto asigne al técnico, y su confirmación."
+        description="Solicitudes donde el cliente pidió que Tumantenimiento asigne al técnico, y su confirmación."
       />
-      <Card>
-        <div className="px-5 pt-2">
+      <ListCard
+        tabs={
           <Tabs
+            aria-label="Estado de la asignación"
             tabs={ASSIGNMENT_TABS.map(t => ({ ...t, count: counts[t.value] }))}
             value={tab}
             onChange={setTab}
           />
-        </div>
+        }
+      >
         <DataTable
           rows={visible}
           key={tab}
@@ -238,7 +235,7 @@ export default function AsignacionesPage() {
               : columns
           }
           rowKey={r => r.id}
-          onRowClick={r => router.push(`/servicios/${r.id}`)}
+          rowHref={r => `/servicios/${r.id}`}
           initialSort={
             tab === 'pendientes' ? { key: 'espera', dir: 'desc' } : undefined
           }
@@ -262,7 +259,7 @@ export default function AsignacionesPage() {
           ]}
           empty={<EmptyState kind="no-results" {...EMPTY[tab]} />}
         />
-      </Card>
+      </ListCard>
     </div>
   );
 }

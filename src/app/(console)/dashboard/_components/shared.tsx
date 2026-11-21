@@ -76,9 +76,9 @@ export function CardHead({
   return (
     <div className="flex items-center justify-between gap-3">
       {kicker ? (
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+        <h2 className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
           {kicker}
-        </span>
+        </h2>
       ) : (
         <h2 className="font-display text-[16px] font-bold text-navy">
           {title}

@@ -60,12 +60,12 @@ export function MatrixEditor({
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card padded={false} className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
         <div>
-          <div className="font-display text-[16px] font-bold text-navy">
+          <h2 className="font-display text-[16px] font-bold text-navy">
             Permisos de {role.name}
-          </div>
+          </h2>
           <p className="mt-0.5 font-sans text-[12.5px] text-muted">
             {readOnly
               ? 'Super admin siempre tiene acceso total y no se puede editar.'

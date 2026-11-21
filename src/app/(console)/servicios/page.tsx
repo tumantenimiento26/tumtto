@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  AlertTriangle,
   Ban,
   Copy,
   Download,
@@ -15,17 +13,18 @@ import {
   Search,
   SlidersHorizontal,
   UserCog,
+  UserPlus,
   XCircle,
 } from 'lucide-react';
 import {
   Badge,
   Button,
-  Card,
   Chip,
   DataTable,
   EmptyState,
   ErrorPage,
   Input,
+  ListCard,
   PageHeader,
   ScreenSkeleton,
   Tabs,
@@ -277,7 +276,7 @@ export default function ServiciosPage() {
           )}
           {r.is_admin_request && (
             <Badge tone="info" mono>
-              Tumtto asigna
+              Tumantenimiento asigna
             </Badge>
           )}
           {ticketed.has(r.id) && (
@@ -305,9 +304,13 @@ export default function ServiciosPage() {
       key: 'cliente',
       header: 'Cliente',
       sortValue: r => r.clientName,
+      // La zona va bajo el cliente: una columna menos para que la tabla quepa a 1440 px.
       render: r => (
-        <span className="block truncate font-display text-[13.5px] font-bold text-navy">
-          {r.clientName}
+        <span className="block min-w-0">
+          <span className="block truncate font-display text-[13.5px] font-bold text-navy">
+            {r.clientName}
+          </span>
+          {r.zone && <span className="block truncate text-[12.5px] text-muted">{r.zone}</span>}
         </span>
       ),
     },
@@ -318,46 +321,29 @@ export default function ServiciosPage() {
         r.techName ? (
           <span className="text-[13.5px] text-body">{r.techName}</span>
         ) : r.needs_manual ? (
-          <Link
-            href={`/servicios/${r.id}?asignar=1`}
-            onClick={e => e.stopPropagation()}
-            className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-btn border border-error-line bg-error-soft px-2.5 py-1 text-[12.5px] font-semibold text-error hover:brightness-95 max-[640px]:whitespace-normal max-[640px]:text-left"
-          >
-            <AlertTriangle size={13} aria-hidden />
-            {inbox ? 'Asignar' : 'Sin técnico — asignar'}
-          </Link>
+          <Button size="sm" variant="secondary" icon={UserPlus} href={`/servicios/${r.id}?asignar=1`}>
+            {inbox ? 'Asignar' : 'Asignar técnico'}
+          </Button>
         ) : (
           <span className="text-[13.5px] text-faint">Sin asignar</span>
         ),
     },
     {
-      key: 'zona',
-      header: 'Zona',
-      render: r => <span className="text-[13.5px] text-muted">{r.zone}</span>,
-    },
-    {
       key: 'estado',
       header: 'Estado',
+      // La disputa es una marca sobre el estado (no una columna aparte).
       render: r => (
         <span className="flex flex-wrap items-center gap-1.5">
           <Badge tone={STATUS[r.status].tone} dot>
             {STATUS[r.status].label}
           </Badge>
+          {r.is_disputed && (
+            <Badge tone="danger" mono>
+              Disputa
+            </Badge>
+          )}
         </span>
       ),
-    },
-    {
-      key: 'disputa',
-      header: 'Disputa',
-      sortValue: r => (r.is_disputed ? 1 : 0),
-      render: r =>
-        r.is_disputed ? (
-          <Badge tone="danger" dot>
-            Sí
-          </Badge>
-        ) : (
-          <span className="text-[12.5px] text-faint">No</span>
-        ),
     },
     {
       key: 'total',
@@ -421,7 +407,7 @@ export default function ServiciosPage() {
   ];
   const shownColumns = inbox
     ? [
-        ...columns.filter(c => ['servicio', 'tipo', 'cliente', 'zona'].includes(c.key)),
+        ...columns.filter(c => ['servicio', 'tipo', 'cliente'].includes(c.key)),
         ...inboxColumns,
         columns.find(c => c.key === 'tecnico')!,
       ]
@@ -539,15 +525,17 @@ export default function ServiciosPage() {
         }
       />
 
-      <Card className="overflow-hidden">
-        <Tabs
-          className="px-5"
-          tabs={SERVICE_TABS.map(t => ({ ...t, count: counts[t.value] }))}
-          value={f.tab}
-          onChange={tab => setF(s => ({ ...s, tab }))}
-        />
-
-        <div className="flex flex-col gap-3 border-b border-line px-5 py-4">
+      <ListCard
+        tabs={
+          <Tabs
+            aria-label="Estado de los servicios"
+            tabs={SERVICE_TABS.map(t => ({ ...t, count: counts[t.value] }))}
+            value={f.tab}
+            onChange={tab => setF(s => ({ ...s, tab }))}
+          />
+        }
+        toolbar={
+          <>
           <div className="flex flex-wrap items-center gap-2.5">
             <Input
               icon={Search}
@@ -565,7 +553,7 @@ export default function ServiciosPage() {
             >
               Filtros
               {sheetCount > 0 && (
-                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">
                   {sheetCount}
                 </span>
               )}
@@ -582,14 +570,15 @@ export default function ServiciosPage() {
               {visible.length} resultado{visible.length === 1 ? '' : 's'}
             </span>
           </div>
-        </div>
-
+          </>
+        }
+      >
         <DataTable
           rows={visible}
           key={inbox ? 'inbox' : 'all'}
           columns={shownColumns}
           rowKey={r => r.id}
-          onRowClick={r => router.push(`/servicios/${r.id}`)}
+          rowHref={r => `/servicios/${r.id}`}
           selectable
           initialSort={inbox ? { key: 'antiguedad', dir: 'asc' } : { key: 'actualizado', dir: 'desc' }}
           pinRank={r => r.pin}
@@ -702,7 +691,7 @@ export default function ServiciosPage() {
             )
           }
         />
-      </Card>
+      </ListCard>
 
       <ServiceFiltersSheet
         open={filtersOpen}

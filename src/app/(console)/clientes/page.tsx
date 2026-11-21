@@ -6,12 +6,12 @@ import { BadgeCheck, Ban, Download, Eye, Pencil, RotateCcw, Search, SlidersHoriz
 import {
   Badge,
   Button,
-  Card,
   Chip,
   DataTable,
   EmptyState,
   ErrorPage,
   Input,
+  ListCard,
   PageHeader,
   ScreenSkeleton,
   Segmented,
@@ -149,7 +149,7 @@ export default function ClientesPage() {
         list.map(r => ({
           ID: r.id,
           Nombre: r.name,
-          Teléfono: r.phone,
+          Celular: r.phone,
           Zona: r.zone,
           Servicios: r.services,
           'Gasto total': r.gmvCents / 100,
@@ -190,7 +190,7 @@ export default function ClientesPage() {
     },
     {
       key: 'telefono',
-      header: 'Teléfono',
+      header: 'Celular',
       render: r => (
         <span className="whitespace-nowrap font-mono text-[12.5px] text-body">
           {r.phone}
@@ -267,6 +267,7 @@ export default function ClientesPage() {
         description={`${rows.length.toLocaleString('es-MX')} cuentas registradas · ${recurrentPct}% recurrentes`}
         actions={
           <>
+            <ImportButton entity="clientes" />
             <Button
               variant="secondary"
               icon={Download}
@@ -275,7 +276,6 @@ export default function ClientesPage() {
             >
               Exportar
             </Button>
-            <ImportButton entity="clientes" />
             <Button icon={UserPlus} onClick={() => setForm({ open: true, id: null })}>
               Nuevo cliente
             </Button>
@@ -283,41 +283,42 @@ export default function ClientesPage() {
         }
       />
 
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-5">
+      <ListCard
+        tabs={
           <Tabs
-            className="border-b-0"
+            aria-label="Tipo de cliente"
             tabs={TABS.map(t => ({ ...t, count: counts[t.value] }))}
             value={f.tab}
             onChange={tab => setF(s => ({ ...s, tab }))}
           />
-          <div className="mb-2.5 flex w-full items-center gap-2.5 sm:w-auto">
+        }
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2.5">
             <Input
               icon={Search}
               value={f.query}
               onChange={e => setF(s => ({ ...s, query: e.target.value }))}
-              placeholder="Nombre o teléfono"
+              placeholder="Nombre o celular"
               aria-label="Buscar clientes"
-              wrapperClassName="min-w-0 flex-1 sm:w-[300px] sm:flex-none"
+              wrapperClassName="min-w-[220px] flex-1 sm:max-w-[360px]"
             />
             <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setFiltersOpen(true)}>
               Filtros
               {filterCount > 0 && (
-                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 font-mono text-[11px] text-white">
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary-fill px-1.5 font-mono text-[11px] text-white">
                   {filterCount}
                 </span>
               )}
             </Button>
           </div>
-        </div>
-
-
+        }
+      >
         <DataTable
           mobileSort={false}
           rows={visible}
           columns={columns}
           rowKey={r => r.id}
-          onRowClick={r => router.push(`/clientes/${r.id}`)}
+          rowHref={r => `/clientes/${r.id}`}
           selectable
           pageSize={8}
           minWidth={900}
@@ -377,7 +378,7 @@ export default function ClientesPage() {
             )
           }
         />
-      </Card>
+      </ListCard>
 
       {/* Todos los filtros en el drawer: zona, gasto y orden (se aplican en vivo). */}
       <Sheet

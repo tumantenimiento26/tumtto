@@ -92,7 +92,7 @@ const METHODS = [
   { key: 'card', label: 'Tarjeta', note: 'Stripe · Visa / Mastercard' },
   { key: 'oxxo', label: 'OXXO Pay', note: 'Stripe · referencia' },
   { key: 'wallet', label: 'Monedero', note: 'Saldo en cuenta' },
-  { key: 'cash', label: 'Efectivo', note: 'El técnico cobra; con dinero de Tu Mantenimiento lo entrega y gana su comisión' },
+  { key: 'cash', label: 'Efectivo', note: 'El técnico cobra; con dinero de Tumantenimiento lo entrega y gana su comisión' },
 ] as const;
 
 /**
@@ -131,7 +131,7 @@ function readForm(): SettingsMap {
 const LABELS: Record<string, string> = {
   commission_bps: 'Comisión global',
   [ONLINE_PAYMENTS_KEY]: 'Pagos en línea (Stripe)',
-  payment_model_admin_owned_enabled: 'Dinero de Tu Mantenimiento',
+  payment_model_admin_owned_enabled: 'Dinero de Tumantenimiento',
   emergency_initial_radius_m: 'Radio inicial de emergencia',
   emergency_radius_step_m: 'Incremento de radio',
   emergency_max_radius_m: 'Radio máximo de emergencia',
@@ -326,7 +326,7 @@ export default function ConfigPage() {
   const toggleField = (key: string, label: string, desc?: string) => (
     <Row label={label} desc={desc}>
       <div className="flex justify-end">
-        <Toggle checked={bool(key)} onChange={v => set(key, v)} />
+        <Toggle checked={bool(key)} onChange={v => set(key, v)} aria-label={label} />
       </div>
     </Row>
   );
@@ -335,7 +335,7 @@ export default function ConfigPage() {
     <div className="flex flex-col gap-6 pb-28">
       <PageHeader
         title="Configuración del sistema"
-        description="Reglas globales que lee el backend (platform_settings). Los cambios aplican a solicitudes nuevas."
+        description="Reglas globales de la plataforma. Los cambios aplican a solicitudes nuevas."
       />
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -376,8 +376,8 @@ export default function ConfigPage() {
                 )}
                 {toggleField(
                   ADMIN_OWNED_FLAG_KEY,
-                  'Dinero de Tu Mantenimiento',
-                  'Activo: en los servicios nuevos todo lo cobrado (visita y efectivo) es de Tu Mantenimiento y el técnico gana su comisión. Apagado: el técnico conserva el dinero y adeuda la comisión de plataforma (modelo anterior). Los servicios existentes no cambian.',
+                  'Dinero de Tumantenimiento',
+                  'Activo: en los servicios nuevos todo lo cobrado (visita y efectivo) es de Tumantenimiento y el técnico gana su comisión. Apagado: el técnico conserva el dinero y adeuda la comisión de plataforma (modelo anterior). Los servicios existentes no cambian.',
                 )}
               </Section>
               <TechnicianCommissionSection />
@@ -424,7 +424,7 @@ export default function ConfigPage() {
                   'unassigned_alert_minutes',
                   'Alerta de solicitud sin técnico',
                   'min',
-                  'Las solicitudes que Tumtto debe asignar y llevan más de este tiempo sin técnico avisan en Panel y Notificaciones.',
+                  'Las solicitudes que Tumantenimiento debe asignar y llevan más de este tiempo sin técnico avisan en Panel y Notificaciones.',
                 )}
               </Section>
               <Section title="Métodos de pago en las apps">
@@ -678,10 +678,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-divider px-5 py-4 font-display text-[16px] font-bold text-navy">
+    <Card padded={false} className="overflow-hidden">
+      <h2 className="border-b border-divider px-5 py-4 font-display text-[16px] font-bold text-navy">
         {title}
-      </div>
+      </h2>
       <div className="divide-y divide-divider">{children}</div>
     </Card>
   );

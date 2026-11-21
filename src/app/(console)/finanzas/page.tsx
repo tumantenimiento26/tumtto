@@ -386,7 +386,7 @@ export default function FinanzasPage() {
       </div>
       <p className="-mt-3 font-sans text-[12px] text-muted">
         «Comisión plataforma» y «Por cobrar · efectivo» solo cuentan servicios del modelo anterior (el técnico conserva
-        el dinero). En servicios con dinero de Tu Mantenimiento todo lo cobrado es ingreso de Tu Mantenimiento y el
+        el dinero). En servicios con dinero de Tumantenimiento todo lo cobrado es ingreso de Tumantenimiento y el
         técnico gana su comisión: ve la pestaña{' '}
         <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setTab('com')}>
           Comisiones de técnicos
@@ -538,7 +538,7 @@ export default function FinanzasPage() {
               rows={txRows}
               rowKey={r => r.id}
               columns={txCols}
-              onRowClick={r => router.push(`/servicios/${r.orderId}`)}
+              rowHref={r => `/servicios/${r.orderId}`}
               initialSort={{ key: 'at', dir: 'desc' }}
               pageSize={8}
               empty={<EmptyState kind="no-results" title="Sin transacciones" description="No hay cobros en este periodo con ese método." compact />}

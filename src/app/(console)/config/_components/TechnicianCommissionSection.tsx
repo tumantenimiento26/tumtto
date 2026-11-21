@@ -76,8 +76,8 @@ export function TechnicianCommissionSection() {
       ) : (
         <div className="flex flex-col gap-4 px-5 py-4">
           <p className="font-sans text-[12.5px] text-muted">
-            En los servicios con dinero de Tu Mantenimiento, todo lo que paga el cliente (visita, recargos y
-            cotización) es ingreso de Tu Mantenimiento y el técnico gana esta comisión por servicio. Se congela en cada
+            En los servicios con dinero de Tumantenimiento, todo lo que paga el cliente (visita, recargos y
+            cotización) es ingreso de Tumantenimiento y el técnico gana esta comisión por servicio. Se congela en cada
             servicio al terminarlo; los cambios aplican a los servicios que terminen después.
           </p>
           <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,220px)_auto]">

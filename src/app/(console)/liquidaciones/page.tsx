@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wallet } from 'lucide-react';
+import { Eye, User, Wallet } from 'lucide-react';
 import {
   Badge,
   DataTable,
   EmptyState,
   ErrorPage,
+  ListCard,
   PageHeader,
   ScreenSkeleton,
   type DataColumn,
@@ -105,7 +106,7 @@ export default function LiquidacionesPage() {
     <div>
       <PageHeader
         title="Liquidaciones"
-        description="Lo que Tu Mantenimiento le debe a cada técnico (comisiones) y el efectivo que cada técnico debe entregar. Solo registra pagos: no mueve dinero."
+        description="Lo que Tumantenimiento le debe a cada técnico (comisiones) y el efectivo que cada técnico debe entregar. Solo registra pagos: no mueve dinero."
       />
       <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Tile label="Total por pagar a técnicos" value={money(totals.owedToTechnicians)} help="Comisiones de servicios ya terminados" valueClass="text-primary" />
@@ -113,19 +114,33 @@ export default function LiquidacionesPage() {
         <Tile
           label="Neto"
           value={money(Math.abs(totals.net))}
-          help={totals.net > 0 ? 'Tu Mantenimiento debe más de lo que va a recibir' : totals.net < 0 ? 'Los técnicos deben más de lo que se les debe' : 'Todo parejo'}
+          help={totals.net > 0 ? 'Tumantenimiento debe más de lo que va a recibir' : totals.net < 0 ? 'Los técnicos deben más de lo que se les debe' : 'Todo parejo'}
         />
       </div>
-      <DataTable
-        rows={rows}
-        columns={cols}
-        rowKey={r => r.technician_id}
-        onRowClick={r => router.push(`/liquidaciones/${r.technician_id}`)}
-        pageSize={10}
-        minWidth={900}
-        mobileSort={false}
-        empty={<EmptyState kind="all-clear" icon={Wallet} title="Sin saldos" description="Cuando un técnico termine servicios con comisión o cobre en efectivo aparecerá aquí." compact />}
-      />
+      <ListCard>
+        <DataTable
+          rows={rows}
+          columns={cols}
+          rowKey={r => r.technician_id}
+          rowHref={r => `/liquidaciones/${r.technician_id}`}
+          pageSize={10}
+          minWidth={900}
+          mobileSort={false}
+          rowMenu={r => [
+            {
+              label: 'Ver liquidación',
+              icon: Eye,
+              onSelect: () => router.push(`/liquidaciones/${r.technician_id}`),
+            },
+            {
+              label: 'Ver perfil del técnico',
+              icon: User,
+              onSelect: () => router.push(`/tecnicos/${r.technician_id}`),
+            },
+          ]}
+          empty={<EmptyState kind="all-clear" icon={Wallet} title="Sin saldos" description="Cuando un técnico termine servicios con comisión o cobre en efectivo aparecerá aquí." compact />}
+        />
+      </ListCard>
     </div>
   );
 }

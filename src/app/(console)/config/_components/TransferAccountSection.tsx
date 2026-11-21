@@ -127,7 +127,7 @@ export function TransferAccountSection() {
           {noneActive && list.length > 0 && (
             <div
               role="alert"
-              className="mx-5 mt-3 flex items-start gap-2 rounded-card border border-warning/40 bg-warning-soft px-3.5 py-3 font-sans text-[13px] text-warning-ink"
+              className="mx-5 mt-3 flex items-start gap-2 rounded-box border border-warning/40 bg-warning-soft px-3.5 py-3 font-sans text-[13px] text-warning-ink"
             >
               <AlertTriangle
                 size={16}

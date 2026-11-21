@@ -60,7 +60,7 @@ export function CardHead({
 }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
-      <Kicker>{title}</Kicker>
+      <Kicker as="h2">{title}</Kicker>
       {action}
     </div>
   );

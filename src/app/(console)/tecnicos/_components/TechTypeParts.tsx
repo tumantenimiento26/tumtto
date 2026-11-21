@@ -24,9 +24,27 @@ import { CompanyModal } from '../../config/_components/CompanyModal';
 import { CardHead, KV } from './detail-parts';
 
 /** Badge del tipo (Tercero muestra la empresa). Solo consola admin. */
-export function TechTypeBadge({ techId, short }: { techId: string; short?: boolean }) {
+export function TechTypeBadge({
+  techId,
+  short,
+  stacked,
+}: {
+  techId: string;
+  short?: boolean;
+  /** Tablas: pastilla corta y la empresa debajo (ajusta línea, no desborda). */
+  stacked?: boolean;
+}) {
   useExtras(s => s.companies);
   const { type, company } = getTechType(techId);
+  if (stacked)
+    return (
+      <span className="flex min-w-0 flex-col items-start gap-1">
+        <Badge tone={TECH_TYPE_TONE[type]}>{TECH_TYPE_LABEL[type]}</Badge>
+        {company && (
+          <span className="text-[12px] leading-snug text-muted">{company.name}</span>
+        )}
+      </span>
+    );
   return (
     <Badge tone={TECH_TYPE_TONE[type]}>
       {short ? TECH_TYPE_LABEL[type] : techTypeLabel(type, company?.name)}

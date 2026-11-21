@@ -84,6 +84,16 @@ Fondo fijo: 3 auras radiales (azul `rgba(10,107,207,.42)`, cian `.22`, azul viol
 - `?movimiento=reducido` / `prefers-reduced-motion` → sin animaciones continuas ni reveals.
 - Reveal on scroll: opacity 0 + translateY(22px) → 0 en .7s `cubic-bezier(.2,.8,.2,1)`, stagger por `data-reveal`.
 
+### A1. Planes de suscripción en la landing (propuesta 2026-11, sección `#planes`)
+Va entre **Precios** y **Para técnicos**; suma el link "Planes" al nav (los links del nav ahora se ocultan debajo de 1280px para que no se corten) y una pregunta al FAQ. **Los precios y beneficios son datos de ejemplo**: en producción salen de la consola (C · Planes y suscripciones).
+- **Controles**: segmentado *Hogar / Negocios* y segmentado *Mensual / Anual* (etiqueta "2 meses gratis"). En anual el precio se muestra como equivalente mensual y la nota dice el pago anual y el ahorro.
+- **Matriz de planes** (≥980px): un solo panel con la columna de beneficios a la izquierda (26%) y tres columnas de plan. Filas: Visitas incluidas · Descuento en tu cotización · Emergencias y prioridad · Revisiones preventivas · Garantía. Una franja con el degradado de tarjeta destacada (`linear-gradient(160deg,#0A3A78,#0B2A55 60%,#081C38)`, bordes interiores cian .32) marca **un** plan y se desliza entre columnas (`left .5s cubic-bezier(.2,.8,.2,1)`). Ese plan lleva la pastilla "Te conviene" (si lo recomienda la calculadora) o "Más elegido" (el marcado en consola) y el CTA sólido; los demás, CTA de contorno. Sin kicker sobre el H2.
+- **<980px**: cada plan es una tarjeta apilada con sus cinco filas (ícono, etiqueta, valor); la recomendada usa el degradado.
+- **¿Te conviene un plan?** (solo Hogar): slider 1–14 "veces que llamas a un técnico al año" + interruptor "Contar una emergencia al año". Compara *lo mismo sin plan* contra cada plan y recomienda el de mayor ahorro; si ninguno ahorra, lo dice ("te sale mejor pagar por servicio") e indica desde cuántos servicios conviene. Fórmula del prototipo (servicio típico: visita $350, cotización $1,180, revisión preventiva $650): `sin = n·(visita+cotización) + preventivos·650 + emergencia·30%`; `con = cuota anual + max(0, n − visitas incluidas)·visita + n·cotización·(1 − descuento) + emergencia·recargo del plan`. Región `aria-live="polite"`.
+- **Negocios**: el tercer plan es "Corporativo · A la medida" (sin precio, CTA "Hablar con ventas") y en lugar de la calculadora hay una banda de contacto con ventas.
+- **Letra chica**: cobertura ZMG y las dos formas de pago (tarjeta con renovación automática; transferencia o efectivo con activación al confirmar el pago).
+- Estado: `aud: 'hogar'|'negocio'`, `bill: 'mes'|'anio'`, `use` (1–14), `emg`.
+
 ### A2. Login unificado (`Web Login.dc.html` → `src/app/login/page.tsx`)
 Mismo fondo que el registro (aura + rejilla), tarjeta blanca 440px. Pasos: **login** (correo, contraseña con mostrar/ocultar, mantener sesión, error de credenciales con intentos restantes, bloqueo 30 s tras 3 fallos, link a registro) → si el correo es del dominio `@tumantenimiento.mx` y `profiles.role = admin`: **verificación en 2 pasos** (TOTP 6 dígitos, código de respaldo) → "Entrando a la consola…" → `/dashboard`. Cliente o técnico: **continuar en la app** (tiendas + QR, "Usar otra cuenta"). **Olvidé mi contraseña** → enlace enviado (reenviar) → **nueva contraseña** (medidor 4 segmentos, confirmación) → actualizada. `?out=1` muestra "Cerraste sesión" (logout de la consola redirige aquí). Hashes de demo: `#mfa`, `#app`, `#forgot`, `#reset`.
 
@@ -119,6 +129,12 @@ Fondo `#050F22` con 2 auras + rejilla enmascarada. Header: logo + "Volver al sit
 **Reportes**: KPIs vs metas del PRD (barras), línea de servicios, embudo hover, mapa de calor día×franja (celda hover escala 1.12, resalta día/hora, leyenda), zonas frías, desempeño por categoría, top técnicos, exportar CSV.
 
 **Catálogo**: tarjetas con toggle publicar (Deshacer) + editor (nombre, rango, comisión específica, servicios incluidos como chips removibles). Nueva categoría.
+
+**Planes y suscripciones** (propuesta 2026-11, `#s=planes`, grupo Sistema, ícono shield; el badge del sidebar cuenta suscripciones por activar): pestañas *Planes* y *Suscriptores*.
+- *Planes*: segmentado Hogar/Negocios + resumen (suscriptores activos, ingreso recurrente). Columna izquierda fija: lista de planes (nombre, "Más elegido", precio, suscriptores, Publicado/Pausado con interruptor y Deshacer) y **vista previa en vivo** de la tarjeta como se ve en la landing. Columna derecha, editor por secciones: **Plan** (nombre, para quién es, más elegido — uno por tipo de cliente), **Precio** (a la medida, precio mensual, pago anual, meses gratis con el total calculado), **Qué incluye** (cinco beneficios con interruptor; al activarlos aparecen sus parámetros: visitas — cantidad, periodo, categorías; descuento — % y alcance; emergencias — recargo normal/reducido/sin recargo y prioridad; preventivos — revisiones al año y qué se revisa; garantía extendida — 60/90/180 días) y **Cobro** (tarjeta con renovación automática, transferencia o efectivo con activación manual, días de gracia).
+- Barra fija "Cambios sin guardar" con el número de suscriptores que conservan sus condiciones hasta renovar; si falta nombre, precio, método de cobro o beneficios, la barra explica qué corregir y Guardar queda deshabilitado. Cambiar de plan con cambios pendientes los descarta con Deshacer. No se puede publicar un plan sin precio.
+- *Suscriptores*: filtro por estado (Todas, Activas, Por activar, Pago vencido, Canceladas); tabla con cliente, plan, ciclo, método, renovación, visitas usadas y estado. "Confirmar pago" activa las suscripciones pagadas por transferencia o efectivo; "Enviar recordatorio" para pagos vencidos.
+- Regla de negocio: precio y beneficios se congelan por suscripción hasta su renovación (igual que la comisión por orden).
 
 **Configuración**: tabs laterales; campos genéricos (texto con sufijo, toggles). **Notificaciones**: tipos (KYC, Disputas, Tickets, Retiros, Servicios, Pagos, Sistema), canales (push, correo, SMS, sonido), horario (no molestar). Equipo: admins con rol y MFA, matriz de permisos, invitar. Barra "Cambios sin guardar" (Descartar/Guardar).
 
@@ -171,4 +187,5 @@ Capturas de referencia (~924px de ancho; la consola aparece con la navegación c
 - `screenshots/login/` — iniciar sesión, verificación en 2 pasos, continuar en la app, olvidé mi contraseña, nueva contraseña.
 - `screenshots/registro/` — paso 1 (datos), paso 2 (oficio), cuenta creada.
 - `screenshots/consola/` — dashboard, servicios, detalle de servicio, clientes, detalle de cliente, técnicos, revisión KYC, regiones, finanzas, soporte, reportes, catálogo, configuración, notificaciones, estados y errores, 404, 500, sin conexión.
-- `screenshots/consola-oscuro/` — dashboard, servicios, revisión KYC, finanzas, notificaciones.
+- `screenshots/consola-oscuro/` — dashboard, servicios, revisión KYC, finanzas, notificaciones, planes.
+- Propuesta de suscripciones: `screenshots/landing/10-planes.jpg` a `13-planes-movil.jpg`, `screenshots/consola/19-planes.jpg` a `21-planes-validacion.jpg`.

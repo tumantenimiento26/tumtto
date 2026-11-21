@@ -55,8 +55,7 @@ import {
   getAllRequests,
   getClients,
   getOpenSupportCount,
-  getCashReviewOrders,
-  getTransferReviewOrders,
+  getPaymentReviewCount,
   getPendingKyc,
   getProfile,
   getTechniciansWithProfile,
@@ -192,7 +191,7 @@ function useNavGroups(): NavGroup[] {
           href: '/revision-pagos',
           icon: Banknote,
           label: 'Revisión de pagos',
-          badge: () => getCashReviewOrders().length + getTransferReviewOrders().length,
+          badge: getPaymentReviewCount,
         },
         {
           href: '/soporte',
@@ -548,7 +547,7 @@ function CommandPalette() {
               aria-label="Buscar"
               className="h-14 flex-1 bg-transparent text-[15px] text-navy outline-none placeholder:text-faint"
             />
-            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-faint">
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-faint [@media(pointer:coarse)]:hidden">
               esc
             </kbd>
           </div>
@@ -593,7 +592,7 @@ function CommandPalette() {
               );
             })}
           </div>
-          <div className="flex gap-4 border-t border-line px-4 py-2.5 font-mono text-[11px] text-faint">
+          <div className="flex gap-4 border-t border-line px-4 py-2.5 font-mono text-[11px] text-faint [@media(pointer:coarse)]:hidden">
             <span>↑↓ moverse</span>
             <span>↵ abrir</span>
             <span>esc cerrar</span>
@@ -759,7 +758,7 @@ function Header({ onMenu, narrow }: { onMenu: () => void; narrow: boolean }) {
         <span className="flex-1 truncate">
           Buscar servicio, cliente, técnico o pantalla
         </span>
-        <kbd className="rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[11px]">
+        <kbd className="rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[11px] [@media(pointer:coarse)]:hidden">
           ⌘K
         </kbd>
       </button>

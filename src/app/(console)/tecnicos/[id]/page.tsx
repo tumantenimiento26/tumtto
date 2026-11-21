@@ -43,7 +43,6 @@ import {
   getTechMunicipality,
   getTechRadiusKm,
   getTechRates,
-  getTechRatings,
   getTechnician,
   getTechnicianCommissions,
   getWallet,
@@ -97,7 +96,6 @@ import { ToolsCard } from '../_components/ToolsCard';
 import { CompanyToolsCard } from '../_components/CompanyToolsCard';
 import { RatingsCard } from '../_components/RatingsCard';
 import { SettlementCard } from '../../liquidaciones/_components/SettlementCard';
-import { ratingSummary } from '@/lib/ratingModeration';
 
 const money = (c: number) =>
   (c / 100).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
@@ -160,7 +158,6 @@ export default function TecnicoDetailPage() {
         b.created_at.localeCompare(a.created_at),
       ),
       docs: getTechDocuments(tech.id),
-      ratings: getTechRatings(tech.id),
       zone: getTechMunicipality(tech.id),
       radius: getTechRadiusKm(tech.id),
     };
@@ -199,9 +196,11 @@ export default function TecnicoDetailPage() {
     ? undefined
     : `Primero aprueba la carta de antecedentes (vigente, menos de ${CRIMINAL_RECORD_VALID_MONTHS} meses).`;
 
-  // Promedio mostrado: solo calificaciones visibles (el servidor hace lo mismo en technicians).
-  const shown =
-    data.ratings.length > 0 ? ratingSummary(data.ratings) : { avg: tech.rating_avg, count: tech.rating_count };
+  // Una sola fuente para la calificación: el agregado del servidor
+  // (technicians.rating_avg/count, solo calificaciones visibles), el mismo que
+  // usan la lista de técnicos y el dashboard. Recalcularlo con las reseñas
+  // cargadas daba otra cifra (4.6 aquí, 4.9 en la lista).
+  const shown = { avg: tech.rating_avg, count: tech.rating_count };
 
   const approve = () =>
     void run('approve', () => resolveKyc(tech.id, true), `Técnico aprobado · ${name}`);

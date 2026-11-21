@@ -62,9 +62,14 @@ export default function RevisionPagosPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Revisión de pagos"
-        description="Coteja las transferencias del adelanto de la visita, da seguimiento a las visitas que siguen sin pagar y resuelve el efectivo que no cuadra."
+        description={
+          online
+            ? 'Coteja las transferencias del adelanto de la visita, da seguimiento a las visitas que siguen sin pagar y resuelve el efectivo que no cuadra.'
+            : 'Resuelve el efectivo que no cuadra entre lo que reporta el técnico y lo que confirma el cliente.'
+        }
       />
       <Tabs
+        aria-label="Tipo de revisión"
         tabs={[
           ...(online
             ? [

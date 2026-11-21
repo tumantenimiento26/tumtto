@@ -71,11 +71,11 @@ export function AuthShell({
           {children}
         </div>
         {footer && (
-          <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+          <p className="text-center font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
             Conexión cifrada ·{' '}
             <a
               href="mailto:soporte@tumantenimiento.mx"
-              className="inline-flex min-h-6 items-center px-1 text-[12px] hover:text-navy"
+              className="inline-flex min-h-6 items-center px-1 hover:text-navy"
             >
               Ayuda
             </a>

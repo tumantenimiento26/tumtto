@@ -335,6 +335,7 @@ export default function DashboardPage() {
 
     return {
       kpis,
+      gmvDelta,
       chart: {
         labels: bks.map(b => b.label),
         values: metric === 'gmv' ? gmvSerie : series(metric, bks, orders, payments),
@@ -384,6 +385,7 @@ export default function DashboardPage() {
             labels={data.chart.labels}
             values={data.chart.values}
             prev={data.chart.prev}
+            periodDelta={metric === 'gmv' ? data.gmvDelta : undefined}
           />
         </div>
         <div className="min-w-0 flex-[1_1_340px]">

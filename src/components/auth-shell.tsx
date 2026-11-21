@@ -163,20 +163,25 @@ function AuthAside({ kicker, title, lead, bullets, children }: AuthAsideProps) {
 export function AsideConsole() {
   // Reloj solo en cliente: evita desajuste de hidratación con el HTML del server.
   const [now, setNow] = useState<Date | null>(null);
+  const tz = { timeZone: 'America/Mexico_City' } as const;
+  // La fecha de compilación también se formatea solo en cliente: el ICU de
+  // Node y el del navegador separan «a.m.» distinto y la página prerenderada
+  // fallaba la hidratación (React #418) en producción.
+  const [built, setBuilt] = useState('—');
   useEffect(() => {
     setNow(new Date());
+    if (BUILD.builtAt)
+      setBuilt(
+        new Date(BUILD.builtAt).toLocaleString('es-MX', {
+          timeZone: 'America/Mexico_City',
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+      );
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const tz = { timeZone: 'America/Mexico_City' } as const;
   const env = envLabel(BUILD.env);
-  const built = BUILD.builtAt
-    ? new Date(BUILD.builtAt).toLocaleString('es-MX', {
-        ...tz,
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : '—';
 
   return (
     <div className="rounded-box border border-lp-line bg-lp-card p-5 backdrop-blur-md">

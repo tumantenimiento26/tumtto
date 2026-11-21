@@ -358,18 +358,26 @@ export function QuickRange({
   /** true: tocar el filtro activo lo quita (vuelve a «todas las fechas»). */
   allowAll?: boolean;
 }) {
+  // Aspecto de segmentado (como el selector de periodo del dashboard y del
+  // handoff); semántica de botones de alternar porque admite «ninguno».
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Periodo rápido">
+    <div className="inline-flex rounded-btn bg-segment p-1" role="group" aria-label="Periodo rápido">
       {QUICK.map(q => {
         const on = isPreset(value, q.kind);
         return (
-          <Chip
+          <button
             key={q.kind}
-            active={on}
+            type="button"
+            aria-pressed={on}
             onClick={() => onChange(on && allowAll ? null : rangePreset(q.kind))}
+            className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+              on
+                ? 'bg-card text-navy shadow-[0_1px_3px_rgba(6,27,58,0.12)]'
+                : 'text-body hover:text-navy'
+            }`}
           >
             {q.label}
-          </Chip>
+          </button>
         );
       })}
     </div>

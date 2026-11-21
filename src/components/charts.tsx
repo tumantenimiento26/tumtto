@@ -399,7 +399,8 @@ export function LineChart({
               key={i}
               x={x(i)}
               y={height - 6}
-              textAnchor="middle"
+              // Extremos alineados hacia dentro: centrados se cortaban («20-no»).
+              textAnchor={i === 0 ? 'start' : i === view.length - 1 ? 'end' : 'middle'}
               fontSize={11}
               fill={FAINT}
               className="font-mono"

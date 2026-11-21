@@ -320,7 +320,7 @@ export default function RegionesPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi index={0} label="Zonas activas" value={`${active}/${data.rows.length}`} sub={extras.unavailable.zones ? 'Zonas no disponibles (RPC)' : 'municipios con servicio'} />
+        <Kpi index={0} label="Zonas activas" value={`${active}/${data.rows.length}`} sub={extras.unavailable.zones ? 'Zonas no disponibles por ahora' : 'municipios con servicio'} />
         <Kpi index={1} label="Técnicos con base" value={String(withBase)} sub={`de ${data.techs.length} aprobados`} />
         <Kpi index={2} label="Solicitudes 7 d" value={String(data.demand7[0])} sub={`${deltaLabel(pctDelta(data.demand7[0], data.demand7[1]))} vs semana anterior`} />
         <Kpi index={3} label="Llegada media" value={data.eta != null ? `${data.eta} min` : '—'} sub="de aceptada a en sitio" />
@@ -459,7 +459,7 @@ export default function RegionesPage() {
             />
             {extras.unavailable.zones && (
               <p className="border-t border-divider px-5 py-3 font-sans text-[12px] text-muted">
-                No respondió <span className="font-mono">admin_list_coverage_zones</span>: los interruptores están deshabilitados.
+                No pudimos cargar las zonas de cobertura: los interruptores están deshabilitados hasta que vuelvan.
               </p>
             )}
           </Card>

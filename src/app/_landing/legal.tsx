@@ -79,7 +79,7 @@ export function LegalPage({
           </Link>
           <Link
             href="/"
-            className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-btn border border-white/[0.22] px-3.5 font-display text-[14px] font-bold text-white transition-colors hover:bg-white/[0.08]"
+            className="ml-auto inline-flex h-10 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-btn border border-white/[0.22] px-3.5 font-display text-[14px] font-bold text-white transition-colors hover:bg-white/[0.08]"
           >
             <ChevronLeft size={16} aria-hidden /> Volver al sitio
           </Link>
@@ -117,7 +117,8 @@ export function LegalPage({
           </div>
         )}
 
-        <div className="flex flex-col gap-8">{children}</div>
+        {/* ~70 caracteres por línea: a 860 px el texto corrido llegaba a ~105. */}
+        <div className="flex max-w-[70ch] flex-col gap-8">{children}</div>
       </main>
     </div>
   );

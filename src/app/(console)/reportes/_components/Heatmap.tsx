@@ -18,8 +18,10 @@ const cellColor = (v: number, rg: Range) =>
   v === 0 || rg.hi === 0 ? 'var(--color-segment)' : heatColor(cellT(v, rg));
 
 /**
- * Demanda día × franja. Celdas limpias (el detalle va en el tooltip), resumen
- * arriba, totales discretos por día y franja, pico marcado.
+ * Demanda día × franja. Cada celda imprime su número (el color repite el dato,
+ * no es la única vía: la escala rojo-verde es una excepción documentada y
+ * cuesta leerla con daltonismo), el detalle va en el tooltip, resumen arriba,
+ * totales por día y franja, y el pico lleva recuadro además del color.
  */
 export function Heatmap({ grid }: { grid: number[][] }) {
   const [hover, setHover] = useState<Cell | null>(null);
@@ -53,9 +55,9 @@ export function Heatmap({ grid }: { grid: number[][] }) {
             key={k}
             className="flex min-w-0 items-baseline justify-between gap-3 rounded-[10px] bg-panel px-3 py-2 min-[641px]:block"
           >
-            <div className="truncate font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">{k}</div>
+            <div className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{k}</div>
             <div className="truncate font-display text-[15px] font-extrabold text-navy max-[640px]:ml-auto">{v}</div>
-            <div className="truncate font-mono text-[10.5px] text-muted tabular">{m}</div>
+            <div className="truncate font-mono text-[11px] text-muted tabular">{m}</div>
           </div>
         ))}
       </div>
@@ -67,14 +69,14 @@ export function Heatmap({ grid }: { grid: number[][] }) {
           {HEAT_SLOTS.map((s, c) => (
             <span
               key={s}
-              className={`whitespace-nowrap pb-0.5 text-center font-mono text-[9px] transition-colors min-[641px]:text-[10.5px] ${
+              className={`whitespace-nowrap pb-0.5 text-center font-mono text-[10.5px] transition-colors min-[641px]:text-[11px] ${
                 hover?.c === c ? 'font-semibold text-navy' : 'text-faint'
               }`}
             >
               {s}
             </span>
           ))}
-          <span className="hidden text-right font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint min-[641px]:block">
+          <span className="hidden text-right font-mono text-[11px] uppercase tracking-[0.1em] text-faint min-[641px]:block">
             Total
           </span>
 
@@ -102,7 +104,7 @@ export function Heatmap({ grid }: { grid: number[][] }) {
                   style={{ width: `${(t / maxSlot) * 100}%` }}
                 />
               </div>
-              <span className={`font-mono text-[10px] tabular ${hover?.c === c ? 'text-navy' : 'text-faint'}`}>{t}</span>
+              <span className={`font-mono text-[11px] tabular ${hover?.c === c ? 'text-navy' : 'text-faint'}`}>{t}</span>
             </div>
           ))}
           <span className="hidden pt-1.5 text-right font-mono text-[11px] font-semibold tabular text-navy min-[641px]:block">
@@ -115,20 +117,21 @@ export function Heatmap({ grid }: { grid: number[][] }) {
         )}
       </div>
 
-      {/* Leyenda */}
+      {/* Leyenda: el número de cada celda es el dato; el color, un refuerzo. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="font-sans text-[12px] text-muted">
-          <span className="pointer-coarse:hidden">Pasa el cursor sobre una celda para ver el detalle</span>
-          <span className="hidden pointer-coarse:inline">Toca una celda para ver el detalle</span>
+          Cada celda muestra sus solicitudes; el recuadro marca el pico.{' '}
+          <span className="pointer-coarse:hidden">Pasa el cursor para ver el detalle.</span>
+          <span className="hidden pointer-coarse:inline">Toca una celda para ver el detalle.</span>
         </span>
-        <span className="flex items-center gap-2 font-mono text-[10.5px] text-muted">
+        <span className="flex items-center gap-2 font-mono text-[11px] text-muted">
           <span className="flex items-center gap-1">
-            <span className="h-3 w-3 rounded-[3px] bg-segment" /> 0
+            <span className="h-3 w-3 rounded-[3px] bg-segment" aria-hidden /> 0
           </span>
-          <span>{rg.lo}</span>
-          <span className="h-2 w-28 rounded-full" style={{ background: HEAT_GRADIENT }} />
-          <span>{rg.hi}</span>
-          <span className="sr-only">Escala: {HEAT_STOPS.length} colores de baja a alta</span>
+          <span>menos · {rg.lo}</span>
+          <span className="h-2 w-28 rounded-full" style={{ background: HEAT_GRADIENT }} aria-hidden />
+          <span>{rg.hi} · más</span>
+          <span className="sr-only">Escala de {HEAT_STOPS.length} colores, de verde (menos) a rojo (más)</span>
         </span>
       </div>
     </div>
@@ -158,7 +161,7 @@ function Row({
   return (
     <>
       <span
-        className={`font-mono text-[10.5px] transition-colors ${hover?.r === r ? 'font-semibold text-navy' : 'text-muted'}`}
+        className={`font-mono text-[11px] transition-colors ${hover?.r === r ? 'font-semibold text-navy' : 'text-muted'}`}
       >
         {label}
       </span>
@@ -173,21 +176,25 @@ function Row({
             onFocus={() => setHover({ r, c })}
             onClick={() => setHover({ r, c })}
             aria-label={`${label} ${HEAT_SLOTS[c]} h: ${v} solicitudes${isPeak ? ' (pico)' : ''}`}
-            className="relative h-8 rounded-[6px] outline-none transition-[transform,opacity,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-primary min-[641px]:h-9"
+            className="relative grid h-8 place-items-center rounded-[6px] font-mono text-[11px] tabular transition-[transform,opacity,box-shadow] duration-150 min-[641px]:h-9 min-[641px]:text-[12px]"
             style={{
               background: cellColor(v, rg),
               transform: active ? 'scale(1.08)' : undefined,
               zIndex: active ? 2 : undefined,
               boxShadow: active
                 ? `0 0 0 2px var(--color-card), 0 0 0 4px ${v ? heatColor(cellT(v, rg)) : 'var(--color-line-strong)'}`
-                : undefined,
+                : isPeak
+                  ? 'inset 0 0 0 2px var(--color-deep)'
+                  : undefined,
             }}
           >
-            {isPeak && (
-              <span className="absolute inset-0 grid place-items-center font-mono text-[10px] font-bold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
-                {v}
-              </span>
-            )}
+            {/* Tinta oscura fija (deep): ≥4.7:1 sobre todas las paradas de la escala. */}
+            <span
+              aria-hidden
+              className={v ? `text-deep ${isPeak ? 'font-bold' : 'font-medium'}` : 'text-faint'}
+            >
+              {v}
+            </span>
           </button>
         );
       })}
@@ -238,11 +245,11 @@ function HeatTip({
     >
       <div className="flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: cellColor(v, rg) }} />
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/60">
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/70">
           {HEAT_DAYS[cell.r]} · {HEAT_SLOTS[cell.c]} h
         </span>
         {peak?.r === cell.r && peak?.c === cell.c && (
-          <span className="ml-auto rounded-full bg-[#E74C3C] px-1.5 py-px text-[9px] font-bold tracking-wide">PICO</span>
+          <span className="ml-auto rounded-full bg-[#E74C3C] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-deep">PICO</span>
         )}
       </div>
       <div className="mt-1 font-display text-[19px] font-extrabold tabular-nums">

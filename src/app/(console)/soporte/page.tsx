@@ -385,7 +385,7 @@ function DisputeDetail({
       )}
 
       <div className="flex flex-col gap-3 border-t border-divider pt-5">
-        <Kicker>Resolución</Kicker>
+        <Kicker as="h2">Resolución</Kicker>
         <Segmented
           options={RESOLUTIONS.map(r => ({ value: r.value, label: r.label }))}
           value={resolution}
@@ -704,7 +704,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
   return (
     <aside className="flex min-h-0 flex-col gap-3.5 overflow-y-auto border-t border-line bg-card p-4 xl:border-l xl:border-t-0">
       <div>
-        <Kicker className="mb-2">Usuario</Kicker>
+        <Kicker as="h2" className="mb-2">Usuario</Kicker>
         <div className="flex items-center gap-3">
           <Avatar userId={requester?.id} size={38} />
           <div className="min-w-0">
@@ -736,7 +736,7 @@ function TicketContext({ ticket }: { ticket: Ticket }) {
 
       {req && (
         <div className="border-t border-divider pt-3.5">
-          <Kicker className="mb-2">Servicio relacionado</Kicker>
+          <Kicker as="h2" className="mb-2">Servicio relacionado</Kicker>
           <div className="flex items-center justify-between">
             <span className="font-mono text-[12.5px] font-medium text-primary">
               {orderCode(req.id)}

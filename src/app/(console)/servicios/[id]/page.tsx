@@ -31,7 +31,6 @@ import {
   EmptyState,
   ErrorPage,
   Input,
-  Kicker,
   Modal,
   ScreenSkeleton,
   Select,
@@ -508,13 +507,13 @@ export default function ServicioDetailPage() {
           )}
           {(adminRequest || wantsReassign) && (
             <Card padded>
-              <Kicker className="mb-3">Ubicación del servicio</Kicker>
+              <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Ubicación del servicio</h2>
               <RequestMap center={wkbPoint(req.location)} label={address || undefined} />
               <p className="mt-3 text-[13.5px] text-body">{address || 'Dirección no disponible'}</p>
             </Card>
           )}
           <Card padded>
-            <Kicker className="mb-3">Descripción del problema</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Descripción del problema</h2>
             <p className="text-[15px] leading-relaxed text-navy">
               {req.description ? `“${req.description}”` : 'Sin descripción.'}
             </p>
@@ -698,7 +697,7 @@ export default function ServicioDetailPage() {
         {/* Columna lateral */}
         <div className="flex min-w-0 flex-col gap-4">
           <Card padded>
-            <Kicker className="mb-3">Cliente</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Cliente</h2>
             <div className="flex items-center gap-3">
               <Avatar name={client?.full_name} userId={client?.id} size={42} />
               <div className="min-w-0">
@@ -724,7 +723,7 @@ export default function ServicioDetailPage() {
 
           <Card padded>
             <div className="mb-3 flex items-center justify-between">
-              <Kicker>Técnico</Kicker>
+              <h2 className="font-display text-[16px] font-bold text-navy">Técnico</h2>
               <span title={!terminal && !reassignable ? REASSIGN_BLOCKED_TIP : undefined}>
                 <Button
                   size="sm"
@@ -797,7 +796,7 @@ export default function ServicioDetailPage() {
             <PaymentBreakdown order={req} />
           ) : (
           <Card padded>
-            <Kicker className="mb-3">Cobro y comisión</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Cobro y comisión</h2>
             <dl className="flex flex-col gap-2 text-[13.5px]">
               <Row label="Mano de obra" value={money(laborCents || null, true)} />
               <Row label="Materiales" value={money(materialsCents || null, true)} />
@@ -829,7 +828,7 @@ export default function ServicioDetailPage() {
           )}
 
           <Card padded>
-            <Kicker className="mb-3">Acciones del admin</Kicker>
+            <h2 className="mb-3 font-display text-[16px] font-bold text-navy">Acciones del admin</h2>
             <div className="flex flex-col gap-2.5">
               <Select
                 aria-label="Forzar estado"

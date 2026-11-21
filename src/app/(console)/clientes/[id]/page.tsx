@@ -181,8 +181,8 @@ export default function ClientDetailPage() {
               {since(profile.created_at)}
             </p>
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2.5">
+          {/* Acciones a la derecha del nombre, como en Técnico e Inventario. */}
+          <div className="flex flex-wrap gap-2.5">
           <Button variant="secondary" icon={Pencil} onClick={() => setEditOpen(true)}>
             Editar
           </Button>
@@ -205,6 +205,7 @@ export default function ClientDetailPage() {
               Suspender cuenta
             </Button>
           )}
+          </div>
         </div>
       </Card>
 

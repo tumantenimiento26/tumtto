@@ -426,7 +426,7 @@ export default function FinanzasPage() {
         <Card padded>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <Kicker>Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
+              <Kicker as="h2">Ingresos por {isWeekly(range) ? 'semana' : 'día'}</Kicker>
               <div className="mt-1 font-display text-[20px] font-extrabold text-navy tabular">
                 {money(m.bars.reduce((s, b) => s + b.gross, 0))}
               </div>
@@ -448,7 +448,7 @@ export default function FinanzasPage() {
           />
         </Card>
         <Card padded>
-          <Kicker className="mb-3">Desglose por método</Kicker>
+          <Kicker as="h2" className="mb-3">Desglose por método</Kicker>
           <MethodBreakdown rows={m.methods} />
         </Card>
       </div>

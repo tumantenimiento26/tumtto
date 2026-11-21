@@ -173,14 +173,23 @@ export function CompanyToolFilesCard({ toolId, canEdit }: { toolId: string; canE
         <div className="mb-4 rounded-[12px] border border-line bg-tint/40 p-3">
           <div className="grid grid-cols-1 gap-3 min-[641px]:grid-cols-2">
             <Field label="Archivo" hint="Imagen o PDF, máximo 15 MB">
-              <input
-                ref={input}
-                type="file"
-                accept={TOOL_FILE_TYPES.join(',')}
-                aria-label="Archivo"
-                onChange={e => setFile(e.target.files?.[0] ?? null)}
-                className="block w-full font-sans text-[13px] text-body file:mr-3 file:cursor-pointer file:rounded-[8px] file:border file:border-line file:bg-card file:px-3 file:py-1.5 file:font-sans file:text-[13px] file:font-semibold file:text-navy"
-              />
+              {/* Selector propio: el nativo muestra «Choose File» en el idioma del navegador. */}
+              <div className="flex min-w-0 items-center gap-3">
+                <label className="inline-flex h-8 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-btn border border-line-strong bg-card px-3 font-display text-[13px] font-bold text-navy transition-colors hover:bg-panel has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
+                  <Paperclip size={14} aria-hidden />
+                  {file ? 'Cambiar archivo' : 'Elegir archivo'}
+                  <input
+                    ref={input}
+                    type="file"
+                    accept={TOOL_FILE_TYPES.join(',')}
+                    className="sr-only"
+                    onChange={e => setFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <span className="min-w-0 truncate font-sans text-[13px] text-muted">
+                  {file?.name ?? 'Ningún archivo elegido'}
+                </span>
+              </div>
             </Field>
             <Field label="Tipo">
               <Select options={KIND_OPTIONS} value={kind} onChange={setKind} aria-label="Tipo de archivo" />

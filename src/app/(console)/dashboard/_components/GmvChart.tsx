@@ -369,9 +369,10 @@ export function GmvChart({
             i % labelEvery === 0 || i === n - 1 ? (
               <span
                 key={i}
-                className={`absolute bottom-1.5 -translate-x-1/2 font-mono text-[10.5px] transition-colors ${
-                  hover === i ? 'font-bold text-primary' : 'text-faint'
-                }`}
+                // Primera/última etiqueta alineadas hacia dentro: centradas tocaban el borde.
+                className={`absolute bottom-1.5 font-mono text-[11px] transition-colors ${
+                  i === 0 ? '' : i === n - 1 ? '-translate-x-full' : '-translate-x-1/2'
+                } ${hover === i ? 'font-bold text-primary' : 'text-faint'}`}
                 style={{ left: `${xPct(i)}%` }}
               >
                 {l}

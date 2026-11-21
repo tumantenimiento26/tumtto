@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { AuthProvider } from '@/lib/auth';
 import { THEME_SCRIPT } from '@/lib/theme';

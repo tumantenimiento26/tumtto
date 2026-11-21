@@ -125,7 +125,7 @@ export function Coverage() {
             className="relative h-[520px] min-w-0 flex-[2_1_560px] overflow-hidden rounded-[16px] border border-[rgba(90,176,255,0.16)] bg-[#07111F] max-sm:h-[380px]"
           >
             <LandingMap />
-            <div className="pointer-events-none absolute bottom-3.5 left-3.5 z-[500] flex flex-wrap gap-3.5 rounded-box border border-lp-line bg-lp-card px-3.5 py-2.5 text-[12px] text-[var(--lp-soft)] shadow-[0_18px_40px_-16px_rgba(6,27,58,0.45)]">
+            <div className="pointer-events-none absolute bottom-[42px] left-3.5 z-[500] flex flex-wrap gap-3.5 rounded-box border border-lp-line bg-lp-card px-3.5 py-2.5 text-[12px] text-[var(--lp-soft)] shadow-[0_18px_40px_-16px_rgba(6,27,58,0.45)]">
               <span className="flex items-center gap-1.5">
                 <span className="h-[11px] w-[11px] rounded-[3px] border-[1.5px] border-[var(--lp-blue)] bg-[rgba(10,107,207,0.18)]" />
                 Cobertura total

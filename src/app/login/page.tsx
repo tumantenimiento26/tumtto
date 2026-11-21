@@ -388,7 +388,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPass(s => !s)}
-                    className="flex items-center text-muted hover:text-navy"
+                    className="-mr-2 grid h-10 w-10 place-items-center rounded-btn text-muted hover:bg-panel hover:text-navy"
                     aria-label={
                       showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'
                     }
